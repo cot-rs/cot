@@ -23,14 +23,14 @@
 pub mod fields;
 
 use std::borrow::Cow;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use async_trait::async_trait;
 pub use cot_macros::Form;
 use thiserror::Error;
 
+use crate::request;
 use crate::request::{Request, RequestExt};
-use crate::{request, Html, Render};
 
 /// Error occurred while processing a form.
 #[derive(Debug, Error)]
@@ -244,18 +244,6 @@ pub trait FormContext: Debug {
     fn has_errors(&self) -> bool;
 }
 
-impl<T: FormContext> Render for T {
-    fn render(&self) -> Html {
-        let mut html = String::new();
-
-        for field in self.fields() {
-            html.push_str(field.dyn_render().as_str());
-        }
-
-        Html::new(html)
-    }
-}
-
 /// Generic options valid for all types of form fields.
 #[derive(Debug)]
 pub struct FormFieldOptions {
@@ -273,7 +261,7 @@ pub struct FormFieldOptions {
 /// is used to render the field in an HTML form, set the value of the field, and
 /// validate it. Typically, the implementors of this trait are used indirectly
 /// through the [`Form`] trait and field types that implement [`AsFormField`].
-pub trait FormField: Render {
+pub trait FormField: Display {
     /// Custom options for the form field, unique for each field type.
     type CustomOptions: Default;
 
@@ -307,14 +295,12 @@ pub trait FormField: Render {
 /// options, value, and rendering, among others.
 ///
 /// This trait is implemented for all types that implement [`FormField`].
-pub trait DynFormField {
+pub trait DynFormField: Display {
     fn dyn_options(&self) -> &FormFieldOptions;
 
     fn dyn_id(&self) -> &str;
 
     fn dyn_set_value(&mut self, value: Cow<str>);
-
-    fn dyn_render(&self) -> Html;
 }
 
 impl<T: FormField> DynFormField for T {
@@ -328,10 +314,6 @@ impl<T: FormField> DynFormField for T {
 
     fn dyn_set_value(&mut self, value: Cow<str>) {
         FormField::set_value(self, value);
-    }
-
-    fn dyn_render(&self) -> Html {
-        Render::render(self)
     }
 }
 

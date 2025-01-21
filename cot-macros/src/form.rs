@@ -280,6 +280,20 @@ impl FormDeriveBuilder {
                     !self.__errors.__form.is_empty() #( || #fields_as_has_errors )*
                 }
             }
+
+            #[automatically_derived]
+            impl ::core::fmt::Display for #context_struct_name {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    for field in #crate_ident::forms::FormContext::fields(self) {
+                        ::core::write!(f, "{}", field)?;
+                    }
+
+                    Ok(())
+                }
+            }
+
+            #[automatically_derived]
+            impl #crate_ident::__private::rinja::filters::HtmlSafe for #context_struct_name {}
         }
     }
 

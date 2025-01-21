@@ -760,12 +760,6 @@ async fn pass_to_axum(
     Ok(response.map(axum::body::Body::new))
 }
 
-/// A trait for types that can be used to render them as HTML.
-pub trait Render {
-    /// Renders the object as an HTML string.
-    fn render(&self) -> Html;
-}
-
 /// A type that represents HTML content as a string.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Deref, From, Display)]
 pub struct Html(String);

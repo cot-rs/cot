@@ -249,9 +249,22 @@ impl PathParams {
         self.params.insert(name, value);
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.params
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str()))
+    }
+
     #[must_use]
     pub fn get(&self, name: &str) -> Option<&str> {
         self.params.get(name).map(String::as_str)
+    }
+
+    #[must_use]
+    pub fn get_index(&self, index: usize) -> Option<&str> {
+        self.params
+            .get_index(index)
+            .map(|(_, value)| value.as_str())
     }
 }
 

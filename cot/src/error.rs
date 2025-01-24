@@ -140,6 +140,9 @@ pub(crate) enum ErrorRepr {
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
+    // An error occurred while trying to parse a path parameter.
+    // #[error("Could not parse a path parameter: {0}")]
+    // FromPath(#[from] crate::router::FromPathError),
 }
 
 #[cfg(test)]

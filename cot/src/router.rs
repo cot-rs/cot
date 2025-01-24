@@ -21,6 +21,7 @@ use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Body, Error, RequestHandler, Result};
 
 pub mod path;
+mod path_params_deserializer;
 
 #[derive(Clone, Debug)]
 pub struct Router {

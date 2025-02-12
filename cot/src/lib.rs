@@ -76,7 +76,7 @@ pub mod test;
 pub(crate) mod utils;
 
 pub use body::Body;
-pub use cot_macros::main;
+pub use cot_macros::{main, test};
 pub use error::Error;
 pub use {bytes, http};
 

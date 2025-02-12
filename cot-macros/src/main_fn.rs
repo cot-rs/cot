@@ -39,3 +39,12 @@ pub(super) fn fn_to_cot_main(main_function_decl: ItemFn) -> syn::Result<TokenStr
 
     Ok(result)
 }
+
+pub(super) fn fn_to_cot_test(test_function_decl: ItemFn) -> syn::Result<TokenStream> {
+    let result = quote! {
+        #[cot::__private::tokio::test(crate = "cot::__private::tokio")]
+        #test_function_decl
+    };
+
+    Ok(result)
+}

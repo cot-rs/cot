@@ -301,7 +301,7 @@ mod tests {
         assert_eq!(file.unwrap().content, Bytes::from("This is a test file"));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn file_as_response() {
         let file = File::new("This is a test file", mime_guess::mime::TEXT_PLAIN);
 
@@ -321,7 +321,7 @@ mod tests {
         static_files
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn static_files_middleware() {
         let static_files = Arc::new(create_static_files());
         let middleware = StaticFilesMiddleware {
@@ -347,7 +347,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn static_files_middleware_not_found() {
         let static_files = Arc::new(create_static_files());
         let middleware = StaticFilesMiddleware {
@@ -371,7 +371,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
     async fn static_files_middleware_from_app_context() {
         struct App1;

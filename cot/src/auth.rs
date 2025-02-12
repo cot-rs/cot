@@ -1200,7 +1200,7 @@ mod tests {
         assert_eq!(hash.into_string(), TEST_PASSWORD_HASH);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn user_anonymous() {
         let mut request = test_request_with_auth_backend(NoAuthBackend {});
 
@@ -1209,7 +1209,7 @@ mod tests {
         assert!(!user.is_active());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn user() {
         let mut request = test_request(|| {
             let mut mock_user = MockUser::new();
@@ -1230,7 +1230,7 @@ mod tests {
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn authenticate() {
         let mut request = test_request(|| {
             let mut mock_user = MockUser::new();
@@ -1245,7 +1245,7 @@ mod tests {
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn login_logout() {
         let mut request = test_request(MockUser::new);
 
@@ -1267,7 +1267,7 @@ mod tests {
 
     /// Test that the user is logged out when there is an invalid user ID in the
     /// session (can happen if the user is deleted from the database)
-    #[tokio::test]
+    #[cot::test]
     async fn logout_on_invalid_user_id_in_session() {
         let mut request = test_request_with_auth_backend(NoAuthBackend {});
 
@@ -1282,7 +1282,7 @@ mod tests {
         assert!(!user.is_authenticated());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn logout_on_session_hash_change() {
         let session_auth_hash = Arc::new(Mutex::new(SessionAuthHash::new(&[1, 2, 3])));
         let session_auth_hash_clone = Arc::clone(&session_auth_hash);
@@ -1318,7 +1318,7 @@ mod tests {
         assert_eq!(user.username(), None);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn user_secret_key_change() {
         let create_user = move || {
             let mut mock_user = MockUser::new();

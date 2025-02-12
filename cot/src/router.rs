@@ -638,7 +638,7 @@ mod tests {
         assert_eq!(router.routes().len(), 1);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn router_route() {
         let route = Route::with_handler("/test", MockHandler);
         let router = Router::with_urls(vec![route.clone()]);
@@ -646,7 +646,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn router_handle() {
         let route = Route::with_handler("/test", MockHandler);
         let router = Router::with_urls(vec![route.clone()]);
@@ -654,7 +654,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn sub_router_handle() {
         let route_1 = Route::with_handler("/test", MockHandler);
         let sub_router_1 = Router::with_urls(vec![route_1.clone()]);

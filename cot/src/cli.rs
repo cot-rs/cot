@@ -356,7 +356,7 @@ mod tests {
         assert!(matches.is_ok());
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
     async fn collect_static_execute() {
         let mut collect_static = CollectStatic;
@@ -392,7 +392,7 @@ mod tests {
         assert!(temp_path.join("test.txt").exists());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn check_execute() {
         let config = r#"secret_key = "123abc""#;
         let result = test_check(config).await;
@@ -400,7 +400,7 @@ mod tests {
         assert!(result.is_ok(), "{:?}", result);
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `geteuid` on OS `linux`
     #[cfg(feature = "db")]
     async fn check_execute_db_fail() {

@@ -128,6 +128,7 @@ async fn model_macro_filtering(test_db: &mut TestDatabase) {
 #[derive(Debug, PartialEq)]
 #[model]
 struct TestModel {
+    #[model(primary_key)]
     id: Auto<i32>,
     name: String,
 }
@@ -167,6 +168,7 @@ macro_rules! all_fields_migration_field {
 #[model]
 struct AllFieldsModel {
     #[dummy(expr = "Auto::auto()")]
+    #[model(primary_key)]
     id: Auto<i32>,
     field_bool: bool,
     field_i8: i8,
@@ -269,6 +271,7 @@ async fn foreign_keys(db: &mut TestDatabase) {
     #[derive(Debug, Clone, PartialEq)]
     #[model]
     struct Artist {
+        #[model(primary_key)]
         id: Auto<i32>,
         name: String,
     }
@@ -276,6 +279,7 @@ async fn foreign_keys(db: &mut TestDatabase) {
     #[derive(Debug, Clone, PartialEq)]
     #[model]
     struct Track {
+        #[model(primary_key)]
         id: Auto<i32>,
         artist: ForeignKey<Artist>,
         name: String,
@@ -353,12 +357,14 @@ async fn foreign_keys_option(db: &mut TestDatabase) {
     #[derive(Debug, Clone, PartialEq)]
     #[model]
     struct Parent {
+        #[model(primary_key)]
         id: Auto<i32>,
     }
 
     #[derive(Debug, Clone, PartialEq)]
     #[model]
     struct Child {
+        #[model(primary_key)]
         id: Auto<i32>,
         parent: Option<ForeignKey<Parent>>,
     }
@@ -435,12 +441,14 @@ async fn foreign_keys_cascade(db: &mut TestDatabase) {
     #[derive(Debug, Clone, PartialEq)]
     #[model]
     struct Parent {
+        #[model(primary_key)]
         id: Auto<i32>,
     }
 
     #[derive(Debug, Clone, PartialEq)]
     #[model]
     struct Child {
+        #[model(primary_key)]
         id: Auto<i32>,
         parent: Option<ForeignKey<Parent>>,
     }

@@ -27,6 +27,7 @@ impl ::cot::db::migrations::Migration for Migration {
 #[derive(::core::fmt::Debug)]
 #[::cot::db::model(model_type = "migration")]
 struct _TodoItem {
+    #[model(primary_key)]
     id: i32,
     title: String,
 }

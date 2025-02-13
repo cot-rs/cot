@@ -11,7 +11,7 @@ use tracing::info;
 
 use crate::db::migrations::sorter::{MigrationSorter, MigrationSorterError};
 use crate::db::relations::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
-use crate::db::{model, query, ColumnType, Database, DatabaseField, Identifier, Result};
+use crate::db::{model, query, Auto, ColumnType, Database, DatabaseField, Identifier, Result};
 
 /// An error that occurred while running migrations.
 #[derive(Debug, Clone, Error)]
@@ -216,7 +216,7 @@ impl MigrationEngine {
         migration: &MigrationWrapper,
     ) -> Result<()> {
         let mut applied_migration = AppliedMigration {
-            id: 0,
+            id: Auto::auto(),
             app: migration.app_name().to_string(),
             name: migration.name().to_string(),
             applied: chrono::Utc::now().into(),
@@ -1400,7 +1400,8 @@ pub fn wrap_migrations(migrations: &[&'static SyncDynMigration]) -> Vec<Box<Sync
 #[derive(Debug)]
 #[model(table_name = "cot__migrations", model_type = "internal")]
 struct AppliedMigration {
-    id: i32,
+    #[model(primary_key)]
+    id: Auto<i32>,
     app: String,
     name: String,
     applied: chrono::DateTime<chrono::FixedOffset>,
@@ -1409,7 +1410,7 @@ struct AppliedMigration {
 const CREATE_APPLIED_MIGRATIONS_MIGRATION: Operation = Operation::create_model()
     .table_name(Identifier::new("cot__migrations"))
     .fields(&[
-        Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+        Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
             .primary_key()
             .auto(),
         Field::new(Identifier::new("app"), <String as DatabaseField>::TYPE),

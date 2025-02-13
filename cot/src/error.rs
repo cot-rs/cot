@@ -26,7 +26,7 @@ impl Error {
         }
     }
 
-    /// Create a new error with a custom error message.
+    /// Create a new error with a custom error message or error type.
     ///
     /// # Examples
     ///
@@ -34,6 +34,10 @@ impl Error {
     /// use cot::Error;
     ///
     /// let error = Error::custom("An error occurred");
+    /// let error = Error::custom(std::io::Error::new(
+    ///     std::io::ErrorKind::Other,
+    ///     "An error occurred",
+    /// ));
     /// ```
     #[must_use]
     pub fn custom<E>(error: E) -> Self
@@ -41,6 +45,27 @@ impl Error {
         E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
     {
         Self::new(ErrorRepr::Custom(error.into()))
+    }
+
+    /// Create a new admin panel error with a custom error message or error
+    /// type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::Error;
+    ///
+    /// let error = Error::admin("An error occurred");
+    /// let error = Error::admin(std::io::Error::new(
+    ///     std::io::ErrorKind::Other,
+    ///     "An error occurred",
+    /// ));
+    /// ```
+    pub fn admin<E>(error: E) -> Self
+    where
+        E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    {
+        Self::new(ErrorRepr::AdminError(error.into()))
     }
 
     /// Create a new "404 Not Found" error without a message.
@@ -203,6 +228,9 @@ pub(crate) enum ErrorRepr {
     /// An error occurred while trying to parse path parameters.
     #[error("Could not parse path parameters: {0}")]
     PathParametersParse(#[from] crate::request::PathParamsDeserializerError),
+    /// An error occured in an [`AdminModel`](crate::admin::AdminModel).
+    #[error("Admin error: {0}")]
+    AdminError(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 #[cfg(test)]

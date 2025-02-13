@@ -15,8 +15,9 @@ pub mod query;
 mod relations;
 mod sea_query_db;
 
-use std::fmt::Write;
+use std::fmt::{Display, Formatter, Write};
 use std::hash::Hash;
+use std::str::FromStr;
 
 use async_trait::async_trait;
 pub use cot_macros::{model, query};
@@ -106,6 +107,7 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
 ///
 /// #[model]
 /// struct MyModel {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     name: String,
 /// }
@@ -1378,6 +1380,7 @@ pub struct RowsNum(pub u64);
 ///
 /// #[model]
 /// struct MyModel {
+///     #[model(primary_key)]
 ///     id: Auto<i32>,
 /// }
 ///
@@ -1505,6 +1508,23 @@ impl<T> From<T> for Auto<T> {
     }
 }
 
+impl<T: FromStr> FromStr for Auto<T> {
+    type Err = T::Err;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        T::from_str(s).map(Self::fixed)
+    }
+}
+
+impl<T: Display> Display for Auto<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Fixed(value) => Display::fmt(value, f),
+            Self::Auto => panic!("Auto values cannot be displayed"),
+        }
+    }
+}
+
 /// A wrapper over a string that has a limited length.
 ///
 /// This type is used to represent a string that has a limited length in the
@@ -1528,7 +1548,7 @@ impl<T> From<T> for Auto<T> {
 /// let limited_string = LimitedString::<5>::new("too long");
 /// assert!(limited_string.is_err());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display)]
 pub struct LimitedString<const LIMIT: u32>(String);
 
 impl<const LIMIT: u32> PartialEq<&str> for LimitedString<LIMIT> {

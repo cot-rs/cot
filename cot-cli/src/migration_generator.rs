@@ -1461,6 +1461,7 @@ mod tests {
         let app_model = ModelInSource {
             model_item: parse_quote! {
                 struct TestModel {
+                    #[model(primary_key)]
                     id: i32,
                     field1: i32,
                 }

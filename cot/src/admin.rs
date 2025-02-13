@@ -9,6 +9,14 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use bytes::Bytes;
 use cot::Error;
+/// Implements the [`AdminModel`] trait for a struct.
+///
+/// This is a simple method for adding a database model to the admin panel.
+/// Note that in order for this derive macro to work, the structure
+/// **must** implement [`Model`](crate::db::Model) and
+/// [`Form`](crate::form::Form) traits. These can also be derived using the `#
+/// [model]` and `#[derive(Form)]` attributes.
+pub use cot_macros::AdminModel;
 use derive_more::Debug;
 use rinja::Template;
 
@@ -317,6 +325,11 @@ pub trait AdminModelManager: Send + Sync {
     fn form_context(&self) -> Box<dyn FormContext>;
 
     /// Returns a form context pre-filled with the data from given object.
+    ///
+    /// It is guaranteed that `object` parameter is an object returned by either
+    /// [`get_objects`] or [`get_object_by_id`] methods. This means that if you
+    /// always return the same object type from these methods, you can
+    /// safely downcast the object to the same type in this method as well.
     fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext>;
 
     /// Saves the object by using the form data from given request.

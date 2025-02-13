@@ -397,6 +397,7 @@ mod tests {
     fn test_handle_response_error() {
         let diagnostics = create_diagnostics();
         let error = Error::new(ErrorRepr::NoViewToReverse {
+            app_name: None,
             view_name: "error occurred".to_string(),
         });
 

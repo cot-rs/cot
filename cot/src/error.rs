@@ -157,8 +157,8 @@ impl_error_from_repr!(crate::request::PathParamsDeserializerError);
 #[non_exhaustive]
 pub(crate) enum ErrorRepr {
     /// A custom user error occurred.
-    #[error("{0}")]
-    Custom(#[source] Box<dyn std::error::Error + Send + Sync>),
+    #[error(transparent)]
+    Custom(Box<dyn std::error::Error + Send + Sync>),
     /// An error occurred while trying to load the config.
     #[error("Could not read the config file at `{config}` or `config/{config}.toml`")]
     LoadConfig {
@@ -197,7 +197,10 @@ pub(crate) enum ErrorRepr {
     ResponseBuilder(#[from] http::Error),
     /// `reverse` was called on a route that does not exist.
     #[error("Failed to reverse route `{view_name}` due to view not existing")]
-    NoViewToReverse { view_name: String },
+    NoViewToReverse {
+        app_name: Option<String>,
+        view_name: String,
+    },
     /// An error occurred while trying to reverse a route (e.g. due to missing
     /// parameters).
     #[error("Failed to reverse route: {0}")]
@@ -220,9 +223,8 @@ pub(crate) enum ErrorRepr {
     #[cfg(feature = "json")]
     Json(#[from] serde_json::Error),
     /// An error occurred inside a middleware-wrapped view.
-    #[error("{source}")]
+    #[error(transparent)]
     MiddlewareWrapped {
-        #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// An error occurred while trying to parse path parameters.
@@ -269,6 +271,7 @@ mod tests {
     #[test]
     fn test_error_from_repr() {
         let inner = ErrorRepr::NoViewToReverse {
+            app_name: None,
             view_name: "home".to_string(),
         };
 

@@ -19,17 +19,29 @@ use crate::form::{
 use crate::request::{Request, RequestExt};
 use crate::response::{Response, ResponseExt};
 use crate::router::Router;
-use crate::{reverse_redirect, static_files, App, Body, Method, StatusCode};
+use crate::{reverse_redirect, static_files, App, Body, Method, RequestHandler, StatusCode};
 
-macro_rules! check_authenticated {
-    ($request:ident) => {
-        if !$request.user().await?.is_authenticated() {
-            return Ok(reverse_redirect!($request, "login")?);
-        }
-    };
+struct AdminAuthenticated<T: Send + Sync>(T);
+
+impl<T: RequestHandler + Send + Sync> AdminAuthenticated<T> {
+    #[must_use]
+    fn new(handler: T) -> Self {
+        Self(handler)
+    }
 }
 
-async fn index(mut request: Request) -> crate::Result<Response> {
+#[async_trait]
+impl<T: RequestHandler + Send + Sync> RequestHandler for AdminAuthenticated<T> {
+    async fn handle(&self, mut request: Request) -> crate::Result<Response> {
+        if !request.user().await?.is_authenticated() {
+            return Ok(reverse_redirect!(request, "login")?);
+        }
+
+        self.0.handle(request).await
+    }
+}
+
+async fn index(request: Request) -> crate::Result<Response> {
     #[derive(Debug, Template)]
     #[template(path = "admin/model_list.html")]
     struct ModelListTemplate<'a> {
@@ -37,8 +49,6 @@ async fn index(mut request: Request) -> crate::Result<Response> {
         #[debug("..")]
         model_managers: Vec<Box<dyn AdminModelManager>>,
     }
-
-    check_authenticated!(request);
 
     let template = ModelListTemplate {
         request: &request,
@@ -117,7 +127,7 @@ async fn authenticate(request: &mut Request, login_form: LoginForm) -> cot::Resu
     }
 }
 
-async fn view_model(mut request: Request) -> cot::Result<Response> {
+async fn view_model(request: Request) -> cot::Result<Response> {
     #[derive(Debug, Template)]
     #[template(path = "admin/model.html")]
     struct ModelTemplate<'a> {
@@ -127,8 +137,6 @@ async fn view_model(mut request: Request) -> cot::Result<Response> {
         #[debug("..")]
         objects: Vec<Box<dyn AdminModel>>,
     }
-
-    check_authenticated!(request);
 
     let model_name: String = request.path_params().parse()?;
     let manager = get_manager(&request, &model_name)?;
@@ -144,17 +152,13 @@ async fn view_model(mut request: Request) -> cot::Result<Response> {
     ))
 }
 
-async fn create_model_instance(mut request: Request) -> cot::Result<Response> {
-    check_authenticated!(request);
-
+async fn create_model_instance(request: Request) -> cot::Result<Response> {
     let model_name: String = request.path_params().parse()?;
 
     edit_model_instance_impl(request, &model_name, None).await
 }
 
-async fn edit_model_instance(mut request: Request) -> cot::Result<Response> {
-    check_authenticated!(request);
-
+async fn edit_model_instance(request: Request) -> cot::Result<Response> {
     let (model_name, object_id): (String, String) = request.path_params().parse()?;
 
     edit_model_instance_impl(request, &model_name, Some(&object_id)).await
@@ -174,8 +178,6 @@ async fn edit_model_instance_impl(
         form_context: Box<dyn FormContext>,
         is_edit: bool,
     }
-
-    check_authenticated!(request);
 
     let manager = get_manager(&request, model_name)?;
 
@@ -222,8 +224,6 @@ async fn remove_model_instance(mut request: Request) -> cot::Result<Response> {
         #[debug("..")]
         object: &'a dyn AdminModel,
     }
-
-    check_authenticated!(request);
 
     let (model_name, object_id): (String, String) = request.path_params().parse()?;
 
@@ -552,22 +552,30 @@ impl App for AdminApp {
 
     fn router(&self) -> Router {
         Router::with_urls([
-            crate::router::Route::with_handler_and_name("/", index, "index"),
+            crate::router::Route::with_handler_and_name(
+                "/",
+                AdminAuthenticated::new(index),
+                "index",
+            ),
             crate::router::Route::with_handler_and_name("/login/", login, "login"),
-            crate::router::Route::with_handler_and_name("/{model_name}/", view_model, "view_model"),
+            crate::router::Route::with_handler_and_name(
+                "/{model_name}/",
+                AdminAuthenticated::new(view_model),
+                "view_model",
+            ),
             crate::router::Route::with_handler_and_name(
                 "/{model_name}/create/",
-                create_model_instance,
+                AdminAuthenticated::new(create_model_instance),
                 "create_model_instance",
             ),
             crate::router::Route::with_handler_and_name(
                 "/{model_name}/{pk}/edit/",
-                edit_model_instance,
+                AdminAuthenticated::new(edit_model_instance),
                 "edit_model_instance",
             ),
             crate::router::Route::with_handler_and_name(
                 "/{model_name}/{pk}/remove/",
-                remove_model_instance,
+                AdminAuthenticated::new(remove_model_instance),
                 "remove_model_instance",
             ),
         ])

@@ -736,7 +736,7 @@ mod tests {
             .is_some());
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)]
     async fn create_user() {
         let mut mock_db = MockDatabaseBackend::new();
@@ -753,7 +753,7 @@ mod tests {
         assert_eq!(user.username(), username);
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)]
     async fn get_by_id() {
         let mut mock_db = MockDatabaseBackend::new();
@@ -772,7 +772,7 @@ mod tests {
         assert_eq!(result.unwrap().username(), "testuser");
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)]
     async fn authenticate() {
         let mut mock_db = MockDatabaseBackend::new();
@@ -795,7 +795,7 @@ mod tests {
         assert_eq!(result.unwrap().username(), "testuser");
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)]
     async fn authenticate_non_existing() {
         let mut mock_db = MockDatabaseBackend::new();
@@ -812,7 +812,7 @@ mod tests {
         assert!(result.is_none());
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)]
     async fn authenticate_invalid_password() {
         let mut mock_db = MockDatabaseBackend::new();

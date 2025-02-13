@@ -1367,7 +1367,7 @@ mod tests {
         assert!(query.filter.is_some());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn query_all() {
         let mut db = MockDatabaseBackend::new();
         db.expect_query().returning(|_| Ok(Vec::<MockModel>::new()));
@@ -1378,7 +1378,7 @@ mod tests {
         assert_eq!(result.unwrap(), Vec::<MockModel>::new());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn query_get() {
         let mut db = MockDatabaseBackend::new();
         db.expect_get().returning(|_| Ok(Option::<MockModel>::None));
@@ -1389,7 +1389,7 @@ mod tests {
         assert_eq!(result.unwrap(), Option::<MockModel>::None);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn query_exists() {
         let mut db = MockDatabaseBackend::new();
         db.expect_exists()
@@ -1401,7 +1401,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn query_delete() {
         let mut db = MockDatabaseBackend::new();
         db.expect_delete()

@@ -1757,6 +1757,7 @@ pub async fn run_at(
         std::panic::set_hook(Box::new(new_hook));
     }
     axum::serve(listener, handler.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .map_err(|e| ErrorRepr::StartServer { source: e })?;
     if register_panic_hook {
@@ -1894,6 +1895,30 @@ fn response_cot_to_axum(response: Response) -> axum::response::Response {
     response.map(axum::body::Body::new)
 }
 
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use cot::test::serial_guard;
@@ -1911,7 +1936,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn app_default_impl() {
         let app = TestApp {};
         assert_eq!(app.name(), "mock");
@@ -1933,7 +1958,7 @@ mod tests {
     }
 
     #[cfg(feature = "live-reload")]
-    #[tokio::test]
+    #[cot::test]
     async fn project_middlewares() {
         struct TestProject;
         impl Project for TestProject {
@@ -1999,7 +2024,7 @@ mod tests {
         assert!(apps.apps.is_empty());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_default_auth_backend() {
         let context = ProjectContext::new()
             .with_config(
@@ -2017,7 +2042,7 @@ mod tests {
             .is_none());
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
     async fn bootstrapper() {
         struct TestProject;

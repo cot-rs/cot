@@ -20,7 +20,7 @@ async fn parameterized(request: Request) -> cot::Result<Response> {
     Ok(Response::new_html(StatusCode::OK, Body::fixed(name)))
 }
 
-#[tokio::test]
+#[cot::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
 async fn test_index() {
     let client = Client::new(project().await);
@@ -33,7 +33,7 @@ async fn test_index() {
     );
 }
 
-#[tokio::test]
+#[cot::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
 async fn path_params() {
     let client = Client::new(project().await);

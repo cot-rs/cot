@@ -644,7 +644,7 @@ pub(crate) fn query_pairs(bytes: &Bytes) -> impl Iterator<Item = (Cow<'_, str>, 
 mod tests {
     use super::*;
 
-    #[tokio::test]
+    #[cot::test]
     async fn form_data() {
         let mut request = http::Request::builder()
             .method(http::Method::POST)
@@ -657,7 +657,7 @@ mod tests {
     }
 
     #[cfg(feature = "json")]
-    #[tokio::test]
+    #[cot::test]
     async fn json() {
         let mut request = http::Request::builder()
             .method(http::Method::POST)

@@ -274,7 +274,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn body_streaming() {
         let stream = stream::once(async { Ok(Bytes::from("Hello, world!")) });
         let body = Body::streaming(stream);
@@ -285,7 +285,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn http_body_poll_frame_fixed() {
         let content = "Hello, world!";
         let mut body = Body::fixed(content);
@@ -304,7 +304,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn http_body_poll_frame_streaming() {
         let content = "Hello, world!";
         let mut body = Body::streaming(stream::once(async move { Ok(Bytes::from(content)) }));

@@ -1335,6 +1335,68 @@ impl MigrationDependency {
     }
 }
 
+/// Wrap a list of statically defined migrations into a dynamic [`Vec`].
+///
+/// This is mostly useful for use in [`crate::project::App::migrations`] when
+/// all of your migrations are statically defined (which is the most common
+/// case).
+///
+/// # Examples
+///
+/// ```
+/// // m_0001_initial.rs
+/// # mod migrations {
+/// # mod m_0001_initial {
+/// pub struct Migration;
+///
+/// impl ::cot::db::migrations::Migration for Migration {
+///     const APP_NAME: &'static str = "todoapp";
+///     const MIGRATION_NAME: &'static str = "m_0001_initial";
+///     const DEPENDENCIES: &'static [::cot::db::migrations::MigrationDependency] = &[];
+///     const OPERATIONS: &'static [::cot::db::migrations::Operation] = &[
+///         // ...
+///     ];
+/// }
+/// # }
+///
+/// // migrations.rs
+/// pub const MIGRATIONS: &[&::cot::db::migrations::SyncDynMigration] =
+///     &[&m_0001_initial::Migration];
+/// # }
+///
+/// // main.rs
+/// use cot::db::migrations::SyncDynMigration;
+/// use cot::project::App;
+///
+/// struct MyApp;
+///
+/// impl App for MyApp {
+///     fn name(&self) -> &str {
+///         env!("CARGO_PKG_NAME")
+///     }
+///
+///     fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+///         cot::db::migrations::wrap_migrations(&migrations::MIGRATIONS)
+///     }
+/// }
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// # let engine = cot::db::migrations::MigrationEngine::new(MyApp.migrations())?;
+/// # let database = cot::db::Database::new("sqlite::memory:").await?;
+/// # engine.run(&database).await?;
+/// # Ok(())
+/// # }
+/// ```
+pub fn wrap_migrations(migrations: &[&'static SyncDynMigration]) -> Vec<Box<SyncDynMigration>> {
+    #[allow(trivial_casts)] // cast to the correct trait object type
+    migrations
+        .iter()
+        .copied()
+        .map(|x| Box::new(x) as Box<SyncDynMigration>)
+        .collect()
+}
+
 #[derive(Debug)]
 #[model(table_name = "cot__migrations", model_type = "internal")]
 struct AppliedMigration {

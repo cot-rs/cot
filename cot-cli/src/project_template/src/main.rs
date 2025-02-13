@@ -1,5 +1,8 @@
+mod migrations;
+
 use cot::bytes::Bytes;
 use cot::cli::CliMetadata;
+use cot::db::migrations::SyncDynMigration;
 use cot::middleware::LiveReloadMiddleware;
 use cot::project::{RootHandlerBuilder, WithApps, WithConfig};
 use cot::request::Request;
@@ -25,6 +28,10 @@ struct {{ app_name }};
 impl App for {{ app_name }} {
     fn name(&self) -> &'static str {
         env!("CARGO_CRATE_NAME")
+    }
+
+    fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+        cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
     }
 
     fn router(&self) -> Router {

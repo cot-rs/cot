@@ -13,11 +13,12 @@ macro_rules! project_file {
     };
 }
 
-const PROJECT_FILES: [(&str, &str); 8] = [
+const PROJECT_FILES: [(&str, &str); 9] = [
     project_file!("Cargo.toml.template"),
     project_file!("bacon.toml"),
     project_file!(".gitignore"),
     project_file!("src/main.rs"),
+    project_file!("src/migrations.rs"),
     project_file!("static/css/main.css"),
     project_file!("templates/index.html"),
     project_file!("config/dev.toml"),

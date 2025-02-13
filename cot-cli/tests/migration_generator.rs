@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::path::PathBuf;
 
 use cot_cli::migration_generator::{
@@ -189,6 +190,38 @@ mod migrations {{
 
     let t = trybuild::TestCases::new();
     t.pass(&test_path);
+}
+
+#[test]
+fn write_migrations_module() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let mut generator = MigrationGenerator::new(
+        PathBuf::from("Cargo.toml"),
+        String::from("my_crate"),
+        MigrationGeneratorOptions {
+            app_name: Some("my_crate".to_string()),
+            output_dir: Some(tempdir.path().to_path_buf()),
+        },
+    );
+
+    let migrations_dir = tempdir.path().join("migrations");
+    std::fs::create_dir(&migrations_dir).unwrap();
+
+    File::create(migrations_dir.join("m_0001_initial.rs")).unwrap();
+    File::create(migrations_dir.join("m_0002_auto.rs")).unwrap();
+
+    generator.write_migrations_module().unwrap();
+
+    let migrations_file = tempdir.path().join("migrations.rs");
+    assert!(migrations_file.exists());
+
+    let content = std::fs::read_to_string(&migrations_file).unwrap();
+    assert!(content.contains("pub const MIGRATIONS"));
+    assert!(content.contains("pub mod m_0001_initial;"));
+    assert!(content.contains("&m_0001_initial::Migration"));
+    assert!(content.contains("pub mod m_0002_auto;"));
+    assert!(content.contains("&m_0002_auto::Migration"));
 }
 
 fn test_generator() -> MigrationGenerator {

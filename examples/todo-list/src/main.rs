@@ -83,13 +83,7 @@ impl App for TodoApp {
     }
 
     fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
-        // TODO: this is way too complicated for the user-facing API
-        #[allow(trivial_casts)]
-        migrations::MIGRATIONS
-            .iter()
-            .copied()
-            .map(|x| Box::new(x) as Box<SyncDynMigration>)
-            .collect()
+        cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
     }
 
     fn router(&self) -> Router {

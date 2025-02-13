@@ -205,6 +205,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq)]
     #[model]
     struct TestModel {
+        #[model(primary_key)]
         id: Auto<i32>,
     }
 

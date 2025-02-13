@@ -230,6 +230,7 @@ impl FormDeriveBuilder {
         }
     }
 
+    #[allow(clippy::too_many_lines)] // it's mostly the FormContext impl
     fn build_form_context_impl(&self) -> TokenStream {
         let crate_ident = cot_ident();
 

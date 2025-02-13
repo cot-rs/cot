@@ -22,6 +22,7 @@ use crate::db::{
 ///
 /// #[model]
 /// struct User {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     name: String,
 ///     age: i32,
@@ -78,6 +79,7 @@ impl<T: Model> Query<T> {
     ///
     /// #[model]
     /// struct User {
+    ///     #[model(primary_key)]
     ///     id: i32,
     ///     name: String,
     ///     age: i32,
@@ -103,6 +105,7 @@ impl<T: Model> Query<T> {
     ///
     /// #[model]
     /// struct User {
+    ///     #[model(primary_key)]
     ///     id: i32,
     ///     name: String,
     ///     age: i32,
@@ -1341,6 +1344,7 @@ mod tests {
     #[model]
     #[derive(std::fmt::Debug, PartialEq, Eq)]
     struct MockModel {
+        #[model(primary_key)]
         id: i32,
     }
 

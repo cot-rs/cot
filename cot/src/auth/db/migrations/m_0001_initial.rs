@@ -48,6 +48,7 @@ impl ::cot::db::migrations::Migration for Migration {
 #[derive(::core::fmt::Debug)]
 #[::cot::db::model(model_type = "migration")]
 struct _DatabaseUser {
+    #[model(primary_key)]
     id: cot::db::Auto<i64>,
     #[model(unique)]
     username: crate::db::LimitedString<{ crate::auth::db::MAX_USERNAME_LENGTH }>,

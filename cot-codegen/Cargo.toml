@@ -1,9 +1,13 @@
 [package]
 name = "cot_codegen"
 version = "0.1.0"
+description = "The Rust web framework for lazy developers - code generation utils."
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
-description = "Modern web framework focused on speed and ease of use - code generation utils."
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
 
 [lints]
 workspace = true

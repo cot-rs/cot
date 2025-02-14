@@ -17,7 +17,15 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
+rust-version = "1.84"
 license = "MIT OR Apache-2.0"
+homepage = "https://cot.rs"
+repository = "https://github.com/cot-rs/cot"
+keywords = ["web", "framework", "server", "backend"]
+authors = [
+    "Mateusz Maćkowski <mateusz@mackowski.org>",
+    "Marek Grzelak <marek.grzelak@seqre.dev>",
+]
 
 [workspace.lints.rust]
 deprecated-safe = "warn"

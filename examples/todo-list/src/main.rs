@@ -20,6 +20,7 @@ use rinja::Template;
 #[derive(Debug, Clone)]
 #[model]
 struct TodoItem {
+    #[model(primary_key)]
     id: i32,
     title: String,
 }

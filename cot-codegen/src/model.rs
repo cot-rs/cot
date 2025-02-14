@@ -128,8 +128,8 @@ impl ModelOpts {
         if pks.is_empty() {
             return Err(syn::Error::new(
                 self.ident.span(),
-                "models must have a primary key field, either named `id` \
-                or annotated with the `#[model(primary_key)]` attribute",
+                "models must have a primary key field annotated with \
+                the `#[model(primary_key)]` attribute",
             ));
         }
         if pks.len() > 1 {
@@ -221,7 +221,7 @@ impl FieldOpts {
                 .map(ForeignKeySpec::try_from)
                 .transpose()?,
         );
-        let is_primary_key = column_name == "id" || self.primary_key.is_present();
+        let is_primary_key = self.primary_key.is_present();
 
         Ok(Field {
             field_name: name.clone(),
@@ -362,6 +362,7 @@ mod tests {
     fn model_opts_as_model() {
         let input: syn::DeriveInput = parse_quote! {
             struct TestModel {
+                #[model(primary_key)]
                 id: i32,
                 name: String,
             }
@@ -429,8 +430,8 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             err.to_string(),
-            "models must have a primary key field, either named `id` \
-            or annotated with the `#[model(primary_key)]` attribute"
+            "models must have a primary key field annotated with \
+            the `#[model(primary_key)]` attribute"
         );
     }
 
@@ -440,6 +441,7 @@ mod tests {
         let input: syn::DeriveInput = parse_quote! {
             #[model]
             struct TestModel {
+                #[model(primary_key)]
                 id: i64,
                 #[model(primary_key)]
                 id_2: i64,

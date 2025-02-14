@@ -1,3 +1,4 @@
+mod admin;
 mod dbtest;
 mod form;
 mod main_fn;
@@ -11,6 +12,7 @@ use proc_macro_crate::crate_name;
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
 
+use crate::admin::impl_admin_model_for_struct;
 use crate::dbtest::fn_to_dbtest;
 use crate::form::impl_form_for_struct;
 use crate::main_fn::{fn_to_cot_main, fn_to_cot_test};
@@ -21,6 +23,13 @@ use crate::query::{query_to_tokens, Query};
 pub fn derive_form(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     let token_stream = impl_form_for_struct(&ast);
+    token_stream.into()
+}
+
+#[proc_macro_derive(AdminModel)]
+pub fn derive_admin_model(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    let token_stream = impl_admin_model_for_struct(&ast);
     token_stream.into()
 }
 
@@ -44,6 +53,7 @@ pub fn derive_form(input: TokenStream) -> TokenStream {
 /// // This is equivalent to:
 /// // #[model]
 /// struct User {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     username: String,
 /// }
@@ -68,6 +78,7 @@ pub fn derive_form(input: TokenStream) -> TokenStream {
 ///
 /// #[model(model_type = "migration")]
 /// struct _User {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     username: String,
 /// }
@@ -81,6 +92,7 @@ pub fn derive_form(input: TokenStream) -> TokenStream {
 ///
 /// #[model(model_type = "internal")]
 /// struct CotMigrations {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     app: String,
 ///     name: String,

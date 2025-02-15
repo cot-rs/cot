@@ -17,7 +17,15 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
+rust-version = "1.84"
 license = "MIT OR Apache-2.0"
+homepage = "https://cot.rs"
+repository = "https://github.com/cot-rs/cot"
+keywords = ["web", "framework", "server", "backend"]
+authors = [
+    "Mateusz Maćkowski <mateusz@mackowski.org>",
+    "Marek Grzelak <marek.grzelak@seqre.dev>",
+]
 
 [workspace.lints.rust]
 deprecated-safe = "warn"
@@ -57,7 +65,7 @@ cot_macros = { version = "0.1.0", path = "cot-macros" }
 darling = "0.20"
 derive_builder = "0.20"
 derive_more = "2"
-fake = "3.1"
+fake = "3.2"
 form_urlencoded = "1"
 futures = { version = "0.3", default-features = false }
 futures-core = { version = "0.3", default-features = false }

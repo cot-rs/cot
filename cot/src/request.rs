@@ -99,6 +99,19 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn router(&self) -> &Router;
 
+    /// Get the app name teh current route belogns to, or [`None`] if the
+    /// request is not routed.
+    ///
+    /// This is mainly useful for providing context to reverse redirects, where
+    /// you want to redirect to a route in the same app.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // TODO
+    /// ```
+    fn app_name(&self) -> Option<&str>;
+
     /// Get the route name, or [`None`] if the request is not routed or doesn't
     /// have a route name.
     ///
@@ -343,6 +356,12 @@ impl RequestExt for Request {
         self.context().router()
     }
 
+    fn app_name(&self) -> Option<&str> {
+        self.extensions()
+            .get::<AppName>()
+            .map(|AppName(name)| name.as_str())
+    }
+
     fn route_name(&self) -> Option<&str> {
         self.extensions()
             .get::<RouteName>()
@@ -422,6 +441,10 @@ impl RequestExt for Request {
         }
     }
 }
+
+#[repr(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct AppName(pub(crate) String);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -1,10 +1,15 @@
 [package]
 name = "cot"
 version = "0.1.0"
+description = "The Rust web framework for lazy developers."
+categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
-description = "Modern web framework focused on speed and ease of use."
-rust-version = "1.84"
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+authors.workspace = true
 
 [lints]
 workspace = true

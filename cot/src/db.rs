@@ -1623,7 +1623,7 @@ impl<const LIMIT: u32> fake::Dummy<usize> for LimitedString<LIMIT> {
         );
 
         let str: String = rng
-            .sample_iter(&fake::rand::distributions::Alphanumeric)
+            .sample_iter(&fake::rand::distr::Alphanumeric)
             .take(*len)
             .map(char::from)
             .collect();

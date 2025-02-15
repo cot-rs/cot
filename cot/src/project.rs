@@ -50,7 +50,7 @@ use crate::error::ErrorRepr;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::request::{Request, RequestExt};
+use crate::request::{AppName, Request, RequestExt};
 use crate::response::{Response, ResponseExt};
 use crate::router::{Route, Router, RouterService};
 use crate::{cli, error_page, Body, Error, StatusCode};
@@ -671,8 +671,10 @@ impl AppBuilder {
     /// }
     /// ```
     pub fn register_with_views<T: App + 'static>(&mut self, module: T, url_prefix: &str) {
-        self.urls
-            .push(Route::with_router(url_prefix, module.router()));
+        let mut router = module.router();
+        router.set_app_name(AppName(module.name().to_owned()));
+
+        self.urls.push(Route::with_router(url_prefix, router));
         self.register(module);
     }
 }

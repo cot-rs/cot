@@ -27,14 +27,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use axum::http::StatusCode;
-use bytes::Bytes;
 use derive_more::with_trait::Debug;
 use tracing::debug;
 
 use crate::error::ErrorRepr;
 use crate::handler::RequestHandler;
-use crate::request::{PathParams, Request, RouteName};
+use crate::request::{AppName, PathParams, Request, RouteName};
 use crate::response::{not_found_response, Response};
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};
@@ -62,6 +60,7 @@ pub mod path;
 /// ```
 #[derive(Clone, Debug)]
 pub struct Router {
+    app_name: Option<AppName>,
     urls: Vec<Route>,
     names: HashMap<RouteName, Arc<PathMatcher>>,
 }
@@ -109,7 +108,15 @@ impl Router {
             }
         }
 
-        Self { urls, names }
+        Self {
+            app_name: None,
+            urls,
+            names,
+        }
+    }
+
+    pub(crate) fn set_app_name(&mut self, app_name: AppName) {
+        self.app_name = Some(app_name);
     }
 
     async fn route(&self, mut request: Request, request_path: &str) -> Result<Response> {
@@ -141,6 +148,7 @@ impl Router {
                         if matches_fully {
                             return Some(HandlerFound {
                                 handler: &**handler,
+                                app_name: self.app_name.clone(),
                                 name: route.name.clone(),
                                 params: Self::matches_to_path_params(&matches, Vec::new()),
                             });
@@ -150,6 +158,7 @@ impl Router {
                         if let Some(result) = router.get_handler(matches.remaining_path) {
                             return Some(HandlerFound {
                                 handler: result.handler,
+                                app_name: result.app_name.or_else(|| self.app_name.clone()),
                                 name: result.name,
                                 params: Self::matches_to_path_params(&matches, result.params),
                             });
@@ -193,21 +202,33 @@ impl Router {
     /// [`reverse!`](crate::reverse) macro which provides much more ergonomic
     /// way to call this.
     ///
+    /// `app_name` is the name of the app that the view should be found in. If
+    /// `app_name` is `None`, the view will be searched for in any app.
+    ///
     /// # Errors
     ///
     /// This method returns an error if the view name is not found.
     ///
     /// This method returns an error if the URL cannot be generated because of
     /// missing parameters.
-    pub fn reverse(&self, name: &str, params: &ReverseParamMap) -> Result<String> {
+    pub fn reverse(
+        &self,
+        app_name: Option<&str>,
+        name: &str,
+        params: &ReverseParamMap,
+    ) -> Result<String> {
         Ok(self
-            .reverse_option(name, params)?
+            .reverse_option(app_name, name, params)?
             .ok_or_else(|| ErrorRepr::NoViewToReverse {
+                app_name: app_name.map(ToOwned::to_owned),
                 view_name: name.to_owned(),
             })?)
     }
 
     /// Get a URL for a view by name.
+    ///
+    /// `app_name` is the name of the app that the view should be found in. If
+    /// `app_name` is `None`, the view will be searched for in any app.
     ///
     /// Returns `None` if the view name is not found.
     ///
@@ -215,7 +236,28 @@ impl Router {
     ///
     /// This method returns an error if the URL cannot be generated because of
     /// missing parameters.
-    pub fn reverse_option(&self, name: &str, params: &ReverseParamMap) -> Result<Option<String>> {
+    pub fn reverse_option(
+        &self,
+        app_name: Option<&str>,
+        name: &str,
+        params: &ReverseParamMap,
+    ) -> Result<Option<String>> {
+        if app_name.is_none()
+            || self.app_name.is_none()
+            || app_name == self.app_name.as_ref().map(|name| name.0.as_str())
+        {
+            self.reverse_option_impl(app_name, name, params)
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn reverse_option_impl(
+        &self,
+        app_name: Option<&str>,
+        name: &str,
+        params: &ReverseParamMap,
+    ) -> Result<Option<String>> {
         let url = self
             .names
             .get(&RouteName(String::from(name)))
@@ -226,7 +268,7 @@ impl Router {
 
         for route in &self.urls {
             if let RouteInner::Router(router) = &route.view {
-                if let Some(url) = router.reverse_option(name, params)? {
+                if let Some(url) = router.reverse_option(app_name, name, params)? {
                     return Ok(Some(
                         route.url.reverse(params).map_err(ErrorRepr::from)? + &url,
                     ));
@@ -292,6 +334,7 @@ impl Default for Router {
 struct HandlerFound<'a> {
     #[debug("handler(...)")]
     handler: &'a (dyn RequestHandler + Send + Sync),
+    app_name: Option<AppName>,
     name: Option<RouteName>,
     params: Vec<(String, String)>,
 }
@@ -343,6 +386,20 @@ impl tower::Service<Request> for RouterService {
     fn call(&mut self, req: Request) -> Self::Future {
         let router = self.router.clone();
         Box::pin(async move { router.handle(req).await })
+    }
+}
+
+// used in the reverse! macro; not part of public API
+#[doc(hidden)]
+#[must_use]
+pub fn split_view_name(view_name: &str) -> (Option<&str>, &str) {
+    let colon_pos = view_name.find(':');
+    if let Some(colon_pos) = colon_pos {
+        let app_name = &view_name[..colon_pos];
+        let view_name = &view_name[colon_pos + 1..];
+        (Some(app_name), view_name)
+    } else {
+        (None, view_name)
     }
 }
 
@@ -519,16 +576,13 @@ enum RouteInner {
     Router(Router),
 }
 
-impl Debug for RouteInner {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            RouteInner::Handler(_) => f.debug_tuple("Handler").field(&"handler(...)").finish(),
-            RouteInner::Router(router) => f.debug_tuple("Router").field(router).finish(),
-        }
-    }
-}
-
 /// Get a URL for a view by its registered name and given params.
+///
+/// If the view name has two parts separated by a colon, the first part is
+/// considered the app name. If the app name is not provided, the app name of
+/// the request is used. This means that if you don't specify the `app_name`,
+/// this macro will only return URLs for views in the same app as the current
+/// request handler.
 ///
 /// # Return value
 ///
@@ -538,31 +592,65 @@ impl Debug for RouteInner {
 /// # Examples
 ///
 /// ```
+/// ///
+/// use cot::project::WithConfig;
 /// use cot::request::Request;
 /// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
-/// use cot::{reverse, Body, StatusCode};
+/// use cot::{reverse, App, AppBuilder, Body, Project, ProjectContext, StatusCode};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
+///     // any of below two lines returns the same:
+///     let url = reverse!(request, "home")?;
+///     let url = reverse!(request, "my_custom_app:home")?;
+///
 ///     Ok(Response::new_html(
 ///         StatusCode::OK,
-///         Body::fixed(format!(
-///             "Hello! The URL for this view is: {}",
-///             reverse!(request, "home")?
-///         )),
+///         Body::fixed(format!("Hello! The URL for this view is: {}", url)),
 ///     ))
 /// }
 ///
 /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
+///
+/// struct MyApp;
+///
+/// impl App for MyApp {
+///     fn name(&self) -> &'static str {
+///         "my_custom_app"
+///     }
+///
+///     fn router(&self) -> Router {
+///         Router::with_urls([Route::with_handler_and_name("/", home, "home")])
+///     }
+/// }
+///
+/// struct MyProject;
+///
+/// impl Project for MyProject {
+///     fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+///         apps.register_with_views(MyApp, "");
+///     }
+/// }
 /// ```
 #[macro_export]
 macro_rules! reverse {
     ($request:expr, $view_name:literal $(, $($key:ident = $value:expr),*)?) => {{
         use $crate::request::RequestExt;
+        let (app_name, view_name) = $crate::router::split_view_name($view_name);
+        let app_name = app_name.or_else(|| $request.app_name());
         $request
             .router()
-            .reverse($view_name, &$crate::reverse_param_map!($( $($key = $value),* )?))
+            .reverse(app_name, view_name, &$crate::reverse_param_map!($( $($key = $value),* )?))
     }};
+}
+
+impl Debug for RouteInner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            RouteInner::Handler(_) => f.debug_tuple("Handler").field(&"handler(...)").finish(),
+            RouteInner::Router(router) => f.debug_tuple("Router").field(router).finish(),
+        }
+    }
 }
 
 /// Get a URL for a view by its registered name and given params and return a
@@ -670,7 +758,7 @@ mod tests {
         let route = Route::with_handler_and_name("/test", MockHandler, "test");
         let router = Router::with_urls(vec![route.clone()]);
         let params = ReverseParamMap::new();
-        let url = router.reverse("test", &params).unwrap();
+        let url = router.reverse(None, "test", &params).unwrap();
         assert_eq!(url, "/test");
     }
 
@@ -680,8 +768,42 @@ mod tests {
         let router = Router::with_urls(vec![route.clone()]);
         let mut params = ReverseParamMap::new();
         params.insert("id", "123");
-        let url = router.reverse("test", &params).unwrap();
+        let url = router.reverse(None, "test", &params).unwrap();
         assert_eq!(url, "/test/123");
+    }
+
+    #[test]
+    fn router_reverse_app_name() {
+        let route = Route::with_handler_and_name("/test", MockHandler, "test");
+        let mut router_1 = Router::with_urls(vec![route.clone()]);
+        router_1.set_app_name(AppName("app_1".to_string()));
+        let mut router_2 = Router::with_urls(vec![route.clone()]);
+        router_2.set_app_name(AppName("app_2".to_string()));
+        let root_router = Router::with_urls(vec![
+            Route::with_router("/", router_1),
+            Route::with_router("/sub", router_2),
+        ]);
+
+        let params = ReverseParamMap::new();
+        let url = root_router.reverse(Some("app_2"), "test", &params).unwrap();
+
+        assert_eq!(url, "/sub/test");
+    }
+
+    #[test]
+    fn router_reverse_app_name_nested() {
+        let route = Route::with_handler_and_name("/test", MockHandler, "test");
+        let router = Router::with_urls(vec![route.clone()]);
+        let sub_router = Router::with_urls(vec![Route::with_router("/sub", router)]);
+        let mut root_router = Router::with_urls(vec![Route::with_router("/subsub", sub_router)]);
+        root_router.set_app_name(AppName("app_root".to_string()));
+
+        let params = ReverseParamMap::new();
+        let url = root_router
+            .reverse(Some("app_root"), "test", &params)
+            .unwrap();
+
+        assert_eq!(url, "/subsub/sub/test");
     }
 
     #[test]
@@ -689,7 +811,10 @@ mod tests {
         let route = Route::with_handler_and_name("/test", MockHandler, "test");
         let router = Router::with_urls(vec![route.clone()]);
         let params = ReverseParamMap::new();
-        let url = router.reverse_option("test", &params).unwrap().unwrap();
+        let url = router
+            .reverse_option(None, "test", &params)
+            .unwrap()
+            .unwrap();
         assert_eq!(url, "/test");
     }
 

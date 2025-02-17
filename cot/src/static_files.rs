@@ -115,10 +115,10 @@ impl Default for StaticFiles {
 }
 
 impl From<&ProjectContext<WithApps>> for StaticFiles {
-    fn from(app_context: &ProjectContext<WithApps>) -> Self {
+    fn from(context: &ProjectContext<WithApps>) -> Self {
         let mut static_files = StaticFiles::new();
 
-        for module in app_context.apps() {
+        for module in context.apps() {
             for (path, content) in module.static_files() {
                 static_files.add_file(&path, content);
             }
@@ -170,9 +170,9 @@ impl StaticFilesMiddleware {
     /// Creates a new `StaticFilesMiddleware` instance from the application
     /// context.
     #[must_use]
-    pub fn from_app_context(app_context: &ProjectContext<WithApps>) -> Self {
+    pub fn from_app_context(context: &ProjectContext<WithApps>) -> Self {
         Self {
-            static_files: Arc::new(StaticFiles::from(app_context)),
+            static_files: Arc::new(StaticFiles::from(context)),
         }
     }
 }
@@ -398,7 +398,7 @@ mod tests {
 
         struct TestProject;
         impl Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
                 apps.register(App1);
                 apps.register(App2);
             }

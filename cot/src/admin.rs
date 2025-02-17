@@ -513,12 +513,8 @@ pub trait AdminModel: Any + Send + 'static {
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
-///     fn register_apps(
-///         &self,
-///         modules: &mut AppBuilder,
-///         _app_context: &ProjectContext<WithConfig>,
-///     ) {
-///         modules.register_with_views(AdminApp::new(), "/admin");
+///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+///         apps.register_with_views(AdminApp::new(), "/admin");
 ///     }
 /// }
 /// ```
@@ -543,12 +539,8 @@ impl AdminApp {
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
-    ///     fn register_apps(
-    ///         &self,
-    ///         modules: &mut AppBuilder,
-    ///         _app_context: &ProjectContext<WithConfig>,
-    ///     ) {
-    ///         modules.register_with_views(AdminApp::new(), "/admin");
+    ///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+    ///         apps.register_with_views(AdminApp::new(), "/admin");
     ///     }
     /// }
     /// ```

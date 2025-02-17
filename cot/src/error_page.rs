@@ -80,9 +80,9 @@ impl ErrorPageTemplateBuilder {
     }
 
     #[must_use]
-    fn error(error: Error) -> Self {
+    fn error(error: &Error) -> Self {
         let mut error_data = Vec::new();
-        Self::build_error_data(&mut error_data, &error);
+        Self::build_error_data(&mut error_data, error);
 
         Self {
             kind: Kind::Error,
@@ -93,7 +93,7 @@ impl ErrorPageTemplateBuilder {
     }
 
     #[must_use]
-    fn panic(panic_payload: Box<dyn Any + Send>) -> Self {
+    fn panic(panic_payload: &Box<dyn Any + Send>) -> Self {
         Self {
             kind: Kind::Panic,
             panic_string: Self::get_panic_string(panic_payload),
@@ -103,7 +103,7 @@ impl ErrorPageTemplateBuilder {
         }
     }
 
-    fn diagnostics(&mut self, diagnostics: Diagnostics) -> &mut Self {
+    fn diagnostics(&mut self, diagnostics: &Diagnostics) -> &mut Self {
         self.project_config = format!("{:#?}", diagnostics.project_config);
         self.route_data.clear();
         Self::build_route_data(&mut self.route_data, &diagnostics.router, "", "");
@@ -180,7 +180,7 @@ impl ErrorPageTemplateBuilder {
     }
 
     #[must_use]
-    fn get_panic_string(panic_payload: Box<dyn Any + Send>) -> Option<String> {
+    fn get_panic_string(panic_payload: &Box<dyn Any + Send>) -> Option<String> {
         if let Some(&panic_string) = panic_payload.downcast_ref::<&str>() {
             Some(panic_string.to_owned())
         } else {
@@ -239,7 +239,7 @@ struct RequestData {
 #[must_use]
 pub(super) fn handle_not_found(
     message: Option<String>,
-    diagnostics: Diagnostics,
+    diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     build_response(
         build_not_found_response(message, diagnostics),
@@ -249,8 +249,8 @@ pub(super) fn handle_not_found(
 
 #[must_use]
 pub(super) fn handle_response_panic(
-    panic_payload: Box<dyn Any + Send>,
-    diagnostics: Diagnostics,
+    panic_payload: &Box<dyn Any + Send>,
+    diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     build_response(
         build_panic_response(panic_payload, diagnostics),
@@ -260,8 +260,8 @@ pub(super) fn handle_response_panic(
 
 #[must_use]
 pub(super) fn handle_response_error(
-    error: Error,
-    diagnostics: Diagnostics,
+    error: &Error,
+    diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     build_response(
         build_error_response(error, diagnostics),
@@ -286,22 +286,22 @@ fn build_response(
     }
 }
 
-fn build_not_found_response(message: Option<String>, diagnostics: Diagnostics) -> Result<String> {
+fn build_not_found_response(message: Option<String>, diagnostics: &Diagnostics) -> Result<String> {
     ErrorPageTemplateBuilder::not_found(message)
         .diagnostics(diagnostics)
         .render()
 }
 
 fn build_panic_response(
-    panic_payload: Box<dyn Any + Send>,
-    diagnostics: Diagnostics,
+    panic_payload: &Box<dyn Any + Send>,
+    diagnostics: &Diagnostics,
 ) -> Result<String> {
     ErrorPageTemplateBuilder::panic(panic_payload)
         .diagnostics(diagnostics)
         .render()
 }
 
-fn build_error_response(error: Error, diagnostics: Diagnostics) -> Result<String> {
+fn build_error_response(error: &Error, diagnostics: &Diagnostics) -> Result<String> {
     ErrorPageTemplateBuilder::error(error)
         .diagnostics(diagnostics)
         .render()
@@ -378,7 +378,7 @@ mod tests {
     fn test_handle_not_found() {
         let diagnostics = create_diagnostics();
 
-        let response = handle_not_found(None, diagnostics);
+        let response = handle_not_found(None, &diagnostics);
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
@@ -386,9 +386,9 @@ mod tests {
     #[test]
     fn test_handle_response_panic() {
         let diagnostics = create_diagnostics();
-        let panic_payload = Box::new("panic occurred");
+        let panic_payload: Box<dyn Any + Send> = Box::new("panic occurred");
 
-        let response = handle_response_panic(panic_payload, diagnostics);
+        let response = handle_response_panic(&panic_payload, &diagnostics);
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
@@ -401,7 +401,7 @@ mod tests {
             view_name: "error occurred".to_string(),
         });
 
-        let response = handle_response_error(error, diagnostics);
+        let response = handle_response_error(&error, &diagnostics);
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }

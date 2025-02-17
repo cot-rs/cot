@@ -134,7 +134,7 @@ struct TestModel {
 }
 
 async fn migrate_test_model(db: &Database) {
-    crate::CREATE_TEST_MODEL.forwards(db).await.unwrap();
+    CREATE_TEST_MODEL.forwards(db).await.unwrap();
 }
 
 const CREATE_TEST_MODEL: Operation = Operation::create_model()

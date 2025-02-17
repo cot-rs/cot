@@ -190,9 +190,7 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn test(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);
-    fn_to_cot_test(fn_input)
-        .unwrap_or_else(syn::Error::into_compile_error)
-        .into()
+    fn_to_cot_test(&fn_input).into()
 }
 
 pub(crate) fn cot_ident() -> proc_macro2::TokenStream {

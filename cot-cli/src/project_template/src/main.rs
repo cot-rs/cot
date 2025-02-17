@@ -50,8 +50,8 @@ impl Project for {{ project_struct_name }} {
         cot::cli::metadata!()
     }
 
-    fn register_apps(&self, modules: &mut AppBuilder, _app_context: &ProjectContext<WithConfig>) {
-        modules.register_with_views({{ app_name }}, "");
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+        apps.register_with_views({{ app_name }}, "");
     }
 
     fn middlewares(

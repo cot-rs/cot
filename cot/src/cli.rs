@@ -380,7 +380,7 @@ mod tests {
 
         struct TestProject;
         impl cot::Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
                 apps.register(TestApp);
             }
         }

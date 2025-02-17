@@ -36,8 +36,8 @@ impl Project for HelloProject {
         Ok(config)
     }
 
-    fn register_apps(&self, modules: &mut AppBuilder, _app_context: &ProjectContext<WithConfig>) {
-        modules.register_with_views(HelloApp, "");
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+        apps.register_with_views(HelloApp, "");
     }
 
     fn server_error_handler(&self) -> Box<dyn ErrorPageHandler> {

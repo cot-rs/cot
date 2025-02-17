@@ -98,14 +98,14 @@ impl Project for SessionsProject {
         Ok(ProjectConfig::dev_default())
     }
 
-    fn register_apps(&self, modules: &mut AppBuilder, _app_context: &ProjectContext<WithConfig>) {
-        modules.register_with_views(HelloApp, "");
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+        apps.register_with_views(HelloApp, "");
     }
 
     fn middlewares(
         &self,
         handler: cot::project::RootHandlerBuilder,
-        _app_context: &ProjectContext<WithApps>,
+        _context: &ProjectContext<WithApps>,
     ) -> BoxedHandler {
         handler.middleware(SessionMiddleware::new()).build()
     }

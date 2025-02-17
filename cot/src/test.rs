@@ -61,6 +61,7 @@ impl Client {
     /// }
     /// ```
     #[must_use]
+    #[allow(clippy::future_not_send)] // used in the test code
     pub async fn new<P>(project: P) -> Self
     where
         P: Project + 'static,

@@ -68,7 +68,7 @@ async fn project() -> impl Project {
             Ok(ProjectConfig::default())
         }
 
-        fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+        fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
             apps.register_with_views(RouterApp, "");
         }
     }

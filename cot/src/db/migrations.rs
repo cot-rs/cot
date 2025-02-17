@@ -1468,6 +1468,7 @@ mod tests {
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_multiple_migrations_run(test_db: &mut TestDatabase) {
+        #[allow(trivial_casts)] // cast to the correct trait object type
         let engine = MigrationEngine::new([
             &TestMigration as &SyncDynMigration,
             &DummyMigration as &SyncDynMigration,

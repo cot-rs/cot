@@ -66,19 +66,19 @@ impl Project for AdminProject {
             .build())
     }
 
-    fn register_apps(&self, modules: &mut AppBuilder, _app_context: &ProjectContext<WithConfig>) {
-        modules.register(DatabaseUserApp::new());
-        modules.register_with_views(AdminApp::new(), "/admin");
-        modules.register_with_views(HelloApp, "");
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+        apps.register(DatabaseUserApp::new());
+        apps.register_with_views(AdminApp::new(), "/admin");
+        apps.register_with_views(HelloApp, "");
     }
 
     fn middlewares(
         &self,
         handler: cot::project::RootHandlerBuilder,
-        app_context: &ProjectContext<WithApps>,
+        context: &ProjectContext<WithApps>,
     ) -> BoxedHandler {
         handler
-            .middleware(StaticFilesMiddleware::from_app_context(app_context))
+            .middleware(StaticFilesMiddleware::from_app_context(context))
             .middleware(SessionMiddleware::new())
             .middleware(LiveReloadMiddleware::new())
             .build()

@@ -633,6 +633,34 @@ impl PathParams {
     ///
     /// ```
     /// use cot::request::PathParams;
+    ///
+    /// # fn main() -> Result<(), cot::Error> {
+    /// let mut path_params = PathParams::new();
+    /// path_params.insert("hello".into(), "world".into());
+    ///
+    /// let hello: String = path_params.parse()?;
+    /// assert_eq!(hello, "world");
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ```
+    /// use cot::request::PathParams;
+    ///
+    /// # fn main() -> Result<(), cot::Error> {
+    /// let mut path_params = PathParams::new();
+    /// path_params.insert("hello".into(), "world".into());
+    /// path_params.insert("name".into(), "john".into());
+    ///
+    /// let (hello, name): (String, String) = path_params.parse()?;
+    /// assert_eq!(hello, "world");
+    /// assert_eq!(name, "john");
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ```
+    /// use cot::request::PathParams;
     /// use serde::Deserialize;
     ///
     /// # fn main() -> Result<(), cot::Error> {

@@ -110,18 +110,18 @@ impl Project for TodoProject {
             .build())
     }
 
-    fn register_apps(&self, modules: &mut AppBuilder, _app_context: &ProjectContext<WithConfig>) {
-        modules.register(DatabaseUserApp::new());
-        modules.register_with_views(TodoApp, "");
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+        apps.register(DatabaseUserApp::new());
+        apps.register_with_views(TodoApp, "");
     }
 
     fn middlewares(
         &self,
         handler: cot::project::RootHandlerBuilder,
-        app_context: &ProjectContext<WithApps>,
+        context: &ProjectContext<WithApps>,
     ) -> BoxedHandler {
         handler
-            .middleware(StaticFilesMiddleware::from_app_context(app_context))
+            .middleware(StaticFilesMiddleware::from_app_context(context))
             .middleware(SessionMiddleware::new())
             .build()
     }

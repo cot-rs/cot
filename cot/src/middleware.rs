@@ -245,6 +245,9 @@ where
     })
 }
 
+/// A middleware that provides session management.
+///
+/// By default, it uses an in-memory store for session data.
 #[derive(Debug, Copy, Clone)]
 pub struct SessionMiddleware;
 
@@ -293,8 +296,8 @@ impl LiveReloadMiddleware {
     }
 
     #[must_use]
-    pub fn from_app_context(app_context: &crate::ProjectContext<crate::project::WithApps>) -> Self {
-        Self::with_enabled(app_context.config().middlewares.live_reload.enabled)
+    pub fn from_app_context(context: &crate::ProjectContext<crate::project::WithApps>) -> Self {
+        Self::with_enabled(context.config().middlewares.live_reload.enabled)
     }
 
     fn with_enabled(enabled: bool) -> Self {

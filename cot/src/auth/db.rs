@@ -510,7 +510,7 @@ impl DatabaseUserBackend {
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn auth_backend(&self, app_context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
+    ///     fn auth_backend(&self, context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
     ///         Box::new(DatabaseUserBackend::new())
     ///         // note that it's usually better to just set the auth backend in the config
     ///     }

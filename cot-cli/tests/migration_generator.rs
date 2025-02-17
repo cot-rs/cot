@@ -196,7 +196,7 @@ mod migrations {{
 fn write_migrations_module() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let mut generator = MigrationGenerator::new(
+    let generator = MigrationGenerator::new(
         PathBuf::from("Cargo.toml"),
         String::from("my_crate"),
         MigrationGeneratorOptions {

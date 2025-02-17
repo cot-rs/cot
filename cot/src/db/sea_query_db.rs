@@ -27,7 +27,7 @@ macro_rules! impl_sea_query_db_backend {
                 Ok(())
             }
 
-            pub(super) async fn fetch_option<T: sea_query_binder::SqlxBinder>(
+            pub(super) async fn fetch_option<T: sea_query_binder::SqlxBinder + Send + Sync>(
                 &self,
                 statement: &T,
             ) -> crate::db::Result<Option<$row_name>> {
@@ -39,7 +39,7 @@ macro_rules! impl_sea_query_db_backend {
                 Ok(row.map($row_name::new))
             }
 
-            pub(super) async fn fetch_all<T: sea_query_binder::SqlxBinder>(
+            pub(super) async fn fetch_all<T: sea_query_binder::SqlxBinder + Send + Sync>(
                 &self,
                 statement: &T,
             ) -> crate::db::Result<Vec<$row_name>> {
@@ -54,7 +54,7 @@ macro_rules! impl_sea_query_db_backend {
                 Ok(result)
             }
 
-            pub(super) async fn execute_statement<T: sea_query_binder::SqlxBinder>(
+            pub(super) async fn execute_statement<T: sea_query_binder::SqlxBinder + Send + Sync>(
                 &self,
                 statement: &T,
             ) -> crate::db::Result<crate::db::StatementResult> {
@@ -101,7 +101,7 @@ macro_rules! impl_sea_query_db_backend {
 
             fn build_sql<T>(statement: &T) -> (String, sea_query_binder::SqlxValues)
             where
-                T: sea_query_binder::SqlxBinder,
+                T: sea_query_binder::SqlxBinder + Send + Sync,
             {
                 let (sql, values) = statement.build_sqlx($query_builder);
 

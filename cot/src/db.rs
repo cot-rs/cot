@@ -1107,7 +1107,7 @@ impl Database {
 
     async fn fetch_option<T>(&self, statement: &T) -> Result<Option<Row>>
     where
-        T: SqlxBinder,
+        T: SqlxBinder + Send + Sync,
     {
         let result = match &self.inner {
             #[cfg(feature = "sqlite")]
@@ -1136,7 +1136,7 @@ impl Database {
 
     async fn fetch_all<T>(&self, statement: &T) -> Result<Vec<Row>>
     where
-        T: SqlxBinder,
+        T: SqlxBinder + Send + Sync,
     {
         let result = match &self.inner {
             #[cfg(feature = "sqlite")]
@@ -1167,7 +1167,7 @@ impl Database {
 
     async fn execute_statement<T>(&self, statement: &T) -> Result<StatementResult>
     where
-        T: SqlxBinder + Sync,
+        T: SqlxBinder + Send + Sync,
     {
         let result = match &self.inner {
             #[cfg(feature = "sqlite")]
@@ -1577,7 +1577,7 @@ impl<const LIMIT: u32> PartialEq<LimitedString<LIMIT>> for String {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Error)]
 #[error("string is too long ({length} > {LIMIT})")]
 pub struct NewLimitedStringError<const LIMIT: u32> {
-    pub(crate) length: u32,
+    pub(crate) length: usize,
 }
 
 impl<const LIMIT: u32> LimitedString<LIMIT> {
@@ -1599,9 +1599,9 @@ impl<const LIMIT: u32> LimitedString<LIMIT> {
         value: impl Into<String>,
     ) -> std::result::Result<Self, NewLimitedStringError<LIMIT>> {
         let value = value.into();
-        let length = value.len() as u32;
+        let length = value.len();
 
-        if length > LIMIT {
+        if length > LIMIT as usize {
             return Err(NewLimitedStringError { length });
         }
         Ok(Self(value))

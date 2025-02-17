@@ -325,14 +325,14 @@ pub trait Project {
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn auth_backend(&self, app_context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
+    ///     fn auth_backend(&self, context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
     ///         Box::new(NoAuthBackend)
     ///     }
     /// }
     /// ```
-    fn auth_backend(&self, app_context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
+    fn auth_backend(&self, context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
         #[allow(trivial_casts)] // cast to Box<dyn AuthBackend>
-        match &app_context.config().auth_backend {
+        match &context.config().auth_backend {
             AuthBackendConfig::None => Box::new(NoAuthBackend) as Box<dyn AuthBackend>,
             #[cfg(feature = "db")]
             AuthBackendConfig::Database => Box::new(DatabaseUserBackend) as Box<dyn AuthBackend>,
@@ -1731,7 +1731,7 @@ pub async fn run_at(
                         request_parts,
                     );
 
-                    build_cot_error_page(error_response, diagnostics)
+                    build_cot_error_page(error_response, &diagnostics)
                 } else {
                     build_custom_error_page(
                         &not_found_handler,
@@ -1781,7 +1781,7 @@ enum ErrorResponse {
 
 fn build_cot_error_page(
     error_response: ErrorResponse,
-    diagnostics: Diagnostics,
+    diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     match error_response {
         ErrorResponse::ErrorPageTrigger(trigger) => match trigger {
@@ -1790,9 +1790,9 @@ fn build_cot_error_page(
             }
         },
         ErrorResponse::ErrorReturned(error) => {
-            error_page::handle_response_error(error, diagnostics)
+            error_page::handle_response_error(&error, diagnostics)
         }
-        ErrorResponse::Panic(error) => error_page::handle_response_panic(error, diagnostics),
+        ErrorResponse::Panic(error) => error_page::handle_response_panic(&error, diagnostics),
     }
 }
 
@@ -1916,8 +1916,8 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
 }
 
@@ -1964,7 +1964,7 @@ mod tests {
     async fn project_middlewares() {
         struct TestProject;
         impl Project for TestProject {
-            fn config(&self, config_name: &str) -> cot::Result<ProjectConfig> {
+            fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
                 Ok(ProjectConfig::default())
             }
 
@@ -2049,7 +2049,7 @@ mod tests {
     async fn bootstrapper() {
         struct TestProject;
         impl Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
                 apps.register_with_views(TestApp {}, "/app");
             }
         }

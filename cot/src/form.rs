@@ -157,9 +157,9 @@ impl FormFieldValidationError {
 /// An enum indicating the target of a form validation error.
 #[derive(Debug)]
 pub enum FormErrorTarget<'a> {
-    /// An error targetting a single field.
+    /// An error targeting a single field.
     Field(&'a str),
-    /// An error targetting the entire form.
+    /// An error targeting the entire form.
     Form,
 }
 

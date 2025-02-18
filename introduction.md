@@ -98,7 +98,7 @@ async fn index(request: Request) -> cot::Result<Response> {
 Further in the file you can see that this view is registered in the `App` implementation:
 
 ```rust
-struct GownoApp;
+struct CotTutorialApp;
 
 impl App for CotTutorialApp {
     // ...

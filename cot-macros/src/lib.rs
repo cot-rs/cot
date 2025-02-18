@@ -1,3 +1,4 @@
+mod admin;
 mod dbtest;
 mod form;
 mod main_fn;
@@ -11,9 +12,10 @@ use proc_macro_crate::crate_name;
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
 
+use crate::admin::impl_admin_model_for_struct;
 use crate::dbtest::fn_to_dbtest;
 use crate::form::impl_form_for_struct;
-use crate::main_fn::fn_to_cot_main;
+use crate::main_fn::{fn_to_cot_main, fn_to_cot_test};
 use crate::model::impl_model_for_struct;
 use crate::query::{query_to_tokens, Query};
 
@@ -21,6 +23,13 @@ use crate::query::{query_to_tokens, Query};
 pub fn derive_form(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     let token_stream = impl_form_for_struct(&ast);
+    token_stream.into()
+}
+
+#[proc_macro_derive(AdminModel)]
+pub fn derive_admin_model(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    let token_stream = impl_admin_model_for_struct(&ast);
     token_stream.into()
 }
 
@@ -44,6 +53,7 @@ pub fn derive_form(input: TokenStream) -> TokenStream {
 /// // This is equivalent to:
 /// // #[model]
 /// struct User {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     username: String,
 /// }
@@ -68,6 +78,7 @@ pub fn derive_form(input: TokenStream) -> TokenStream {
 ///
 /// #[model(model_type = "migration")]
 /// struct _User {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     username: String,
 /// }
@@ -81,6 +92,7 @@ pub fn derive_form(input: TokenStream) -> TokenStream {
 ///
 /// #[model(model_type = "internal")]
 /// struct CotMigrations {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     app: String,
 ///     name: String,
@@ -118,32 +130,35 @@ pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// An attribute macro that defines an entry point to a Cot-powered app.
 ///
-/// This macro is meant to wrap a function returning
-/// [`cot::Result<cot::CotProject>`]. It should initialize a [`CotProject`] and
-/// return it, while the macro takes care of initializing an async runtime,
-/// creating a CLI and running the app.
+/// This macro is meant to wrap a function returning a structure implementing
+/// [`CotProject`]. It should just initialize a [`CotProject`] and return it,
+/// while the macro takes care of initializing an async runtime, creating a CLI
+/// and running the app.
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use cot::{CotApp, CotProject};
+/// use cot::project::WithConfig;
+/// use cot::{App, AppBuilder, Project, ProjectContext};
 ///
 /// struct HelloApp;
 ///
-/// impl CotApp for HelloApp {
+/// impl App for HelloApp {
 ///     fn name(&self) -> &'static str {
 ///         env!("CARGO_PKG_NAME")
 ///     }
 /// }
 ///
-/// #[cot::main]
-/// async fn main() -> cot::Result<CotProject> {
-///     let cot_project = CotProject::builder()
-///         .register_app_with_views(HelloApp, "")
-///         .build()
-///         .await?;
+/// struct HelloProject;
+/// impl Project for HelloProject {
+///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+///         apps.register_with_views(HelloApp, "");
+///     }
+/// }
 ///
-///     Ok(cot_project)
+/// #[cot::main]
+/// fn main() -> impl Project {
+///     HelloProject
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -152,6 +167,30 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
     fn_to_cot_main(fn_input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
+}
+
+/// An attribute macro that defines an `async` test function for a Cot-powered
+/// app.
+///
+/// This is pretty much an equivalent to `#[tokio::test]` provided so that you
+/// don't have to declare `tokio` as a dependency in your tests.
+///
+/// # Examples
+///
+/// ```no_run
+/// use cot::test::TestDatabase;
+///
+/// #[cot::test]
+/// async fn test_db() {
+///     let db = TestDatabase::new_sqlite().await.unwrap();
+///     // do something with the database
+///     db.cleanup().await.unwrap();
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn test(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let fn_input = parse_macro_input!(input as ItemFn);
+    fn_to_cot_test(&fn_input).into()
 }
 
 pub(crate) fn cot_ident() -> proc_macro2::TokenStream {

@@ -855,7 +855,7 @@ impl AuthRequestExt for Request {
         &mut self,
         credentials: &(dyn Any + Send + Sync),
     ) -> Result<Option<Box<dyn User + Send + Sync>>> {
-        self.project_config()
+        self.context()
             .auth_backend()
             .authenticate(self, credentials)
             .await
@@ -868,7 +868,7 @@ impl AuthRequestExt for Request {
                 .insert(USER_ID_SESSION_KEY, user_id)
                 .await?;
         }
-        let secret_key = self.project_config().secret_key();
+        let secret_key = &self.project_config().secret_key;
         if let Some(session_auth_hash) = user.session_auth_hash(secret_key) {
             self.session_mut()
                 .insert(SESSION_HASH_SESSION_KEY, session_auth_hash.as_bytes())
@@ -899,7 +899,7 @@ async fn get_user_with_saved_id(
     };
 
     let Some(user) = request
-        .project_config()
+        .context()
         .auth_backend()
         .get_by_id(request, user_id)
         .await?
@@ -920,7 +920,7 @@ async fn session_auth_hash_valid(
 ) -> Result<bool> {
     let config = request.project_config();
 
-    let Some(user_hash) = user.session_auth_hash(config.secret_key()) else {
+    let Some(user_hash) = user.session_auth_hash(&config.secret_key) else {
         return Ok(true);
     };
 
@@ -938,7 +938,7 @@ async fn session_auth_hash_valid(
     // If the primary secret key doesn't match, try the fallback keys (in other
     // words, check if the session hash was generated with an old secret key)
     // and update the session hash with the new key if a match is found.
-    for fallback_key in config.fallback_secret_keys() {
+    for fallback_key in &config.fallback_secret_keys {
         let user_hash_fallback = user
             .session_auth_hash(fallback_key)
             .expect("User should have a session hash for each secret key");
@@ -993,7 +993,7 @@ pub trait AuthBackend: Send + Sync {
     ///
     /// async fn view_user_profile(request: &Request) {
     ///     let user = request
-    ///         .project_config()
+    ///         .context()
     ///         .auth_backend()
     ///         .get_by_id(request, UserId::Int(1))
     ///         .await;
@@ -1086,32 +1086,25 @@ mod tests {
     fn test_request_with_auth_backend<T: AuthBackend + 'static>(auth_backend: T) -> Request {
         TestRequestBuilder::get("/")
             .with_session()
-            .config(test_project_config(
-                auth_backend,
-                SecretKey::new(TEST_KEY_1),
-                vec![],
-            ))
+            .config(test_project_config(SecretKey::new(TEST_KEY_1), vec![]))
+            .auth_backend(auth_backend)
             .build()
     }
 
-    fn test_request_with_config_and_session(
+    fn test_request_with_auth_config_and_session<T: AuthBackend + 'static>(
+        auth_backend: T,
         config: ProjectConfig,
         session_source: &Request,
     ) -> Request {
         TestRequestBuilder::get("/")
             .with_session_from(session_source)
             .config(config)
+            .auth_backend(auth_backend)
             .build()
     }
 
-    fn test_project_config<T: AuthBackend + 'static>(
-        auth_backend: T,
-        secret_key: SecretKey,
-        fallback_keys: Vec<SecretKey>,
-    ) -> ProjectConfig {
-        #[allow(trivial_casts)] // Upcast to the correct Arc type
+    fn test_project_config(secret_key: SecretKey, fallback_keys: Vec<SecretKey>) -> ProjectConfig {
         ProjectConfig::builder()
-            .auth_backend(auth_backend)
             .secret_key(secret_key)
             .fallback_secret_keys(fallback_keys)
             .clone()
@@ -1207,7 +1200,7 @@ mod tests {
         assert_eq!(hash.into_string(), TEST_PASSWORD_HASH);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn user_anonymous() {
         let mut request = test_request_with_auth_backend(NoAuthBackend {});
 
@@ -1216,7 +1209,7 @@ mod tests {
         assert!(!user.is_active());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn user() {
         let mut request = test_request(|| {
             let mut mock_user = MockUser::new();
@@ -1237,7 +1230,7 @@ mod tests {
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn authenticate() {
         let mut request = test_request(|| {
             let mut mock_user = MockUser::new();
@@ -1252,7 +1245,7 @@ mod tests {
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn login_logout() {
         let mut request = test_request(MockUser::new);
 
@@ -1274,7 +1267,7 @@ mod tests {
 
     /// Test that the user is logged out when there is an invalid user ID in the
     /// session (can happen if the user is deleted from the database)
-    #[tokio::test]
+    #[cot::test]
     async fn logout_on_invalid_user_id_in_session() {
         let mut request = test_request_with_auth_backend(NoAuthBackend {});
 
@@ -1289,7 +1282,7 @@ mod tests {
         assert!(!user.is_authenticated());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn logout_on_session_hash_change() {
         let session_auth_hash = Arc::new(Mutex::new(SessionAuthHash::new(&[1, 2, 3])));
         let session_auth_hash_clone = Arc::clone(&session_auth_hash);
@@ -1325,7 +1318,7 @@ mod tests {
         assert_eq!(user.username(), None);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn user_secret_key_change() {
         let create_user = move || {
             let mut mock_user = MockUser::new();
@@ -1355,14 +1348,11 @@ mod tests {
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
 
         let replace_keys = move |request: &mut Request, secret_key, fallback_keys| {
-            let new_config = test_project_config(
-                MockAuthBackend {
-                    return_user: create_user,
-                },
-                secret_key,
-                fallback_keys,
-            );
-            *request = test_request_with_config_and_session(new_config, request);
+            let auth_backend = MockAuthBackend {
+                return_user: create_user,
+            };
+            let new_config = test_project_config(secret_key, fallback_keys);
+            *request = test_request_with_auth_config_and_session(auth_backend, new_config, request);
         };
 
         // Change the secret key and verify the user is still logged in with the

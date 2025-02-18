@@ -12,7 +12,7 @@ use crate::error::backtrace::{Backtrace as CotBacktrace, __cot_create_backtrace}
 /// An error that can occur while using Cot.
 #[derive(Debug)]
 pub struct Error {
-    inner: ErrorRepr,
+    pub(crate) inner: ErrorRepr,
     #[debug(skip)]
     backtrace: CotBacktrace,
 }
@@ -26,7 +26,7 @@ impl Error {
         }
     }
 
-    /// Create a new error with a custom error message.
+    /// Create a new error with a custom error message or error type.
     ///
     /// # Examples
     ///
@@ -34,6 +34,10 @@ impl Error {
     /// use cot::Error;
     ///
     /// let error = Error::custom("An error occurred");
+    /// let error = Error::custom(std::io::Error::new(
+    ///     std::io::ErrorKind::Other,
+    ///     "An error occurred",
+    /// ));
     /// ```
     #[must_use]
     pub fn custom<E>(error: E) -> Self
@@ -41,6 +45,61 @@ impl Error {
         E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
     {
         Self::new(ErrorRepr::Custom(error.into()))
+    }
+
+    /// Create a new admin panel error with a custom error message or error
+    /// type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::Error;
+    ///
+    /// let error = Error::admin("An error occurred");
+    /// let error = Error::admin(std::io::Error::new(
+    ///     std::io::ErrorKind::Other,
+    ///     "An error occurred",
+    /// ));
+    /// ```
+    pub fn admin<E>(error: E) -> Self
+    where
+        E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    {
+        Self::new(ErrorRepr::AdminError(error.into()))
+    }
+
+    /// Create a new "404 Not Found" error without a message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::Error;
+    ///
+    /// let error = Error::not_found();
+    /// ```
+    #[must_use]
+    pub fn not_found() -> Self {
+        Self::new(ErrorRepr::NotFound { message: None })
+    }
+
+    /// Create a new "404 Not Found" error with a message.
+    ///
+    /// Note that the message is only displayed when Cot's debug mode is
+    /// enabled. It will not be exposed to the user in production.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::Error;
+    ///
+    /// let id = 123;
+    /// let error = Error::not_found_message(format!("User with id={id} not found"));
+    /// ```
+    #[must_use]
+    pub fn not_found_message(message: String) -> Self {
+        Self::new(ErrorRepr::NotFound {
+            message: Some(message),
+        })
     }
 
     #[must_use]
@@ -83,6 +142,7 @@ impl From<Error> for rinja::Error {
     }
 }
 
+impl_error_from_repr!(toml::de::Error);
 impl_error_from_repr!(rinja::Error);
 impl_error_from_repr!(crate::router::path::ReverseError);
 #[cfg(feature = "db")]
@@ -97,8 +157,20 @@ impl_error_from_repr!(crate::request::PathParamsDeserializerError);
 #[non_exhaustive]
 pub(crate) enum ErrorRepr {
     /// A custom user error occurred.
-    #[error("{0}")]
-    Custom(#[source] Box<dyn std::error::Error + Send + Sync>),
+    #[error(transparent)]
+    Custom(Box<dyn std::error::Error + Send + Sync>),
+    /// An error occurred while trying to load the config.
+    #[error("Could not read the config file at `{config}` or `config/{config}.toml`")]
+    LoadConfig {
+        config: String,
+        source: std::io::Error,
+    },
+    /// An error occurred while trying to parse the config.
+    #[error("Could not parse the config: {source}")]
+    ParseConfig {
+        #[from]
+        source: toml::de::Error,
+    },
     /// An error occurred while trying to start the server.
     #[error("Could not start server: {source}")]
     StartServer { source: std::io::Error },
@@ -117,12 +189,18 @@ pub(crate) enum ErrorRepr {
         expected: &'static str,
         actual: String,
     },
+    /// Could not find a route for the request.
+    #[error("Not found: {message:?}")]
+    NotFound { message: Option<String> },
     /// Could not create a response object.
     #[error("Could not create a response object: {0}")]
     ResponseBuilder(#[from] http::Error),
     /// `reverse` was called on a route that does not exist.
     #[error("Failed to reverse route `{view_name}` due to view not existing")]
-    NoViewToReverse { view_name: String },
+    NoViewToReverse {
+        app_name: Option<String>,
+        view_name: String,
+    },
     /// An error occurred while trying to reverse a route (e.g. due to missing
     /// parameters).
     #[error("Failed to reverse route: {0}")]
@@ -145,14 +223,16 @@ pub(crate) enum ErrorRepr {
     #[cfg(feature = "json")]
     Json(#[from] serde_json::Error),
     /// An error occurred inside a middleware-wrapped view.
-    #[error("{source}")]
+    #[error(transparent)]
     MiddlewareWrapped {
-        #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// An error occurred while trying to parse path parameters.
     #[error("Could not parse path parameters: {0}")]
     PathParametersParse(#[from] crate::request::PathParamsDeserializerError),
+    /// An error occured in an [`AdminModel`](crate::admin::AdminModel).
+    #[error("Admin error: {0}")]
+    AdminError(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 #[cfg(test)]
@@ -191,6 +271,7 @@ mod tests {
     #[test]
     fn test_error_from_repr() {
         let inner = ErrorRepr::NoViewToReverse {
+            app_name: None,
             view_name: "home".to_string(),
         };
 

@@ -63,7 +63,7 @@ pub trait RequestExt: private::Sealed {
     /// }
     /// ```
     #[must_use]
-    fn context(&self) -> &crate::AppContext;
+    fn context(&self) -> &crate::ProjectContext;
 
     /// Get the project configuration.
     ///
@@ -98,6 +98,19 @@ pub trait RequestExt: private::Sealed {
     /// ```
     #[must_use]
     fn router(&self) -> &Router;
+
+    /// Get the app name teh current route belogns to, or [`None`] if the
+    /// request is not routed.
+    ///
+    /// This is mainly useful for providing context to reverse redirects, where
+    /// you want to redirect to a route in the same app.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // TODO
+    /// ```
+    fn app_name(&self) -> Option<&str>;
 
     /// Get the route name, or [`None`] if the request is not routed or doesn't
     /// have a route name.
@@ -329,9 +342,9 @@ impl private::Sealed for Request {}
 
 #[async_trait]
 impl RequestExt for Request {
-    fn context(&self) -> &crate::AppContext {
+    fn context(&self) -> &crate::ProjectContext {
         self.extensions()
-            .get::<Arc<crate::AppContext>>()
+            .get::<Arc<crate::ProjectContext>>()
             .expect("AppContext extension missing")
     }
 
@@ -341,6 +354,12 @@ impl RequestExt for Request {
 
     fn router(&self) -> &Router {
         self.context().router()
+    }
+
+    fn app_name(&self) -> Option<&str> {
+        self.extensions()
+            .get::<AppName>()
+            .map(|AppName(name)| name.as_str())
     }
 
     fn route_name(&self) -> Option<&str> {
@@ -422,6 +441,10 @@ impl RequestExt for Request {
         }
     }
 }
+
+#[repr(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct AppName(pub(crate) String);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -610,6 +633,34 @@ impl PathParams {
     ///
     /// ```
     /// use cot::request::PathParams;
+    ///
+    /// # fn main() -> Result<(), cot::Error> {
+    /// let mut path_params = PathParams::new();
+    /// path_params.insert("hello".into(), "world".into());
+    ///
+    /// let hello: String = path_params.parse()?;
+    /// assert_eq!(hello, "world");
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ```
+    /// use cot::request::PathParams;
+    ///
+    /// # fn main() -> Result<(), cot::Error> {
+    /// let mut path_params = PathParams::new();
+    /// path_params.insert("hello".into(), "world".into());
+    /// path_params.insert("name".into(), "john".into());
+    ///
+    /// let (hello, name): (String, String) = path_params.parse()?;
+    /// assert_eq!(hello, "world");
+    /// assert_eq!(name, "john");
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ```
+    /// use cot::request::PathParams;
     /// use serde::Deserialize;
     ///
     /// # fn main() -> Result<(), cot::Error> {
@@ -644,7 +695,7 @@ pub(crate) fn query_pairs(bytes: &Bytes) -> impl Iterator<Item = (Cow<'_, str>, 
 mod tests {
     use super::*;
 
-    #[tokio::test]
+    #[cot::test]
     async fn form_data() {
         let mut request = http::Request::builder()
             .method(http::Method::POST)
@@ -657,7 +708,7 @@ mod tests {
     }
 
     #[cfg(feature = "json")]
-    #[tokio::test]
+    #[cot::test]
     async fn json() {
         let mut request = http::Request::builder()
             .method(http::Method::POST)

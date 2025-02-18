@@ -15,8 +15,9 @@ pub mod query;
 mod relations;
 mod sea_query_db;
 
-use std::fmt::Write;
+use std::fmt::{Display, Formatter, Write};
 use std::hash::Hash;
+use std::str::FromStr;
 
 use async_trait::async_trait;
 pub use cot_macros::{model, query};
@@ -106,6 +107,7 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
 ///
 /// #[model]
 /// struct MyModel {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     name: String,
 /// }
@@ -1105,7 +1107,7 @@ impl Database {
 
     async fn fetch_option<T>(&self, statement: &T) -> Result<Option<Row>>
     where
-        T: SqlxBinder,
+        T: SqlxBinder + Send + Sync,
     {
         let result = match &self.inner {
             #[cfg(feature = "sqlite")]
@@ -1134,7 +1136,7 @@ impl Database {
 
     async fn fetch_all<T>(&self, statement: &T) -> Result<Vec<Row>>
     where
-        T: SqlxBinder,
+        T: SqlxBinder + Send + Sync,
     {
         let result = match &self.inner {
             #[cfg(feature = "sqlite")]
@@ -1165,7 +1167,7 @@ impl Database {
 
     async fn execute_statement<T>(&self, statement: &T) -> Result<StatementResult>
     where
-        T: SqlxBinder + Sync,
+        T: SqlxBinder + Send + Sync,
     {
         let result = match &self.inner {
             #[cfg(feature = "sqlite")]
@@ -1378,6 +1380,7 @@ pub struct RowsNum(pub u64);
 ///
 /// #[model]
 /// struct MyModel {
+///     #[model(primary_key)]
 ///     id: Auto<i32>,
 /// }
 ///
@@ -1505,6 +1508,23 @@ impl<T> From<T> for Auto<T> {
     }
 }
 
+impl<T: FromStr> FromStr for Auto<T> {
+    type Err = T::Err;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        T::from_str(s).map(Self::fixed)
+    }
+}
+
+impl<T: Display> Display for Auto<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Fixed(value) => Display::fmt(value, f),
+            Self::Auto => panic!("Auto values cannot be displayed"),
+        }
+    }
+}
+
 /// A wrapper over a string that has a limited length.
 ///
 /// This type is used to represent a string that has a limited length in the
@@ -1528,7 +1548,7 @@ impl<T> From<T> for Auto<T> {
 /// let limited_string = LimitedString::<5>::new("too long");
 /// assert!(limited_string.is_err());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display)]
 pub struct LimitedString<const LIMIT: u32>(String);
 
 impl<const LIMIT: u32> PartialEq<&str> for LimitedString<LIMIT> {
@@ -1557,7 +1577,7 @@ impl<const LIMIT: u32> PartialEq<LimitedString<LIMIT>> for String {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Error)]
 #[error("string is too long ({length} > {LIMIT})")]
 pub struct NewLimitedStringError<const LIMIT: u32> {
-    pub(crate) length: u32,
+    pub(crate) length: usize,
 }
 
 impl<const LIMIT: u32> LimitedString<LIMIT> {
@@ -1579,9 +1599,9 @@ impl<const LIMIT: u32> LimitedString<LIMIT> {
         value: impl Into<String>,
     ) -> std::result::Result<Self, NewLimitedStringError<LIMIT>> {
         let value = value.into();
-        let length = value.len() as u32;
+        let length = value.len();
 
-        if length > LIMIT {
+        if length > LIMIT as usize {
             return Err(NewLimitedStringError { length });
         }
         Ok(Self(value))
@@ -1603,7 +1623,7 @@ impl<const LIMIT: u32> fake::Dummy<usize> for LimitedString<LIMIT> {
         );
 
         let str: String = rng
-            .sample_iter(&fake::rand::distributions::Alphanumeric)
+            .sample_iter(&fake::rand::distr::Alphanumeric)
             .take(*len)
             .map(char::from)
             .collect();

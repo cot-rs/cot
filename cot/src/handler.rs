@@ -1,10 +1,11 @@
 use std::future::Future;
 
 use async_trait::async_trait;
-use tower::util::BoxCloneService;
+use tower::util::BoxCloneSyncService;
 
+use crate::error::ErrorRepr;
 use crate::request::Request;
-use crate::response::Response;
+use crate::response::{not_found_response, Response};
 use crate::{Error, Result};
 
 /// A function that takes a request and returns a response.
@@ -31,25 +32,56 @@ where
     R: for<'a> Future<Output = Result<Response>> + Send,
 {
     async fn handle(&self, request: Request) -> Result<Response> {
-        self(request).await
+        let response = self(request).await;
+        match response {
+            Ok(response) => Ok(response),
+            Err(error) => match error.inner {
+                ErrorRepr::NotFound { message } => Ok(not_found_response(message)),
+                _ => Err(error),
+            },
+        }
     }
 }
 
-/// A wrapper around a handler that's used in [`CotProject`].
+/// A wrapper around a handler that's used in
+/// [`Bootstrapper`](cot::Bootstrapper).
 ///
-/// It is returned by [`CotProject::into_context`]. Typically, you don't
-/// need to interact with this type directly.
+/// It is returned by
+/// [`Bootstrapper::into_context_and_handler`](cot::Bootstrapper::into_context_and_handler).
+/// Typically, you don't need to interact with this type directly, except for
+/// creating it in [`Project::middlewares`](cot::Project::middlewares) through
+/// the [`RootHandlerBuilder::build`](cot::project::RootHandlerBuilder::build).
+/// method.
 ///
 /// # Examples
 ///
 /// ```
-/// use cot::CotProject;
+/// use cot::config::ProjectConfig;
+/// use cot::project::{RootHandlerBuilder, WithApps};
+/// use cot::static_files::StaticFilesMiddleware;
+/// use cot::{Bootstrapper, BoxedHandler, Project, ProjectContext};
+///
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn middlewares(
+///         &self,
+///         handler: RootHandlerBuilder,
+///         context: &ProjectContext<WithApps>,
+///     ) -> BoxedHandler {
+///         handler
+///             .middleware(StaticFilesMiddleware::from_app_context(context))
+///             .build()
+///     }
+/// }
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
-/// let project = CotProject::builder().build().await?;
-/// let (context, handler) = project.into_context();
+/// let bootstrapper = Bootstrapper::new(MyProject)
+///     .with_config(ProjectConfig::default())
+///     .boot()
+///     .await?;
+/// let (context, handler) = bootstrapper.into_context_and_handler();
 /// # Ok(())
 /// # }
 /// ```
-pub type BoxedHandler = BoxCloneService<Request, Response, Error>;
+pub type BoxedHandler = BoxCloneSyncService<Request, Response, Error>;

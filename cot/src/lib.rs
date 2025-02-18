@@ -67,7 +67,7 @@ mod error_page;
 mod handler;
 pub mod html;
 pub mod middleware;
-pub(crate) mod project;
+pub mod project;
 pub mod request;
 pub mod response;
 pub mod router;
@@ -76,12 +76,14 @@ pub mod test;
 pub(crate) mod utils;
 
 pub use body::Body;
-pub use cot_macros::main;
+pub use cot_macros::{main, test};
 pub use error::Error;
 pub use {bytes, http};
 
 pub use crate::handler::{BoxedHandler, RequestHandler};
-pub use crate::project::{run, run_at, run_cli, AppContext, CotApp, CotProject, CotProjectBuilder};
+pub use crate::project::{
+    run, run_at, run_cli, App, AppBuilder, Bootstrapper, Project, ProjectContext,
+};
 
 /// A type alias for a result that can return a [`cot::Error`].
 pub type Result<T> = std::result::Result<T, Error>;

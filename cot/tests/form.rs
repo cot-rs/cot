@@ -10,7 +10,7 @@ struct MyForm {
     age: u8,
 }
 
-#[tokio::test]
+#[cot::test]
 async fn context_from_empty_request() {
     let mut request = TestRequestBuilder::get("/").build();
 
@@ -18,7 +18,7 @@ async fn context_from_empty_request() {
     assert!(context.is_ok());
 }
 
-#[tokio::test]
+#[cot::test]
 async fn context_display_non_empty() {
     let mut request = TestRequestBuilder::get("/").build();
 
@@ -27,7 +27,7 @@ async fn context_display_non_empty() {
     assert!(!form_rendered.is_empty());
 }
 
-#[tokio::test]
+#[cot::test]
 async fn form_from_request() {
     let mut request = TestRequestBuilder::post("/")
         .form_data(&[("name", "Alice"), ("age", "30")])
@@ -39,7 +39,7 @@ async fn form_from_request() {
     assert_eq!(form.age, 30);
 }
 
-#[tokio::test]
+#[cot::test]
 async fn form_errors_required() {
     let mut request = TestRequestBuilder::post("/")
         .form_data::<String>(&[])
@@ -63,7 +63,7 @@ async fn form_errors_required() {
     }
 }
 
-#[tokio::test]
+#[cot::test]
 async fn values_persist_on_form_errors() {
     let mut request = TestRequestBuilder::post("/")
         .form_data(&[("name", "Alice"), ("age", "invalid")])

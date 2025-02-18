@@ -1,6 +1,4 @@
-use cot::db::DatabaseError;
-
-use crate::db::{DatabaseBackend, Model, Result};
+use crate::db::{DatabaseBackend, DatabaseError, Model, Result};
 
 /// A foreign key to another model.
 ///
@@ -207,6 +205,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq)]
     #[model]
     struct TestModel {
+        #[model(primary_key)]
         id: Auto<i32>,
     }
 

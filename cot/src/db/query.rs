@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use derive_more::Debug;
+use derive_more::with_trait::Debug;
 use sea_query::{ExprTrait, IntoColumnRef};
 
 use crate::db;
@@ -22,6 +22,7 @@ use crate::db::{
 ///
 /// #[model]
 /// struct User {
+///     #[model(primary_key)]
 ///     id: i32,
 ///     name: String,
 ///     age: i32,
@@ -78,6 +79,7 @@ impl<T: Model> Query<T> {
     ///
     /// #[model]
     /// struct User {
+    ///     #[model(primary_key)]
     ///     id: i32,
     ///     name: String,
     ///     age: i32,
@@ -103,6 +105,7 @@ impl<T: Model> Query<T> {
     ///
     /// #[model]
     /// struct User {
+    ///     #[model(primary_key)]
     ///     id: i32,
     ///     name: String,
     ///     age: i32,
@@ -1341,6 +1344,7 @@ mod tests {
     #[model]
     #[derive(std::fmt::Debug, PartialEq, Eq)]
     struct MockModel {
+        #[model(primary_key)]
         id: i32,
     }
 
@@ -1367,7 +1371,7 @@ mod tests {
         assert!(query.filter.is_some());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn query_all() {
         let mut db = MockDatabaseBackend::new();
         db.expect_query().returning(|_| Ok(Vec::<MockModel>::new()));
@@ -1378,7 +1382,7 @@ mod tests {
         assert_eq!(result.unwrap(), Vec::<MockModel>::new());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn query_get() {
         let mut db = MockDatabaseBackend::new();
         db.expect_get().returning(|_| Ok(Option::<MockModel>::None));
@@ -1389,7 +1393,7 @@ mod tests {
         assert_eq!(result.unwrap(), Option::<MockModel>::None);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn query_exists() {
         let mut db = MockDatabaseBackend::new();
         db.expect_exists()
@@ -1401,7 +1405,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn query_delete() {
         let mut db = MockDatabaseBackend::new();
         db.expect_delete()

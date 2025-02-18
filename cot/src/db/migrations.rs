@@ -5,14 +5,13 @@ mod sorter;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 
-use cot::db::relations::ForeignKeyOnUpdatePolicy;
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::info;
 
 use crate::db::migrations::sorter::{MigrationSorter, MigrationSorterError};
-use crate::db::relations::ForeignKeyOnDeletePolicy;
-use crate::db::{model, query, ColumnType, Database, DatabaseField, Identifier, Result};
+use crate::db::relations::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
+use crate::db::{model, query, Auto, ColumnType, Database, DatabaseField, Identifier, Result};
 
 /// An error that occurred while running migrations.
 #[derive(Debug, Clone, Error)]
@@ -217,7 +216,7 @@ impl MigrationEngine {
         migration: &MigrationWrapper,
     ) -> Result<()> {
         let mut applied_migration = AppliedMigration {
-            id: 0,
+            id: Auto::auto(),
             app: migration.app_name().to_string(),
             name: migration.name().to_string(),
             applied: chrono::Utc::now().into(),
@@ -1336,10 +1335,73 @@ impl MigrationDependency {
     }
 }
 
+/// Wrap a list of statically defined migrations into a dynamic [`Vec`].
+///
+/// This is mostly useful for use in [`crate::project::App::migrations`] when
+/// all of your migrations are statically defined (which is the most common
+/// case).
+///
+/// # Examples
+///
+/// ```
+/// // m_0001_initial.rs
+/// # mod migrations {
+/// # mod m_0001_initial {
+/// pub struct Migration;
+///
+/// impl ::cot::db::migrations::Migration for Migration {
+///     const APP_NAME: &'static str = "todoapp";
+///     const MIGRATION_NAME: &'static str = "m_0001_initial";
+///     const DEPENDENCIES: &'static [::cot::db::migrations::MigrationDependency] = &[];
+///     const OPERATIONS: &'static [::cot::db::migrations::Operation] = &[
+///         // ...
+///     ];
+/// }
+/// # }
+///
+/// // migrations.rs
+/// pub const MIGRATIONS: &[&::cot::db::migrations::SyncDynMigration] =
+///     &[&m_0001_initial::Migration];
+/// # }
+///
+/// // main.rs
+/// use cot::db::migrations::SyncDynMigration;
+/// use cot::project::App;
+///
+/// struct MyApp;
+///
+/// impl App for MyApp {
+///     fn name(&self) -> &str {
+///         env!("CARGO_PKG_NAME")
+///     }
+///
+///     fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+///         cot::db::migrations::wrap_migrations(&migrations::MIGRATIONS)
+///     }
+/// }
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// # let engine = cot::db::migrations::MigrationEngine::new(MyApp.migrations())?;
+/// # let database = cot::db::Database::new("sqlite::memory:").await?;
+/// # engine.run(&database).await?;
+/// # Ok(())
+/// # }
+/// ```
+pub fn wrap_migrations(migrations: &[&'static SyncDynMigration]) -> Vec<Box<SyncDynMigration>> {
+    #[allow(trivial_casts)] // cast to the correct trait object type
+    migrations
+        .iter()
+        .copied()
+        .map(|x| Box::new(x) as Box<SyncDynMigration>)
+        .collect()
+}
+
 #[derive(Debug)]
 #[model(table_name = "cot__migrations", model_type = "internal")]
 struct AppliedMigration {
-    id: i32,
+    #[model(primary_key)]
+    id: Auto<i32>,
     app: String,
     name: String,
     applied: chrono::DateTime<chrono::FixedOffset>,
@@ -1348,7 +1410,7 @@ struct AppliedMigration {
 const CREATE_APPLIED_MIGRATIONS_MIGRATION: Operation = Operation::create_model()
     .table_name(Identifier::new("cot__migrations"))
     .fields(&[
-        Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+        Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
             .primary_key()
             .auto(),
         Field::new(Identifier::new("app"), <String as DatabaseField>::TYPE),
@@ -1386,9 +1448,32 @@ mod tests {
             .build()];
     }
 
+    struct DummyMigration;
+
+    impl Migration for DummyMigration {
+        const APP_NAME: &'static str = "testapp";
+        const MIGRATION_NAME: &'static str = "m_0002_custom";
+        const DEPENDENCIES: &'static [MigrationDependency] = &[];
+        const OPERATIONS: &'static [Operation] = &[];
+    }
+
     #[cot_macros::dbtest]
     async fn test_migration_engine_run(test_db: &mut TestDatabase) {
         let engine = MigrationEngine::new([TestMigration]).unwrap();
+
+        let result = engine.run(&test_db.database()).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[cot_macros::dbtest]
+    async fn test_migration_engine_multiple_migrations_run(test_db: &mut TestDatabase) {
+        #[allow(trivial_casts)] // cast to the correct trait object type
+        let engine = MigrationEngine::new([
+            &TestMigration as &SyncDynMigration,
+            &DummyMigration as &SyncDynMigration,
+        ])
+        .unwrap();
 
         let result = engine.run(&test_db.database()).await;
 

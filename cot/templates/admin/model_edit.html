@@ -17,7 +17,7 @@
             {%- let field_errors = form_context.errors_for(FormErrorTarget::Field(field.dyn_id())) -%}
             {%- if !field_errors.is_empty() -%}
             <ul class="field-errors">
-            {% for error in form_context.errors_for(FormErrorTarget::Field(field.dyn_id())) %}
+            {% for error in field_errors %}
                 <li>{{ error }}</li>
             {% endfor %}
             </ul>

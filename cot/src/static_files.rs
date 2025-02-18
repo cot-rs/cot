@@ -170,7 +170,7 @@ impl StaticFilesMiddleware {
     /// Creates a new `StaticFilesMiddleware` instance from the application
     /// context.
     #[must_use]
-    pub fn from_app_context(context: &ProjectContext<WithApps>) -> Self {
+    pub fn from_context(context: &ProjectContext<WithApps>) -> Self {
         Self {
             static_files: Arc::new(StaticFiles::from(context)),
         }
@@ -373,7 +373,7 @@ mod tests {
 
     #[cot::test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
-    async fn static_files_middleware_from_app_context() {
+    async fn static_files_middleware_from_context() {
         struct App1;
         impl App for App1 {
             fn name(&self) -> &'static str {
@@ -407,7 +407,7 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(ProjectConfig::default())
             .with_apps();
-        let middleware = StaticFilesMiddleware::from_app_context(bootstrapper.context());
+        let middleware = StaticFilesMiddleware::from_context(bootstrapper.context());
         let static_files = middleware.static_files;
 
         let file = static_files.get_file("admin/admin.css").unwrap();

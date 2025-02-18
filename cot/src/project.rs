@@ -359,7 +359,7 @@ pub trait Project {
     ///         context: &ProjectContext<WithApps>,
     ///     ) -> BoxedHandler {
     ///         handler
-    ///             .middleware(LiveReloadMiddleware::from_app_context(context))
+    ///             .middleware(LiveReloadMiddleware::from_context(context))
     ///             .build()
     ///     }
     /// }
@@ -483,7 +483,7 @@ pub trait Project {
 ///         context: &ProjectContext<WithApps>,
 ///     ) -> BoxedHandler {
 ///         handler
-///             .middleware(LiveReloadMiddleware::from_app_context(context))
+///             .middleware(LiveReloadMiddleware::from_context(context))
 ///             .build()
 ///     }
 /// }
@@ -518,7 +518,7 @@ where
     ///         context: &ProjectContext<WithApps>,
     ///     ) -> BoxedHandler {
     ///         handler
-    ///             .middleware(LiveReloadMiddleware::from_app_context(context))
+    ///             .middleware(LiveReloadMiddleware::from_context(context))
     ///             .build()
     ///     }
     /// }
@@ -559,7 +559,7 @@ where
     ///         context: &ProjectContext<WithApps>,
     ///     ) -> BoxedHandler {
     ///         handler
-    ///             .middleware(LiveReloadMiddleware::from_app_context(context))
+    ///             .middleware(LiveReloadMiddleware::from_context(context))
     ///             .build()
     ///     }
     /// }
@@ -854,29 +854,6 @@ impl<S: BootstrapPhase> Bootstrapper<S> {
         self.project.as_ref()
     }
 
-    /// Returns the app context for the bootstrapper.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::project::{Bootstrapper, WithConfig};
-    /// use cot::{App, Project};
-    ///
-    /// struct MyProject;
-    /// impl Project for MyProject {}
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> cot::Result<()> {
-    /// let bootstrapper = Bootstrapper::new(MyProject);
-    /// let context = bootstrapper.app_context();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn app_context(&self) -> &ProjectContext<S> {
-        &self.context
-    }
-
     /// Returns the context for the bootstrapper.
     ///
     /// # Examples
@@ -1087,11 +1064,11 @@ impl Bootstrapper<WithConfig> {
 
         let router = Arc::new(Router::with_urls(module_builder.urls));
 
-        let app_context = self.context.with_apps(module_builder.apps, router);
+        let context = self.context.with_apps(module_builder.apps, router);
 
         Bootstrapper {
             project: self.project,
-            context: app_context,
+            context,
             handler: self.handler,
         }
     }
@@ -1144,7 +1121,7 @@ impl Bootstrapper<WithApps> {
         let auth_backend = self.project.auth_backend(&self.context);
         #[cfg(feature = "db")]
         let database = Self::init_database(&self.context.config.database).await?;
-        let app_context = self.context.with_auth_and_db(
+        let context = self.context.with_auth_and_db(
             auth_backend,
             #[cfg(feature = "db")]
             database,
@@ -1152,7 +1129,7 @@ impl Bootstrapper<WithApps> {
 
         Ok(Bootstrapper {
             project: self.project,
-            context: app_context,
+            context,
             handler,
         })
     }
@@ -1974,10 +1951,10 @@ mod tests {
                 context: &ProjectContext<WithApps>,
             ) -> BoxedHandler {
                 handler
-                    .middleware(
-                        crate::static_files::StaticFilesMiddleware::from_app_context(context),
-                    )
-                    .middleware(crate::middleware::LiveReloadMiddleware::from_app_context(
+                    .middleware(crate::static_files::StaticFilesMiddleware::from_context(
+                        context,
+                    ))
+                    .middleware(crate::middleware::LiveReloadMiddleware::from_context(
                         context,
                     ))
                     .build()

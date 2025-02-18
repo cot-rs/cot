@@ -69,7 +69,7 @@ where
 ///         context: &ProjectContext<WithApps>,
 ///     ) -> BoxedHandler {
 ///         handler
-///             .middleware(StaticFilesMiddleware::from_app_context(context))
+///             .middleware(StaticFilesMiddleware::from_context(context))
 ///             .build()
 ///     }
 /// }

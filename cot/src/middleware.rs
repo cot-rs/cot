@@ -43,7 +43,7 @@ use crate::{Body, Error};
 ///     ) -> BoxedHandler {
 ///         handler
 ///             // IntoCotResponseLayer used internally in middleware()
-///             .middleware(LiveReloadMiddleware::from_app_context(context))
+///             .middleware(LiveReloadMiddleware::from_context(context))
 ///             .build()
 ///     }
 /// }
@@ -157,7 +157,7 @@ where
 ///     ) -> BoxedHandler {
 ///         handler
 ///             // IntoCotErrorLayer used internally in middleware()
-///             .middleware(LiveReloadMiddleware::from_app_context(context))
+///             .middleware(LiveReloadMiddleware::from_context(context))
 ///             .build()
 ///     }
 /// }
@@ -296,7 +296,7 @@ impl LiveReloadMiddleware {
     }
 
     #[must_use]
-    pub fn from_app_context(context: &crate::ProjectContext<crate::project::WithApps>) -> Self {
+    pub fn from_context(context: &crate::ProjectContext<crate::project::WithApps>) -> Self {
         Self::with_enabled(context.config().middlewares.live_reload.enabled)
     }
 

@@ -558,7 +558,7 @@ impl TestRequestBuilder {
             None => Box::new(NoAuthBackend),
         };
 
-        let app_context = ProjectContext::initialized(
+        let context = ProjectContext::initialized(
             self.config.clone().unwrap_or_default(),
             Vec::new(),
             Arc::new(self.router.clone().unwrap_or_else(Router::empty)),
@@ -566,7 +566,7 @@ impl TestRequestBuilder {
             #[cfg(feature = "db")]
             self.database.clone(),
         );
-        prepare_request(&mut request, Arc::new(app_context));
+        prepare_request(&mut request, Arc::new(context));
 
         if let Some(session) = &self.session {
             request.extensions_mut().insert(session.clone());

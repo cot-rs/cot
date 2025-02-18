@@ -78,7 +78,7 @@ impl Project for AdminProject {
         context: &ProjectContext<WithApps>,
     ) -> BoxedHandler {
         handler
-            .middleware(StaticFilesMiddleware::from_app_context(context))
+            .middleware(StaticFilesMiddleware::from_context(context))
             .middleware(SessionMiddleware::new())
             .middleware(LiveReloadMiddleware::new())
             .build()

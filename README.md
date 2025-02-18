@@ -52,6 +52,16 @@ You can them execute the following command to stop the database:
 docker compose down
 ```
 
+## Star History
+
+<a href="https://star-history.com/#cot-rs/cot&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=cot-rs/cot&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=cot-rs/cot&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=cot-rs/cot&type=Date" />
+ </picture>
+</a>
+
 ## License
 
 Cot is licensed under either of the following, at your option:

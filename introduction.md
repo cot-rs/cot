@@ -16,7 +16,7 @@ If you are not familiar with Rust, you might want to start by reading the [Rust 
 
 ## Installing and running Cot CLI
 
-Let's get your first Cot project up and running! First, you'll need Cargo, Rust's package manager. If you don't have it installed, you can get it through [rustup](https://rustup.rs/).
+Let's get your first Cot project up and running! First, you'll need Cargo, Rust's package manager. If you don't have it installed, you can get it through [rustup](https://rustup.rs/). Cot requires Rust version 1.84 or later.
 
 Install the Cot CLI with:
 

@@ -60,7 +60,7 @@ clap = { version = "4", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 convert_case = "0.7"
 cot = { version = "0.1.0", path = "cot" }
-cot_codegen = { version = "0.1.0", path = "cot-codegen" }
+cot_codegen = { version = "0.1.1", path = "cot-codegen" }
 cot_macros = { version = "0.1.0", path = "cot-macros" }
 darling = "0.20"
 derive_builder = "0.20"

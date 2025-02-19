@@ -35,8 +35,16 @@ enum Commands {
         #[command(flatten)]
         source: CotSourceArgs,
     },
+
+    /// Manage migrations for a Cot project
+    #[command(subcommand)]
+    Migration(MigrationCommands),
+}
+
+#[derive(Debug, Subcommand)]
+enum MigrationCommands {
     /// Generate migrations for a Cot project
-    MakeMigrations {
+    Make {
         /// Path to the crate directory to generate migrations for (default:
         /// current directory)
         path: Option<PathBuf>,
@@ -59,6 +67,25 @@ struct CotSourceArgs {
     /// Use `cot` from the specified path instead of a published crate
     #[arg(long, group = "cot_source")]
     cot_path: Option<PathBuf>,
+}
+
+fn migration_commands_handler(cmd: MigrationCommands) -> anyhow::Result<()> {
+    match cmd {
+        MigrationCommands::Make {
+            path,
+            app_name,
+            output_dir,
+        } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let options = MigrationGeneratorOptions {
+                app_name,
+                output_dir,
+            };
+            make_migrations(&path, options).with_context(|| "unable to create migrations")?;
+        }
+    }
+
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
@@ -98,18 +125,7 @@ fn main() -> anyhow::Result<()> {
             new_project(&path, &project_name, &cot_source)
                 .with_context(|| "unable to create project")?;
         }
-        Commands::MakeMigrations {
-            path,
-            app_name,
-            output_dir,
-        } => {
-            let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let options = MigrationGeneratorOptions {
-                app_name,
-                output_dir,
-            };
-            make_migrations(&path, options).with_context(|| "unable to create migrations")?;
-        }
+        Commands::Migration(cmd) => migration_commands_handler(cmd)?,
     }
 
     Ok(())

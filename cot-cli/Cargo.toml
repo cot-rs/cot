@@ -9,6 +9,7 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 keywords.workspace = true
+readme.workspace = true
 authors.workspace = true
 
 [[bin]]

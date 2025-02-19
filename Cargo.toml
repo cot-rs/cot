@@ -22,6 +22,7 @@ license = "MIT OR Apache-2.0"
 homepage = "https://cot.rs"
 repository = "https://github.com/cot-rs/cot"
 keywords = ["web", "framework", "server", "backend"]
+readme = "README.md"
 authors = [
     "Mateusz Maćkowski <mateusz@mackowski.org>",
     "Marek Grzelak <marek.grzelak@seqre.dev>",

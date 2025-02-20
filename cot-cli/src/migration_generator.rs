@@ -52,6 +52,53 @@ pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyho
     Ok(())
 }
 
+pub fn list_migrations(path: &Path) -> anyhow::Result<()> {
+    match find_cargo_toml(
+        &path
+            .canonicalize()
+            .with_context(|| "unable to canonicalize Cargo.toml path")?,
+    ) {
+        Some(cargo_toml_path) => {
+            let manifest = Manifest::from_path(&cargo_toml_path)
+                .with_context(|| "unable to read Cargo.toml")?;
+
+            let package_roots = match manifest.workspace {
+                Some(workspace) => workspace.members.iter().map(PathBuf::from).collect(),
+                None => vec![cargo_toml_path
+                    .parent()
+                    .with_context(|| "unable to find parent dir")?
+                    .to_path_buf()],
+            };
+
+            for package_root in package_roots {
+                let app_name = if let Some(cargo_toml_path) = find_cargo_toml(&package_root) {
+                    let manifest = Manifest::from_path(&cargo_toml_path)
+                        .with_context(|| "unable to read Cargo.toml")?;
+                    manifest
+                        .package
+                        .with_context(|| "unable to find package in Cargo.toml")?
+                        .name
+                } else {
+                    bail!(
+                        "Cargo.toml not found in the specified directory or any parent directory."
+                    )
+                };
+
+                let migrations_dir = package_root.join("src").join("migrations");
+                let migration_list = MigrationGenerator::get_migration_list(&migrations_dir)?;
+                for migration in migration_list {
+                    println!("{} - {}", app_name, migration);
+                }
+            }
+        }
+        None => {
+            bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct MigrationGeneratorOptions {
     pub app_name: Option<String>,

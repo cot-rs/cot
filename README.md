@@ -17,6 +17,9 @@ Cot is an easy to use, modern, and fast web framework for Rust. It has been desi
 used [Django](https://www.djangoproject.com/), and easy to learn if you haven't. It's a batteries-included framework
 built on top of [axum](https://github.com/tokio-rs/axum).
 
+**If you want to get started building with Cot, we recommend reading
+[the official guide](https://cot.rs/guide/latest/).**
+
 ## Features
 
 * **Easy to use API** — in many ways modeled after Django, Cot's API is designed to be easy to use and intuitive.

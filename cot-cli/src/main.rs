@@ -11,7 +11,7 @@ use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use crate::migration_generator::{make_migrations, MigrationGeneratorOptions};
+use crate::migration_generator::{list_migrations, make_migrations, MigrationGeneratorOptions};
 use crate::new_project::{new_project, CotSource};
 
 #[derive(Debug, Parser)]
@@ -43,6 +43,12 @@ enum Commands {
 
 #[derive(Debug, Subcommand)]
 enum MigrationCommands {
+    /// List all migrations for a Cot project
+    List {
+        /// Path to the crate directory to list migrations for (default:
+        /// current directory)
+        path: Option<PathBuf>,
+    },
     /// Generate migrations for a Cot project
     Make {
         /// Path to the crate directory to generate migrations for (default:
@@ -56,6 +62,8 @@ enum MigrationCommands {
         #[arg(long)]
         output_dir: Option<PathBuf>,
     },
+    /// Squash selected migrations into a single migration
+    Squash {},
 }
 
 #[derive(Debug, Args)]
@@ -71,6 +79,10 @@ struct CotSourceArgs {
 
 fn migration_commands_handler(cmd: MigrationCommands) -> anyhow::Result<()> {
     match cmd {
+        MigrationCommands::List { path } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            list_migrations(&path).with_context(|| "unable to list migrations")?;
+        }
         MigrationCommands::Make {
             path,
             app_name,

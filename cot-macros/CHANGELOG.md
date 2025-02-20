@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.2](https://github.com/cot-rs/cot/compare/cot_macros-v0.1.1...cot_macros-v0.1.2) - 2025-02-19
+## [0.1.2](https://github.com/cot-rs/cot/compare/cot_macros-v0.1.1...cot_macros-v0.1.2) - 2025-02-21
 
 ### Other
 
 - add README.md to the Cargo.toml metadata (#178)
+
+## 0.1.0 - 2025-02-18
+
+- initial version

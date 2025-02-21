@@ -513,13 +513,15 @@ impl MigrationGenerator {
     }
 
     fn get_migration_list(migrations_dir: &PathBuf) -> anyhow::Result<Vec<String>> {
-        Ok(std::fs::read_dir(migrations_dir)
-            .with_context(|| {
-                format!(
-                    "unable to read migrations directory: {}",
-                    migrations_dir.display()
-                )
-            })?
+        let dir = match std::fs::read_dir(migrations_dir) {
+            Ok(dir) => dir,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Vec::new());
+            }
+            Err(e) => return Err(e).context("unable to read migrations directory"),
+        };
+
+        let migrations = dir
             .filter_map(|entry| {
                 let entry = entry.ok()?;
                 let path = entry.path();
@@ -537,7 +539,9 @@ impl MigrationGenerator {
                     None
                 }
             })
-            .collect())
+            .collect();
+
+        Ok(migrations)
     }
 
     #[must_use]

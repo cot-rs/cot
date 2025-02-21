@@ -170,6 +170,7 @@ impl ModelBuilder {
                 const COLUMNS: &'static [#orm_ident::Column] = &[
                     #(#fields_as_columns,)*
                 ];
+                const APP_NAME: &'static str = env!("CARGO_PKG_NAME");
                 const TABLE_NAME: #orm_ident::Identifier = #orm_ident::Identifier::new(#table_name);
                 const PRIMARY_KEY_NAME: #orm_ident::Identifier = #orm_ident::Identifier::new(#pk_column_name);
 

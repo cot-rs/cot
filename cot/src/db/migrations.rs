@@ -1305,7 +1305,7 @@ enum MigrationDependencyInner {
     },
     Model {
         app: &'static str,
-        table_name: &'static str,
+        table_name: Identifier,
     },
 }
 
@@ -1330,7 +1330,7 @@ impl MigrationDependency {
     /// creates the model with the given app and table name before the current
     /// migration.
     #[must_use]
-    pub const fn model(app: &'static str, table_name: &'static str) -> Self {
+    pub const fn model(app: &'static str, table_name: Identifier) -> Self {
         Self::new(MigrationDependencyInner::Model { app, table_name })
     }
 }

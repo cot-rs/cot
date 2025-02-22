@@ -3,7 +3,7 @@ use std::panic::PanicHookInfo;
 use std::sync::Arc;
 
 use rinja::Template;
-use tracing::error;
+use tracing::{error, warn, Level};
 
 use crate::config::ProjectConfig;
 use crate::error::backtrace::{Backtrace, __cot_create_backtrace};
@@ -241,6 +241,13 @@ pub(super) fn handle_not_found(
     message: Option<String>,
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
+    log_not_found(
+        &message,
+        &diagnostics
+            .request_parts
+            .as_ref()
+            .map(ErrorPageTemplateBuilder::build_request_data),
+    );
     build_response(
         build_not_found_response(message, diagnostics),
         StatusCode::NOT_FOUND,
@@ -252,6 +259,16 @@ pub(super) fn handle_response_panic(
     panic_payload: &Box<dyn Any + Send>,
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
+    let request_data = diagnostics
+        .request_parts
+        .as_ref()
+        .map(ErrorPageTemplateBuilder::build_request_data);
+    log_panic(
+        panic_payload,
+        &PANIC_LOCATION.take(),
+        &PANIC_BACKTRACE.take(),
+        &request_data,
+    );
     build_response(
         build_panic_response(panic_payload, diagnostics),
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -263,6 +280,13 @@ pub(super) fn handle_response_error(
     error: &Error,
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
+    log_error(
+        error,
+        &diagnostics
+            .request_parts
+            .as_ref()
+            .map(ErrorPageTemplateBuilder::build_request_data),
+    );
     build_response(
         build_error_response(error, diagnostics),
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -357,13 +381,153 @@ pub(super) fn error_page_panic_hook(info: &PanicHookInfo<'_>) {
     PANIC_BACKTRACE.replace(Some(__cot_create_backtrace()));
 }
 
+fn log_error(error: &Error, request_data: &Option<RequestData>) {
+    let span = tracing::span!(Level::ERROR,
+        "request_error",
+        error_type=%error.inner,
+        error_message= %error,
+        backtrace= ?error.backtrace()
+    );
+    let _enter = span.enter();
+    if let Some(req) = request_data {
+        error!(method = %req.method, path = %req.url, "Request failed with error!");
+    } else {
+        error!("Error occurred without request context!")
+    }
+}
+
+fn log_panic(
+    panic_payload: &Box<dyn Any + Send>,
+    panic_location: &Option<String>,
+    backtrace: &Option<Backtrace>,
+    request_data: &Option<RequestData>,
+) {
+    let span = tracing::span!(
+        Level::ERROR,
+        "request_panic",
+        panic_message = ?ErrorPageTemplateBuilder::get_panic_string(panic_payload),
+        location = ?panic_location,
+        backtrace = ?backtrace
+    );
+    let _enter = span.enter();
+    if let Some(req) = request_data {
+        error!(method = %req.method, path = %req.url, "Request handler panicked!");
+    } else {
+        error!("Panic occurred without a request context");
+    }
+}
+
+fn log_not_found(message: &Option<String>, request_data: &Option<RequestData>) {
+    let span = tracing::span!(
+        Level::WARN,
+        "not_found",
+        message = ?message,
+    );
+    let _enter = span.enter();
+
+    if let Some(req) = request_data {
+        warn!(method = %req.method, path = %req.url, "Route not found!");
+    } else {
+        warn!("Not Found error occurred without a request context!");
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::panic;
     use std::sync::Arc;
+
+    use tracing_test::traced_test;
 
     use super::*;
     use crate::router::{Route, Router};
     use crate::test::TestRequestBuilder;
+
+    fn create_test_request_data() -> RequestData {
+        RequestData {
+            method: "GET".to_string(),
+            url: "/test".to_string(),
+            protocol_version: "HTTP/1.1".to_string(),
+            headers: vec![("content-type".to_string(), "text/plain".to_string())],
+        }
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_log_error() {
+        let error = Error::custom("Test Error!");
+        let request_data = Some(create_test_request_data());
+
+        log_error(&error, &request_data);
+        assert!(logs_contain("Request failed with error!"));
+        assert!(logs_contain("Test Error!"));
+        assert!(logs_contain("GET"));
+        assert!(logs_contain("/test"));
+    }
+    #[test]
+    #[traced_test]
+    fn test_log_panic() {
+        let panic_payload: Box<dyn Any + Send> = Box::new("Test panic");
+        let panic_location = Some("src/test.rs:10".to_string());
+        let backtrace = Some(__cot_create_backtrace());
+        let request_data = Some(create_test_request_data());
+
+        log_panic(&panic_payload, &panic_location, &backtrace, &request_data);
+
+        assert!(logs_contain("Request handler panicked"));
+        assert!(logs_contain("Test panic"));
+        assert!(logs_contain("src/test.rs:10"));
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_log_not_found() {
+        let message = Some("Resource not found".to_string());
+        let request_data = Some(create_test_request_data());
+
+        log_not_found(&message, &request_data);
+
+        assert!(logs_contain("Route not found"));
+        assert!(logs_contain("Resource not found"));
+        assert!(logs_contain("GET"));
+        assert!(logs_contain("/test"));
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_log_error_without_request() {
+        let error = Error::custom("Test error");
+        log_error(&error, &None);
+
+        assert!(logs_contain("Error occurred without request context"));
+        assert!(logs_contain("Test error"));
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_handle_response_error_logging() {
+        let diagnostics = create_diagnostics();
+        let error = Error::custom("Test handler error");
+
+        let response = handle_response_error(&error, &diagnostics);
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert!(logs_contain("Request failed with error"));
+        assert!(logs_contain("Test handler error"));
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_handle_response_panic_logging() {
+        let diagnostics = create_diagnostics();
+        let panic_payload: Box<dyn Any + Send> = Box::new("Test panic in handler");
+
+        let response = handle_response_panic(&panic_payload, &diagnostics);
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert!(logs_contain("Request handler panicked"));
+        assert!(logs_contain("Test panic in handler"));
+    }
 
     fn create_diagnostics() -> Diagnostics {
         let project_config = ProjectConfig::default();

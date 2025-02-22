@@ -58,6 +58,7 @@ tracing.workspace = true
 url = { workspace = true, features = ["serde"], optional = true }
 
 [dev-dependencies]
+tracing-test = "0.2.5"
 async-stream.workspace = true
 fake.workspace = true
 futures.workspace = true

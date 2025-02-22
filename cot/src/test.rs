@@ -7,7 +7,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use derive_more::Debug;
 use tower::Service;
-use tower_sessions::{MemoryStore, Session};
+use tower_sessions::MemoryStore;
 
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;
@@ -24,6 +24,7 @@ use crate::project::prepare_request;
 use crate::request::{Request, RequestExt};
 use crate::response::Response;
 use crate::router::Router;
+use crate::session::Session;
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
 
 /// A test client for making requests to a Cot project.
@@ -437,7 +438,8 @@ impl TestRequestBuilder {
     /// ```
     pub fn with_session(&mut self) -> &mut Self {
         let session_store = MemoryStore::default();
-        self.session = Some(Session::new(None, Arc::new(session_store), None));
+        let session_inner = tower_sessions::Session::new(None, Arc::new(session_store), None);
+        self.session = Some(Session::new(session_inner));
         self
     }
 
@@ -453,7 +455,7 @@ impl TestRequestBuilder {
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let mut request = TestRequestBuilder::get("/").with_session().build();
-    /// request.session_mut().insert("key", "value").await?;
+    /// request.session().insert("key", "value").await?;
     ///
     /// let mut request = TestRequestBuilder::get("/")
     ///     .with_session_from(&request)
@@ -478,7 +480,7 @@ impl TestRequestBuilder {
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let mut request = TestRequestBuilder::get("/").with_session().build();
-    /// request.session_mut().insert("key", "value").await?;
+    /// request.session().insert("key", "value").await?;
     ///
     /// let mut request = TestRequestBuilder::get("/")
     ///     .session(request.session().clone())

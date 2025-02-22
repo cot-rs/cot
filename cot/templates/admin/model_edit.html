@@ -3,7 +3,6 @@
 {% block title %}{% if is_edit %}Edit{% else %}Create{% endif %} {{ model.name() }}{% endblock %}
 
 {% block content -%}
-{%- let request = request -%}
 <h2>{% if is_edit %}Edit{% else %}Create{% endif %} {{ model.name() }}</h2>
 
 <form class="model-form" action="" method="post">

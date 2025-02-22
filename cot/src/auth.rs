@@ -864,13 +864,11 @@ impl AuthRequestExt for Request {
     async fn login(&mut self, user: Box<dyn User + Send + Sync + 'static>) -> Result<()> {
         let user = UserExtension::from(user);
         if let Some(user_id) = user.id() {
-            self.session_mut()
-                .insert(USER_ID_SESSION_KEY, user_id)
-                .await?;
+            self.session().insert(USER_ID_SESSION_KEY, user_id).await?;
         }
         let secret_key = &self.project_config().secret_key;
         if let Some(session_auth_hash) = user.session_auth_hash(secret_key) {
-            self.session_mut()
+            self.session()
                 .insert(SESSION_HASH_SESSION_KEY, session_auth_hash.as_bytes())
                 .await?;
         }
@@ -880,8 +878,8 @@ impl AuthRequestExt for Request {
     }
 
     async fn logout(&mut self) -> Result<()> {
-        self.session_mut().remove_value(USER_ID_SESSION_KEY).await?;
-        self.session_mut()
+        self.session().remove_value(USER_ID_SESSION_KEY).await?;
+        self.session()
             .remove_value(SESSION_HASH_SESSION_KEY)
             .await?;
         self.extensions_mut()
@@ -944,7 +942,7 @@ async fn session_auth_hash_valid(
             .expect("User should have a session hash for each secret key");
         if user_hash_fallback == stored_hash {
             request
-                .session_mut()
+                .session()
                 .insert(SESSION_HASH_SESSION_KEY, user_hash.as_bytes())
                 .await?;
 
@@ -1222,7 +1220,7 @@ mod tests {
         });
 
         request
-            .session_mut()
+            .session()
             .insert(USER_ID_SESSION_KEY, UserId::Int(1))
             .await
             .unwrap();
@@ -1272,7 +1270,7 @@ mod tests {
         let mut request = test_request_with_auth_backend(NoAuthBackend {});
 
         request
-            .session_mut()
+            .session()
             .insert(USER_ID_SESSION_KEY, UserId::Int(1))
             .await
             .unwrap();

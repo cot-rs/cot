@@ -103,15 +103,15 @@ pub struct IntoCotResponse<S> {
     inner: S,
 }
 
-impl<S, B, E> Service<Request> for IntoCotResponse<S>
+impl<S, ResBody, E> Service<Request> for IntoCotResponse<S>
 where
-    S: Service<Request, Response = http::Response<B>>,
-    B: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
+    S: Service<Request, Response = http::Response<ResBody>>,
+    ResBody: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
     E: std::error::Error + Send + Sync + 'static,
 {
     type Response = Response;
     type Error = S::Error;
-    type Future = futures_util::future::MapOk<S::Future, fn(http::Response<B>) -> Response>;
+    type Future = futures_util::future::MapOk<S::Future, fn(http::Response<ResBody>) -> Response>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -124,9 +124,9 @@ where
     }
 }
 
-fn map_response<B, E>(response: http::response::Response<B>) -> Response
+fn map_response<ResBody, E>(response: http::response::Response<ResBody>) -> Response
 where
-    B: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
+    ResBody: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
     E: std::error::Error + Send + Sync + 'static,
 {
     response.map(|body| Body::wrapper(BoxBody::new(body.map_err(map_err))))
@@ -266,12 +266,82 @@ impl Default for SessionMiddleware {
 }
 
 impl<S> tower::Layer<S> for SessionMiddleware {
-    type Service = <SessionManagerLayer<MemoryStore> as tower::Layer<S>>::Service;
+    type Service = <SessionManagerLayer<MemoryStore> as tower::Layer<
+        <SessionWrapperLayer as tower::Layer<S>>::Service,
+    >>::Service;
 
     fn layer(&self, inner: S) -> Self::Service {
         let session_store = MemoryStore::default();
         let session_layer = SessionManagerLayer::new(session_store);
-        session_layer.layer(inner)
+        let session_wrapper_layer = SessionWrapperLayer::new();
+        let layers = (session_layer, session_wrapper_layer);
+
+        layers.layer(inner)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct SessionWrapperLayer;
+
+impl SessionWrapperLayer {
+    /// Create a new [`SessionWrapperLayer`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionWrapperLayer;
+    ///
+    /// let middleware = SessionWrapperLayer::new();
+    /// ```
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for SessionWrapperLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S> tower::Layer<S> for SessionWrapperLayer {
+    type Service = SessionWrapper<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        SessionWrapper { inner }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SessionWrapper<S> {
+    inner: S,
+}
+
+impl<ReqBody, ResBody, S> Service<http::Request<ReqBody>> for SessionWrapper<S>
+where
+    S: Service<http::Request<ReqBody>, Response = http::Response<ResBody>> + Clone + Send + 'static,
+    S::Future: Send,
+    ReqBody: Send + 'static,
+    ResBody: Default + Send,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut req: http::Request<ReqBody>) -> Self::Future {
+        let session = req
+            .extensions_mut()
+            .remove::<tower_sessions::Session>()
+            .expect("session extension must be present");
+        let session_wrapped = crate::session::Session::new(session);
+        req.extensions_mut().insert(session_wrapped);
+
+        self.inner.call(req)
     }
 }
 

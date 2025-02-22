@@ -7,9 +7,9 @@ use cot::db::migrations::SyncDynMigration;
 use cot::db::{model, query, Auto, Model};
 use cot::form::Form;
 use cot::project::{WithApps, WithConfig};
-use cot::request::{Request, RequestExt};
+use cot::request::extractors::{Path, RequestDb, RequestForm};
 use cot::response::{Response, ResponseExt};
-use cot::router::{Route, Router};
+use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{
     reverse_redirect, App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode,
@@ -27,14 +27,14 @@ struct TodoItem {
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
 struct IndexTemplate<'a> {
-    request: &'a Request,
+    urls: &'a Urls,
     todo_items: Vec<TodoItem>,
 }
 
-async fn index(request: Request) -> cot::Result<Response> {
-    let todo_items = TodoItem::objects().all(request.db()).await?;
+async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Response> {
+    let todo_items = TodoItem::objects().all(&db).await?;
     let index_template = IndexTemplate {
-        request: &request,
+        urls: &urls,
         todo_items,
     };
     let rendered = index_template.render()?;
@@ -48,31 +48,35 @@ struct TodoForm {
     title: String,
 }
 
-async fn add_todo(mut request: Request) -> cot::Result<Response> {
-    let todo_form = TodoForm::from_request(&mut request).await?.unwrap();
+async fn add_todo(
+    urls: Urls,
+    RequestDb(db): RequestDb,
+    RequestForm(todo_form): RequestForm<TodoForm>,
+) -> cot::Result<Response> {
+    let todo_form = todo_form.unwrap();
 
     {
         TodoItem {
             id: Auto::auto(),
             title: todo_form.title,
         }
-        .save(request.db())
+        .save(&db)
         .await?;
     }
 
-    Ok(reverse_redirect!(request, "index")?)
+    Ok(reverse_redirect!(urls, "index")?)
 }
 
-async fn remove_todo(request: Request) -> cot::Result<Response> {
-    let todo_id: i32 = request.path_params().parse()?;
-
+async fn remove_todo(
+    urls: Urls,
+    RequestDb(db): RequestDb,
+    Path(todo_id): Path<i32>,
+) -> cot::Result<Response> {
     {
-        query!(TodoItem, $id == todo_id)
-            .delete(request.db())
-            .await?;
+        query!(TodoItem, $id == todo_id).delete(&db).await?;
     }
 
-    Ok(reverse_redirect!(request, "index")?)
+    Ok(reverse_redirect!(urls, "index")?)
 }
 
 struct TodoApp;

@@ -3,9 +3,10 @@ use cot::config::ProjectConfig;
 use cot::form::Form;
 use cot::middleware::SessionMiddleware;
 use cot::project::{WithApps, WithConfig};
-use cot::request::{Request, RequestExt};
+use cot::request::Request;
 use cot::response::{Response, ResponseExt};
-use cot::router::{Route, Router};
+use cot::router::{Route, Router, Urls};
+use cot::session::Session;
 use cot::{
     reverse_redirect, App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode,
 };
@@ -13,15 +14,14 @@ use rinja::Template;
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
-struct IndexTemplate<'a> {
-    request: &'a Request,
+struct IndexTemplate {
     name: String,
 }
 
 #[derive(Debug, Template)]
 #[template(path = "name.html")]
 struct NameTemplate<'a> {
-    request: &'a Request,
+    urls: &'a Urls,
 }
 
 #[derive(Debug, Form)]
@@ -30,21 +30,17 @@ struct NameForm {
     name: String,
 }
 
-async fn hello(request: Request) -> cot::Result<Response> {
-    let name: String = request
-        .session()
+async fn hello(urls: Urls, session: Session) -> cot::Result<Response> {
+    let name: String = session
         .get("user_name")
         .await
         .expect("Invalid session value")
         .unwrap_or_default();
     if name.is_empty() {
-        return Ok(reverse_redirect!(request, "name")?);
+        return Ok(reverse_redirect!(urls, "name")?);
     }
 
-    let template = IndexTemplate {
-        request: &request,
-        name,
-    };
+    let template = IndexTemplate { name };
 
     Ok(Response::new_html(
         StatusCode::OK,
@@ -52,18 +48,15 @@ async fn hello(request: Request) -> cot::Result<Response> {
     ))
 }
 
-async fn name(mut request: Request) -> cot::Result<Response> {
+async fn name(urls: Urls, session: Session, mut request: Request) -> cot::Result<Response> {
     if request.method() == cot::Method::POST {
         let name_form = NameForm::from_request(&mut request).await?.unwrap();
-        request
-            .session_mut()
-            .insert("user_name", name_form.name)
-            .await?;
+        session.insert("user_name", name_form.name).await?;
 
-        return Ok(reverse_redirect!(request, "index")?);
+        return Ok(reverse_redirect!(urls, "index")?);
     }
 
-    let template = NameTemplate { request: &request };
+    let template = NameTemplate { urls: &urls };
 
     Ok(Response::new_html(
         StatusCode::OK,

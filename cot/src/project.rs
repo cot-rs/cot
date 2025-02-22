@@ -1352,7 +1352,7 @@ impl ProjectContext<Uninitialized> {
     }
 }
 
-impl ProjectContext<WithConfig> {
+impl<S: BootstrapPhase<Config = Arc<ProjectConfig>>> ProjectContext<S> {
     /// Returns the configuration for the project.
     ///
     /// # Examples
@@ -1376,7 +1376,9 @@ impl ProjectContext<WithConfig> {
     pub fn config(&self) -> &ProjectConfig {
         &self.config
     }
+}
 
+impl ProjectContext<WithConfig> {
     #[must_use]
     fn with_apps(self, apps: Vec<Box<dyn App>>, router: Arc<Router>) -> ProjectContext<WithApps> {
         ProjectContext {
@@ -1390,31 +1392,7 @@ impl ProjectContext<WithConfig> {
     }
 }
 
-impl ProjectContext<WithApps> {
-    /// Returns the configuration for the project.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     let config = request.context().config();
-    ///     // can also be accessed via:
-    ///     let config = request.project_config();
-    ///
-    ///     let db_url = &config.database.url;
-    ///
-    ///     // ...
-    /// #    todo!()
-    /// }
-    /// ```
-    #[must_use]
-    pub fn config(&self) -> &ProjectConfig {
-        &self.config
-    }
-
+impl<S: BootstrapPhase<Apps = Vec<Box<dyn App>>>> ProjectContext<S> {
     /// Returns the apps for the project.
     ///
     /// # Examples
@@ -1434,7 +1412,9 @@ impl ProjectContext<WithApps> {
     pub fn apps(&self) -> &[Box<dyn App>] {
         &self.apps
     }
+}
 
+impl ProjectContext<WithApps> {
     #[must_use]
     fn with_auth_and_db(
         self,
@@ -1469,51 +1449,9 @@ impl ProjectContext<Initialized> {
             database,
         }
     }
+}
 
-    /// Returns the configuration for the project.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     let config = request.context().config();
-    ///     // can also be accessed via:
-    ///     let config = request.project_config();
-    ///
-    ///     let db_url = &config.database.url;
-    ///
-    ///     // ...
-    /// #    todo!()
-    /// }
-    /// ```
-    #[must_use]
-    pub fn config(&self) -> &ProjectConfig {
-        &self.config
-    }
-
-    /// Returns the apps for the project.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     let apps = request.context().apps();
-    ///
-    ///     // ...
-    /// #    todo!()
-    /// }
-    /// ```
-    #[must_use]
-    pub fn apps(&self) -> &[Box<dyn App>] {
-        &self.apps
-    }
-
+impl<S: BootstrapPhase<Router = Arc<Router>>> ProjectContext<S> {
     /// Returns the router for the project.
     ///
     /// # Examples
@@ -1534,10 +1472,11 @@ impl ProjectContext<Initialized> {
     /// }
     /// ```
     #[must_use]
-    pub fn router(&self) -> &Router {
+    pub fn router(&self) -> &Arc<Router> {
         &self.router
     }
-
+}
+impl<S: BootstrapPhase<AuthBackend = Box<dyn AuthBackend>>> ProjectContext<S> {
     /// Returns the authentication backend for the project.
     ///
     /// # Examples
@@ -1556,7 +1495,10 @@ impl ProjectContext<Initialized> {
     pub fn auth_backend(&self) -> &dyn AuthBackend {
         self.auth_backend.as_ref()
     }
+}
 
+#[cfg(feature = "db")]
+impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     /// Returns the database for the project, if it is enabled.
     ///
     /// # Examples
@@ -1604,7 +1546,7 @@ impl ProjectContext<Initialized> {
     /// ```
     #[must_use]
     #[cfg(feature = "db")]
-    pub fn database(&self) -> &Database {
+    pub fn database(&self) -> &Arc<Database> {
         self.try_database().expect(
             "Database missing. Did you forget to add the database when configuring CotProject?",
         )

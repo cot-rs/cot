@@ -1,12 +1,11 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::project::WithConfig;
-use cot::request::Request;
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::{App, AppBuilder, Body, Project, ProjectContext, StatusCode};
 
-async fn return_hello(_request: Request) -> cot::Result<Response> {
+async fn return_hello() -> cot::Result<Response> {
     Ok(Response::new_html(
         StatusCode::OK,
         Body::fixed("<h1>Hello Cot!</h1>".as_bytes().to_vec()),

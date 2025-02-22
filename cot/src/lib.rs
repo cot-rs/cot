@@ -75,6 +75,7 @@ pub mod project;
 pub mod request;
 pub mod response;
 pub mod router;
+pub mod session;
 pub mod static_files;
 pub mod test;
 pub(crate) mod utils;

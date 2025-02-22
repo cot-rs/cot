@@ -13,10 +13,11 @@
 //! ```
 
 use std::borrow::Cow;
+use std::future::Future;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use bytes::Bytes;
+use http::request::Parts;
 use indexmap::IndexMap;
 pub use path_params_deserializer::PathParamsDeserializerError;
 use tower_sessions::Session;
@@ -30,6 +31,7 @@ use crate::headers::JSON_CONTENT_TYPE;
 use crate::router::Router;
 use crate::{Body, Result};
 
+pub mod extractors;
 mod path_params_deserializer;
 
 /// HTTP request type.
@@ -46,7 +48,6 @@ mod private {
 ///
 /// This trait is sealed since it doesn't make sense to be implemented for types
 /// outside the context of Cot.
-#[async_trait]
 pub trait RequestExt: private::Sealed {
     /// Get the application context.
     ///
@@ -59,7 +60,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let context = request.context();
     ///     // ... do something with the context
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -76,7 +77,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let config = request.project_config();
     ///     // ... do something with the config
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -93,13 +94,13 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let router = request.router();
     ///     // ... do something with the router
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
-    fn router(&self) -> &Router;
+    fn router(&self) -> &Arc<Router>;
 
-    /// Get the app name teh current route belogns to, or [`None`] if the
+    /// Get the app name the current route belongs to, or [`None`] if the
     /// request is not routed.
     ///
     /// This is mainly useful for providing context to reverse redirects, where
@@ -108,7 +109,14 @@ pub trait RequestExt: private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// // TODO
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
+    ///     let app_name = request.app_name();
+    ///     // ... do something with the app name
+    ///     # todo!()
+    /// }
     /// ```
     fn app_name(&self) -> Option<&str>;
 
@@ -127,7 +135,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let route_name = request.route_name();
     ///     // ... do something with the route name
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -144,7 +152,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let path_params = request.path_params();
     ///     // ... do something with the path params
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -161,7 +169,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let path_params = request.path_params_mut();
     ///     // ... do something with the path params
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -178,7 +186,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let db = request.db();
     ///     // ... do something with the database
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[cfg(feature = "db")]
@@ -203,7 +211,7 @@ pub trait RequestExt: private::Sealed {
     ///     println!("Hello, {}!", name);
     ///
     ///     // ...
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     ///
     /// async fn set_name(mut request: Request) -> cot::Result<Response> {
@@ -214,7 +222,7 @@ pub trait RequestExt: private::Sealed {
     ///         .unwrap();
     ///
     ///     // ...
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -238,7 +246,7 @@ pub trait RequestExt: private::Sealed {
     ///     println!("Hello, {}!", name);
     ///
     ///     // ...
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     ///
     /// async fn set_name(mut request: Request) -> cot::Result<Response> {
@@ -249,7 +257,7 @@ pub trait RequestExt: private::Sealed {
     ///         .unwrap();
     ///
     ///     // ...
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -265,7 +273,7 @@ pub trait RequestExt: private::Sealed {
     /// Throws an error if the request method is not GET or HEAD and the content
     /// type is not `application/x-www-form-urlencoded`.
     /// Throws an error if the request body could not be read.
-    async fn form_data(&mut self) -> Result<Bytes>;
+    fn form_data(&mut self) -> impl Future<Output = Result<Bytes>> + Send;
 
     /// Get the request body as JSON and deserialize it into a type `T`
     /// implementing `serde::de::DeserializeOwned`.
@@ -298,7 +306,7 @@ pub trait RequestExt: private::Sealed {
     /// }
     /// ```
     #[cfg(feature = "json")]
-    async fn json<T: serde::de::DeserializeOwned>(&mut self) -> Result<T>;
+    fn json<T: serde::de::DeserializeOwned>(&mut self) -> impl Future<Output = Result<T>> + Send;
 
     /// Get the content type of the request.
     ///
@@ -311,7 +319,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let content_type = request.content_type();
     ///     // ... do something with the content type
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -332,7 +340,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     request.expect_content_type("application/json")?;
     ///     // ...
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     fn expect_content_type(&mut self, expected: &'static str) -> Result<()>;
@@ -340,7 +348,6 @@ pub trait RequestExt: private::Sealed {
 
 impl private::Sealed for Request {}
 
-#[async_trait]
 impl RequestExt for Request {
     fn context(&self) -> &crate::ProjectContext {
         self.extensions()
@@ -352,7 +359,7 @@ impl RequestExt for Request {
         self.context().config()
     }
 
-    fn router(&self) -> &Router {
+    fn router(&self) -> &Arc<Router> {
         self.context().router()
     }
 
@@ -424,6 +431,91 @@ impl RequestExt for Request {
 
     fn content_type(&self) -> Option<&http::HeaderValue> {
         self.headers().get(http::header::CONTENT_TYPE)
+    }
+
+    fn expect_content_type(&mut self, expected: &'static str) -> Result<()> {
+        let content_type = self
+            .content_type()
+            .map_or("".into(), |value| String::from_utf8_lossy(value.as_bytes()));
+        if content_type == expected {
+            Ok(())
+        } else {
+            Err(ErrorRepr::InvalidContentType {
+                expected,
+                actual: content_type.into_owned(),
+            }
+            .into())
+        }
+    }
+}
+
+impl private::Sealed for Parts {}
+
+impl RequestExt for Parts {
+    fn context(&self) -> &crate::ProjectContext {
+        self.extensions
+            .get::<Arc<crate::ProjectContext>>()
+            .expect("AppContext extension missing")
+    }
+
+    fn project_config(&self) -> &crate::config::ProjectConfig {
+        self.context().config()
+    }
+
+    fn router(&self) -> &Arc<Router> {
+        self.context().router()
+    }
+
+    fn app_name(&self) -> Option<&str> {
+        self.extensions
+            .get::<AppName>()
+            .map(|AppName(name)| name.as_str())
+    }
+
+    fn route_name(&self) -> Option<&str> {
+        self.extensions
+            .get::<RouteName>()
+            .map(|RouteName(name)| name.as_str())
+    }
+
+    fn path_params(&self) -> &PathParams {
+        self.extensions
+            .get::<PathParams>()
+            .expect("PathParams extension missing")
+    }
+
+    fn path_params_mut(&mut self) -> &mut PathParams {
+        self.extensions.get_or_insert_default::<PathParams>()
+    }
+
+    #[cfg(feature = "db")]
+    fn db(&self) -> &Database {
+        self.context().database()
+    }
+
+    fn session(&self) -> &Session {
+        self.extensions
+            .get::<Session>()
+            .expect("Session extension missing. Did you forget to add the SessionMiddleware?")
+    }
+
+    fn session_mut(&mut self) -> &mut Session {
+        self.extensions
+            .get_mut::<Session>()
+            .expect("Session extension missing. Did you forget to add the SessionMiddleware?")
+    }
+
+    async fn form_data(&mut self) -> Result<Bytes> {
+        todo!()
+    }
+
+    #[cfg(feature = "json")]
+    async fn json<T: serde::de::DeserializeOwned>(&mut self) -> Result<T> {
+        todo!()
+    }
+
+    fn content_type(&self) -> Option<&http::HeaderValue> {
+        self.headers.get(http::header::CONTENT_TYPE)
     }
 
     fn expect_content_type(&mut self, expected: &'static str) -> Result<()> {

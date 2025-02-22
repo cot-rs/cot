@@ -8,6 +8,7 @@ use cot::db::{model, query, Model};
 use cot::form::Form;
 use cot::middleware::SessionMiddleware;
 use cot::project::{WithApps, WithConfig};
+use cot::request::extractors::Path;
 use cot::request::{Request, RequestExt};
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
@@ -64,9 +65,7 @@ async fn add_todo(mut request: Request) -> cot::Result<Response> {
     Ok(reverse_redirect!(request, "index")?)
 }
 
-async fn remove_todo(request: Request) -> cot::Result<Response> {
-    let todo_id: i32 = request.path_params().parse()?;
-
+async fn remove_todo(request: Request, Path(todo_id): Path<i32>) -> cot::Result<Response> {
     {
         query!(TodoItem, $id == todo_id)
             .delete(request.db())

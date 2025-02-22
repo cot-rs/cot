@@ -29,17 +29,16 @@ use crate::response::{Response, ResponseExt};
 use crate::router::Router;
 use crate::{reverse_redirect, static_files, App, Body, Method, RequestHandler, StatusCode};
 
-struct AdminAuthenticated<T: Send + Sync>(T);
+struct AdminAuthenticated<T, H: Send + Sync>(H, PhantomData<fn() -> T>);
 
-impl<T: RequestHandler + Send + Sync> AdminAuthenticated<T> {
+impl<T, H: RequestHandler<T> + Send + Sync> AdminAuthenticated<T, H> {
     #[must_use]
-    fn new(handler: T) -> Self {
-        Self(handler)
+    fn new(handler: H) -> Self {
+        Self(handler, PhantomData)
     }
 }
 
-#[async_trait]
-impl<T: RequestHandler + Send + Sync> RequestHandler for AdminAuthenticated<T> {
+impl<T, H: RequestHandler<T> + Send + Sync> RequestHandler<T> for AdminAuthenticated<T, H> {
     async fn handle(&self, mut request: Request) -> crate::Result<Response> {
         if !request.user().await?.is_authenticated() {
             return Ok(reverse_redirect!(request, "login")?);

@@ -30,6 +30,7 @@ use crate::headers::JSON_CONTENT_TYPE;
 use crate::router::Router;
 use crate::{Body, Result};
 
+pub mod extractors;
 mod path_params_deserializer;
 
 /// HTTP request type.

@@ -31,7 +31,7 @@ use derive_more::with_trait::Debug;
 use tracing::debug;
 
 use crate::error::ErrorRepr;
-use crate::handler::RequestHandler;
+use crate::handler::{into_box_request_handler, BoxRequestHandler, RequestHandler};
 use crate::request::{AppName, PathParams, Request, RouteName};
 use crate::response::{not_found_response, Response};
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
@@ -333,7 +333,7 @@ impl Default for Router {
 #[derive(Debug)]
 struct HandlerFound<'a> {
     #[debug("handler(...)")]
-    handler: &'a (dyn RequestHandler + Send + Sync),
+    handler: &'a (dyn BoxRequestHandler + Send + Sync),
     app_name: Option<AppName>,
     name: Option<RouteName>,
     params: Vec<(String, String)>,
@@ -442,10 +442,14 @@ impl Route {
     /// let route = Route::with_handler("/", home);
     /// ```
     #[must_use]
-    pub fn with_handler<V: RequestHandler + Send + Sync + 'static>(url: &str, view: V) -> Self {
+    pub fn with_handler<HandlerParams, H>(url: &str, handler: H) -> Self
+    where
+        HandlerParams: 'static,
+        H: RequestHandler<HandlerParams> + Send + Sync + 'static,
+    {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(view)),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: None,
         }
     }
@@ -466,14 +470,15 @@ impl Route {
     /// let route = Route::with_handler_and_name("/", home, "home");
     /// ```
     #[must_use]
-    pub fn with_handler_and_name<T: Into<String>, V: RequestHandler + Send + Sync + 'static>(
-        url: &str,
-        view: V,
-        name: T,
-    ) -> Self {
+    pub fn with_handler_and_name<N, HandlerParams, H>(url: &str, handler: H, name: N) -> Self
+    where
+        N: Into<String>,
+        HandlerParams: 'static,
+        H: RequestHandler<HandlerParams> + Send + Sync + 'static,
+    {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(view)),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: Some(RouteName(name.into())),
         }
     }
@@ -572,7 +577,7 @@ pub(crate) enum RouteKind {
 
 #[derive(Clone)]
 enum RouteInner {
-    Handler(Arc<dyn RequestHandler + Send + Sync>),
+    Handler(Arc<dyn BoxRequestHandler + Send + Sync>),
     Router(Router),
 }
 
@@ -702,7 +707,6 @@ mod tests {
 
     struct MockHandler;
 
-    #[async_trait::async_trait]
     impl RequestHandler for MockHandler {
         async fn handle(&self, _request: Request) -> Result<Response> {
             Ok(Response::new_html(

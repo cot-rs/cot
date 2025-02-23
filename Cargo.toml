@@ -59,7 +59,6 @@ cargo_toml = "0.21"
 chrono = { version = "0.4", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
-convert_case = "0.7"
 cot = { version = "0.1.1", path = "cot" }
 cot_codegen = { version = "0.1.2", path = "cot-codegen" }
 cot_macros = { version = "0.1.2", path = "cot-macros" }
@@ -111,5 +110,6 @@ tower-livereload = "0.9.6"
 tower-sessions = { version = "0.14", default-features = false }
 tracing = { version = "0.1", default-features = false }
 tracing-subscriber = "0.3"
+tracing-test = "0.2"
 trybuild = { version = "1", features = ["diff"] }
 url = "2"

@@ -46,6 +46,10 @@
     feature(doc_cfg, doc_auto_cfg, rustdoc_missing_doc_code_examples)
 )]
 #![cfg_attr(docsrs, warn(rustdoc::missing_doc_code_examples))]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/cot-rs/media/6585c518/logo/logo.svg",
+    html_favicon_url = "https://raw.githubusercontent.com/cot-rs/media/6585c518/logo/favicon.svg"
+)]
 
 extern crate self as cot;
 

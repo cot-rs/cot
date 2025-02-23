@@ -1,5 +1,5 @@
 <div align="center">
-<h1>Cot</h1>
+<h1><img src="https://raw.githubusercontent.com/cot-rs/media/6585c518/logo/logo-text.svg" alt="Cot" width="300"></h1>
 
 [![Rust Build Status](https://github.com/cot-rs/cot/workflows/Rust%20CI/badge.svg)](https://github.com/cot-rs/cot/actions/workflows/rust.yml)
 [![crates.io](https://img.shields.io/crates/v/cot.svg)](https://crates.io/crates/cot)

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/cot-rs/cot/compare/cot-v0.1.1...cot-v0.1.2) - 2025-02-23
+
+### Fixed
+
+- switch back to using non-prerelease versions of crypto crates (#188)
+
 ## [0.1.1](https://github.com/cot-rs/cot/compare/cot-v0.1.0...cot-v0.1.1) - 2025-02-21
 
 ### Other

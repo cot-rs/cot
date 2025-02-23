@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/cot-rs/cot/compare/cot-cli-v0.1.1...cot-cli-v0.1.2) - 2025-02-23
+
+### Fixed
+
+- add Cargo.lock to project template to avoid broken dependencies (#191)
+
 ## [0.1.1](https://github.com/cot-rs/cot/compare/cot-cli-v0.1.0...cot-cli-v0.1.1) - 2025-02-21
 
 ### Other

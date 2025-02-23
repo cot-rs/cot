@@ -1,0 +1,24 @@
+[workspace]
+git_release_enable = false
+
+git_release_body = """
+{{ changelog }}
+{% if remote.contributors %}
+### Contributors
+{% for contributor in remote.contributors %}
+* @{{ contributor.username }}
+{% endfor %}
+{% endif %}
+"""
+
+[[package]]
+name = "cot"  # name of the package to configure
+# include commits from internal crates in the changelog
+changelog_include = ["cot-codegen", "cot-macros"]
+# set the path of the changelog to the root of the repository
+changelog_path = "./CHANGELOG.md"
+git_release_enable = true  # create GitHub release
+
+[[package]]
+name = "cot-cli"  # name of the package to configure
+git_release_enable = true  # create GitHub release

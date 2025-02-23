@@ -13,8 +13,9 @@ macro_rules! project_file {
     };
 }
 
-const PROJECT_FILES: [(&str, &str); 9] = [
+const PROJECT_FILES: [(&str, &str); 10] = [
     project_file!("Cargo.toml.template"),
+    project_file!("Cargo.lock.template"),
     project_file!("bacon.toml"),
     project_file!(".gitignore"),
     project_file!("src/main.rs"),
@@ -28,7 +29,6 @@ const PROJECT_FILES: [(&str, &str); 9] = [
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CotSource<'a> {
     Git,
-    #[allow(dead_code)] // used in integration tests
     Path(&'a Path),
     PublishedCrate,
 }

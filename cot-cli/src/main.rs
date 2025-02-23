@@ -7,7 +7,7 @@ mod utils;
 use std::path::PathBuf;
 
 use anyhow::Context;
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -32,9 +32,8 @@ enum Commands {
         /// Set the resulting crate name (defaults to the directory name)
         #[arg(long)]
         name: Option<String>,
-        /// Use the latest `cot` version from git instead of a published crate
-        #[arg(long)]
-        use_git: bool,
+        #[command(flatten)]
+        source: CotSourceArgs,
     },
     /// Generate migrations for a Cot project
     MakeMigrations {
@@ -49,6 +48,17 @@ enum Commands {
         #[arg(long)]
         output_dir: Option<PathBuf>,
     },
+}
+
+#[derive(Debug, Args)]
+#[group(multiple = false)]
+struct CotSourceArgs {
+    /// Use the latest `cot` version from git instead of a published crate
+    #[arg(long, group = "cot_source")]
+    use_git: bool,
+    /// Use `cot` from the specified path instead of a published crate
+    #[arg(long, group = "cot_source")]
+    cot_path: Option<PathBuf>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -66,7 +76,7 @@ fn main() -> anyhow::Result<()> {
         Commands::New {
             path,
             name,
-            use_git,
+            source: cot_source,
         } => {
             let project_name = match name {
                 None => {
@@ -78,8 +88,10 @@ fn main() -> anyhow::Result<()> {
                 Some(name) => name,
             };
 
-            let cot_source = if use_git {
+            let cot_source = if cot_source.use_git {
                 CotSource::Git
+            } else if let Some(path) = &cot_source.cot_path {
+                CotSource::Path(path)
             } else {
                 CotSource::PublishedCrate
             };

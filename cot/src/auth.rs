@@ -173,7 +173,7 @@ pub trait User {
     ///
     /// use cot::auth::{Password, SessionAuthHash, User, UserId};
     /// use cot::config::SecretKey;
-    /// use hmac::{Hmac, KeyInit, Mac};
+    /// use hmac::{Hmac, Mac};
     /// use sha2::Sha512;
     ///
     /// struct MyUser {
@@ -325,7 +325,7 @@ impl User for AnonymousUser {}
 ///
 /// use cot::auth::{Password, SessionAuthHash, User, UserId};
 /// use cot::config::SecretKey;
-/// use hmac::{Hmac, KeyInit, Mac};
+/// use hmac::{Hmac, Mac};
 /// use sha2::Sha512;
 ///
 /// struct MyUser {

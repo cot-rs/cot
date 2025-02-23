@@ -43,6 +43,28 @@ We are also using [`pre-commit`](https://pre-commit.com/) hooks to handle
 formatting and linting. See the `pre-commit` website for installation
 instructions. This handles formatting of all the files in the repository.
 
+### Dependencies
+
+When adding a new dependency to the project, please consider if it's actually
+needed and if it's possible to avoid it. If it's not plausible, make sure
+that the dependency is well-maintained and has a permissive license.
+
+When adding a new dependency, please add it to the `Cargo.toml` file of the
+workspace root, not to the `Cargo.toml` file of the crate, even if it's
+not being used in any other crate. This way, all the dependencies are in
+one place, and it's easier to manage them. The only exception to this rule
+is the `examples` directory – examples should have all their dependencies
+(except for the `cot` crate) listed in their own `Cargo.toml` file, so it's
+easier to copy them to a new project.
+
+The dependency's version should be pinned to the least specific version
+possible. This means you should avoid specifying the patch and minor version,
+as long as it works with your patch. The CI will check if the project builds
+with the minimum version specified in the `Cargo.toml` file. By doing this,
+we ensure that the project is not tied to a specific version of the dependencies,
+potentially avoiding duplicate dependencies in the tree, and, more importantly,
+avoiding problems when one of the dependencies is yanked.
+
 ## Conduct
 
 We follow the [Code of Conduct](CODE_OF_CONDUCT.md).

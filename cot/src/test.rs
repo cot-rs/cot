@@ -855,6 +855,7 @@ impl TestDatabase {
     ///     "create_users",
     ///     vec![],
     ///     vec![],
+    ///     vec![],
     /// )]);
     /// # Ok(())
     /// # }
@@ -886,6 +887,7 @@ impl TestDatabase {
     /// test_database.add_migrations(vec![TestMigration::new(
     ///     "auth",
     ///     "create_users",
+    ///     vec![],
     ///     vec![],
     ///     vec![],
     /// )]);
@@ -1010,7 +1012,7 @@ enum TestDatabaseKind {
 ///         .primary_key()])
 ///     .build();
 ///
-/// let migration = TestMigration::new("auth", "create_users", vec![], vec![OPERATION]);
+/// let migration = TestMigration::new("auth", "create_users", vec![], vec![], vec![OPERATION]);
 /// ```
 #[cfg(feature = "db")]
 #[derive(Debug, Clone)]

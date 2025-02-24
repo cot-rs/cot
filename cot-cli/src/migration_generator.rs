@@ -97,6 +97,41 @@ pub fn list_migrations(path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn squash_migrations(
+    path: &Path,
+    options: MigrationGeneratorOptions,
+    squash_from: Option<String>,
+    squash_to: Option<String>,
+) -> anyhow::Result<()> {
+    match find_cargo_toml(
+        &path
+            .canonicalize()
+            .with_context(|| "unable to canonicalize Cargo.toml path")?,
+    ) {
+        Some(cargo_toml_path) => {
+            let manifest = Manifest::from_path(&cargo_toml_path)
+                .with_context(|| "unable to read Cargo.toml")?;
+            let crate_name = manifest
+                .package
+                .with_context(|| "unable to find package in Cargo.toml")?
+                .name;
+
+            let mut generator = MigrationGenerator::new(cargo_toml_path, crate_name, options);
+            let squashed = generator
+                .squash_migrations(squash_from, squash_to)
+                .with_context(|| "unable to squash migrations")?;
+            generator
+                .save_file(squashed)
+                .with_context(|| "unable to save squashed migration")?;
+        }
+        None => {
+            bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct MigrationGeneratorOptions {
     pub app_name: Option<String>,
@@ -125,6 +160,178 @@ impl MigrationGenerator {
             crate_name,
             options,
         }
+    }
+
+    fn save_file(&self, file: SourceFile) -> anyhow::Result<()> {
+        let path = file.path;
+        let content = prettyplease::unparse(&file.content);
+
+        std::fs::create_dir_all(&path.parent().unwrap()).with_context(|| {
+            format!("unable to create migrations directory: {}", path.display())
+        })?;
+
+        let mut file = File::create(&path)
+            .with_context(|| format!("unable to create migration file: {}", path.display()))?;
+        file.write_all(content.as_bytes())
+            .with_context(|| "unable to write migration file")?;
+
+        info!("Generated migration: {}", path.display());
+
+        Ok(())
+    }
+
+    fn squash_migrations(
+        &mut self,
+        squash_from: Option<String>,
+        squash_to: Option<String>,
+    ) -> anyhow::Result<SourceFile> {
+        let migrations_dir = self
+            .cargo_toml_path
+            .parent()
+            .with_context(|| "unable to find parent dir")?
+            .join("src")
+            .join("migrations");
+        let migrations = Self::get_migration_list(&migrations_dir)?;
+
+        if migrations.is_empty() {
+            bail!("no migrations found");
+        }
+
+        let from = squash_from.unwrap_or_else(|| migrations.first().unwrap().clone());
+        let to = squash_to.unwrap_or_else(|| migrations.last().unwrap().clone());
+
+        let from_index = migrations
+            .iter()
+            .position(|migration| migration == &from)
+            .with_context(|| "unable to find from migration")?;
+        let migrations_to_include = migrations
+            .iter()
+            .skip(from_index)
+            .position(|migration| migration == &to)
+            .with_context(|| "unable to find to migration")?;
+
+        let migrations = migrations
+            .into_iter()
+            .skip(from_index)
+            .take(migrations_to_include + 1)
+            .collect::<Vec<_>>();
+
+        if migrations.is_empty() || migrations.len() == 1 {
+            bail!("no migrations found to squash");
+        }
+
+        let first = migrations
+            .first()
+            .expect("array with two or more entries has to have first element")
+            .split("_")
+            .nth(1)
+            .with_context(|| "migration is improperly named")?;
+        let last = migrations
+            .last()
+            .expect("array with two or more entries has to have last element")
+            .split("_")
+            .nth(1)
+            .with_context(|| "migration is improperly named")?;
+
+        let migration_name = format!("{MIGRATIONS_MODULE_PREFIX}{}_squashed_{}", first, last);
+        let merged_migration = self.merge_migrations(&migrations_dir, migrations)?;
+
+        let file = SourceFile {
+            path: migrations_dir.join(migration_name).with_extension("rs"),
+            content: merged_migration,
+        };
+
+        Ok(file)
+    }
+
+    fn merge_migrations(
+        &mut self,
+        migrations_dir: &Path,
+        migrations: Vec<String>,
+    ) -> anyhow::Result<syn::File> {
+        assert!(
+            migrations.len() >= 2,
+            "at least two migrations are required"
+        );
+
+        let file_name = format!("{}.rs", &migrations[0]);
+        let mut source_file = Self::parse_file(migrations_dir, PathBuf::from(file_name))
+            .with_context(|| format!("unable to parse migration file: {}", &migrations[0]))?
+            .content;
+
+        for migration in migrations.iter().skip(1) {
+            let file_name = format!("{}.rs", migration);
+            let inner_source_file = Self::parse_file(migrations_dir, PathBuf::from(file_name))
+                .with_context(|| format!("unable to parse migration file: {migration}"))?
+                .content;
+
+            Self::merge_files(&mut source_file, inner_source_file);
+        }
+
+        Ok(source_file)
+    }
+
+    fn merge_files(acc: &mut syn::File, file: syn::File) {
+        todo!()
+    }
+
+    fn parse_migration_file(
+        &mut self,
+        file: SourceFile,
+    ) -> anyhow::Result<(Vec<ModelInSource>, Vec<DynDependency>, Vec<DynOperation>)> {
+        let syn::Item::Impl(item_impl) = file
+            .content
+            .items
+            .iter()
+            .find(|item| {
+                if let syn::Item::Impl(imp) = item {
+                    if let Some((_, path, _)) = imp.trait_.as_ref() {
+                        path.segments.last().unwrap().ident == "Migration"
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            })
+            .with_context(|| "migration file does not contain migration")?
+        else {
+            bail!("migration file does not contain migration")
+        };
+
+        let consts: Vec<&syn::ImplItemConst> = item_impl
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::ImplItem::Const(const_item) => Some(const_item),
+                _ => None,
+            })
+            .collect();
+
+        let deps = consts
+            .iter()
+            .find(|const_item| const_item.ident == "DEPENDENCIES")
+            .with_context(|| "migration file does not contain DEPENDENCIES")?
+            .expr
+            .clone();
+
+        let ops = consts
+            .iter()
+            .find(|const_item| const_item.ident == "OPERATIONS")
+            .with_context(|| "migration file does not contain OPERATIONS")?
+            .expr
+            .clone();
+
+        // print deps as rust code
+        let tokens = deps.to_token_stream();
+        println!("Deps: {:?}", tokens);
+        println!("{}", tokens.to_string());
+
+        println!("");
+        // println!("Ops: {:?}", ops);
+        exit(1);
+
+        Ok((vec![], vec![], vec![]))
     }
 
     fn generate_and_write_migrations(&mut self) -> anyhow::Result<()> {

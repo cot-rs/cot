@@ -1613,6 +1613,9 @@ mod tests {
             app_name: "app1".to_string(),
             name: "m0001_initial".to_string(),
             models: vec![],
+            dependencies: vec![],
+            replaces: vec![],
+            operations: vec![],
         }];
         let processor = MigrationProcessor::new(migrations).unwrap();
 

@@ -15,7 +15,7 @@ use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_quote, Meta};
+use syn::{parse_quote, Expr, Meta, Type};
 use tracing::{debug, info, trace};
 
 use crate::utils::find_cargo_toml;
@@ -120,8 +120,13 @@ pub fn squash_migrations(
             let squashed = generator
                 .squash_migrations(squash_from, squash_to)
                 .with_context(|| "unable to squash migrations")?;
+
+            let migration_name = squashed.name.clone();
+            let content = generator.generate_migration_file_content2(squashed);
+            let migration = MigrationAsSource::new(migration_name, content);
+
             generator
-                .save_file(&squashed)
+                .write_migration(&migration)
                 .with_context(|| "unable to save squashed migration")?;
         }
         None => {
@@ -170,13 +175,10 @@ impl MigrationGenerator {
             format!("unable to create migrations directory: {}", path.display())
         })?;
 
-        let path = path
-            .canonicalize()
-            .with_context(|| "unable to canonicalize path")?;
-
-        if path.is_absolute() && !path.starts_with(&migration_path) {
-            bail!("path is not in migrations directory");
-        }
+        let path = migration_path.join(
+            path.file_name()
+                .with_context(|| "unable to get file name")?,
+        );
 
         let mut file = File::create(&path)
             .with_context(|| format!("unable to create migration file: {}", path.display()))?;
@@ -188,163 +190,129 @@ impl MigrationGenerator {
         Ok(())
     }
 
-    fn save_file(&self, file: &SourceFile) -> anyhow::Result<()> {
-        let content = prettyplease::unparse(&file.content);
-        self.save_data_to_file(&file.path, &content)
-    }
-
     fn squash_migrations(
         &mut self,
         squash_from: Option<String>,
         squash_to: Option<String>,
-    ) -> anyhow::Result<SourceFile> {
-        let migrations_dir = self
-            .cargo_toml_path
-            .parent()
-            .with_context(|| "unable to find parent dir")?
-            .join("src")
-            .join("migrations");
-        let migrations = Self::get_migration_list(&migrations_dir)?;
+    ) -> anyhow::Result<Migration> {
+        let source_files: Vec<SourceFile> = self
+            .get_source_files()?
+            .into_iter()
+            .filter(|file| file.path.starts_with(MIGRATIONS_MODULE_NAME))
+            .collect();
+
+        let AppState { models, migrations } = self.process_source_files(source_files.clone())?;
+        assert!(
+            models.is_empty(),
+            "no application models should be present in migrations"
+        );
 
         if migrations.is_empty() {
             bail!("no migrations found");
         }
 
-        let from = squash_from.unwrap_or_else(|| migrations.first().unwrap().clone());
-        let to = squash_to.unwrap_or_else(|| migrations.last().unwrap().clone());
+        let migrations = {
+            let from = squash_from.unwrap_or_else(|| {
+                migrations
+                    .first()
+                    .expect("array with entries has to have last element")
+                    .name
+                    .clone()
+            });
+            let to = squash_to.unwrap_or_else(|| {
+                migrations
+                    .last()
+                    .expect("array with entries has to have last element")
+                    .name
+                    .clone()
+            });
 
-        let from_index = migrations
-            .iter()
-            .position(|migration| migration == &from)
-            .with_context(|| "unable to find from migration")?;
-        let migrations_to_include = migrations
-            .iter()
-            .skip(from_index)
-            .position(|migration| migration == &to)
-            .with_context(|| "unable to find to migration")?;
+            let from_index = migrations
+                .iter()
+                .position(|migration| migration.name == from)
+                .with_context(|| "unable to find from migration")?;
+            let migrations_to_include = migrations
+                .iter()
+                .skip(from_index)
+                .position(|migration| migration.name == to)
+                .with_context(|| "unable to find to migration")?;
 
-        let migrations = migrations
-            .into_iter()
-            .skip(from_index)
-            .take(migrations_to_include + 1)
-            .collect::<Vec<_>>();
+            migrations
+                .into_iter()
+                .skip(from_index)
+                .take(migrations_to_include + 1)
+                .collect::<Vec<_>>()
+        };
+        let migrations_names = migrations
+            .iter()
+            .map(|m| m.name.clone())
+            .collect::<HashSet<_>>();
+        let app_name = self
+            .options
+            .app_name
+            .as_ref()
+            .unwrap_or(&self.crate_name)
+            .clone();
 
         if migrations.is_empty() || migrations.len() == 1 {
             bail!("no migrations found to squash");
         }
 
-        let first = migrations
-            .first()
-            .expect("array with two or more entries has to have first element")
-            .split("_")
-            .nth(1)
-            .with_context(|| "migration is improperly named")?;
-        let last = migrations
-            .last()
-            .expect("array with two or more entries has to have last element")
-            .split("_")
-            .nth(1)
-            .with_context(|| "migration is improperly named")?;
+        let new_migration_name = {
+            let first = migrations
+                .first()
+                .expect("array with entries has to have first element")
+                .name
+                .split("_")
+                .nth(1)
+                .with_context(|| "migration is improperly named")?;
+            let last = migrations
+                .last()
+                .expect("array with entries has to have last element")
+                .name
+                .split("_")
+                .nth(1)
+                .with_context(|| "migration is improperly named")?;
 
-        let migration_name = format!("{MIGRATIONS_MODULE_PREFIX}{}_squashed_{}", first, last);
-        let merged_migration = self.merge_migrations(&migrations_dir, migrations)?;
+            let now = chrono::Utc::now();
+            let date_time = now.format("%Y%m%d_%H%M%S");
 
-        let file = SourceFile {
-            path: migrations_dir.join(migration_name).with_extension("rs"),
-            content: merged_migration,
+            format!("{MIGRATIONS_MODULE_PREFIX}{first}_squashed_{last}_auto_{date_time}")
         };
 
-        Ok(file)
-    }
-
-    fn merge_migrations(
-        &mut self,
-        migrations_dir: &Path,
-        migrations: Vec<String>,
-    ) -> anyhow::Result<syn::File> {
-        assert!(
-            migrations.len() >= 2,
-            "at least two migrations are required"
-        );
-
-        let file_name = format!("{}.rs", &migrations[0]);
-        let mut source_file = Self::parse_file(migrations_dir, PathBuf::from(file_name))
-            .with_context(|| format!("unable to parse migration file: {}", &migrations[0]))?
-            .content;
-
-        for migration in migrations.iter().skip(1) {
-            let file_name = format!("{}.rs", migration);
-            let inner_source_file = Self::parse_file(migrations_dir, PathBuf::from(file_name))
-                .with_context(|| format!("unable to parse migration file: {migration}"))?
-                .content;
-
-            Self::merge_files(&mut source_file, inner_source_file);
-        }
-
-        Ok(source_file)
-    }
-
-    fn merge_files(acc: &mut syn::File, file: syn::File) {
-        todo!()
-    }
-
-    fn parse_migration_file(
-        &mut self,
-        file: SourceFile,
-    ) -> anyhow::Result<(Vec<ModelInSource>, Vec<DynDependency>, Vec<DynOperation>)> {
-        let syn::Item::Impl(item_impl) = file
-            .content
-            .items
+        let replaces = migrations
             .iter()
-            .find(|item| {
-                if let syn::Item::Impl(imp) = item {
-                    if let Some((_, path, _)) = imp.trait_.as_ref() {
-                        path.segments.last().unwrap().ident == "Migration"
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            })
-            .with_context(|| "migration file does not contain migration")?
-        else {
-            bail!("migration file does not contain migration")
-        };
-
-        let consts: Vec<&syn::ImplItemConst> = item_impl
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                syn::ImplItem::Const(const_item) => Some(const_item),
-                _ => None,
-            })
+            .map(|migration| migration.name.clone())
             .collect();
 
-        let deps = consts
+        let dependencies = migrations
             .iter()
-            .find(|const_item| const_item.ident == "DEPENDENCIES")
-            .with_context(|| "migration file does not contain DEPENDENCIES")?
-            .expr
-            .clone();
-
-        let ops = consts
+            .flat_map(|m| m.dependencies.clone())
+            .filter(|dep| !migrations_names.contains(&dep.to_string()))
+            .fold(HashMap::new(), |mut acc, dep| {
+                acc.insert(dep.to_string(), dep);
+                acc
+            })
+            .into_values()
+            .collect();
+        let operations = migrations
             .iter()
-            .find(|const_item| const_item.ident == "OPERATIONS")
-            .with_context(|| "migration file does not contain OPERATIONS")?
-            .expr
-            .clone();
+            .flat_map(|m| m.operations.clone())
+            .collect();
 
-        // print deps as rust code
-        let tokens = deps.to_token_stream();
-        println!("Deps: {:?}", tokens);
-        println!("{}", tokens.to_string());
+        let processor = MigrationProcessor::new(migrations)?;
+        let modified_models: Vec<ModelInSource> = processor.latest_models();
 
-        println!("");
-        // println!("Ops: {:?}", ops);
-        exit(1);
+        let squashed_migration = Migration {
+            app_name,
+            name: new_migration_name,
+            models: modified_models,
+            dependencies,
+            replaces,
+            operations,
+        };
 
-        Ok((vec![], vec![], vec![]))
+        Ok(squashed_migration)
     }
 
     fn generate_and_write_migrations(&mut self) -> anyhow::Result<()> {
@@ -472,38 +440,73 @@ impl MigrationGenerator {
 
         let symbol_resolver = SymbolResolver::from_file(&file, &path);
 
+        let mut operations: Vec<TokenStream> = Vec::new();
+        let mut dependencies: Vec<TokenStream> = Vec::new();
+        let mut replaces: Vec<String> = Vec::new();
+
         let mut migration_models = Vec::new();
         for item in file.items {
-            if let syn::Item::Struct(mut item) = item {
-                for attr in &item.attrs.clone() {
-                    if is_model_attr(attr) {
-                        symbol_resolver.resolve_struct(&mut item);
+            match item {
+                syn::Item::Struct(mut item) => {
+                    for attr in &item.attrs.clone() {
+                        if is_model_attr(attr) {
+                            symbol_resolver.resolve_struct(&mut item);
 
-                        let args = Self::args_from_attr(&path, attr)?;
-                        let model_in_source =
-                            ModelInSource::from_item(item, &args, &symbol_resolver)?;
+                            let args = Self::args_from_attr(&path, attr)?;
+                            let model_in_source =
+                                ModelInSource::from_item(item, &args, &symbol_resolver)?;
 
-                        match args.model_type {
-                            ModelType::Application => {
-                                trace!(
-                                    "Found an Application model: {}",
-                                    model_in_source.model.name.to_string()
-                                );
-                                app_state.models.push(model_in_source);
+                            match args.model_type {
+                                ModelType::Application => {
+                                    trace!(
+                                        "Found an Application model: {}",
+                                        model_in_source.model.name.to_string()
+                                    );
+                                    app_state.models.push(model_in_source);
+                                }
+                                ModelType::Migration => {
+                                    trace!(
+                                        "Found a Migration model: {}",
+                                        model_in_source.model.name.to_string()
+                                    );
+                                    migration_models.push(model_in_source);
+                                }
+                                ModelType::Internal => {}
                             }
-                            ModelType::Migration => {
-                                trace!(
-                                    "Found a Migration model: {}",
-                                    model_in_source.model.name.to_string()
-                                );
-                                migration_models.push(model_in_source);
-                            }
-                            ModelType::Internal => {}
+
+                            break;
                         }
-
-                        break;
                     }
                 }
+                syn::Item::Impl(mut item_impl) => {
+                    if let Type::Path(type_path) = &*item_impl.self_ty {
+                        if let Some(ident) = type_path.path.get_ident() {
+                            if ident != "Migration" {
+                                break;
+                            }
+                        }
+                    }
+
+                    for item in item_impl.items {
+                        // It's jank and will need to be improved in the future, but I have no idea
+                        // how to parse it better
+                        if let syn::ImplItem::Const(const_item) = item {
+                            match const_item.ident.to_string().as_str() {
+                                "DEPENDENCIES" => {
+                                    dependencies = Self::parse_dependency_constant(&const_item)?;
+                                }
+                                "REPLACES" => {
+                                    replaces = Self::parse_replaces_constant(&const_item)?;
+                                }
+                                "OPERATIONS" => {
+                                    operations = Self::parse_operations_constant(&const_item)?;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -517,10 +520,86 @@ impl MigrationGenerator {
                 app_name: self.crate_name.clone(),
                 name: migration_name,
                 models: migration_models,
+                dependencies,
+                replaces,
+                operations,
             });
         }
 
         Ok(())
+    }
+
+    fn parse_dependency_constant(
+        const_item: &syn::ImplItemConst,
+    ) -> anyhow::Result<Vec<TokenStream>> {
+        let Expr::Reference(expr) = &const_item.expr else {
+            bail!("DEPENDENCIES constant is not a reference")
+        };
+        let Expr::Array(expr) = &*expr.expr else {
+            bail!("DEPENDENCIES constant is not an array")
+        };
+
+        let deps = expr
+            .elems
+            .iter()
+            .filter_map(|expr| {
+                if let Expr::Call(expr) = expr {
+                    Some(expr.to_token_stream())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(deps)
+    }
+
+    fn parse_replaces_constant(const_item: &syn::ImplItemConst) -> anyhow::Result<Vec<String>> {
+        let Expr::Reference(expr) = &const_item.expr else {
+            bail!("OPERATIONS constant is not a reference")
+        };
+        let Expr::Array(expr) = &*expr.expr else {
+            bail!("OPERATIONS constant is not an array")
+        };
+
+        let ops = expr
+            .elems
+            .iter()
+            .filter_map(|expr| {
+                if let Expr::Lit(expr) = expr {
+                    Some(expr.to_token_stream().to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(ops)
+    }
+
+    fn parse_operations_constant(
+        const_item: &syn::ImplItemConst,
+    ) -> anyhow::Result<Vec<TokenStream>> {
+        let Expr::Reference(expr) = &const_item.expr else {
+            bail!("OPERATIONS constant is not a reference")
+        };
+        let Expr::Array(expr) = &*expr.expr else {
+            bail!("OPERATIONS constant is not an array")
+        };
+
+        let ops = expr
+            .elems
+            .iter()
+            .filter_map(|expr| {
+                if let Expr::MethodCall(expr) = expr {
+                    Some(expr.to_token_stream())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(ops)
     }
 
     fn args_from_attr(path: &Path, attr: &syn::Attribute) -> Result<ModelArgs, ParsingError> {
@@ -698,6 +777,11 @@ impl MigrationGenerator {
             .into_iter()
             .map(|dependency| dependency.repr())
             .collect();
+        let replaces: Vec<_> = migration
+            .replaces
+            .iter()
+            .filter(|r| !r.contains("squashed"))
+            .collect();
 
         let app_name = self.options.app_name.as_ref().unwrap_or(&self.crate_name);
         let migration_name = &migration.migration_name;
@@ -711,6 +795,9 @@ impl MigrationGenerator {
                 const DEPENDENCIES: &'static [::cot::db::migrations::MigrationDependency] = &[
                     #(#dependencies,)*
                 ];
+                const REPLACES: &'static [&'static str] = &[
+                    #(#replaces,)*
+                ];
                 const OPERATIONS: &'static [::cot::db::migrations::Operation] = &[
                     #(#operations,)*
                 ];
@@ -719,6 +806,44 @@ impl MigrationGenerator {
 
         let models = migration
             .modified_models
+            .iter()
+            .map(Self::model_to_migration_model)
+            .collect::<Vec<_>>();
+        let models_def = quote! {
+            #(#models)*
+        };
+
+        Self::generate_migration(migration_def, models_def)
+    }
+
+    fn generate_migration_file_content2(&self, migration: Migration) -> String {
+        let operations: Vec<_> = migration.operations;
+        let dependencies: Vec<_> = migration.dependencies;
+        let replaces: Vec<_> = migration.replaces;
+        let app_name = migration.app_name;
+        let migration_name = &migration.name;
+
+        let migration_def = quote! {
+            #[derive(Debug, Copy, Clone)]
+            pub(super) struct Migration;
+
+            impl ::cot::db::migrations::Migration for Migration {
+                const APP_NAME: &'static str = #app_name;
+                const MIGRATION_NAME: &'static str = #migration_name;
+                const DEPENDENCIES: &'static [::cot::db::migrations::MigrationDependency] = &[
+                    #(#dependencies,)*
+                ];
+                const REPLACES: &'static [&'static str] = &[
+                    #(#replaces,)*
+                ];
+                const OPERATIONS: &'static [::cot::db::migrations::Operation] = &[
+                    #(#operations,)*
+                ];
+            }
+        };
+
+        let models = migration
+            .models
             .iter()
             .map(Self::model_to_migration_model)
             .collect::<Vec<_>>();
@@ -761,7 +886,10 @@ impl MigrationGenerator {
     fn model_to_migration_model(model: &ModelInSource) -> TokenStream {
         let mut model_source = model.model_item.clone();
         model_source.vis = syn::Visibility::Inherited;
-        model_source.ident = format_ident!("_{}", model_source.ident);
+        // Squashed migration models already have underscore prefix
+        if !&model_source.ident.to_string().starts_with('_') {
+            model_source.ident = format_ident!("_{}", model_source.ident);
+        }
         model_source.attrs.clear();
         model_source
             .attrs
@@ -1288,11 +1416,20 @@ impl Repr for Field {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 struct Migration {
     app_name: String,
     name: String,
     models: Vec<ModelInSource>,
+    dependencies: Vec<TokenStream>,
+    replaces: Vec<String>,
+    operations: Vec<TokenStream>,
+}
+
+impl PartialEq for Migration {
+    fn eq(&self, other: &Self) -> bool {
+        self.app_name == other.app_name && self.name == other.name && self.models == other.models
+    }
 }
 
 impl DynMigration for Migration {

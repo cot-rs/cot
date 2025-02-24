@@ -13,7 +13,7 @@ use cot_codegen::symbol_resolver::SymbolResolver;
 use darling::FromMeta;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse_quote, Expr, Meta, Type};
 use tracing::{debug, info, trace};
@@ -288,7 +288,33 @@ impl MigrationGenerator {
         let dependencies = migrations
             .iter()
             .flat_map(|m| m.dependencies.clone())
-            .filter(|dep| !migrations_names.contains(&dep.to_string()))
+            .filter(|dep| {
+                let string = dep
+                    .clone()
+                    .into_iter()
+                    .filter_map(|d| {
+                        if let TokenTree::Group(group) = d {
+                            group
+                                .stream()
+                                .into_iter()
+                                .filter_map(|t| {
+                                    if let TokenTree::Literal(lit) = t {
+                                        Some(lit.to_string().trim_matches('"').to_string())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .skip(1)
+                                .next()
+                        } else {
+                            None
+                        }
+                    })
+                    .next();
+                string
+                    .map(|s| !migrations_names.contains(&s))
+                    .unwrap_or(true)
+            })
             .fold(HashMap::new(), |mut acc, dep| {
                 acc.insert(dep.to_string(), dep);
                 acc

@@ -168,8 +168,13 @@ impl MigrationGenerator {
             let migration_name = migration_processor.next_migration_name()?;
             let dependencies = migration_processor.base_dependencies();
 
-            let migration =
-                GeneratedMigration::new(migration_name, modified_models, dependencies, operations);
+            let migration = GeneratedMigration::new(
+                migration_name,
+                modified_models,
+                dependencies,
+                vec![],
+                operations,
+            );
             Ok(Some(migration))
         }
     }
@@ -796,6 +801,7 @@ pub struct GeneratedMigration {
     pub migration_name: String,
     pub modified_models: Vec<ModelInSource>,
     pub dependencies: Vec<DynDependency>,
+    pub replaces: Vec<String>,
     pub operations: Vec<DynOperation>,
 }
 
@@ -805,6 +811,7 @@ impl GeneratedMigration {
         migration_name: String,
         modified_models: Vec<ModelInSource>,
         mut dependencies: Vec<DynDependency>,
+        replaces: Vec<String>,
         mut operations: Vec<DynOperation>,
     ) -> Self {
         Self::remove_cycles(&mut operations);
@@ -815,6 +822,7 @@ impl GeneratedMigration {
             migration_name,
             modified_models,
             dependencies,
+            replaces,
             operations,
         }
     }
@@ -1096,6 +1104,10 @@ impl DynMigration for Migration {
     }
 
     fn dependencies(&self) -> &[cot::db::migrations::MigrationDependency] {
+        &[]
+    }
+
+    fn replaces(&self) -> &[&str] {
         &[]
     }
 

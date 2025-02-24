@@ -157,6 +157,7 @@ mod tests {
                 "app1",
                 "migration1",
                 [],
+                vec![],
                 [Operation::create_model()
                     .table_name(Identifier::new("model1"))
                     .fields(&[])
@@ -166,6 +167,7 @@ mod tests {
                 "app1",
                 "migration2",
                 [],
+                vec![],
                 [Operation::create_model()
                     .table_name(Identifier::new("model2"))
                     .fields(&[])
@@ -197,8 +199,8 @@ mod tests {
     #[test]
     fn sort() {
         let mut migrations = vec![
-            TestMigration::new("app1", "migration2", [], []),
-            TestMigration::new("app1", "migration1", [], []),
+            TestMigration::new("app1", "migration2", [], vec![], []),
+            TestMigration::new("app1", "migration1", [], vec![], []),
         ];
 
         let mut sorter = MigrationSorter::new(&mut migrations);
@@ -211,17 +213,19 @@ mod tests {
     #[test]
     fn toposort() {
         let mut migrations = vec![
-            TestMigration::new("app2", "migration_before", [], []),
+            TestMigration::new("app2", "migration_before", [], vec![], []),
             TestMigration::new(
                 "app2",
                 "migration_after",
                 [MigrationDependency::migration("app2", "migration_before")],
+                vec![],
                 [],
             ),
             TestMigration::new(
                 "app1",
                 "migration_before",
                 [MigrationDependency::migration("app2", "migration_before")],
+                vec![],
                 [],
             ),
             TestMigration::new(
@@ -231,6 +235,7 @@ mod tests {
                     MigrationDependency::migration("app1", "migration_before"),
                     MigrationDependency::migration("app2", "migration_after"),
                 ],
+                vec![],
                 [],
             ),
         ];
@@ -279,7 +284,13 @@ mod tests {
                 .map(|i| MigrationDependency::migration("app1", MIGRATION_NAMES[i]))
                 .collect::<Vec<_>>();
 
-            migrations.push(TestMigration::new("app1", MIGRATION_NAMES[i], deps, []));
+            migrations.push(TestMigration::new(
+                "app1",
+                MIGRATION_NAMES[i],
+                deps,
+                vec![],
+                [],
+            ));
         }
 
         let mut sorter = MigrationSorter::new(&mut migrations);
@@ -297,6 +308,7 @@ mod tests {
                 "app1",
                 "migration1",
                 [MigrationDependency::migration("app1", "migration2")],
+                vec![],
                 [Operation::create_model()
                     .table_name(Identifier::new("model1"))
                     .fields(&[])
@@ -306,6 +318,7 @@ mod tests {
                 "app1",
                 "migration2",
                 [MigrationDependency::migration("app1", "migration1")],
+                vec![],
                 [Operation::create_model()
                     .table_name(Identifier::new("model2"))
                     .fields(&[])
@@ -323,8 +336,8 @@ mod tests {
     #[test]
     fn duplicate_migration() {
         let mut migrations = vec![
-            TestMigration::new("app1", "migration1", [], []),
-            TestMigration::new("app1", "migration1", [], []),
+            TestMigration::new("app1", "migration1", [], vec![], []),
+            TestMigration::new("app1", "migration1", [], vec![], []),
         ];
 
         let mut sorter = MigrationSorter::new(&mut migrations);
@@ -344,6 +357,7 @@ mod tests {
                 "app1",
                 "migration1",
                 [],
+                vec![],
                 [Operation::create_model()
                     .table_name(Identifier::new("model1"))
                     .fields(&[])
@@ -353,6 +367,7 @@ mod tests {
                 "app1",
                 "migration2",
                 [],
+                vec![],
                 [Operation::create_model()
                     .table_name(Identifier::new("model1"))
                     .fields(&[])

@@ -1089,6 +1089,7 @@ impl AddFieldBuilder {
 ///     const APP_NAME: &'static str = "myapp";
 ///     const MIGRATION_NAME: &'static str = "m_0001_initial";
 ///     const DEPENDENCIES: &'static [MigrationDependency] = &[];
+///     const REPLACES: &'static [&'static str] = &[];
 ///     const OPERATIONS: &'static [Operation] = &[Operation::create_model()
 ///         .table_name(Identifier::new("todoapp__my_model"))
 ///         .fields(&[
@@ -1106,6 +1107,9 @@ pub trait Migration {
 
     /// The list of dependencies of the migration.
     const DEPENDENCIES: &'static [MigrationDependency];
+
+    /// The list of migrations this migration replaces.
+    const REPLACES: &'static [&'static str] = &[];
 
     /// The list of operations to apply in the migration.
     const OPERATIONS: &'static [Operation];
@@ -1130,6 +1134,9 @@ pub trait DynMigration {
     /// The list of dependencies of the migration.
     fn dependencies(&self) -> &[MigrationDependency];
 
+    /// The list of migrations this migration replaces.
+    fn replaces(&self) -> &[&str];
+
     /// The list of operations to apply in the migration.
     fn operations(&self) -> &[Operation];
 }
@@ -1150,6 +1157,10 @@ impl<T: Migration + Send + Sync + 'static> DynMigration for T {
         Self::DEPENDENCIES
     }
 
+    fn replaces(&self) -> &[&str] {
+        Self::REPLACES
+    }
+
     fn operations(&self) -> &[Operation] {
         Self::OPERATIONS
     }
@@ -1166,6 +1177,10 @@ impl DynMigration for &dyn DynMigration {
 
     fn dependencies(&self) -> &[MigrationDependency] {
         DynMigration::dependencies(*self)
+    }
+
+    fn replaces(&self) -> &[&str] {
+        DynMigration::replaces(*self)
     }
 
     fn operations(&self) -> &[Operation] {
@@ -1186,6 +1201,10 @@ impl DynMigration for &SyncDynMigration {
         DynMigration::dependencies(*self)
     }
 
+    fn replaces(&self) -> &[&str] {
+        DynMigration::replaces(*self)
+    }
+
     fn operations(&self) -> &[Operation] {
         DynMigration::operations(*self)
     }
@@ -1204,6 +1223,10 @@ impl DynMigration for Box<dyn DynMigration> {
         DynMigration::dependencies(&**self)
     }
 
+    fn replaces(&self) -> &[&str] {
+        DynMigration::replaces(&**self)
+    }
+
     fn operations(&self) -> &[Operation] {
         DynMigration::operations(&**self)
     }
@@ -1220,6 +1243,10 @@ impl DynMigration for Box<SyncDynMigration> {
 
     fn dependencies(&self) -> &[MigrationDependency] {
         DynMigration::dependencies(&**self)
+    }
+
+    fn replaces(&self) -> &[&str] {
+        DynMigration::replaces(&**self)
     }
 
     fn operations(&self) -> &[Operation] {
@@ -1247,6 +1274,10 @@ impl DynMigration for MigrationWrapper {
 
     fn dependencies(&self) -> &[MigrationDependency] {
         self.0.dependencies()
+    }
+
+    fn replaces(&self) -> &[&str] {
+        self.0.replaces()
     }
 
     fn operations(&self) -> &[Operation] {

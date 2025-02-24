@@ -121,7 +121,7 @@ pub fn squash_migrations(
                 .squash_migrations(squash_from, squash_to)
                 .with_context(|| "unable to squash migrations")?;
             generator
-                .save_file(squashed)
+                .save_file(&squashed)
                 .with_context(|| "unable to save squashed migration")?;
         }
         None => {
@@ -162,13 +162,21 @@ impl MigrationGenerator {
         }
     }
 
-    fn save_file(&self, file: SourceFile) -> anyhow::Result<()> {
-        let path = file.path;
-        let content = prettyplease::unparse(&file.content);
+    fn save_data_to_file(&self, path: &Path, content: &String) -> anyhow::Result<()> {
+        let src_path = self.get_src_path();
+        let migration_path = src_path.join(MIGRATIONS_MODULE_NAME);
 
-        std::fs::create_dir_all(&path.parent().unwrap()).with_context(|| {
+        std::fs::create_dir_all(&migration_path).with_context(|| {
             format!("unable to create migrations directory: {}", path.display())
         })?;
+
+        let path = path
+            .canonicalize()
+            .with_context(|| "unable to canonicalize path")?;
+
+        if path.is_absolute() && !path.starts_with(&migration_path) {
+            bail!("path is not in migrations directory");
+        }
 
         let mut file = File::create(&path)
             .with_context(|| format!("unable to create migration file: {}", path.display()))?;
@@ -178,6 +186,11 @@ impl MigrationGenerator {
         info!("Generated migration: {}", path.display());
 
         Ok(())
+    }
+
+    fn save_file(&self, file: &SourceFile) -> anyhow::Result<()> {
+        let content = prettyplease::unparse(&file.content);
+        self.save_data_to_file(&file.path, &content)
     }
 
     fn squash_migrations(
@@ -717,27 +730,8 @@ impl MigrationGenerator {
     }
 
     fn write_migration(&self, migration: &MigrationAsSource) -> anyhow::Result<()> {
-        let src_path = self.get_src_path();
-        let migration_path = src_path.join(MIGRATIONS_MODULE_NAME);
-        let migration_file = migration_path.join(format!("{}.rs", migration.name));
-
-        std::fs::create_dir_all(&migration_path).with_context(|| {
-            format!(
-                "unable to create migrations directory: {}",
-                migration_path.display()
-            )
-        })?;
-
-        let mut file = File::create(&migration_file).with_context(|| {
-            format!(
-                "unable to create migration file: {}",
-                migration_file.display()
-            )
-        })?;
-        file.write_all(migration.content.as_bytes())
-            .with_context(|| "unable to write migration file")?;
-        info!("Generated migration: {}", migration_file.display());
-        Ok(())
+        let file_name = format!("{}.rs", migration.name);
+        self.save_data_to_file(Path::new(&file_name), &migration.content)
     }
 
     #[must_use]

@@ -11,7 +11,9 @@ use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use crate::migration_generator::{make_migrations, MigrationGeneratorOptions};
+use crate::migration_generator::{
+    list_migrations, make_migrations, squash_migrations, MigrationGeneratorOptions,
+};
 use crate::new_project::{new_project, CotSource};
 
 #[derive(Debug, Parser)]
@@ -35,8 +37,22 @@ enum Commands {
         #[command(flatten)]
         source: CotSourceArgs,
     },
+
+    /// Manage migrations for a Cot project
+    #[command(subcommand)]
+    Migration(MigrationCommands),
+}
+
+#[derive(Debug, Subcommand)]
+enum MigrationCommands {
+    /// List all migrations for a Cot project
+    List {
+        /// Path to the crate directory to list migrations for (default:
+        /// current directory)
+        path: Option<PathBuf>,
+    },
     /// Generate migrations for a Cot project
-    MakeMigrations {
+    Make {
         /// Path to the crate directory to generate migrations for (default:
         /// current directory)
         path: Option<PathBuf>,
@@ -47,6 +63,25 @@ enum Commands {
         /// in the crate's src/ directory)
         #[arg(long)]
         output_dir: Option<PathBuf>,
+    },
+    /// Squash selected migrations into a single migration
+    Squash {
+        /// Path to the crate directory to generate migrations for (default:
+        /// current directory)
+        path: Option<PathBuf>,
+        /// Name of the app to use in the migration (default: crate name)
+        #[arg(long)]
+        app_name: Option<String>,
+        /// Directory to write the migrations to (default: migrations/ directory
+        /// in the crate's src/ directory)
+        #[arg(long)]
+        output_dir: Option<PathBuf>,
+        /// Name of the oldest migration to include (default: the first
+        /// migration)
+        from: Option<String>,
+        /// Name of the newest migration to include (default: the latest
+        /// migration)
+        to: Option<String>,
     },
 }
 
@@ -59,6 +94,44 @@ struct CotSourceArgs {
     /// Use `cot` from the specified path instead of a published crate
     #[arg(long, group = "cot_source")]
     cot_path: Option<PathBuf>,
+}
+
+fn migration_commands_handler(cmd: MigrationCommands) -> anyhow::Result<()> {
+    match cmd {
+        MigrationCommands::List { path } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            list_migrations(&path).with_context(|| "unable to list migrations")?;
+        }
+        MigrationCommands::Make {
+            path,
+            app_name,
+            output_dir,
+        } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let options = MigrationGeneratorOptions {
+                app_name,
+                output_dir,
+            };
+            make_migrations(&path, options).with_context(|| "unable to create migrations")?;
+        }
+        MigrationCommands::Squash {
+            path,
+            app_name,
+            output_dir,
+            from,
+            to,
+        } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let options = MigrationGeneratorOptions {
+                app_name,
+                output_dir,
+            };
+            squash_migrations(&path, options, from, to)
+                .with_context(|| "unable to squash migrations")?;
+        }
+    }
+
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
@@ -98,18 +171,7 @@ fn main() -> anyhow::Result<()> {
             new_project(&path, &project_name, &cot_source)
                 .with_context(|| "unable to create project")?;
         }
-        Commands::MakeMigrations {
-            path,
-            app_name,
-            output_dir,
-        } => {
-            let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let options = MigrationGeneratorOptions {
-                app_name,
-                output_dir,
-            };
-            make_migrations(&path, options).with_context(|| "unable to create migrations")?;
-        }
+        Commands::Migration(cmd) => migration_commands_handler(cmd)?,
     }
 
     Ok(())

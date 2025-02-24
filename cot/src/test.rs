@@ -855,6 +855,7 @@ impl TestDatabase {
     ///     "create_users",
     ///     vec![],
     ///     vec![],
+    ///     vec![],
     /// )]);
     /// # Ok(())
     /// # }
@@ -886,6 +887,7 @@ impl TestDatabase {
     /// test_database.add_migrations(vec![TestMigration::new(
     ///     "auth",
     ///     "create_users",
+    ///     vec![],
     ///     vec![],
     ///     vec![],
     /// )]);
@@ -1010,7 +1012,7 @@ enum TestDatabaseKind {
 ///         .primary_key()])
 ///     .build();
 ///
-/// let migration = TestMigration::new("auth", "create_users", vec![], vec![OPERATION]);
+/// let migration = TestMigration::new("auth", "create_users", vec![], vec![], vec![OPERATION]);
 /// ```
 #[cfg(feature = "db")]
 #[derive(Debug, Clone)]
@@ -1018,6 +1020,7 @@ pub struct TestMigration {
     app_name: &'static str,
     name: &'static str,
     dependencies: Vec<MigrationDependency>,
+    replaces: Vec<&'static str>,
     operations: Vec<Operation>,
 }
 
@@ -1039,19 +1042,21 @@ impl TestMigration {
     ///         .primary_key()])
     ///     .build();
     ///
-    /// let migration = TestMigration::new("auth", "create_users", vec![], vec![OPERATION]);
+    /// let migration = TestMigration::new("auth", "create_users", vec![], vec![], vec![OPERATION]);
     /// ```
     #[must_use]
     pub fn new<D: Into<Vec<MigrationDependency>>, O: Into<Vec<Operation>>>(
         app_name: &'static str,
         name: &'static str,
         dependencies: D,
+        replaces: Vec<&'static str>,
         operations: O,
     ) -> Self {
         Self {
             app_name,
             name,
             dependencies: dependencies.into(),
+            replaces,
             operations: operations.into(),
         }
     }
@@ -1069,6 +1074,10 @@ impl DynMigration for TestMigration {
 
     fn dependencies(&self) -> &[MigrationDependency] {
         &self.dependencies
+    }
+
+    fn replaces(&self) -> &[&str] {
+        &self.replaces
     }
 
     fn operations(&self) -> &[Operation] {

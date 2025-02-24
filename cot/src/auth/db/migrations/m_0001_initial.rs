@@ -6,6 +6,7 @@ impl ::cot::db::migrations::Migration for Migration {
     const APP_NAME: &'static str = "cot_auth";
     const MIGRATION_NAME: &'static str = "m_0001_initial";
     const DEPENDENCIES: &'static [::cot::db::migrations::MigrationDependency] = &[];
+    const REPLACES: &'static [&'static str] = &[];
     const OPERATIONS: &'static [::cot::db::migrations::Operation] = &[
         ::cot::db::migrations::Operation::create_model()
             .table_name(::cot::db::Identifier::new("database_user"))

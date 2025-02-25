@@ -5,7 +5,7 @@ use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use tracing::trace;
 
-use crate::utils::print_status_msg;
+use crate::utils::{print_status_msg, StatusType};
 
 macro_rules! project_file {
     ($name:literal) => {
@@ -55,7 +55,10 @@ pub fn new_project(
     project_name: &str,
     cot_source: &CotSource<'_>,
 ) -> anyhow::Result<()> {
-    print_status_msg("Creating", &format!("Cot project `{project_name}`"));
+    print_status_msg(
+        StatusType::Creating,
+        &format!("Cot project `{project_name}`"),
+    );
 
     if path.exists() {
         anyhow::bail!("destination `{}` already exists", path.display());
@@ -90,6 +93,10 @@ pub fn new_project(
                 .replace("{{ dev_secret_key }}", &dev_secret_key),
         )?;
     }
+    print_status_msg(
+        StatusType::Created,
+        &format!("Cot project `{project_name}`"),
+    );
 
     Ok(())
 }

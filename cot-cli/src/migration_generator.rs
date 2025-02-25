@@ -16,9 +16,9 @@ use petgraph::visit::EdgeRef;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse_quote, Meta};
-use tracing::{debug, info, trace};
+use tracing::{debug, trace};
 
-use crate::utils::find_cargo_toml;
+use crate::utils::{find_cargo_toml, print_status_msg, StatusType};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
     match find_cargo_toml(
@@ -84,7 +84,17 @@ impl MigrationGenerator {
         let source_files = self.get_source_files()?;
 
         if let Some(migration) = self.generate_migrations_to_write(source_files)? {
+            print_status_msg(
+                StatusType::Creating,
+                &format!("Migration '{}'", migration.name),
+            );
+
             self.write_migration(&migration)?;
+
+            print_status_msg(
+                StatusType::Created,
+                &format!("Migration '{}'", migration.name),
+            );
         }
 
         Ok(())
@@ -318,11 +328,20 @@ impl MigrationGenerator {
 
     #[must_use]
     fn make_create_model_operation(app_model: &ModelInSource) -> DynOperation {
-        DynOperation::CreateModel {
+        print_status_msg(
+            StatusType::Creating,
+            &format!("Model '{}'", app_model.model.table_name),
+        );
+        let op = DynOperation::CreateModel {
             table_name: app_model.model.table_name.clone(),
             model_ty: app_model.model.resolved_ty.clone(),
             fields: app_model.model.fields.clone(),
-        }
+        };
+        print_status_msg(
+            StatusType::Created,
+            &format!("Model '{}'", app_model.model.table_name),
+        );
+        op
     }
 
     #[must_use]
@@ -333,6 +352,11 @@ impl MigrationGenerator {
     ) -> Vec<DynOperation> {
         let mut all_field_names = HashSet::new();
         let mut app_model_fields = HashMap::new();
+        print_status_msg(
+            StatusType::Modifying,
+            &format!("Model '{}'", app_model.model.table_name),
+        );
+
         for field in &app_model.model.fields {
             all_field_names.insert(field.column_name.clone());
             app_model_fields.insert(field.column_name.clone(), field);
@@ -374,17 +398,39 @@ impl MigrationGenerator {
                 (None, None) => unreachable!(),
             }
         }
+        print_status_msg(
+            StatusType::Modified,
+            &format!("Model '{}'", app_model.model.table_name),
+        );
 
         operations
     }
 
     #[must_use]
     fn make_add_field_operation(app_model: &ModelInSource, field: &Field) -> DynOperation {
-        DynOperation::AddField {
+        print_status_msg(
+            StatusType::Adding,
+            &format!(
+                "Field '{}' to Model '{}'",
+                &field.field_name, app_model.model.name
+            ),
+        );
+
+        let op = DynOperation::AddField {
             table_name: app_model.model.table_name.clone(),
             model_ty: app_model.model.resolved_ty.clone(),
             field: field.clone(),
-        }
+        };
+
+        print_status_msg(
+            StatusType::Added,
+            &format!(
+                "Field '{}' to Model '{}'",
+                &field.field_name, app_model.model.name
+            ),
+        );
+
+        op
     }
 
     #[must_use]
@@ -392,27 +438,74 @@ impl MigrationGenerator {
         &self,
         _app_model: &ModelInSource,
         app_field: &Field,
-        _migration_model: &ModelInSource,
+        migration_model: &ModelInSource,
         migration_field: &Field,
     ) -> Option<DynOperation> {
         if app_field == migration_field {
             return None;
         }
-        todo!()
+        print_status_msg(
+            StatusType::Modifying,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.field_name, migration_model.model.name
+            ),
+        );
+
+        todo!();
+
+        // line below should be removed once todo is implemented
+        #[allow(unreachable_code)]
+        print_status_msg(
+            StatusType::Modified,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.field_name, migration_model.model.name
+            ),
+        );
     }
 
     #[must_use]
     fn make_remove_field_operation(
         &self,
-        _migration_model: &ModelInSource,
-        _migration_field: &Field,
+        migration_model: &ModelInSource,
+        migration_field: &Field,
     ) -> DynOperation {
-        todo!()
+        print_status_msg(
+            StatusType::Removing,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.field_name, migration_model.model.name
+            ),
+        );
+
+        todo!();
+        // line below should be removed once todo is implemented
+        #[allow(unreachable_code)]
+        print_status_msg(
+            StatusType::Removed,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.field_name, migration_model.model.name
+            ),
+        );
     }
 
     #[must_use]
-    fn make_remove_model_operation(&self, _migration_model: &ModelInSource) -> DynOperation {
-        todo!()
+    fn make_remove_model_operation(&self, migration_model: &ModelInSource) -> DynOperation {
+        print_status_msg(
+            StatusType::Removing,
+            &format!("Model '{}'", &migration_model.model.name),
+        );
+
+        todo!();
+
+        // line below should be removed once todo is implemented
+        #[allow(unreachable_code)]
+        print_status_msg(
+            StatusType::Removed,
+            &format!("Model '{}'", &migration_model.model.name),
+        );
     }
 
     fn generate_migration_file_content(&self, migration: GeneratedMigration) -> String {
@@ -461,7 +554,10 @@ impl MigrationGenerator {
         let src_path = self.get_src_path();
         let migration_path = src_path.join(MIGRATIONS_MODULE_NAME);
         let migration_file = migration_path.join(format!("{}.rs", migration.name));
-
+        print_status_msg(
+            StatusType::Creating,
+            &format!("Migration file '{}'", migration_file.display()),
+        );
         std::fs::create_dir_all(&migration_path).with_context(|| {
             format!(
                 "unable to create migrations directory: {}",
@@ -477,7 +573,10 @@ impl MigrationGenerator {
         })?;
         file.write_all(migration.content.as_bytes())
             .with_context(|| "unable to write migration file")?;
-        info!("Generated migration: {}", migration_file.display());
+        print_status_msg(
+            StatusType::Created,
+            &format!("Migration file '{}'", migration_file.display()),
+        );
         Ok(())
     }
 
@@ -1511,6 +1610,231 @@ mod tests {
             }
             _ => panic!("Expected AddField operation"),
         }
+    }
+
+    #[test]
+    fn make_create_model_operation() {
+        let app_model = ModelInSource {
+            model_item: parse_quote! {
+                struct TestModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    field1: i32,
+                }
+            },
+            model: Model {
+                name: format_ident!("TestModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "TestModel".to_string(),
+                resolved_ty: parse_quote!(TestModel),
+                model_type: Default::default(),
+                table_name: "test_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![Field {
+                    field_name: format_ident!("field1"),
+                    column_name: "field1".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: None,
+                }],
+            },
+        };
+
+        let operation = MigrationGenerator::make_create_model_operation(&app_model);
+
+        match operation {
+            DynOperation::CreateModel {
+                table_name,
+                model_ty,
+                fields,
+            } => {
+                assert_eq!(table_name, "test_model");
+                assert_eq!(model_ty, parse_quote!(TestModel));
+                assert_eq!(fields.len(), 1);
+                assert_eq!(fields[0].column_name, "field1");
+            }
+            _ => panic!("Expected CreateModel operation"),
+        }
+    }
+
+    #[test]
+    fn generate_operations_with_new_model() {
+        let app_model = ModelInSource {
+            model_item: parse_quote! {
+                struct NewModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("NewModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "NewModel".to_string(),
+                resolved_ty: parse_quote!(NewModel),
+                model_type: Default::default(),
+                table_name: "new_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![Field {
+                    field_name: format_ident!("name"),
+                    column_name: "name".to_string(),
+                    ty: parse_quote!(String),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: None,
+                }],
+            },
+        };
+
+        let app_models = vec![app_model.clone()];
+        let migration_models = vec![];
+
+        let generator = MigrationGenerator::new(
+            PathBuf::from("/fake/path/Cargo.toml"),
+            "test_crate".to_string(),
+            MigrationGeneratorOptions::default(),
+        );
+
+        let (modified_models, operations) =
+            generator.generate_operations(&app_models, &migration_models);
+
+        assert_eq!(modified_models.len(), 1);
+        assert_eq!(operations.len(), 1);
+
+        match &operations[0] {
+            DynOperation::CreateModel { table_name, .. } => {
+                assert_eq!(table_name, "new_model");
+            }
+            _ => panic!("Expected CreateModel operation"),
+        }
+    }
+
+    #[test]
+    fn generate_operations_with_modified_model() {
+        let app_model = ModelInSource {
+            model_item: parse_quote! {
+                struct UserModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                    email: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("UserModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "UserModel".to_string(),
+                resolved_ty: parse_quote!(UserModel),
+                model_type: Default::default(),
+                table_name: "user_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![
+                    Field {
+                        field_name: format_ident!("name"),
+                        column_name: "name".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                    Field {
+                        field_name: format_ident!("email"),
+                        column_name: "email".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                ],
+            },
+        };
+
+        let migration_model = ModelInSource {
+            model_item: parse_quote! {
+                struct UserModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("UserModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "UserModel".to_string(),
+                resolved_ty: parse_quote!(UserModel),
+                model_type: Default::default(),
+                table_name: "user_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![Field {
+                    field_name: format_ident!("name"),
+                    column_name: "name".to_string(),
+                    ty: parse_quote!(String),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: None,
+                }],
+            },
+        };
+
+        let app_models = vec![app_model.clone()];
+        let migration_models = vec![migration_model.clone()];
+
+        let generator = MigrationGenerator::new(
+            PathBuf::from("/fake/path/Cargo.toml"),
+            "test_crate".to_string(),
+            MigrationGeneratorOptions::default(),
+        );
+
+        let (modified_models, operations) =
+            generator.generate_operations(&app_models, &migration_models);
+
+        assert_eq!(modified_models.len(), 1);
+        assert!(operations.len() > 0, "Expected at least one operation");
+
+        let has_add_field = operations.iter().any(|op| match op {
+            DynOperation::AddField { field, .. } => field.column_name == "email",
+            _ => false,
+        });
+
+        assert!(has_add_field, "Expected an AddField operation for 'email'");
     }
 
     #[test]

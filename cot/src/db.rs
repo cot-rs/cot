@@ -526,6 +526,7 @@ impl DbFieldValue {
     /// assert_eq!(value_field.unwrap_value(), DbValue::Int(Some(42)));
     /// ```
     #[must_use]
+    #[track_caller]
     pub fn unwrap_value(self) -> DbValue {
         self.expect_value("called DbValue::unwrap_value() on a wrong DbValue variant")
     }
@@ -550,6 +551,7 @@ impl DbFieldValue {
     /// );
     /// ```
     #[must_use]
+    #[track_caller]
     pub fn expect_value(self, message: &str) -> DbValue {
         match self {
             Self::Value(value) => value,
@@ -1466,6 +1468,7 @@ impl<T> Auto<T> {
     /// assert_eq!(auto.unwrap(), 42);
     /// ```
     #[must_use]
+    #[track_caller]
     pub fn unwrap(self) -> T {
         self.expect("called `Auto::unwrap()` on a `Auto::Auto` value")
     }

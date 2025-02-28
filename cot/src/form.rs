@@ -94,6 +94,7 @@ impl<T: Form> FormResult<T> {
     /// # Panics
     ///
     /// Panics if the form validation failed.
+    #[track_caller]
     pub fn unwrap(self) -> T {
         match self {
             Self::Ok(form) => form,

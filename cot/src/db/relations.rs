@@ -72,6 +72,7 @@ impl<T: Model> ForeignKey<T> {
     /// # Panics
     ///
     /// Panics if the model has not been stored in this [`ForeignKey`] instance.
+    #[track_caller]
     pub fn unwrap(self) -> T {
         match self {
             Self::Model(model) => *model,

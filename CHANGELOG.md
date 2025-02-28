@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/cot-rs/cot/compare/cot-v0.1.3...cot-v0.1.4) - 2025-02-28
+
+### Added
+
+- add #[track_caller] to `unwrap`s for better panic messages (#212)
+
+### Fixed
+
+- use cot's version instead of cli's when creating a new project (#213)
+
 ## [0.1.3](https://github.com/cot-rs/cot/compare/cot-v0.1.2...cot-v0.1.3) - 2025-02-24
 
 ### Other

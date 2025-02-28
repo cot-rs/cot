@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/cot-rs/cot/compare/cot-cli-v0.1.3...cot-cli-v0.1.4) - 2025-02-28
+
+### Fixed
+
+- use cot's version instead of cli's when creating a new project (#213)
+
+### Other
+
+- Add status messages to CLI operations for better user feedback ([#204](https://github.com/cot-rs/cot/pull/204))
+
 ## [0.1.3](https://github.com/cot-rs/cot/compare/cot-cli-v0.1.2...cot-cli-v0.1.3) - 2025-02-24
 
 ### Other

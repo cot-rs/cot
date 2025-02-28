@@ -59,7 +59,7 @@ cargo_toml = "0.21"
 chrono = { version = "0.4", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
-cot = { version = "0.1.3", path = "cot" }
+cot = { version = "0.1.4", path = "cot" }
 cot_codegen = { version = "0.1.2", path = "cot-codegen" }
 cot_macros = { version = "0.1.2", path = "cot-macros" }
 darling = "0.20"

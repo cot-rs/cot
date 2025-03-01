@@ -129,6 +129,12 @@ button, .btn {
             background-color: var(--btn-danger-bg-active);
         }
     }
+
+    &.disabled {
+        cursor: not-allowed;
+        opacity: .65;
+        pointer-events: none;
+    }
 }
 
 h2 {
@@ -177,6 +183,20 @@ h2 {
     footer {
         padding: .5rem 1.5rem;
         font-style: italic;
+        display: flex;
+        justify-content: space-between;
+
+        select {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
     }
 }
 

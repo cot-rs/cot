@@ -4,6 +4,7 @@
 //! registered in the application, straight from the web interface.
 
 use std::any::Any;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
@@ -24,7 +25,7 @@ use crate::auth::{AuthRequestExt, Password};
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
-use crate::request::{Request, RequestExt};
+use crate::request::{query_pairs, Request, RequestExt};
 use crate::response::{Response, ResponseExt};
 use crate::router::Router;
 use crate::{reverse_redirect, static_files, App, Body, Method, RequestHandler, StatusCode};
@@ -135,6 +136,34 @@ async fn authenticate(request: &mut Request, login_form: LoginForm) -> cot::Resu
     }
 }
 
+/// Struct representing the pagination of objects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Pagination {
+    limit: usize,
+    offset: usize,
+}
+
+impl Pagination {
+    fn new(limit: usize, page: usize) -> Self {
+        assert!(page > 0, "Page number must be greater than 0");
+
+        Self {
+            limit,
+            offset: (page - 1) * limit,
+        }
+    }
+
+    /// Returns the limit of objects per page.
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
+
+    /// Returns the offset of objects.
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+}
+
 async fn view_model(request: Request) -> cot::Result<Response> {
     #[derive(Debug, Template)]
     #[template(path = "admin/model.html")]
@@ -144,16 +173,54 @@ async fn view_model(request: Request) -> cot::Result<Response> {
         model: &'a dyn AdminModelManager,
         #[debug("..")]
         objects: Vec<Box<dyn AdminModel>>,
+        page: usize,
+        page_size: &'a usize,
+        total_object_counts: usize,
+        total_pages: usize,
     }
 
     let model_name: String = request.path_params().parse()?;
     let manager = get_manager(&request, &model_name)?;
 
+    let query_params: HashMap<String, String> = request
+        .uri()
+        .query()
+        .map(|q| {
+            query_pairs(&Bytes::copy_from_slice(q.as_bytes()))
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let page: usize = query_params
+        .get("page")
+        .map_or(1, |p| p.parse().unwrap_or(1));
+
+    let limit = query_params
+        .get("page_size")
+        .map_or(10, |p| p.parse().unwrap_or(10));
+
+    let total_object_counts = manager.get_total_object_counts(&request).await?;
+    let total_pages = total_object_counts.div_ceil(limit);
+
+    if page == 0 || page > total_pages {
+        return Err(Error::not_found_message(format!("page {page} not found")));
+    }
+
+    let pagination = Pagination::new(limit, page);
+
+    let objects = manager.get_objects(&request, pagination).await?;
+
     let template = ModelTemplate {
         request: &request,
         model: &*manager,
-        objects: manager.get_objects(&request).await?,
+        objects,
+        page,
+        page_size: &limit,
+        total_object_counts,
+        total_pages,
     };
+
     Ok(Response::new_html(
         StatusCode::OK,
         Body::fixed(template.render()?),
@@ -312,7 +379,14 @@ pub trait AdminModelManager: Send + Sync {
     fn url_name(&self) -> &str;
 
     /// Returns the list of objects of this model.
-    async fn get_objects(&self, request: &Request) -> cot::Result<Vec<Box<dyn AdminModel>>>;
+    async fn get_objects(
+        &self,
+        request: &Request,
+        pagination: Pagination,
+    ) -> cot::Result<Vec<Box<dyn AdminModel>>>;
+
+    /// Returns the total count of objects of this model.
+    async fn get_total_object_counts(&self, request: &Request) -> cot::Result<usize>;
 
     /// Returns the object with the given ID.
     async fn get_object_by_id(
@@ -387,9 +461,17 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         T::url_name()
     }
 
-    async fn get_objects(&self, request: &Request) -> cot::Result<Vec<Box<dyn AdminModel>>> {
+    async fn get_total_object_counts(&self, request: &Request) -> cot::Result<usize> {
+        T::get_total_object_counts(request).await
+    }
+
+    async fn get_objects(
+        &self,
+        request: &Request,
+        pagination: Pagination,
+    ) -> cot::Result<Vec<Box<dyn AdminModel>>> {
         #[allow(trivial_casts)] // Upcast to the correct Box type
-        T::get_objects(request).await.map(|objects| {
+        T::get_objects(request, pagination).await.map(|objects| {
             objects
                 .into_iter()
                 .map(|object| Box::new(object) as Box<dyn AdminModel>)
@@ -443,7 +525,12 @@ pub trait AdminModel: Any + Send + 'static {
     fn as_any(&self) -> &dyn Any;
 
     /// Get the objects of this model.
-    async fn get_objects(request: &Request) -> cot::Result<Vec<Self>>
+    async fn get_objects(request: &Request, pagination: Pagination) -> cot::Result<Vec<Self>>
+    where
+        Self: Sized;
+
+    /// Get the total count of objects of this model.
+    async fn get_total_object_counts(request: &Request) -> cot::Result<usize>
     where
         Self: Sized;
 

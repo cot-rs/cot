@@ -7,8 +7,8 @@ use sea_query::{ExprTrait, IntoColumnRef};
 
 use crate::db;
 use crate::db::{
-    Auto, DatabaseBackend, DbFieldValue, DbValue, ForeignKey, FromDbValue, Identifier, Model,
-    StatementResult, ToDbFieldValue,
+    Auto, Database, DatabaseBackend, DbFieldValue, DbValue, ForeignKey, FromDbValue, Identifier,
+    Model, StatementResult, ToDbFieldValue,
 };
 
 /// A query that can be executed on a database. Can be used to filter, update,
@@ -32,6 +32,8 @@ use crate::db::{
 /// ```
 pub struct Query<T> {
     filter: Option<Expr>,
+    limit: Option<usize>,
+    offset: Option<usize>,
     phantom_data: PhantomData<fn() -> T>,
 }
 
@@ -40,6 +42,8 @@ impl<T> Debug for Query<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Query")
             .field("filter", &self.filter)
+            .field("limit", &self.limit)
+            .field("offset", &self.offset)
             .field("phantom_data", &self.phantom_data)
             .finish()
     }
@@ -50,6 +54,8 @@ impl<T> Clone for Query<T> {
     fn clone(&self) -> Self {
         Self {
             filter: self.filter.clone(),
+            limit: self.limit,
+            offset: self.offset,
             phantom_data: PhantomData,
         }
     }
@@ -91,6 +97,8 @@ impl<T: Model> Query<T> {
     pub fn new() -> Self {
         Self {
             filter: None,
+            limit: None,
+            offset: None,
             phantom_data: PhantomData,
         }
     }
@@ -118,6 +126,52 @@ impl<T: Model> Query<T> {
         self
     }
 
+    /// Set the limit for the query.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::db::model;
+    /// use cot::db::query::{Expr, Query};
+    ///
+    /// #[model]
+    /// struct User {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    ///     name: String,
+    ///     age: i32,
+    /// }
+    ///
+    /// let query = Query::<User>::new().limit(10);
+    /// ```
+    pub fn limit(&mut self, limit: usize) -> &mut Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    /// Set the offset for the query.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::db::model;
+    /// use cot::db::query::{Expr, Query};
+    ///
+    /// #[model]
+    /// struct User {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    ///     name: String,
+    ///     age: i32,
+    /// }
+    ///
+    /// let query = Query::<User>::new().offset(10);
+    /// ```
+    pub fn offset(&mut self, offset: usize) -> &mut Self {
+        self.offset = Some(offset);
+        self
+    }
+
     /// Execute the query and return all results.
     ///
     /// # Errors
@@ -135,6 +189,25 @@ impl<T: Model> Query<T> {
     pub async fn get<DB: DatabaseBackend>(&self, db: &DB) -> db::Result<Option<T>> {
         // TODO panic/error if more than one result
         db.get(self).await
+    }
+
+    /// Execute the query and return the number of results.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails.
+    pub async fn count(&self, db: &Database) -> db::Result<usize> {
+        let mut select = sea_query::Query::select();
+        select
+            .from(T::TABLE_NAME)
+            .expr(sea_query::Expr::col(sea_query::Asterisk).count());
+        self.add_filter_to_statement(&mut select);
+        let row = db.fetch_option(&select).await?;
+        let count = match row {
+            Some(row) => row.get::<i64>(0)? as usize,
+            None => 0,
+        };
+        Ok(count)
     }
 
     /// Execute the query and check if any results exist.
@@ -161,6 +234,18 @@ impl<T: Model> Query<T> {
     ) {
         if let Some(filter) = &self.filter {
             statement.and_where(filter.as_sea_query_expr());
+        }
+    }
+
+    pub(super) fn add_limit_to_statement(&self, statement: &mut sea_query::SelectStatement) {
+        if let Some(limit) = self.limit {
+            statement.limit(limit as u64);
+        }
+    }
+
+    pub(super) fn add_offset_to_statement(&self, statement: &mut sea_query::SelectStatement) {
+        if let Some(offset) = self.offset {
+            statement.offset(offset as u64);
         }
     }
 }
@@ -1353,6 +1438,8 @@ mod tests {
         let query: Query<MockModel> = Query::new();
 
         assert!(query.filter.is_none());
+        assert!(query.limit.is_none());
+        assert!(query.offset.is_none());
     }
 
     #[test]
@@ -1360,6 +1447,8 @@ mod tests {
         let query: Query<MockModel> = Query::default();
 
         assert!(query.filter.is_none());
+        assert!(query.limit.is_none());
+        assert!(query.offset.is_none());
     }
 
     #[test]
@@ -1369,6 +1458,22 @@ mod tests {
         query.filter(Expr::eq(Expr::field("name"), Expr::value("John")));
 
         assert!(query.filter.is_some());
+    }
+
+    #[test]
+    fn query_limit() {
+        let mut query: Query<MockModel> = Query::new();
+        query.limit(10);
+        assert!(query.limit.is_some());
+        assert_eq!(query.limit.unwrap(), 10);
+    }
+
+    #[test]
+    fn query_offset() {
+        let mut query: Query<MockModel> = Query::new();
+        query.offset(10);
+        assert!(query.offset.is_some());
+        assert_eq!(query.offset.unwrap(), 10);
     }
 
     #[cot::test]

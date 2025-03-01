@@ -101,13 +101,23 @@ impl AdminModelDeriveBuilder {
                     self
                 }
 
+                async fn get_total_object_counts(
+                    request: &#crate_ident::request::Request,
+                ) -> #crate_ident::Result<usize> {
+                    use #crate_ident::db::Model;
+                    use #crate_ident::request::RequestExt;
+
+                    Ok(Self::objects().count(request.db()).await?)
+                }
+
                 async fn get_objects(
                     request: &#crate_ident::request::Request,
+                    pagination: #crate_ident::admin::Pagination,
                 ) -> #crate_ident::Result<::std::vec::Vec<Self>> {
                     use #crate_ident::db::Model;
                     use #crate_ident::request::RequestExt;
 
-                    Ok(Self::objects().all(request.db()).await?)
+                    Ok(Self::objects().limit(pagination.limit()).offset(pagination.offset()).all(request.db()).await?)
                 }
 
                 async fn get_object_by_id(

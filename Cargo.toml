@@ -49,7 +49,7 @@ future_not_send = "warn"
 
 [workspace.dependencies]
 anstyle = "1.0.10"
-anyhow = "1.0.95"
+anyhow = "1.0.96"
 async-stream = "0.3"
 async-trait = "0.1"
 axum = { version = "0.8", default-features = false }

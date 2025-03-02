@@ -283,6 +283,7 @@ impl MigrationGenerator {
         let replaces = migrations
             .iter()
             .map(|migration| migration.name.clone())
+            .filter(|name| !name.contains("squashed"))
             .collect();
 
         let dependencies = migrations
@@ -290,7 +291,7 @@ impl MigrationGenerator {
             .flat_map(|m| m.dependencies.clone())
             .filter(|dep| !migrations_names.contains(&dep.to_string()))
             .fold(HashMap::new(), |mut acc, dep| {
-                acc.insert(dep.to_string(), dep);
+                acc.entry(dep.to_string()).or_insert(dep);
                 acc
             })
             .into_values()
@@ -298,6 +299,11 @@ impl MigrationGenerator {
         let operations = migrations
             .iter()
             .flat_map(|m| m.operations.clone())
+            .fold(HashMap::new(), |mut acc, dep| {
+                acc.entry(dep.to_string()).or_insert(dep);
+                acc
+            })
+            .into_values()
             .collect();
 
         let processor = MigrationProcessor::new(migrations)?;
@@ -478,7 +484,7 @@ impl MigrationGenerator {
                         }
                     }
                 }
-                syn::Item::Impl(mut item_impl) => {
+                syn::Item::Impl(item_impl) => {
                     if let Type::Path(type_path) = &*item_impl.self_ty {
                         if let Some(ident) = type_path.path.get_ident() {
                             if ident != "Migration" {

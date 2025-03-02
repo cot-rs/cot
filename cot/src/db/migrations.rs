@@ -203,9 +203,30 @@ impl MigrationEngine {
         database: &Database,
         migration: &MigrationWrapper,
     ) -> Result<bool> {
+        if migration.is_squashed() {
+            for replaced in migration.replaces() {
+                let is_applied =
+                    Self::is_migration_applied_inner(database, migration.app_name(), replaced)
+                        .await?;
+
+                if !is_applied {
+                    return Ok(false);
+                }
+            }
+            return Ok(true);
+        }
+
+        Self::is_migration_applied_inner(database, migration.app_name(), migration.name()).await
+    }
+
+    async fn is_migration_applied_inner(
+        database: &Database,
+        app_name: &str,
+        migration_name: &str,
+    ) -> Result<bool> {
         query!(
             AppliedMigration,
-            $app == migration.app_name() && $name == migration.name()
+            $app == app_name && $name == migration_name
         )
         .exists(database)
         .await
@@ -215,6 +236,25 @@ impl MigrationEngine {
         database: &Database,
         migration: &MigrationWrapper,
     ) -> Result<()> {
+        if migration.is_squashed() {
+            for replaced in migration.replaces() {
+                if Self::is_migration_applied_inner(database, migration.app_name(), replaced)
+                    .await?
+                {
+                    continue;
+                }
+                let mut applied_migration = AppliedMigration {
+                    id: Auto::auto(),
+                    app: migration.app_name().to_string(),
+                    name: replaced.to_string(),
+                    applied: chrono::Utc::now().into(),
+                };
+
+                database.insert(&mut applied_migration).await?;
+            }
+            return Ok(());
+        }
+
         let mut applied_migration = AppliedMigration {
             id: Auto::auto(),
             app: migration.app_name().to_string(),
@@ -1113,6 +1153,10 @@ pub trait Migration {
 
     /// The list of operations to apply in the migration.
     const OPERATIONS: &'static [Operation];
+
+    fn is_squashed(&self) -> bool {
+        Self::MIGRATION_NAME.contains("squashed") && !Self::REPLACES.is_empty()
+    }
 }
 
 /// A trait for defining a migration that can be dynamically applied.
@@ -1139,6 +1183,10 @@ pub trait DynMigration {
 
     /// The list of operations to apply in the migration.
     fn operations(&self) -> &[Operation];
+
+    fn is_squashed(&self) -> bool {
+        self.is_squashed()
+    }
 }
 
 /// A type alias for a dynamic migration that is both [`Send`] and [`Sync`].

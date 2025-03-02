@@ -102,6 +102,10 @@ impl<'a, T: DynMigration> MigrationSorter<'a, T> {
                         table_name,
                     };
                     if map.insert(app_and_model, index).is_some() {
+                        if migration.is_squashed() {
+                            // Squashed migrations can define the same model as other migrations
+                            continue;
+                        }
                         return Err(MigrationSorterError::DuplicateModel {
                             app_name: migration.app_name().to_owned(),
                             table_name: table_name.0.to_owned(),

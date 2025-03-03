@@ -62,8 +62,6 @@ enum MigrationCommands {
         #[arg(long)]
         output_dir: Option<PathBuf>,
     },
-    /// Squash selected migrations into a single migration
-    Squash {},
 }
 
 #[derive(Debug, Args)]

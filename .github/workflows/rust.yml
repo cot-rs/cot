@@ -2,11 +2,27 @@ name: Rust CI
 
 on:
   push:
-    paths-ignore:
-      - "**/*.md"
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - ".pre-commit-config.yaml"
+      - "Cargo.lock"
+      - "clippy.toml"
+      - "codecov.yml"
+      - "compose.yml"
+      - "rustfmt.toml"
+      - "yamlfmt.yml"
   pull_request:
-    paths-ignore:
-      - "**/*.md"
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - ".pre-commit-config.yaml"
+      - "Cargo.lock"
+      - "clippy.toml"
+      - "codecov.yml"
+      - "compose.yml"
+      - "rustfmt.toml"
+      - "yamlfmt.yml"
   schedule:
     - cron: "0 0 * * *"
 

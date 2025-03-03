@@ -20,12 +20,12 @@ repos:
         args: ["--fix=lf"]
       - id: trailing-whitespace
   - repo: https://github.com/google/yamlfmt
-    rev: v0.15.0
+    rev: v0.16.0
     hooks:
       - id: yamlfmt
         types_or: [json, yaml]
   - repo: https://github.com/seqre/pre-commit-rust
-    rev: v0.1.0
+    rev: v0.1.1
     hooks:
       - id: fmt
         exclude: ^cot-cli/src/project_template/

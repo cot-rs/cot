@@ -34,10 +34,13 @@ pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyho
                 .with_context(|| "unable to find package in Cargo.toml")?
                 .name;
 
-            let mut generator = MigrationGenerator::new(cargo_toml_path, crate_name, options);
-            generator
-                .generate_and_write_migrations()
+            let generator = MigrationGenerator::new(cargo_toml_path, crate_name, options);
+            let migrations = generator
+                .generate_migrations_as_source()
                 .with_context(|| "unable to generate migrations")?;
+            generator
+                .write_migrations(&migrations)
+                .with_context(|| "unable to write migrations")?;
             generator
                 .write_migrations_module()
                 .with_context(|| "unable to write migrations.rs")?;
@@ -80,44 +83,28 @@ impl MigrationGenerator {
         }
     }
 
-    fn generate_and_write_migrations(&mut self) -> anyhow::Result<()> {
+    pub fn generate_migrations_as_source(&self) -> anyhow::Result<MigrationAsSource> {
         let source_files = self.get_source_files()?;
-
-        if let Some(migration) = self.generate_migrations_to_write(source_files)? {
-            print_status_msg(
-                StatusType::Creating,
-                &format!("Migration '{}'", migration.name),
-            );
-
-            self.write_migration(&migration)?;
-
-            print_status_msg(
-                StatusType::Created,
-                &format!("Migration '{}'", migration.name),
-            );
-        }
-
-        Ok(())
+        self.generate_migrations_as_source_from_files(source_files)
     }
 
-    /// Generate migrations as a ready-to-write source code.
-    pub fn generate_migrations_to_write(
-        &mut self,
+    pub fn generate_migrations_as_source_from_files(
+        &self,
         source_files: Vec<SourceFile>,
-    ) -> anyhow::Result<Option<MigrationAsSource>> {
-        if let Some(migration) = self.generate_migrations(source_files)? {
+    ) -> anyhow::Result<MigrationAsSource> {
+        if let Some(migration) = self.generate_migrations_as_generated_from_files(source_files)? {
             let migration_name = migration.migration_name.clone();
             let content = self.generate_migration_file_content(migration);
-            Ok(Some(MigrationAsSource::new(migration_name, content)))
+            Ok(MigrationAsSource::new(migration_name, content))
         } else {
-            Ok(None)
+            bail!("unable to generate migrations from source files")
         }
     }
 
     /// Generate migrations and return internal structures that can be used to
     /// generate source code.
-    pub fn generate_migrations(
-        &mut self,
+    pub fn generate_migrations_as_generated_from_files(
+        &self,
         source_files: Vec<SourceFile>,
     ) -> anyhow::Result<Option<GeneratedMigration>> {
         let AppState { models, migrations } = self.process_source_files(source_files)?;
@@ -137,7 +124,41 @@ impl MigrationGenerator {
         }
     }
 
-    fn get_source_files(&mut self) -> anyhow::Result<Vec<SourceFile>> {
+    pub fn write_migrations(&self, migration: &MigrationAsSource) -> anyhow::Result<()> {
+        print_status_msg(
+            StatusType::Creating,
+            &format!("Migration '{}'", migration.name),
+        );
+
+        self.save_migration_to_file(&migration.name, migration.content.as_ref())?;
+
+        print_status_msg(
+            StatusType::Created,
+            &format!("Migration '{}'", migration.name),
+        );
+
+        Ok(())
+    }
+
+    pub fn write_migrations_module(&self) -> anyhow::Result<()> {
+        let src_path = self.get_src_path();
+        let migrations_dir = src_path.join(MIGRATIONS_MODULE_NAME);
+
+        let migration_list = Self::get_migration_list(&migrations_dir)?;
+        let contents = Self::get_migration_module_contents(&migration_list);
+        let contents_string = Self::format_tokens(contents);
+
+        let header = Self::migration_header();
+        let migration_header = "//! List of migrations for the current app.\n//!";
+        let contents_with_header = format!("{migration_header}\n{header}\n\n{contents_string}");
+
+        let mut file = File::create(src_path.join(format!("{MIGRATIONS_MODULE_NAME}.rs")))?;
+        file.write_all(contents_with_header.as_bytes())?;
+
+        Ok(())
+    }
+
+    fn get_source_files(&self) -> anyhow::Result<Vec<SourceFile>> {
         let src_dir = self
             .cargo_toml_path
             .parent()
@@ -158,7 +179,7 @@ impl MigrationGenerator {
         Ok(source_files)
     }
 
-    fn find_source_files(src_dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
+    pub fn find_source_files(src_dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
         let mut paths = Vec::new();
         for entry in glob::glob(src_dir.join("**/*.rs").to_str().unwrap())
             .with_context(|| "unable to find Rust source files with glob")?
@@ -217,7 +238,7 @@ impl MigrationGenerator {
                     if is_model_attr(attr) {
                         symbol_resolver.resolve_struct(&mut item);
 
-                        let args = Self::args_from_attr(&path, attr)?;
+                        let args = Self::model_args_from_attr(&path, attr)?;
                         let model_in_source =
                             ModelInSource::from_item(item, &args, &symbol_resolver)?;
 
@@ -261,7 +282,7 @@ impl MigrationGenerator {
         Ok(())
     }
 
-    fn args_from_attr(path: &Path, attr: &syn::Attribute) -> Result<ModelArgs, ParsingError> {
+    fn model_args_from_attr(path: &Path, attr: &syn::Attribute) -> Result<ModelArgs, ParsingError> {
         match attr.meta {
             Meta::Path(_) => {
                 // Means `#[model]` without any arguments
@@ -306,18 +327,26 @@ impl MigrationGenerator {
 
             match (app_model, migration_model) {
                 (Some(&app_model), None) => {
-                    operations.push(Self::make_create_model_operation(app_model));
+                    operations.push(MigrationOperationGenerator::make_create_model_operation(
+                        app_model,
+                    ));
                     modified_models.push(app_model.clone());
                 }
                 (Some(&app_model), Some(&migration_model)) => {
                     if app_model.model != migration_model.model {
                         modified_models.push(app_model.clone());
-                        operations
-                            .extend(self.make_alter_model_operations(app_model, migration_model));
+                        operations.extend(
+                            MigrationOperationGenerator::make_alter_model_operations(
+                                app_model,
+                                migration_model,
+                            ),
+                        );
                     }
                 }
                 (None, Some(&migration_model)) => {
-                    operations.push(self.make_remove_model_operation(migration_model));
+                    operations.push(MigrationOperationGenerator::make_remove_model_operation(
+                        migration_model,
+                    ));
                 }
                 (None, None) => unreachable!(),
             }
@@ -554,10 +583,10 @@ impl MigrationGenerator {
         Self::generate_migration(migration_def, models_def)
     }
 
-    fn write_migration(&self, migration: &MigrationAsSource) -> anyhow::Result<()> {
+    fn save_migration_to_file(&self, migration_name: &String, bytes: &[u8]) -> anyhow::Result<()> {
         let src_path = self.get_src_path();
         let migration_path = src_path.join(MIGRATIONS_MODULE_NAME);
-        let migration_file = migration_path.join(format!("{}.rs", migration.name));
+        let migration_file = migration_path.join(format!("{}.rs", migration_name));
         print_status_msg(
             StatusType::Creating,
             &format!("Migration file '{}'", migration_file.display()),
@@ -575,7 +604,7 @@ impl MigrationGenerator {
                 migration_file.display()
             )
         })?;
-        file.write_all(migration.content.as_bytes())
+        file.write_all(bytes)
             .with_context(|| "unable to write migration file")?;
         print_status_msg(
             StatusType::Created,
@@ -622,24 +651,6 @@ impl MigrationGenerator {
         quote! {
             #model_source
         }
-    }
-
-    pub fn write_migrations_module(&self) -> anyhow::Result<()> {
-        let src_path = self.get_src_path();
-        let migrations_dir = src_path.join(MIGRATIONS_MODULE_NAME);
-
-        let migration_list = Self::get_migration_list(&migrations_dir)?;
-        let contents = Self::get_migration_module_contents(&migration_list);
-        let contents_string = Self::format_tokens(contents);
-
-        let header = Self::migration_header();
-        let migration_header = "//! List of migrations for the current app.\n//!";
-        let contents_with_header = format!("{migration_header}\n{header}\n\n{contents_string}");
-
-        let mut file = File::create(src_path.join(format!("{MIGRATIONS_MODULE_NAME}.rs")))?;
-        file.write_all(contents_with_header.as_bytes())?;
-
-        Ok(())
     }
 
     fn get_migration_list(migrations_dir: &PathBuf) -> anyhow::Result<Vec<String>> {
@@ -696,10 +707,201 @@ impl MigrationGenerator {
     }
 
     fn get_src_path(&self) -> PathBuf {
-        self.options
-            .output_dir
-            .clone()
-            .unwrap_or(self.cargo_toml_path.parent().unwrap().join("src"))
+        self.options.output_dir.clone().unwrap_or(
+            self.cargo_toml_path
+                .parent()
+                .expect("Cargo.toml should always have parent project directory")
+                .join("src"),
+        )
+    }
+}
+
+struct MigrationOperationGenerator;
+
+impl MigrationOperationGenerator {
+    #[must_use]
+    fn make_create_model_operation(app_model: &ModelInSource) -> DynOperation {
+        print_status_msg(
+            StatusType::Creating,
+            &format!("Model '{}'", app_model.model.table_name),
+        );
+        let op = DynOperation::CreateModel {
+            table_name: app_model.model.table_name.clone(),
+            model_ty: app_model.model.resolved_ty.clone(),
+            fields: app_model.model.fields.clone(),
+        };
+        print_status_msg(
+            StatusType::Created,
+            &format!("Model '{}'", app_model.model.table_name),
+        );
+        op
+    }
+
+    #[must_use]
+    fn make_alter_model_operations(
+        app_model: &ModelInSource,
+        migration_model: &ModelInSource,
+    ) -> Vec<DynOperation> {
+        let mut all_field_names = HashSet::new();
+        let mut app_model_fields = HashMap::new();
+        print_status_msg(
+            StatusType::Modifying,
+            &format!("Model '{}'", app_model.model.table_name),
+        );
+
+        for field in &app_model.model.fields {
+            all_field_names.insert(field.column_name.clone());
+            app_model_fields.insert(field.column_name.clone(), field);
+        }
+        let mut migration_model_fields = HashMap::new();
+        for field in &migration_model.model.fields {
+            all_field_names.insert(field.column_name.clone());
+            migration_model_fields.insert(field.column_name.clone(), field);
+        }
+
+        let mut all_field_names: Vec<_> = all_field_names.into_iter().collect();
+        // sort to ensure deterministic order
+        all_field_names.sort();
+
+        let mut operations = Vec::new();
+        for field_name in all_field_names {
+            let app_field = app_model_fields.get(&field_name);
+            let migration_field = migration_model_fields.get(&field_name);
+
+            match (app_field, migration_field) {
+                (Some(app_field), None) => {
+                    operations.push(Self::make_add_field_operation(app_model, app_field));
+                }
+                (Some(app_field), Some(migration_field)) => {
+                    let operation = Self::make_alter_field_operation(
+                        app_model,
+                        app_field,
+                        migration_model,
+                        migration_field,
+                    );
+                    if let Some(operation) = operation {
+                        operations.push(operation);
+                    }
+                }
+                (None, Some(migration_field)) => {
+                    operations.push(Self::make_remove_field_operation(
+                        migration_model,
+                        migration_field,
+                    ));
+                }
+                (None, None) => unreachable!(),
+            }
+        }
+        print_status_msg(
+            StatusType::Modified,
+            &format!("Model '{}'", app_model.model.table_name),
+        );
+
+        operations
+    }
+
+    #[must_use]
+    fn make_add_field_operation(app_model: &ModelInSource, field: &Field) -> DynOperation {
+        print_status_msg(
+            StatusType::Adding,
+            &format!(
+                "Field '{}' to Model '{}'",
+                &field.field_name, app_model.model.name
+            ),
+        );
+
+        let op = DynOperation::AddField {
+            table_name: app_model.model.table_name.clone(),
+            model_ty: app_model.model.resolved_ty.clone(),
+            field: field.clone(),
+        };
+
+        print_status_msg(
+            StatusType::Added,
+            &format!(
+                "Field '{}' to Model '{}'",
+                &field.field_name, app_model.model.name
+            ),
+        );
+
+        op
+    }
+
+    #[must_use]
+    fn make_alter_field_operation(
+        _app_model: &ModelInSource,
+        app_field: &Field,
+        migration_model: &ModelInSource,
+        migration_field: &Field,
+    ) -> Option<DynOperation> {
+        if app_field == migration_field {
+            return None;
+        }
+        print_status_msg(
+            StatusType::Modifying,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.field_name, migration_model.model.name
+            ),
+        );
+
+        todo!();
+
+        // line below should be removed once todo is implemented
+        #[allow(unreachable_code)]
+        print_status_msg(
+            StatusType::Modified,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.field_name, migration_model.model.name
+            ),
+        );
+    }
+
+    #[must_use]
+    fn make_remove_field_operation(
+        migration_model: &ModelInSource,
+        migration_field: &Field,
+    ) -> DynOperation {
+        print_status_msg(
+            StatusType::Removing,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.field_name, migration_model.model.name
+            ),
+        );
+
+        todo!();
+        // line below should be removed once todo is implemented
+        #[allow(unreachable_code)]
+        print_status_msg(
+            StatusType::Removed,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.field_name, migration_model.model.name
+            ),
+        );
+    }
+
+    #[must_use]
+    fn make_remove_model_operation(migration_model: &ModelInSource) -> DynOperation {
+        print_status_msg(
+            StatusType::Removing,
+            &format!("Model '{}'", &migration_model.model.name),
+        );
+
+        let op = DynOperation::RemoveModel {
+            table_name: migration_model.model.table_name.clone(),
+            model_ty: migration_model.model.resolved_ty.clone(),
+            fields: migration_model.model.fields.clone(),
+        };
+
+        print_status_msg(
+            StatusType::Removed,
+            &format!("Model '{}'", &migration_model.model.name),
+        );
+
+        op
     }
 }
 
@@ -1631,7 +1833,7 @@ mod tests {
             foreign_key: None,
         };
 
-        let operation = MigrationGenerator::make_add_field_operation(&app_model, &field);
+        let operation = MigrationOperationGenerator::make_add_field_operation(&app_model, &field);
 
         match operation {
             DynOperation::AddField {
@@ -1686,7 +1888,7 @@ mod tests {
             },
         };
 
-        let operation = MigrationGenerator::make_create_model_operation(&app_model);
+        let operation = MigrationOperationGenerator::make_create_model_operation(&app_model);
 
         match operation {
             DynOperation::CreateModel {
@@ -2032,5 +2234,25 @@ mod tests {
         };
 
         assert_eq!(contents.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn parse_file() {
+        let file_name = "main.rs";
+        let file_content = r#"
+            fn main() {
+                println!("Hello, world!");
+            }
+        "#;
+
+        let parsed = SourceFile::parse(PathBuf::from(file_name), file_content).unwrap();
+
+        assert_eq!(parsed.path, PathBuf::from(file_name));
+        assert_eq!(parsed.content.items.len(), 1);
+        if let syn::Item::Fn(func) = &parsed.content.items[0] {
+            assert_eq!(func.sig.ident.to_string(), "main");
+        } else {
+            panic!("Expected a function item");
+        }
     }
 }

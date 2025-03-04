@@ -111,7 +111,7 @@ impl MigrationGenerator {
         let migration_processor = MigrationProcessor::new(migrations)?;
         let migration_models = migration_processor.latest_models();
 
-        let (modified_models, operations) = self.generate_operations(&models, &migration_models);
+        let (modified_models, operations) = Self::generate_operations(&models, &migration_models);
         if operations.is_empty() {
             Ok(None)
         } else {
@@ -173,7 +173,7 @@ impl MigrationGenerator {
             .into_iter()
             .map(|path| {
                 Self::parse_file(&src_dir, path.clone())
-                    .with_context(|| format!("unable to parse file: {path:?}"))
+                    .with_context(|| format!("unable to parse file: {}", path.display()))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(source_files)
@@ -201,7 +201,7 @@ impl MigrationGenerator {
         for source_file in source_files {
             let path = source_file.path.clone();
             self.process_parsed_file(source_file, &mut app_state)
-                .with_context(|| format!("unable to find models in file: {path:?}"))?;
+                .with_context(|| format!("unable to find models in file: {}", path.display()))?;
         }
 
         Ok(app_state)
@@ -214,7 +214,7 @@ impl MigrationGenerator {
 
         let mut src = String::new();
         file.read_to_string(&mut src)
-            .with_context(|| format!("unable to read file: {full_path:?}"))?;
+            .with_context(|| format!("unable to read file: {}", full_path.display()))?;
 
         SourceFile::parse(path, &src)
     }
@@ -300,7 +300,6 @@ impl MigrationGenerator {
 
     #[must_use]
     fn generate_operations(
-        &self,
         app_models: &Vec<ModelInSource>,
         migration_models: &Vec<ModelInSource>,
     ) -> (Vec<ModelInSource>, Vec<DynOperation>) {
@@ -355,192 +354,6 @@ impl MigrationGenerator {
         (modified_models, operations)
     }
 
-    #[must_use]
-    fn make_create_model_operation(app_model: &ModelInSource) -> DynOperation {
-        print_status_msg(
-            StatusType::Creating,
-            &format!("Model '{}'", app_model.model.table_name),
-        );
-        let op = DynOperation::CreateModel {
-            table_name: app_model.model.table_name.clone(),
-            model_ty: app_model.model.resolved_ty.clone(),
-            fields: app_model.model.fields.clone(),
-        };
-        print_status_msg(
-            StatusType::Created,
-            &format!("Model '{}'", app_model.model.table_name),
-        );
-        op
-    }
-
-    #[must_use]
-    fn make_alter_model_operations(
-        &self,
-        app_model: &ModelInSource,
-        migration_model: &ModelInSource,
-    ) -> Vec<DynOperation> {
-        let mut all_field_names = HashSet::new();
-        let mut app_model_fields = HashMap::new();
-        print_status_msg(
-            StatusType::Modifying,
-            &format!("Model '{}'", app_model.model.table_name),
-        );
-
-        for field in &app_model.model.fields {
-            all_field_names.insert(field.column_name.clone());
-            app_model_fields.insert(field.column_name.clone(), field);
-        }
-        let mut migration_model_fields = HashMap::new();
-        for field in &migration_model.model.fields {
-            all_field_names.insert(field.column_name.clone());
-            migration_model_fields.insert(field.column_name.clone(), field);
-        }
-
-        let mut all_field_names: Vec<_> = all_field_names.into_iter().collect();
-        // sort to ensure deterministic order
-        all_field_names.sort();
-
-        let mut operations = Vec::new();
-        for field_name in all_field_names {
-            let app_field = app_model_fields.get(&field_name);
-            let migration_field = migration_model_fields.get(&field_name);
-
-            match (app_field, migration_field) {
-                (Some(app_field), None) => {
-                    operations.push(Self::make_add_field_operation(app_model, app_field));
-                }
-                (Some(app_field), Some(migration_field)) => {
-                    let operation = self.make_alter_field_operation(
-                        app_model,
-                        app_field,
-                        migration_model,
-                        migration_field,
-                    );
-                    if let Some(operation) = operation {
-                        operations.push(operation);
-                    }
-                }
-                (None, Some(migration_field)) => {
-                    operations
-                        .push(self.make_remove_field_operation(migration_model, migration_field));
-                }
-                (None, None) => unreachable!(),
-            }
-        }
-        print_status_msg(
-            StatusType::Modified,
-            &format!("Model '{}'", app_model.model.table_name),
-        );
-
-        operations
-    }
-
-    #[must_use]
-    fn make_add_field_operation(app_model: &ModelInSource, field: &Field) -> DynOperation {
-        print_status_msg(
-            StatusType::Adding,
-            &format!(
-                "Field '{}' to Model '{}'",
-                &field.field_name, app_model.model.name
-            ),
-        );
-
-        let op = DynOperation::AddField {
-            table_name: app_model.model.table_name.clone(),
-            model_ty: app_model.model.resolved_ty.clone(),
-            field: field.clone(),
-        };
-
-        print_status_msg(
-            StatusType::Added,
-            &format!(
-                "Field '{}' to Model '{}'",
-                &field.field_name, app_model.model.name
-            ),
-        );
-
-        op
-    }
-
-    #[must_use]
-    fn make_alter_field_operation(
-        &self,
-        _app_model: &ModelInSource,
-        app_field: &Field,
-        migration_model: &ModelInSource,
-        migration_field: &Field,
-    ) -> Option<DynOperation> {
-        if app_field == migration_field {
-            return None;
-        }
-        print_status_msg(
-            StatusType::Modifying,
-            &format!(
-                "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
-            ),
-        );
-
-        todo!();
-
-        // line below should be removed once todo is implemented
-        #[allow(unreachable_code)]
-        print_status_msg(
-            StatusType::Modified,
-            &format!(
-                "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
-            ),
-        );
-    }
-
-    #[must_use]
-    fn make_remove_field_operation(
-        &self,
-        migration_model: &ModelInSource,
-        migration_field: &Field,
-    ) -> DynOperation {
-        print_status_msg(
-            StatusType::Removing,
-            &format!(
-                "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
-            ),
-        );
-
-        todo!();
-        // line below should be removed once todo is implemented
-        #[allow(unreachable_code)]
-        print_status_msg(
-            StatusType::Removed,
-            &format!(
-                "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
-            ),
-        );
-    }
-
-    #[must_use]
-    fn make_remove_model_operation(&self, migration_model: &ModelInSource) -> DynOperation {
-        print_status_msg(
-            StatusType::Removing,
-            &format!("Model '{}'", &migration_model.model.name),
-        );
-
-        let op = DynOperation::RemoveModel {
-            table_name: migration_model.model.table_name.clone(),
-            model_ty: migration_model.model.resolved_ty.clone(),
-            fields: migration_model.model.fields.clone(),
-        };
-
-        print_status_msg(
-            StatusType::Removed,
-            &format!("Model '{}'", &migration_model.model.name),
-        );
-
-        op
-    }
-
     fn generate_migration_file_content(&self, migration: GeneratedMigration) -> String {
         let operations: Vec<_> = migration
             .operations
@@ -586,7 +399,7 @@ impl MigrationGenerator {
     fn save_migration_to_file(&self, migration_name: &String, bytes: &[u8]) -> anyhow::Result<()> {
         let src_path = self.get_src_path();
         let migration_path = src_path.join(MIGRATIONS_MODULE_NAME);
-        let migration_file = migration_path.join(format!("{}.rs", migration_name));
+        let migration_file = migration_path.join(format!("{migration_name}.rs"));
         print_status_msg(
             StatusType::Creating,
             &format!("Migration file '{}'", migration_file.display()),
@@ -801,6 +614,27 @@ impl MigrationOperationGenerator {
     }
 
     #[must_use]
+    fn make_remove_model_operation(migration_model: &ModelInSource) -> DynOperation {
+        print_status_msg(
+            StatusType::Removing,
+            &format!("Model '{}'", &migration_model.model.name),
+        );
+
+        let op = DynOperation::RemoveModel {
+            table_name: migration_model.model.table_name.clone(),
+            model_ty: migration_model.model.resolved_ty.clone(),
+            fields: migration_model.model.fields.clone(),
+        };
+
+        print_status_msg(
+            StatusType::Removed,
+            &format!("Model '{}'", &migration_model.model.name),
+        );
+
+        op
+    }
+
+    #[must_use]
     fn make_add_field_operation(app_model: &ModelInSource, field: &Field) -> DynOperation {
         print_status_msg(
             StatusType::Adding,
@@ -813,7 +647,7 @@ impl MigrationOperationGenerator {
         let op = DynOperation::AddField {
             table_name: app_model.model.table_name.clone(),
             model_ty: app_model.model.resolved_ty.clone(),
-            field: field.clone(),
+            field: Box::new(field.clone()),
         };
 
         print_status_msg(
@@ -881,27 +715,6 @@ impl MigrationOperationGenerator {
                 &migration_field.field_name, migration_model.model.name
             ),
         );
-    }
-
-    #[must_use]
-    fn make_remove_model_operation(migration_model: &ModelInSource) -> DynOperation {
-        print_status_msg(
-            StatusType::Removing,
-            &format!("Model '{}'", &migration_model.model.name),
-        );
-
-        let op = DynOperation::RemoveModel {
-            table_name: migration_model.model.table_name.clone(),
-            model_ty: migration_model.model.resolved_ty.clone(),
-            fields: migration_model.model.fields.clone(),
-        };
-
-        print_status_msg(
-            StatusType::Removed,
-            &format!("Model '{}'", &migration_model.model.name),
-        );
-
-        op
     }
 }
 
@@ -1166,7 +979,7 @@ impl GeneratedMigration {
                     result.push(DynOperation::AddField {
                         table_name: table_name.clone(),
                         model_ty: model_ty.clone(),
-                        field,
+                        field: Box::new(field),
                     });
                 }
 
@@ -1377,6 +1190,8 @@ impl DynMigration for Migration {
 ///
 /// This is used to generate migration files.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+// this is not frequently used, so we don't mind extra memory usage
+#[allow(clippy::large_enum_variant)]
 pub enum DynDependency {
     Migration { app: String, migration: String },
     Model { model_type: syn::Type },
@@ -1416,7 +1231,8 @@ pub enum DynOperation {
     AddField {
         table_name: String,
         model_ty: syn::Type,
-        field: Field,
+        // boxed to reduce the size difference between enum variants
+        field: Box<Field>,
     },
     RemoveModel {
         table_name: String,
@@ -1568,7 +1384,7 @@ mod tests {
             DynOperation::AddField {
                 table_name: "table2".to_string(),
                 model_ty: parse_quote!(Table2),
-                field: Field {
+                field: Box::new(Field {
                     field_name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(i32),
@@ -1578,7 +1394,7 @@ mod tests {
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(Table1),
                     }),
-                },
+                }),
             },
             DynOperation::CreateModel {
                 table_name: "table1".to_string(),
@@ -1946,14 +1762,8 @@ mod tests {
         let app_models = vec![app_model.clone()];
         let migration_models = vec![];
 
-        let generator = MigrationGenerator::new(
-            PathBuf::from("/fake/path/Cargo.toml"),
-            "test_crate".to_string(),
-            MigrationGeneratorOptions::default(),
-        );
-
         let (modified_models, operations) =
-            generator.generate_operations(&app_models, &migration_models);
+            MigrationGenerator::generate_operations(&app_models, &migration_models);
 
         assert_eq!(modified_models.len(), 1);
         assert_eq!(operations.len(), 1);
@@ -2004,13 +1814,7 @@ mod tests {
             },
         };
 
-        let generator = MigrationGenerator::new(
-            PathBuf::from("/fake/path/Cargo.toml"),
-            "test_crate".to_string(),
-            MigrationGeneratorOptions::default(),
-        );
-
-        let operation = generator.make_remove_model_operation(&migration_model);
+        let operation = MigrationOperationGenerator::make_remove_model_operation(&migration_model);
 
         match &operation {
             DynOperation::RemoveModel {
@@ -2066,14 +1870,8 @@ mod tests {
 
         let migration_models = vec![migration_model.clone()];
 
-        let generator = MigrationGenerator::new(
-            PathBuf::from("/fake/path/Cargo.toml"),
-            "test_crate".to_string(),
-            MigrationGeneratorOptions::default(),
-        );
-
         let (_modified_models, operations) =
-            generator.generate_operations(&app_models, &migration_models);
+            MigrationGenerator::generate_operations(&app_models, &migration_models);
 
         assert_eq!(operations.len(), 1);
 
@@ -2174,17 +1972,11 @@ mod tests {
         let app_models = vec![app_model.clone()];
         let migration_models = vec![migration_model.clone()];
 
-        let generator = MigrationGenerator::new(
-            PathBuf::from("/fake/path/Cargo.toml"),
-            "test_crate".to_string(),
-            MigrationGeneratorOptions::default(),
-        );
-
         let (modified_models, operations) =
-            generator.generate_operations(&app_models, &migration_models);
+            MigrationGenerator::generate_operations(&app_models, &migration_models);
 
         assert_eq!(modified_models.len(), 1);
-        assert!(operations.len() > 0, "Expected at least one operation");
+        assert!(!operations.is_empty(), "Expected at least one operation");
 
         let has_add_field = operations.iter().any(|op| match op {
             DynOperation::AddField { field, .. } => field.column_name == "email",

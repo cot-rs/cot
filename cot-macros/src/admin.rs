@@ -103,7 +103,7 @@ impl AdminModelDeriveBuilder {
 
                 async fn get_total_object_counts(
                     request: &#crate_ident::request::Request,
-                ) -> #crate_ident::Result<usize> {
+                ) -> #crate_ident::Result<u64> {
                     use #crate_ident::db::Model;
                     use #crate_ident::request::RequestExt;
 

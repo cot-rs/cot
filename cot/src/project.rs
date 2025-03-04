@@ -886,7 +886,7 @@ impl Bootstrapper<Uninitialized> {
         cli.set_metadata(self.project.cli_metadata());
         self.project.register_tasks(&mut cli);
 
-        let common_options = cli.get_common_options();
+        let common_options = cli.common_options();
         let self_with_context = self.with_config_name(common_options.config())?;
 
         cli.execute(self_with_context).await

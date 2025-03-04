@@ -242,11 +242,12 @@ pub(super) fn handle_not_found(
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     log_not_found(
-        &message,
-        &diagnostics
+        message.as_deref(),
+        diagnostics
             .request_parts
             .as_ref()
-            .map(ErrorPageTemplateBuilder::build_request_data),
+            .map(ErrorPageTemplateBuilder::build_request_data)
+            .as_ref(),
     );
     build_response(
         build_not_found_response(message, diagnostics),
@@ -265,9 +266,9 @@ pub(super) fn handle_response_panic(
         .map(ErrorPageTemplateBuilder::build_request_data);
     log_panic(
         panic_payload,
-        &PANIC_LOCATION.take(),
-        &PANIC_BACKTRACE.take(),
-        &request_data,
+        PANIC_LOCATION.take().as_deref(),
+        PANIC_BACKTRACE.take().as_ref(),
+        request_data.as_ref(),
     );
     build_response(
         build_panic_response(panic_payload, diagnostics),
@@ -282,10 +283,11 @@ pub(super) fn handle_response_error(
 ) -> axum::response::Response {
     log_error(
         error,
-        &diagnostics
+        diagnostics
             .request_parts
             .as_ref()
-            .map(ErrorPageTemplateBuilder::build_request_data),
+            .map(ErrorPageTemplateBuilder::build_request_data)
+            .as_ref(),
     );
     build_response(
         build_error_response(error, diagnostics),
@@ -381,7 +383,7 @@ pub(super) fn error_page_panic_hook(info: &PanicHookInfo<'_>) {
     PANIC_BACKTRACE.replace(Some(__cot_create_backtrace()));
 }
 
-fn log_error(error: &Error, request_data: &Option<RequestData>) {
+fn log_error(error: &Error, request_data: Option<&RequestData>) {
     let span = tracing::span!(Level::ERROR,
         "request_error",
         error_type=%error.inner,
@@ -392,15 +394,15 @@ fn log_error(error: &Error, request_data: &Option<RequestData>) {
     if let Some(req) = request_data {
         error!(method = %req.method, path = %req.url, "Request failed with error!");
     } else {
-        error!("Error occurred without request context!")
+        error!("Error occurred without request context!");
     }
 }
 
 fn log_panic(
     panic_payload: &Box<dyn Any + Send>,
-    panic_location: &Option<String>,
-    backtrace: &Option<Backtrace>,
-    request_data: &Option<RequestData>,
+    panic_location: Option<&str>,
+    backtrace: Option<&Backtrace>,
+    request_data: Option<&RequestData>,
 ) {
     let span = tracing::span!(
         Level::ERROR,
@@ -417,7 +419,7 @@ fn log_panic(
     }
 }
 
-fn log_not_found(message: &Option<String>, request_data: &Option<RequestData>) {
+fn log_not_found(message: Option<&str>, request_data: Option<&RequestData>) {
     let span = tracing::span!(
         Level::WARN,
         "not_found",
@@ -458,7 +460,7 @@ mod tests {
         let error = Error::custom("Test Error!");
         let request_data = Some(create_test_request_data());
 
-        log_error(&error, &request_data);
+        log_error(&error, request_data.as_ref());
         assert!(logs_contain("Request failed with error!"));
         assert!(logs_contain("Test Error!"));
         assert!(logs_contain("GET"));
@@ -468,11 +470,16 @@ mod tests {
     #[traced_test]
     fn test_log_panic() {
         let panic_payload: Box<dyn Any + Send> = Box::new("Test panic");
-        let panic_location = Some("src/test.rs:10".to_string());
+        let panic_location = Some("src/test.rs:10");
         let backtrace = Some(__cot_create_backtrace());
         let request_data = Some(create_test_request_data());
 
-        log_panic(&panic_payload, &panic_location, &backtrace, &request_data);
+        log_panic(
+            &panic_payload,
+            panic_location,
+            backtrace.as_ref(),
+            request_data.as_ref(),
+        );
 
         assert!(logs_contain("Request handler panicked"));
         assert!(logs_contain("Test panic"));
@@ -482,10 +489,10 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_log_not_found() {
-        let message = Some("Resource not found".to_string());
+        let message = Some("Resource not found");
         let request_data = Some(create_test_request_data());
 
-        log_not_found(&message, &request_data);
+        log_not_found(message, request_data.as_ref());
 
         assert!(logs_contain("Route not found"));
         assert!(logs_contain("Resource not found"));
@@ -497,7 +504,7 @@ mod tests {
     #[traced_test]
     fn test_log_error_without_request() {
         let error = Error::custom("Test error");
-        log_error(&error, &None);
+        log_error(&error, None);
 
         assert!(logs_contain("Error occurred without request context"));
         assert!(logs_contain("Test error"));

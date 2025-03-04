@@ -188,7 +188,7 @@ impl Display for PathMatcher {
     }
 }
 
-/// A map of parameters for the [`crate::Router::reverse`] method.
+/// A map of parameters for the [`crate::router::Router::reverse`] method.
 ///
 /// Typically, it's only used internally via the [`crate::reverse`] macro.
 ///

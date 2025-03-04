@@ -147,6 +147,7 @@ impl_error_from_repr!(rinja::Error);
 impl_error_from_repr!(crate::router::path::ReverseError);
 #[cfg(feature = "db")]
 impl_error_from_repr!(crate::db::DatabaseError);
+impl_error_from_repr!(tower_sessions::session::Error);
 impl_error_from_repr!(crate::form::FormError);
 impl_error_from_repr!(crate::auth::AuthError);
 #[cfg(feature = "json")]
@@ -212,6 +213,9 @@ pub(crate) enum ErrorRepr {
     #[error("Database error: {0}")]
     #[cfg(feature = "db")]
     Database(#[from] crate::db::DatabaseError),
+    /// An error occurred while accessing the session object.
+    #[error("Error while accessing the session object")]
+    SessionAccess(#[from] tower_sessions::session::Error),
     /// An error occurred while parsing a form.
     #[error("Failed to process a form: {0}")]
     Form(#[from] crate::form::FormError),

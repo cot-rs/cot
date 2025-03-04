@@ -1765,7 +1765,7 @@ mod tests {
     }
 
     #[test]
-    fn test_make_remove_model_operation() {
+    fn make_remove_model_operation() {
         let migration_model = ModelInSource {
             model_item: parse_quote! {
                 struct UserModel {

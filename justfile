@@ -22,3 +22,13 @@ update-template-lockfile:
     sed -i 's/$proj_name/\{\{ project_name \}\}/' $cargo_lock_path
     cp $cargo_lock_path cot-cli/src/project_template/Cargo.lock.template
     rm -rf $tmpdir
+
+coverage:
+    # generate coverage report as HTML
+    # requires cargo-llvm-cov installed and nightly toolchain
+    cargo llvm-cov --all-features --workspace --branch --doctests --html --open
+
+docs:
+    # generate docs for the `cot` crate with similar settings to docs.rs
+    # requires nightly toolchain
+    RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --no-deps --all-features --lib

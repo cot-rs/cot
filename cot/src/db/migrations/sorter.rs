@@ -5,6 +5,7 @@ use thiserror::Error;
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationDependencyInner, OperationInner,
 };
+use crate::db::Identifier;
 use crate::utils::graph::{apply_permutation, Graph};
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -98,7 +99,7 @@ impl<'a, T: DynMigration> MigrationSorter<'a, T> {
                 if let OperationInner::CreateModel { table_name, .. } = operation.inner {
                     let app_and_model = MigrationLookup::ByAppAndModel {
                         app: migration.app_name(),
-                        table_name: table_name.0,
+                        table_name,
                     };
                     if map.insert(app_and_model, index).is_some() {
                         return Err(MigrationSorterError::DuplicateModel {
@@ -116,8 +117,14 @@ impl<'a, T: DynMigration> MigrationSorter<'a, T> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum MigrationLookup<'a> {
-    ByAppAndName { app: &'a str, name: &'a str },
-    ByAppAndModel { app: &'a str, table_name: &'a str },
+    ByAppAndName {
+        app: &'a str,
+        name: &'a str,
+    },
+    ByAppAndModel {
+        app: &'a str,
+        table_name: Identifier,
+    },
 }
 
 impl From<&MigrationDependency> for MigrationLookup<'_> {
@@ -179,11 +186,11 @@ mod tests {
         }));
         assert!(lookup.contains_key(&MigrationLookup::ByAppAndModel {
             app: "app1",
-            table_name: "model1"
+            table_name: Identifier::new("model1")
         }));
         assert!(lookup.contains_key(&MigrationLookup::ByAppAndModel {
             app: "app1",
-            table_name: "model2"
+            table_name: Identifier::new("model2")
         }));
     }
 

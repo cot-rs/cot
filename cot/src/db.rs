@@ -125,6 +125,9 @@ pub trait Model: Sized + Send + 'static {
     /// The primary key type of the model.
     type PrimaryKey: PrimaryKey;
 
+    /// The name of the app this model is defined in.
+    const APP_NAME: &'static str;
+
     /// The name of the table in the database.
     const TABLE_NAME: Identifier;
 

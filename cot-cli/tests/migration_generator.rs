@@ -16,7 +16,7 @@ fn create_model_state_test() {
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
     let migration = generator
-        .generate_migrations(source_files)
+        .generate_migrations_as_generated_from_files(source_files)
         .unwrap()
         .unwrap();
 
@@ -63,7 +63,7 @@ fn create_models_foreign_key() {
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
     let migration = generator
-        .generate_migrations(source_files)
+        .generate_migrations_as_generated_from_files(source_files)
         .unwrap()
         .unwrap();
 
@@ -99,7 +99,7 @@ fn create_models_foreign_key_cycle() {
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
     let migration = generator
-        .generate_migrations(source_files)
+        .generate_migrations_as_generated_from_files(source_files)
         .unwrap()
         .unwrap();
 
@@ -127,8 +127,7 @@ fn create_models_foreign_key_two_migrations() {
     let src = include_str!("migration_generator/foreign_key_two_migrations/step_1.rs");
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
     let migration_file = generator
-        .generate_migrations_to_write(source_files)
-        .unwrap()
+        .generate_migrations_as_source_from_files(source_files)
         .unwrap();
 
     let src = include_str!("migration_generator/foreign_key_two_migrations/step_2.rs");
@@ -137,7 +136,7 @@ fn create_models_foreign_key_two_migrations() {
         SourceFile::parse(PathBuf::from(&migration_file.name), &migration_file.content).unwrap(),
     ];
     let migration = generator
-        .generate_migrations(source_files)
+        .generate_migrations_as_generated_from_files(source_files)
         .unwrap()
         .unwrap();
 
@@ -166,12 +165,12 @@ fn create_model_compile_test() {
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
     let migration_opt = generator
-        .generate_migrations_to_write(source_files)
+        .generate_migrations_as_source_from_files(source_files)
         .unwrap();
     let MigrationAsSource {
         name: migration_name,
         content: migration_content,
-    } = migration_opt.unwrap();
+    } = migration_opt;
 
     let source_with_migrations = format!(
         r"
@@ -222,6 +221,27 @@ fn write_migrations_module() {
     assert!(content.contains("&m_0001_initial::Migration"));
     assert!(content.contains("pub mod m_0002_auto;"));
     assert!(content.contains("&m_0002_auto::Migration"));
+}
+
+#[test]
+fn find_source_files() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let nested = tempdir.path().join("nested");
+    std::fs::create_dir(&nested).unwrap();
+
+    let file_name = "main.rs";
+    let nested_file_name = "nested.rs";
+    File::create(tempdir.path().join(file_name)).unwrap();
+    File::create(tempdir.path().join(nested_file_name)).unwrap();
+
+    let source_files = MigrationGenerator::find_source_files(tempdir.path()).unwrap();
+    assert_eq!(source_files.len(), 2);
+    assert!(source_files
+        .iter()
+        .any(|f| f.file_name().unwrap() == file_name));
+    assert!(source_files
+        .iter()
+        .any(|f| f.file_name().unwrap() == nested_file_name));
 }
 
 fn test_generator() -> MigrationGenerator {

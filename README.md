@@ -17,9 +17,6 @@ Cot is an easy to use, modern, and fast web framework for Rust. It has been desi
 used [Django](https://www.djangoproject.com/), and easy to learn if you haven't. It's a batteries-included framework
 built on top of [axum](https://github.com/tokio-rs/axum).
 
-**If you want to get started building with Cot, we recommend reading
-[the official guide](https://cot.rs/guide/latest/).**
-
 ## Features
 
 * **Easy to use API** — in many ways modeled after Django, Cot's API is designed to be easy to use and intuitive.
@@ -36,6 +33,45 @@ built on top of [axum](https://github.com/tokio-rs/axum).
   debugging, but with its customization options, also for production use.
 * **Secure by default** — security should be opt-out, not opt-in. Cot takes care of making your web apps secure by
   default, defending it against common modern web vulnerabilities. You can focus on building your app, not securing it.
+
+## Getting Started
+
+<a href="https://repology.org/project/rust%3Acot-cli/versions">
+    <img src="https://repology.org/badge/vertical-allrepos/rust%3Acot-cli.svg" alt="Packaging status" align="right">
+</a>
+
+To get started with Cot, you need to have Rust installed. If you don't have it yet, you can install it by following
+the instructions on the [official Rust website](https://www.rust-lang.org/tools/install).
+
+Then, you need to install cot-cli by running:
+
+```shell
+cargo install cot-cli
+```
+
+After that, you can create a new project by running:
+
+```shell
+cot new my_project
+```
+
+This will create a new project in the `my_project` directory. You can then navigate to the project directory and run
+the following command to start the development server:
+
+```shell
+cargo run
+```
+
+**We recommend you to read the [official guide](https://cot.rs/guide/latest/) to learn more about Cot
+and how to use it.**
+
+### cot-cli packages
+
+If you prefer to use your operating system's package manager to manage the `cot-cli` package, you can find it in the
+repositories listed in the “Packaging status” badge on the right. Note that most of these packages are maintained by
+the community, so you should always check what exactly is included in the package. Moreover, the version in the package
+manager might not be the latest one, so we recommend just using the official package which can be installed with
+`cargo install cot-cli`.
 
 ## Development
 

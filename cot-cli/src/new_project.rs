@@ -148,7 +148,7 @@ mod tests {
         let source = CotSource::PublishedCrate;
         assert_eq!(
             source.as_cargo_toml_source(),
-            format!("version = \"{}\"", env!("CARGO_PKG_VERSION"))
+            format!("version = \"{}\"", cot::__private::COT_VERSION)
         );
     }
 }

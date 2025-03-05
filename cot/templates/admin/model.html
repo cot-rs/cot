@@ -33,7 +33,41 @@
     </table>
 
     <footer>
-        Displaying {{ objects.len() }} {{ model.name() }}{{ objects.len()|pluralize }}.
+        Displaying {{ objects.len() }} out of {{ total_object_counts }} {{ model.name() }}{{ total_object_counts|pluralize }}.
+
+        <div class="pagination">
+            <select id="page-size-selector">
+                {% for option in [10, 20, 30, 40] %}
+                    <option value="{{ option }}" {% if option == page_size %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+
+            {% if page > 1 %}
+                <a href="?page={{ page - 1 }}&page_size={{ page_size }}" class="btn secondary">Previous</a>
+            {% else %}
+                <button class="btn disabled">Previous</button>
+            {% endif %}
+
+             <span>Page {{page}} of {{total_pages}}</span>
+
+            {% if page < total_pages %}
+                <a href="?page={{ page + 1 }}&page_size={{ page_size }}" class="btn secondary">Next</a>
+            {% else %}
+                <button class="btn disabled">Next</button>
+            {% endif %}
+        </div>
     </footer>
 </div>
+
+<script>
+    document.getElementById("page-size-selector").addEventListener("change", function() {
+        const pageSize = this.value;
+        const url = new URL(window.location.href);
+        url.searchParams.set("page_size", pageSize);
+        // Reset to page 1 when changing page size
+        url.searchParams.set("page", 1);
+        window.location.href = url.toString();
+    });
+</script>
+
 {%- endblock %}

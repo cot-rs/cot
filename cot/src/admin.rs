@@ -15,8 +15,8 @@ use cot::Error;
 /// This is a simple method for adding a database model to the admin panel.
 /// Note that in order for this derive macro to work, the structure
 /// **must** implement [`Model`](crate::db::Model) and
-/// [`Form`](crate::form::Form) traits. These can also be derived using the `#
-/// [model]` and `#[derive(Form)]` attributes.
+/// [`Form`] traits. These can also be derived using the `#[model]` and
+/// `#[derive(Form)]` attributes.
 pub use cot_macros::AdminModel;
 use derive_more::Debug;
 use rinja::Template;
@@ -139,12 +139,12 @@ async fn authenticate(request: &mut Request, login_form: LoginForm) -> cot::Resu
 /// Struct representing the pagination of objects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Pagination {
-    limit: usize,
-    offset: usize,
+    limit: u64,
+    offset: u64,
 }
 
 impl Pagination {
-    fn new(limit: usize, page: usize) -> Self {
+    fn new(limit: u64, page: u64) -> Self {
         assert!(page > 0, "Page number must be greater than 0");
 
         Self {
@@ -154,12 +154,14 @@ impl Pagination {
     }
 
     /// Returns the limit of objects per page.
-    pub fn limit(&self) -> usize {
+    #[must_use]
+    pub fn limit(&self) -> u64 {
         self.limit
     }
 
     /// Returns the offset of objects.
-    pub fn offset(&self) -> usize {
+    #[must_use]
+    pub fn offset(&self) -> u64 {
         self.offset
     }
 }
@@ -173,10 +175,10 @@ async fn view_model(request: Request) -> cot::Result<Response> {
         model: &'a dyn AdminModelManager,
         #[debug("..")]
         objects: Vec<Box<dyn AdminModel>>,
-        page: usize,
-        page_size: &'a usize,
-        total_object_counts: usize,
-        total_pages: usize,
+        page: u64,
+        page_size: &'a u64,
+        total_object_counts: u64,
+        total_pages: u64,
     }
 
     let model_name: String = request.path_params().parse()?;
@@ -192,7 +194,7 @@ async fn view_model(request: Request) -> cot::Result<Response> {
         })
         .unwrap_or_default();
 
-    let page: usize = query_params
+    let page: u64 = query_params
         .get("page")
         .map_or(1, |p| p.parse().unwrap_or(1));
 
@@ -386,7 +388,7 @@ pub trait AdminModelManager: Send + Sync {
     ) -> cot::Result<Vec<Box<dyn AdminModel>>>;
 
     /// Returns the total count of objects of this model.
-    async fn get_total_object_counts(&self, request: &Request) -> cot::Result<usize>;
+    async fn get_total_object_counts(&self, request: &Request) -> cot::Result<u64>;
 
     /// Returns the object with the given ID.
     async fn get_object_by_id(
@@ -401,9 +403,10 @@ pub trait AdminModelManager: Send + Sync {
     /// Returns a form context pre-filled with the data from given object.
     ///
     /// It is guaranteed that `object` parameter is an object returned by either
-    /// [`get_objects`] or [`get_object_by_id`] methods. This means that if you
-    /// always return the same object type from these methods, you can
-    /// safely downcast the object to the same type in this method as well.
+    /// [`Self::get_objects`] or [`Self::get_object_by_id`] methods. This means
+    /// that if you always return the same object type from these methods,
+    /// you can safely downcast the object to the same type in this method
+    /// as well.
     fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext>;
 
     /// Saves the object by using the form data from given request.
@@ -461,7 +464,7 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         T::url_name()
     }
 
-    async fn get_total_object_counts(&self, request: &Request) -> cot::Result<usize> {
+    async fn get_total_object_counts(&self, request: &Request) -> cot::Result<u64> {
         T::get_total_object_counts(request).await
     }
 
@@ -530,7 +533,7 @@ pub trait AdminModel: Any + Send + 'static {
         Self: Sized;
 
     /// Get the total count of objects of this model.
-    async fn get_total_object_counts(request: &Request) -> cot::Result<usize>
+    async fn get_total_object_counts(request: &Request) -> cot::Result<u64>
     where
         Self: Sized;
 

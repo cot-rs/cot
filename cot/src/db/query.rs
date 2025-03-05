@@ -32,8 +32,8 @@ use crate::db::{
 /// ```
 pub struct Query<T> {
     filter: Option<Expr>,
-    limit: Option<usize>,
-    offset: Option<usize>,
+    limit: Option<u64>,
+    offset: Option<u64>,
     phantom_data: PhantomData<fn() -> T>,
 }
 
@@ -144,7 +144,7 @@ impl<T: Model> Query<T> {
     ///
     /// let query = Query::<User>::new().limit(10);
     /// ```
-    pub fn limit(&mut self, limit: usize) -> &mut Self {
+    pub fn limit(&mut self, limit: u64) -> &mut Self {
         self.limit = Some(limit);
         self
     }
@@ -167,7 +167,7 @@ impl<T: Model> Query<T> {
     ///
     /// let query = Query::<User>::new().offset(10);
     /// ```
-    pub fn offset(&mut self, offset: usize) -> &mut Self {
+    pub fn offset(&mut self, offset: u64) -> &mut Self {
         self.offset = Some(offset);
         self
     }
@@ -196,7 +196,7 @@ impl<T: Model> Query<T> {
     /// # Errors
     ///
     /// Returns an error if the query fails.
-    pub async fn count(&self, db: &Database) -> db::Result<usize> {
+    pub async fn count(&self, db: &Database) -> db::Result<u64> {
         let mut select = sea_query::Query::select();
         select
             .from(T::TABLE_NAME)
@@ -204,7 +204,8 @@ impl<T: Model> Query<T> {
         self.add_filter_to_statement(&mut select);
         let row = db.fetch_option(&select).await?;
         let count = match row {
-            Some(row) => row.get::<i64>(0)? as usize,
+            #[allow(clippy::cast_sign_loss)]
+            Some(row) => row.get::<i64>(0)? as u64,
             None => 0,
         };
         Ok(count)
@@ -239,13 +240,13 @@ impl<T: Model> Query<T> {
 
     pub(super) fn add_limit_to_statement(&self, statement: &mut sea_query::SelectStatement) {
         if let Some(limit) = self.limit {
-            statement.limit(limit as u64);
+            statement.limit(limit);
         }
     }
 
     pub(super) fn add_offset_to_statement(&self, statement: &mut sea_query::SelectStatement) {
         if let Some(offset) = self.offset {
-            statement.offset(offset as u64);
+            statement.offset(offset);
         }
     }
 }

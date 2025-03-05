@@ -661,9 +661,9 @@ impl Debug for RouteInner {
 ///
 /// # Return value
 ///
-/// Returns a [`cot::Result<cot::Response>`] that contains the URL for the view.
-/// You will typically want to append `?` to the macro call to get the
-/// [`cot::Response`] object.
+/// Returns a [`cot::Result<Response>`] that contains the URL for
+/// the view. You will typically want to append `?` to the macro call to get the
+/// [`Response`] object.
 ///
 /// # Examples
 ///

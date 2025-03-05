@@ -30,7 +30,7 @@ pub(crate) enum StatusType {
 }
 
 impl StatusType {
-    fn style(&self) -> Style {
+    fn style(self) -> Style {
         let base_style = Style::new() | Effects::BOLD;
 
         match self {
@@ -51,7 +51,7 @@ impl StatusType {
             StatusType::Error => base_style.fg_color(Some(Color::Ansi(AnsiColor::Red))),
         }
     }
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             StatusType::Creating => "Creating",
             StatusType::Adding => "Adding",

@@ -11,7 +11,7 @@ use syn::parse_quote;
 /// for a given model that has an expected state.
 #[test]
 fn create_model_state_test() {
-    let mut generator = test_generator();
+    let generator = test_generator();
     let src = include_str!("migration_generator/create_model.rs");
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
@@ -58,7 +58,7 @@ fn create_model_state_test() {
 
 #[test]
 fn create_models_foreign_key() {
-    let mut generator = test_generator();
+    let generator = test_generator();
     let src = include_str!("migration_generator/foreign_key.rs");
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
@@ -94,7 +94,7 @@ fn create_models_foreign_key() {
 
 #[test]
 fn create_models_foreign_key_cycle() {
-    let mut generator = test_generator();
+    let generator = test_generator();
     let src = include_str!("migration_generator/foreign_key_cycle.rs");
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
@@ -122,7 +122,7 @@ fn create_models_foreign_key_cycle() {
 
 #[test]
 fn create_models_foreign_key_two_migrations() {
-    let mut generator = test_generator();
+    let generator = test_generator();
 
     let src = include_str!("migration_generator/foreign_key_two_migrations/step_1.rs");
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
@@ -160,7 +160,7 @@ fn create_models_foreign_key_two_migrations() {
 #[test]
 #[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
 fn create_model_compile_test() {
-    let mut generator = test_generator();
+    let generator = test_generator();
     let src = include_str!("migration_generator/create_model.rs");
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
@@ -268,7 +268,7 @@ fn unwrap_add_field(op: &DynOperation) -> (&str, cot_codegen::model::Field) {
         table_name, field, ..
     } = op
     {
-        (table_name, field.clone())
+        (table_name, *field.clone())
     } else {
         panic!("expected create model operation");
     }

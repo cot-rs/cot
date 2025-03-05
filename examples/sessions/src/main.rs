@@ -58,8 +58,7 @@ async fn name(mut request: Request) -> cot::Result<Response> {
         request
             .session_mut()
             .insert("user_name", name_form.name)
-            .await
-            .unwrap();
+            .await?;
 
         return Ok(reverse_redirect!(request, "index")?);
     }

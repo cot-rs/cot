@@ -18,6 +18,51 @@ const CHECK_SUBCOMMAND: &str = "check";
 const LISTEN_PARAM: &str = "listen";
 const COLLECT_STATIC_DIR_PARAM: &str = "dir";
 
+/// A central point for configuring the default Command Line Interface (CLI) for
+/// Cot-powered projects.
+///
+/// By default, it provides a sensible list of commands that should be useful
+/// for most services, such as "run server", "collect static files to a
+/// directory", "check if the configuration is good", etc. It also exposes an
+/// interface to add user-defined tasks if needed.
+///
+/// It is typically used via [`cot::project::Project::register_tasks`].
+///
+/// # Examples
+///
+/// ```
+/// use async_trait::async_trait;
+/// use clap::{ArgMatches, Command};
+/// use cot::cli::{Cli, CliTask};
+/// use cot::project::WithConfig;
+/// use cot::{Bootstrapper, Project};
+///
+/// struct Frobnicate;
+///
+/// #[async_trait(?Send)]
+/// impl CliTask for Frobnicate {
+///     fn subcommand(&self) -> Command {
+///         Command::new("frobnicate")
+///     }
+///
+///     async fn execute(
+///         &mut self,
+///         _matches: &ArgMatches,
+///         _bootstrapper: Bootstrapper<WithConfig>,
+///     ) -> cot::Result<()> {
+///         println!("Frobnicating...");
+///
+///         Ok(())
+///     }
+/// }
+///
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn register_tasks(&self, cli: &mut Cli) {
+///         cli.add_task(Frobnicate)
+///     }
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Cli {
     command: Command,
@@ -70,6 +115,50 @@ impl Cli {
         RunServer
     }
 
+    /// Adds a new task to the CLI.
+    ///
+    /// This allows any user-defined subcommands to be added, by using the
+    /// [`clap`] crate interface.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a CLI task with given name has been registered already.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use async_trait::async_trait;
+    /// use clap::{ArgMatches, Command};
+    /// use cot::cli::{Cli, CliTask};
+    /// use cot::project::WithConfig;
+    /// use cot::{Bootstrapper, Project};
+    ///
+    /// struct Frobnicate;
+    ///
+    /// #[async_trait(?Send)]
+    /// impl CliTask for Frobnicate {
+    ///     fn subcommand(&self) -> Command {
+    ///         Command::new("frobnicate")
+    ///     }
+    ///
+    ///     async fn execute(
+    ///         &mut self,
+    ///         _matches: &ArgMatches,
+    ///         _bootstrapper: Bootstrapper<WithConfig>,
+    ///     ) -> cot::Result<()> {
+    ///         println!("Frobnicating...");
+    ///
+    ///         Ok(())
+    ///     }
+    /// }
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {
+    ///     fn register_tasks(&self, cli: &mut Cli) {
+    ///         cli.add_task(Frobnicate)
+    ///     }
+    /// }
+    /// ```
     pub fn add_task<C>(&mut self, task: C)
     where
         C: CliTask + Send + 'static,
@@ -88,7 +177,7 @@ impl Cli {
     }
 
     #[must_use]
-    pub fn get_common_options(&mut self) -> CommonOptions {
+    pub(crate) fn common_options(&mut self) -> CommonOptions {
         let matches = self.command.get_matches_mut();
         CommonOptions::new(matches)
     }
@@ -121,7 +210,7 @@ impl Default for Cli {
 ///
 /// This struct is used to set the name, version, authors, and description of
 /// the CLI application. This is meant to be typically used in
-/// [`crate::CotProjectBuilder::with_cli`] and [`metadata!`].
+/// [`crate::project::Project::cli_metadata`] and [`metadata!`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct CliMetadata {
     /// The name that will be shown in the help message.
@@ -136,7 +225,8 @@ pub struct CliMetadata {
 
 /// A trait for defining a CLI command.
 ///
-/// This is meant to be used with [`crate::CotProjectBuilder::add_task`].
+/// This is meant to be used with [`Cli::add_task`] inside
+/// [`cot::project::Project::register_tasks`].
 #[async_trait(?Send)]
 pub trait CliTask {
     /// Returns the definition of the task's options as the [`clap`] crate's
@@ -152,7 +242,7 @@ pub trait CliTask {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommonOptions {
+pub(crate) struct CommonOptions {
     matches: ArgMatches,
 }
 
@@ -163,7 +253,7 @@ impl CommonOptions {
     }
 
     #[must_use]
-    pub fn config(&self) -> &str {
+    pub(crate) fn config(&self) -> &str {
         self.matches
             .get_one::<String>("config")
             .expect("default provided")

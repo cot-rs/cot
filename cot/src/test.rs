@@ -38,6 +38,11 @@ pub struct Client {
 impl Client {
     /// Create a new test client for a Cot project.
     ///
+    /// # Panics
+    ///
+    /// Panics if the test config could not be loaded.
+    /// Panics if the project could not be initialized.
+    ///
     /// # Examples
     ///
     /// ```
@@ -331,6 +336,18 @@ impl TestRequestBuilder {
         }
     }
 
+    /// Add a project config instance to the request builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// let request = TestRequestBuilder::get("/")
+    ///     .config(ProjectConfig::dev_default())
+    ///     .build();
+    /// ```
     pub fn config(&mut self, config: ProjectConfig) -> &mut Self {
         self.config = Some(Arc::new(config));
         self
@@ -409,17 +426,66 @@ impl TestRequestBuilder {
         self
     }
 
+    /// Add a session support to the request builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// let request = TestRequestBuilder::get("/").with_session().build();
+    /// ```
     pub fn with_session(&mut self) -> &mut Self {
         let session_store = MemoryStore::default();
         self.session = Some(Session::new(None, Arc::new(session_store), None));
         self
     }
 
+    /// Add a session support to the request builder with the session copied
+    /// over from another [`Request`] object.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::RequestExt;
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let mut request = TestRequestBuilder::get("/").with_session().build();
+    /// request.session_mut().insert("key", "value").await?;
+    ///
+    /// let mut request = TestRequestBuilder::get("/")
+    ///     .with_session_from(&request)
+    ///     .build();
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_session_from(&mut self, request: &Request) -> &mut Self {
         self.session = Some(request.session().clone());
         self
     }
 
+    /// Add a session support to the request builder with the session object
+    /// provided as a parameter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::RequestExt;
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let mut request = TestRequestBuilder::get("/").with_session().build();
+    /// request.session_mut().insert("key", "value").await?;
+    ///
+    /// let mut request = TestRequestBuilder::get("/")
+    ///     .session(request.session().clone())
+    ///     .build();
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn session(&mut self, session: Session) -> &mut Self {
         self.session = Some(session);
         self
@@ -463,6 +529,27 @@ impl TestRequestBuilder {
         self
     }
 
+    /// Use database authentication in the test request.
+    ///
+    /// Note that this calls [`Self::auth_backend`], [`Self::with_session`],
+    /// [`Self::database`], possibly overriding any values set by you earlier.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use cot::test::{TestDatabase, TestRequestBuilder};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let mut test_database = TestDatabase::new_sqlite().await?;
+    /// test_database.with_auth().run_migrations().await;
+    /// let request = TestRequestBuilder::get("/")
+    ///     .with_db_auth(test_database.database())
+    ///     .build();
+    /// # Ok(())
+    /// # }
+    /// ```
     #[cfg(feature = "db")]
     pub fn with_db_auth(&mut self, db: Arc<Database>) -> &mut Self {
         self.auth_backend(DatabaseUserBackend);
@@ -472,6 +559,17 @@ impl TestRequestBuilder {
         self
     }
 
+    /// Add form data to the request builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// let request = TestRequestBuilder::post("/")
+    ///     .form_data(&[("name", "Alice"), ("age", "30")])
+    ///     .build();
+    /// ```
     pub fn form_data<T: ToString>(&mut self, form_data: &[(T, T)]) -> &mut Self {
         self.form_data = Some(
             form_data

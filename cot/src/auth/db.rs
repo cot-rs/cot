@@ -555,6 +555,7 @@ impl AuthBackend for DatabaseUserBackend {
     }
 }
 
+/// An app that provides authentication via a user model stored in the database.
 #[derive(Debug, Copy, Clone)]
 pub struct DatabaseUserApp;
 

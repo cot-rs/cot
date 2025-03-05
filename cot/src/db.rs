@@ -396,6 +396,7 @@ pub trait FromDbValue {
         Self: Sized;
 }
 
+/// An alias for the value type internally used by the [`sea_query`] crate.
 pub type DbValue = sea_query::Value;
 
 /// A trait for converting a Rust value to a database value.

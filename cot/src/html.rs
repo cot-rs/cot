@@ -209,6 +209,10 @@ impl HtmlTag {
 
     /// Renders the HTML tag.
     ///
+    /// # Panics
+    ///
+    /// Panics if the [`String`] writer fails.
+    ///
     /// # Examples
     ///
     /// ```

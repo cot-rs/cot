@@ -108,7 +108,14 @@ pub trait RequestExt: private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// // TODO
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
+    ///     let app_name = request.app_name();
+    ///     // ... do something with the app name
+    ///     # todo!()
+    /// }
     /// ```
     fn app_name(&self) -> Option<&str>;
 

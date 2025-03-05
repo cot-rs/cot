@@ -1,1 +1,1 @@
-doc-valid-idents = ["PostgreSQL", "MySQL", "SQLite"]
+doc-valid-idents = ["PostgreSQL", "MySQL", "SQLite", "JavaScript"]

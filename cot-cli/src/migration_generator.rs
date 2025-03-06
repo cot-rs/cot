@@ -705,9 +705,12 @@ impl MigrationOperationGenerator {
             ),
         );
 
-        todo!();
-        // line below should be removed once todo is implemented
-        #[allow(unreachable_code)]
+        let op = DynOperation::RemoveField {
+            table_name: migration_model.model.table_name.clone(),
+            model_ty: migration_model.model.resolved_ty.clone(),
+            field: Box::new(migration_field.clone()),
+        };
+
         print_status_msg(
             StatusType::Removed,
             &format!(
@@ -715,6 +718,8 @@ impl MigrationOperationGenerator {
                 &migration_field.field_name, migration_model.model.name
             ),
         );
+
+        op
     }
 }
 
@@ -956,6 +961,12 @@ impl GeneratedMigration {
                             because it doesn't create a new model"
                         )
                     }
+                    DynOperation::RemoveField { .. } => {
+                        unreachable!(
+                            "RemoveField operation shouldn't be a dependency of CreateModel \
+                        because it doesn't create a new model"
+                        )
+                    }
                     DynOperation::RemoveModel { .. } => {
                         unreachable!(
                             "RemoveModel operation shouldn't be a dependency of CreateModel \
@@ -989,6 +1000,10 @@ impl GeneratedMigration {
                 // AddField only links two already existing models together, so
                 // removing it shouldn't ever affect whether a graph is cyclic
                 unreachable!("AddField operation should never create cycles")
+            }
+            DynOperation::RemoveField { .. } => {
+                // RemoveField doesn't create dependencies, it only removes a field
+                unreachable!("RemoveField operation should never create cycles")
             }
             DynOperation::RemoveModel { .. } => {
                 // RemoveModel doesn't create dependencies, it only removes a model
@@ -1088,6 +1103,10 @@ impl GeneratedMigration {
                     }
 
                     ops
+                }
+                DynOperation::RemoveField { .. } => {
+                    // RemoveField Doesnt Add Foreign Keys
+                    Vec::new()
                 }
                 DynOperation::RemoveModel { .. } => {
                     // RemoveModel Doesnt Add Foreign Keys
@@ -1234,6 +1253,12 @@ pub enum DynOperation {
         // boxed to reduce the size difference between enum variants
         field: Box<Field>,
     },
+    RemoveField {
+        table_name: String,
+        model_ty: syn::Type,
+        // boxed to reduce size difference between enum variations
+        field: Box<Field>,
+    },
     RemoveModel {
         table_name: String,
         model_ty: syn::Type,
@@ -1277,6 +1302,17 @@ impl Repr for DynOperation {
                 let field = field.repr();
                 quote! {
                     ::cot::db::migrations::Operation::add_field()
+                        .table_name(::cot::db::Identifier::new(#table_name))
+                        .field(#field)
+                        .build()
+                }
+            }
+            Self::RemoveField {
+                table_name, field, ..
+            } => {
+                let field = field.repr();
+                quote! {
+                    ::cot::db::migrations::Operation::remove_field()
                         .table_name(::cot::db::Identifier::new(#table_name))
                         .field(#field)
                         .build()
@@ -1827,7 +1863,74 @@ mod tests {
             _ => panic!("Expected DynOperation::RemoveModel"),
         }
     }
+    #[test]
+    fn make_remove_field_operation() {
+        let migration_model = ModelInSource {
+            model_item: parse_quote! {
+                struct UserModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                    email: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("UserModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "UserModel".to_string(),
+                resolved_ty: parse_quote!(UserModel),
+                model_type: Default::default(),
+                table_name: "user_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![
+                    Field {
+                        field_name: format_ident!("name"),
+                        column_name: "name".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                    Field {
+                        field_name: format_ident!("email"),
+                        column_name: "email".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                ],
+            },
+        };
 
+        let field = &migration_model.model.fields[1];
+        let operation =
+            MigrationOperationGenerator::make_remove_field_operation(&migration_model, field);
+
+        match &operation {
+            DynOperation::RemoveField {
+                table_name,
+                model_ty,
+                field,
+            } => {
+                assert_eq!(table_name, "user_model");
+                assert_eq!(model_ty, &parse_quote!(UserModel));
+                assert_eq!(field.column_name, "email");
+                assert_eq!(field.ty, parse_quote!(String));
+            }
+            _ => panic!("Expected DynOperation::RemoveField"),
+        }
+    }
     #[test]
     fn generate_operations_with_removed_model() {
         let app_models = vec![];
@@ -1985,7 +2088,151 @@ mod tests {
 
         assert!(has_add_field, "Expected an AddField operation for 'email'");
     }
+    #[test]
+    fn repr_for_remove_field_operation() {
+        let op = DynOperation::RemoveField {
+            table_name: "test_table".to_string(),
+            model_ty: parse_quote!(TestModel),
+            field: Box::new(Field {
+                field_name: format_ident!("test_field"),
+                column_name: "test_field".to_string(),
+                ty: parse_quote!(String),
+                auto_value: false,
+                primary_key: false,
+                unique: false,
+                foreign_key: None,
+            }),
+        };
 
+        let tokens = op.repr();
+        let tokens_str = tokens.to_string();
+
+        assert!(
+            tokens_str.contains("remove_field"),
+            "Should call remove_field() but got: {}",
+            tokens_str
+        );
+        assert!(
+            tokens_str.contains("table_name"),
+            "Should call table_name() but got: {}",
+            tokens_str
+        );
+        assert!(
+            tokens_str.contains("field"),
+            "Should call field() but got: {}",
+            tokens_str
+        );
+        assert!(
+            tokens_str.contains("build"),
+            "Should call build() but got: {}",
+            tokens_str
+        );
+    }
+    #[test]
+    fn generate_operations_with_removed_field() {
+        let app_model = ModelInSource {
+            model_item: parse_quote! {
+                struct UserModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("UserModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "UserModel".to_string(),
+                resolved_ty: parse_quote!(UserModel),
+                model_type: Default::default(),
+                table_name: "user_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![Field {
+                    field_name: format_ident!("name"),
+                    column_name: "name".to_string(),
+                    ty: parse_quote!(String),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: None,
+                }],
+            },
+        };
+
+        let migration_model = ModelInSource {
+            model_item: parse_quote! {
+                struct UserModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                    email: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("UserModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "UserModel".to_string(),
+                resolved_ty: parse_quote!(UserModel),
+                model_type: Default::default(),
+                table_name: "user_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![
+                    Field {
+                        field_name: format_ident!("name"),
+                        column_name: "name".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                    Field {
+                        field_name: format_ident!("email"),
+                        column_name: "email".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                ],
+            },
+        };
+
+        let app_models = vec![app_model.clone()];
+        let migration_models = vec![migration_model.clone()];
+
+        let (modified_models, operations) =
+            MigrationGenerator::generate_operations(&app_models, &migration_models);
+
+        assert_eq!(modified_models.len(), 1);
+        assert!(!operations.is_empty(), "Expected at least one operation");
+
+        let has_remove_field = operations.iter().any(|op| match op {
+            DynOperation::RemoveField { field, .. } => field.column_name == "email",
+            _ => false,
+        });
+
+        assert!(
+            has_remove_field,
+            "Expected a RemoveField operation for 'email'"
+        );
+    }
     #[test]
     fn get_migration_list() {
         let tempdir = tempfile::tempdir().unwrap();

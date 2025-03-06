@@ -82,7 +82,7 @@ fn migration_commands_handler(cmd: MigrationCommands) -> anyhow::Result<()> {
             let migrations = list_migrations(&path).with_context(|| "unable to list migrations")?;
             for (app_name, migs) in migrations {
                 for mig in migs {
-                    println!("{}\t{}", app_name, mig);
+                    println!("{app_name}\t{mig}");
                 }
             }
         }

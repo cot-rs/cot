@@ -96,23 +96,15 @@ fn main() -> anyhow::Result<()> {
         .init();
 
     match cli.command {
-        Commands::New(args) => handle_new_project(args)?,
+        Commands::New(args) => handle_new_project(args),
         Commands::Migration(cmd) => match cmd {
-            MigrationCommands::List(args) => handle_migration_list(args)?,
-            MigrationCommands::Make(args) => handle_migration_make(args)?,
+            MigrationCommands::List(args) => handle_migration_list(args),
+            MigrationCommands::Make(args) => handle_migration_make(args),
         },
     }
-
-    Ok(())
 }
 
-fn handle_new_project(
-    ProjectNewArgs {
-        path,
-        name,
-        source: cot_source,
-    }: ProjectNewArgs,
-) -> anyhow::Result<()> {
+fn handle_new_project(ProjectNewArgs { path, name, source }: ProjectNewArgs) -> anyhow::Result<()> {
     let project_name = match name {
         None => {
             let dir_name = path
@@ -123,9 +115,9 @@ fn handle_new_project(
         Some(name) => name,
     };
 
-    let cot_source = if cot_source.use_git {
+    let cot_source = if source.use_git {
         CotSource::Git
-    } else if let Some(path) = &cot_source.cot_path {
+    } else if let Some(path) = &source.cot_path {
         CotSource::Path(path)
     } else {
         CotSource::PublishedCrate

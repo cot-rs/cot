@@ -263,6 +263,29 @@ fn list_migrations() {
     );
 }
 
+#[test]
+fn list_migrations_missing_cargo_toml() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+
+    let migrations = migration_generator::list_migrations(tmp_dir.path());
+
+    assert!(migrations.is_err());
+}
+
+#[test]
+fn list_migrations_missing_migrations_dir() {
+    let cot_cli_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let example_dir = cot_cli_dir
+        .parent()
+        .unwrap()
+        .join("examples")
+        .join("hello-world");
+
+    let migrations = migration_generator::list_migrations(&example_dir).unwrap();
+
+    assert!(migrations.is_empty());
+}
+
 fn test_generator() -> MigrationGenerator {
     MigrationGenerator::new(
         PathBuf::from("Cargo.toml"),

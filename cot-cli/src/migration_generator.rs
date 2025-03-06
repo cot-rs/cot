@@ -52,7 +52,7 @@ pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyho
     Ok(())
 }
 
-pub fn list_migrations(path: &Path) -> anyhow::Result<()> {
+pub fn list_migrations(path: &Path) -> anyhow::Result<HashMap<String, Vec<String>>> {
     match find_cargo_toml(
         &path
             .canonicalize()
@@ -70,6 +70,7 @@ pub fn list_migrations(path: &Path) -> anyhow::Result<()> {
                     .to_path_buf()],
             };
 
+            let mut migration_list = HashMap::new();
             for package_root in package_roots {
                 let app_name = if let Some(cargo_toml_path) = find_cargo_toml(&package_root) {
                     let manifest = Manifest::from_path(&cargo_toml_path)
@@ -85,18 +86,20 @@ pub fn list_migrations(path: &Path) -> anyhow::Result<()> {
                 };
 
                 let migrations_dir = package_root.join("src").join("migrations");
-                let migration_list = MigrationGenerator::get_migration_list(&migrations_dir)?;
-                for migration in migration_list {
-                    println!("{} - {}", app_name, migration);
+                let migrations = MigrationGenerator::get_migration_list(&migrations_dir)?;
+                for migration in migrations {
+                    migration_list
+                        .entry(app_name.clone())
+                        .or_insert_with(Vec::new)
+                        .push(migration);
                 }
             }
+            Ok(migration_list)
         }
         None => {
             bail!("Cargo.toml not found in the specified directory or any parent directory.")
         }
     }
-
-    Ok(())
 }
 
 #[derive(Debug, Clone, Default)]

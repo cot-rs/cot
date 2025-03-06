@@ -79,7 +79,12 @@ fn migration_commands_handler(cmd: MigrationCommands) -> anyhow::Result<()> {
     match cmd {
         MigrationCommands::List { path } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
-            list_migrations(&path).with_context(|| "unable to list migrations")?;
+            let migrations = list_migrations(&path).with_context(|| "unable to list migrations")?;
+            for (app_name, migs) in migrations {
+                for mig in migs {
+                    println!("{}\t{}", app_name, mig);
+                }
+            }
         }
         MigrationCommands::Make {
             path,

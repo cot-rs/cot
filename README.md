@@ -7,6 +7,8 @@
 [![Documentation](https://docs.rs/cot/badge.svg)](https://docs.rs/cot)
 [![codecov](https://codecov.io/gh/cot-rs/cot/branch/master/graph/badge.svg)](https://codecov.io/gh/cot-rs/cot)
 [![Discord chat](https://img.shields.io/discord/1330137289287925781?logo=Discord&logoColor=white)](https://discord.cot.rs)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/cot-rs?label=GitHub%20sponsors)](https://github.com/sponsors/cot-rs)
+[![Open Collective backers](https://img.shields.io/opencollective/backers/cot?label=Open%20Collective%20backers)](https://opencollective.com/cot)
 </div>
 
 > [!WARNING]

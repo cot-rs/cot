@@ -18,10 +18,10 @@ use quote::{format_ident, quote, ToTokens};
 use syn::{parse_quote, Meta};
 use tracing::{debug, trace};
 
-use crate::utils::{find_cargo_toml, print_status_msg, StatusType};
+use crate::utils::{print_status_msg, StatusType, WorkspaceManager};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
-    match find_cargo_toml(
+    match WorkspaceManager::find_cargo_toml(
         &path
             .canonicalize()
             .with_context(|| "unable to canonicalize Cargo.toml path")?,

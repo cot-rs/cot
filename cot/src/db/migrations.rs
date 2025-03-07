@@ -586,7 +586,7 @@ enum OperationInner {
         table_name: Identifier,
         field: Field,
     },
-    /// Remoe a field from an existing model.
+    /// Remove a field from an existing model.
     RemoveField {
         table_name: Identifier,
         field: Field,

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/cot-rs/cot/compare/cot-v0.1.4...cot-v0.2.0) - 2025-03-07
+
+### Added
+
+- add a user-friendly message for AddrInUse error ([#233](https://github.com/cot-rs/cot/pull/233))
+- add support for remove field in automatic migration generator ([#232](https://github.com/cot-rs/cot/pull/232))
+- add basic pagination support for admin panel ([#217](https://github.com/cot-rs/cot/pull/217))
+- support "Remove Model" in Automatic Migration Generator ([#221](https://github.com/cot-rs/cot/pull/221))
+
+### Fixed
+
+- include APP_NAME in model ([#228](https://github.com/cot-rs/cot/pull/228))
+
+### Other
+
+- more docs (up to 100% doc coverage) ([#229](https://github.com/cot-rs/cot/pull/229))
+
 ## [0.1.4](https://github.com/cot-rs/cot/compare/cot-v0.1.3...cot-v0.1.4) - 2025-02-28
 
 ### Added

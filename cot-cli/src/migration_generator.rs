@@ -53,6 +53,56 @@ pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyho
     Ok(())
 }
 
+pub fn list_migrations(path: &Path) -> anyhow::Result<HashMap<String, Vec<String>>> {
+    match find_cargo_toml(
+        &path
+            .canonicalize()
+            .with_context(|| "unable to canonicalize Cargo.toml path")?,
+    ) {
+        Some(cargo_toml_path) => {
+            let manifest = Manifest::from_path(&cargo_toml_path)
+                .with_context(|| "unable to read Cargo.toml")?;
+
+            let package_roots = match manifest.workspace {
+                Some(workspace) => workspace.members.iter().map(PathBuf::from).collect(),
+                None => vec![cargo_toml_path
+                    .parent()
+                    .with_context(|| "unable to find parent dir")?
+                    .to_path_buf()],
+            };
+
+            let mut migration_list = HashMap::new();
+            for package_root in package_roots {
+                let app_name = if let Some(cargo_toml_path) = find_cargo_toml(&package_root) {
+                    let manifest = Manifest::from_path(&cargo_toml_path)
+                        .with_context(|| "unable to read Cargo.toml")?;
+                    manifest
+                        .package
+                        .with_context(|| "unable to find package in Cargo.toml")?
+                        .name
+                } else {
+                    bail!(
+                        "Cargo.toml not found in the specified directory or any parent directory."
+                    )
+                };
+
+                let migrations_dir = package_root.join("src").join("migrations");
+                let migrations = MigrationGenerator::get_migration_list(&migrations_dir)?;
+                for migration in migrations {
+                    migration_list
+                        .entry(app_name.clone())
+                        .or_insert_with(Vec::new)
+                        .push(migration);
+                }
+            }
+            Ok(migration_list)
+        }
+        None => {
+            bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct MigrationGeneratorOptions {
     pub app_name: Option<String>,
@@ -467,13 +517,15 @@ impl MigrationGenerator {
     }
 
     fn get_migration_list(migrations_dir: &PathBuf) -> anyhow::Result<Vec<String>> {
-        Ok(std::fs::read_dir(migrations_dir)
-            .with_context(|| {
-                format!(
-                    "unable to read migrations directory: {}",
-                    migrations_dir.display()
-                )
-            })?
+        let dir = match std::fs::read_dir(migrations_dir) {
+            Ok(dir) => dir,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Vec::new());
+            }
+            Err(e) => return Err(e).context("unable to read migrations directory"),
+        };
+
+        let migrations = dir
             .filter_map(|entry| {
                 let entry = entry.ok()?;
                 let path = entry.path();
@@ -491,7 +543,9 @@ impl MigrationGenerator {
                     None
                 }
             })
-            .collect())
+            .collect();
+
+        Ok(migrations)
     }
 
     #[must_use]

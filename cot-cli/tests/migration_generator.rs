@@ -2,8 +2,8 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use cot_cli::migration_generator::{
-    DynDependency, DynOperation, MigrationAsSource, MigrationGenerator, MigrationGeneratorOptions,
-    SourceFile,
+    self, DynDependency, DynOperation, MigrationAsSource, MigrationGenerator,
+    MigrationGeneratorOptions, SourceFile,
 };
 use syn::parse_quote;
 
@@ -242,6 +242,48 @@ fn find_source_files() {
     assert!(source_files
         .iter()
         .any(|f| f.file_name().unwrap() == nested_file_name));
+}
+
+#[test]
+fn list_migrations() {
+    let cot_cli_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let example_dir = cot_cli_dir
+        .parent()
+        .unwrap()
+        .join("examples")
+        .join("todo-list");
+
+    let migrations = migration_generator::list_migrations(&example_dir).unwrap();
+
+    assert_eq!(migrations.len(), 1);
+    assert!(migrations.contains_key("example-todo-list"));
+    assert_eq!(
+        migrations.get("example-todo-list").unwrap()[0],
+        "m_0001_initial"
+    );
+}
+
+#[test]
+fn list_migrations_missing_cargo_toml() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+
+    let migrations = migration_generator::list_migrations(tmp_dir.path());
+
+    assert!(migrations.is_err());
+}
+
+#[test]
+fn list_migrations_missing_migrations_dir() {
+    let cot_cli_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let example_dir = cot_cli_dir
+        .parent()
+        .unwrap()
+        .join("examples")
+        .join("hello-world");
+
+    let migrations = migration_generator::list_migrations(&example_dir).unwrap();
+
+    assert!(migrations.is_empty());
 }
 
 fn test_generator() -> MigrationGenerator {

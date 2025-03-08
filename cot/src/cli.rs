@@ -292,7 +292,42 @@ impl CliTask for RunServer {
         };
 
         let bootstrapper = bootstrapper.boot().await?;
-        crate::run(bootstrapper, &addr_port).await
+
+        let result = crate::run(bootstrapper, &addr_port).await;
+        if let Err(error) = &result {
+            if let Some(user_friendly_error) = Self::get_user_friendly_error(error, &addr_port) {
+                eprintln!("{user_friendly_error}");
+            }
+        }
+
+        result
+    }
+}
+
+impl RunServer {
+    fn get_user_friendly_error(error: &Error, addr_port: &str) -> Option<String> {
+        match &error.inner {
+            ErrorRepr::StartServer { source } => match source.kind() {
+                std::io::ErrorKind::AddrInUse => {
+                    let exec = std::env::args()
+                        .next()
+                        .unwrap_or_else(|| "<server binary>".to_owned());
+
+                    Some(format!(
+                        "The address you are trying to start the server at ({addr_port}) is \
+                        already in use by a different program. You might want to use the \
+                        -l/--listen option to specify a different port to run the server at. \
+                        For example, to run the server at port 8888:\n\
+                        \n\
+                        {exec} -l 8888\n\
+                        cargo run -- -l 8888\n\
+                        bacon serve -- -- -l 8888"
+                    ))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
     }
 }
 
@@ -521,5 +556,40 @@ mod tests {
         std::env::set_current_dir(&temp_dir).unwrap();
         let bootstrapper = Bootstrapper::new(TestProject).with_config_name("test")?;
         check.execute(&matches, bootstrapper).await
+    }
+
+    #[test]
+    fn get_user_friendly_error_addr_in_use() {
+        let source = std::io::Error::new(std::io::ErrorKind::AddrInUse, "error");
+        let error = Error::new(ErrorRepr::StartServer { source });
+
+        let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
+
+        assert!(message.is_some());
+        let message = message.unwrap();
+        assert!(message.contains("1.2.3.4:8123"));
+        assert!(message.contains("is already in use"));
+    }
+
+    #[test]
+    fn get_user_friendly_error_io_error_other() {
+        let source = std::io::Error::new(std::io::ErrorKind::Other, "error");
+        let error = Error::new(ErrorRepr::StartServer { source });
+
+        let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
+
+        assert!(message.is_none());
+    }
+
+    #[test]
+    fn get_user_friendly_error_unsupported_error() {
+        let error = Error::new(ErrorRepr::NoViewToReverse {
+            app_name: None,
+            view_name: "test".to_string(),
+        });
+
+        let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
+
+        assert!(message.is_none());
     }
 }

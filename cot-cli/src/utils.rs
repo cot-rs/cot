@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anstyle::{AnsiColor, Color, Effects, Style};
 use anyhow::{bail, Context};
-use cargo_toml::{Error, Manifest, Package, Workspace};
+use cargo_toml::Manifest;
 
 pub(crate) fn print_status_msg(status: StatusType, message: &str) {
     let style = status.style();
@@ -73,10 +72,21 @@ impl StatusType {
 #[derive(Debug)]
 pub(crate) struct WorkspaceManager {
     root_manifest: Manifest,
-    package_manifests: HashMap<String, Manifest>,
+    package_manifests: Vec<ManifestEntry>,
+}
+
+#[derive(Debug)]
+struct ManifestEntry {
+    name: String,
+    path: PathBuf,
+    manifest: Manifest,
 }
 impl WorkspaceManager {
     pub fn from_cargo_toml_path(cargo_toml_path: PathBuf) -> anyhow::Result<Self> {
+        let cargo_toml_path = cargo_toml_path
+            .canonicalize()
+            .context("unable to canonicalize path")?;
+
         let manifest =
             Manifest::from_path(&cargo_toml_path).with_context(|| "unable to read Cargo.toml")?;
 
@@ -100,7 +110,7 @@ impl WorkspaceManager {
                     }
                     _ => Self {
                         root_manifest: manifest,
-                        package_manifests: HashMap::new(),
+                        package_manifests: Vec::new(),
                     },
                 }
             }
@@ -128,7 +138,12 @@ impl WorkspaceManager {
 
                 let member_manifest =
                     Manifest::from_path(&member_path).expect("member manifests should be valid");
-                (member.clone(), member_manifest)
+
+                ManifestEntry {
+                    name: member.clone(),
+                    path: member_path,
+                    manifest: member_manifest,
+                }
             })
             .collect();
 
@@ -138,10 +153,11 @@ impl WorkspaceManager {
         }
     }
 
-    pub fn from_path(path: &Path) -> anyhow::Result<Self> {
-        let cargo_toml_path = Self::find_cargo_toml(path)
-            .ok_or_else(|| anyhow::anyhow!("Cargo.toml not found in the package"))?;
-        Self::from_cargo_toml_path(cargo_toml_path)
+    pub fn from_path(path: &Path) -> anyhow::Result<Option<Self>> {
+        let path = path.canonicalize().context("unable to canonicalize path")?;
+        Self::find_cargo_toml(&path)
+            .map(|cargo_toml_path| Self::from_cargo_toml_path(cargo_toml_path))
+            .transpose()
     }
 
     pub fn find_cargo_toml(starting_dir: &Path) -> Option<PathBuf> {
@@ -160,6 +176,32 @@ impl WorkspaceManager {
         }
 
         None
+    }
+
+    pub fn get_package_manifest(&self, package_name: &str) -> Option<&Manifest> {
+        self.package_manifests
+            .iter()
+            .find(|p| p.name == package_name)
+            .map(|m| &m.manifest)
+    }
+
+    pub fn get_package_manifest_by_path(&self, package_path: &Path) -> Option<&Manifest> {
+        let package_path = package_path
+            .canonicalize()
+            .context("unable to canonicalize path")
+            .ok()?;
+
+        self.package_manifests
+            .iter()
+            .find(|p| p.path == package_path)
+            .map(|m| &m.manifest)
+    }
+
+    pub fn get_manifest_path(&self, package_name: &str) -> Option<&Path> {
+        self.package_manifests
+            .iter()
+            .find(|p| p.name == package_name)
+            .map(|m| m.path.as_path())
     }
 }
 
@@ -197,24 +239,28 @@ mod tests {
     }
 
     #[test]
-    fn load_valid_workspace_manifest() {
+    fn load_valid_workspace_manifest() -> anyhow::Result<()> {
         let cot_cli_root = env!("CARGO_MANIFEST_DIR");
         let cot_root = Path::new(cot_cli_root).parent().unwrap();
 
-        let manifest = WorkspaceManager::from_path(&cot_root).unwrap();
+        let manifest = WorkspaceManager::from_path(&cot_root)?.unwrap();
 
         assert!(manifest.root_manifest.workspace.is_some());
         assert!(manifest.package_manifests.len() > 0);
+
+        Ok(())
     }
 
     #[test]
-    fn load_valid_workspace_from_package_manifest() {
+    fn load_valid_workspace_from_package_manifest() -> anyhow::Result<()> {
         let cot_cli_root = env!("CARGO_MANIFEST_DIR");
 
-        let manifest = WorkspaceManager::from_path(Path::new(cot_cli_root)).unwrap();
+        let manifest = WorkspaceManager::from_path(Path::new(cot_cli_root))?.unwrap();
 
         assert!(manifest.root_manifest.workspace.is_some());
         assert!(manifest.package_manifests.len() > 0);
+
+        Ok(())
     }
 
     // TODO: test Cargo.toml with package and manifest in one file

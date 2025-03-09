@@ -21,34 +21,34 @@ use tracing::{debug, trace};
 use crate::utils::{print_status_msg, StatusType, WorkspaceManager};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
-    match WorkspaceManager::find_cargo_toml(
-        &path
-            .canonicalize()
-            .with_context(|| "unable to canonicalize Cargo.toml path")?,
-    ) {
-        Some(cargo_toml_path) => {
-            let manifest = Manifest::from_path(&cargo_toml_path)
-                .with_context(|| "unable to read Cargo.toml")?;
-            let crate_name = manifest
-                .package
-                .with_context(|| "unable to find package in Cargo.toml")?
-                .name;
+    if let Some(manager) = WorkspaceManager::from_path(path)? {
+        let manifest = match &options.app_name {
+            Some(app_name) => manager.get_package_manifest(&app_name),
+            None => manager.get_package_manifest_by_path(path),
+        }
+        .context("unable to find package manifest")?;
 
-            let generator = MigrationGenerator::new(cargo_toml_path, crate_name, options);
-            let migrations = generator
-                .generate_migrations_as_source()
-                .with_context(|| "unable to generate migrations")?;
-            generator
-                .write_migrations(&migrations)
-                .with_context(|| "unable to write migrations")?;
-            generator
-                .write_migrations_module()
-                .with_context(|| "unable to write migrations.rs")?;
-        }
-        None => {
-            bail!("Cargo.toml not found in the specified directory or any parent directory.")
-        }
-    }
+        let crate_name = manifest
+            .package
+            .as_ref()
+            .context("unable to find package in Cargo.toml")?
+            .name
+            .clone();
+        let manifest_path = manager
+            .get_manifest_path(&crate_name)
+            .expect("manifest must exist by this point");
+
+        let generator = MigrationGenerator::new(PathBuf::from(manifest_path), crate_name, options);
+        let migrations = generator
+            .generate_migrations_as_source()
+            .context("unable to generate migrations")?;
+        generator
+            .write_migrations(&migrations)
+            .context("unable to write migrations")?;
+        generator
+            .write_migrations_module()
+            .context("unable to write migrations.rs")?;
+    };
 
     Ok(())
 }

@@ -212,18 +212,9 @@ mod tests {
 
     use cargo;
     use cargo::ops::NewProjectKind;
-    use tempfile::TempDir;
 
     use super::*;
 
-    fn create_safe_tempdir(path: Option<PathBuf>) -> std::io::Result<TempDir> {
-        let mut builder = tempfile::Builder::new();
-        builder.prefix("cargo-cot");
-        match path {
-            Some(path) => builder.tempdir_in(path),
-            None => builder.tempdir(),
-        }
-    }
     fn make_workspace_package(path: PathBuf, packages: u8) -> anyhow::Result<()> {
         make_package(path.clone())?;
         let workspace_cargo_toml = path.join("Cargo.toml");
@@ -233,7 +224,7 @@ mod tests {
         writeln!(&mut cargo_toml, "[workspace]")?;
 
         for _ in 0..packages {
-            let package_path = create_safe_tempdir(Some(path.clone()))?;
+            let package_path = tempfile::TempDir::with_prefix_in("cot-test-", path.clone())?;
             make_package(package_path.into_path())?;
         }
 
@@ -256,7 +247,7 @@ mod tests {
     use super::*;
     #[test]
     fn find_cargo_toml() {
-        let temp_dir = create_safe_tempdir(None).unwrap();
+        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_package(temp_dir.path().into()).unwrap();
         let cargo_toml_path = temp_dir.path().join("Cargo.toml");
 
@@ -294,7 +285,7 @@ mod tests {
 
     #[test]
     fn load_valid_workspace_from_package_manifest() {
-        let temp_dir = create_safe_tempdir(None).unwrap();
+        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_workspace_package(temp_dir.path().into(), 2).unwrap();
 
         let manifest = WorkspaceManager::from_path(&temp_dir.path())
@@ -307,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_get_package_manifest() {
-        let temp_dir = create_safe_tempdir(None).unwrap();
+        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
 
         let workspace = WorkspaceManager::from_path(temp_dir.path())
@@ -325,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_get_package_manifest_by_path() {
-        let temp_dir = create_safe_tempdir(None).unwrap();
+        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
 
         let workspace = WorkspaceManager::from_path(temp_dir.path())
@@ -344,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_get_manifest_path() {
-        let temp_dir = create_safe_tempdir(None).unwrap();
+        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
 
         let workspace = WorkspaceManager::from_path(temp_dir.path())

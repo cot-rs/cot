@@ -208,12 +208,57 @@ impl WorkspaceManager {
 #[cfg(test)]
 mod tests {
 
+    use std::io::Write;
+
+    use cargo;
+    use cargo::ops::NewProjectKind;
+    use tempfile::TempDir;
+
+    use super::*;
+
+    fn create_safe_tempdir(path: Option<PathBuf>) -> std::io::Result<TempDir> {
+        let mut builder = tempfile::Builder::new();
+        builder.prefix("cargo-cot");
+        match path {
+            Some(path) => builder.tempdir_in(path),
+            None => builder.tempdir(),
+        }
+    }
+    fn make_workspace_package(path: PathBuf, packages: u8) -> anyhow::Result<()> {
+        make_package(path.clone())?;
+        let workspace_cargo_toml = path.join("Cargo.toml");
+        let mut cargo_toml = std::fs::OpenOptions::new()
+            .append(true)
+            .open(workspace_cargo_toml.clone())?;
+        writeln!(&mut cargo_toml, "[workspace]")?;
+
+        for _ in 0..packages {
+            let package_path = create_safe_tempdir(Some(path.clone()))?;
+            make_package(package_path.into_path())?;
+        }
+
+        Ok(())
+    }
+    fn make_package(path: PathBuf) -> anyhow::Result<()> {
+        let new_options = cargo::ops::NewOptions {
+            version_control: None,
+            kind: NewProjectKind::Lib,
+            auto_detect_kind: false,
+            path,
+            name: None,
+            edition: None,
+            registry: None,
+        };
+        let global_context = cargo::GlobalContext::default()?;
+        cargo::ops::init(&new_options, &global_context).map(|_| ())
+    }
+
     use super::*;
     #[test]
     fn find_cargo_toml() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = create_safe_tempdir(None).unwrap();
+        make_package(temp_dir.path().into()).unwrap();
         let cargo_toml_path = temp_dir.path().join("Cargo.toml");
-        std::fs::write(&cargo_toml_path, "").unwrap();
 
         let found_path = WorkspaceManager::find_cargo_toml(&temp_dir.path()).unwrap();
         assert_eq!(found_path, cargo_toml_path);
@@ -223,12 +268,10 @@ mod tests {
     fn find_cargo_toml_recursive() {
         let temp_dir = tempfile::tempdir().unwrap();
         let nested_dir = temp_dir.path().join("nested");
-        std::fs::create_dir(&nested_dir).unwrap();
-        let cargo_toml_path = temp_dir.path().join("Cargo.toml");
-        std::fs::write(&cargo_toml_path, "").unwrap();
+        make_package(nested_dir.clone()).unwrap();
 
-        let found_path = WorkspaceManager::find_cargo_toml(&temp_dir.path()).unwrap();
-        assert_eq!(found_path, cargo_toml_path);
+        let found_path = WorkspaceManager::find_cargo_toml(&nested_dir).unwrap();
+        assert_eq!(found_path, nested_dir.join("Cargo.toml"));
     }
 
     #[test]
@@ -239,29 +282,81 @@ mod tests {
     }
 
     #[test]
-    fn load_valid_workspace_manifest() -> anyhow::Result<()> {
+    fn load_valid_workspace_manifest() {
         let cot_cli_root = env!("CARGO_MANIFEST_DIR");
         let cot_root = Path::new(cot_cli_root).parent().unwrap();
 
-        let manifest = WorkspaceManager::from_path(&cot_root)?.unwrap();
+        let manifest = WorkspaceManager::from_path(&cot_root).unwrap().unwrap();
 
         assert!(manifest.root_manifest.workspace.is_some());
         assert!(manifest.package_manifests.len() > 0);
-
-        Ok(())
     }
 
     #[test]
-    fn load_valid_workspace_from_package_manifest() -> anyhow::Result<()> {
-        let cot_cli_root = env!("CARGO_MANIFEST_DIR");
+    fn load_valid_workspace_from_package_manifest() {
+        let temp_dir = create_safe_tempdir(None).unwrap();
+        make_workspace_package(temp_dir.path().into(), 2).unwrap();
 
-        let manifest = WorkspaceManager::from_path(Path::new(cot_cli_root))?.unwrap();
+        let manifest = WorkspaceManager::from_path(&temp_dir.path())
+            .unwrap()
+            .unwrap();
 
         assert!(manifest.root_manifest.workspace.is_some());
-        assert!(manifest.package_manifests.len() > 0);
-
-        Ok(())
+        assert_eq!(manifest.package_manifests.len(), 2);
     }
 
-    // TODO: test Cargo.toml with package and manifest in one file
+    #[test]
+    fn test_get_package_manifest() {
+        let temp_dir = create_safe_tempdir(None).unwrap();
+        make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
+
+        let workspace = WorkspaceManager::from_path(temp_dir.path())
+            .unwrap()
+            .unwrap();
+
+        let first_package = &workspace.package_manifests[0];
+        let manifest = workspace.get_package_manifest(&first_package.name);
+        assert!(manifest.is_some());
+        assert_eq!(manifest.unwrap(), &first_package.manifest);
+
+        let manifest = workspace.get_package_manifest("non-existent");
+        assert!(manifest.is_none());
+    }
+
+    #[test]
+    fn test_get_package_manifest_by_path() {
+        let temp_dir = create_safe_tempdir(None).unwrap();
+        make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
+
+        let workspace = WorkspaceManager::from_path(temp_dir.path())
+            .unwrap()
+            .unwrap();
+
+        let first_package = &workspace.package_manifests[0];
+        let manifest = workspace.get_package_manifest_by_path(&first_package.path);
+        assert!(manifest.is_some());
+        assert_eq!(manifest.unwrap(), &first_package.manifest);
+
+        let non_existent = temp_dir.path().join("non-existent/Cargo.toml");
+        let manifest = workspace.get_package_manifest_by_path(&non_existent);
+        assert!(manifest.is_none());
+    }
+
+    #[test]
+    fn test_get_manifest_path() {
+        let temp_dir = create_safe_tempdir(None).unwrap();
+        make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
+
+        let workspace = WorkspaceManager::from_path(temp_dir.path())
+            .unwrap()
+            .unwrap();
+
+        let first_package = &workspace.package_manifests[0];
+        let path = workspace.get_manifest_path(&first_package.name);
+        assert!(path.is_some());
+        assert_eq!(path.unwrap(), first_package.path.as_path());
+
+        let path = workspace.get_manifest_path("non-existent");
+        assert!(path.is_none());
+    }
 }

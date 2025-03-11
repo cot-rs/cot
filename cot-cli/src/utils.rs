@@ -326,7 +326,7 @@ mod tests {
     fn load_valid_workspace_from_package_manifest() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_package(temp_dir.path().into()).unwrap();
-        let cargo_toml_path = temp_dir.path().join("Cargo.toml");
+        let cargo_toml_path = temp_dir.path().join("Cargo.toml").canonicalize().unwrap();
         let mut handle = std::fs::OpenOptions::new()
             .append(true)
             .open(&cargo_toml_path)
@@ -411,10 +411,17 @@ mod tests {
             .unwrap();
 
         let first_package = &workspace.get_packages()[0];
-        let first_package_path = temp_dir.path().join(first_package);
         let path = workspace.get_manifest_path(&first_package);
         assert!(path.is_some());
-        assert_eq!(path.unwrap(), first_package_path.join("Cargo.toml"));
+        assert_eq!(
+            path.unwrap(),
+            temp_dir
+                .path()
+                .join(first_package)
+                .join("Cargo.toml")
+                .canonicalize()
+                .unwrap()
+        );
 
         let path = workspace.get_manifest_path("non-existent");
         assert!(path.is_none());

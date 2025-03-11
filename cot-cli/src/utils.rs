@@ -91,7 +91,34 @@ impl WorkspaceManager {
             Manifest::from_path(&cargo_toml_path).with_context(|| "unable to read Cargo.toml")?;
 
         let manager = match (&manifest.workspace, &manifest.package) {
-            (Some(_), _) => Self::parse_workspace(&cargo_toml_path, manifest),
+            (Some(_), _) => {
+                let mut manager = Self::parse_workspace(&cargo_toml_path, manifest);
+
+                if let Some(package) = &manager.root_manifest.package {
+                    if let None = manager.get_package_manifest(package.name()) {
+                        let mut workspace = manager
+                            .root_manifest
+                            .workspace
+                            .as_mut()
+                            .expect("workspace is known to be present");
+
+                        if !workspace.members.contains(&package.name) {
+                            let package_name = package.name().to_string();
+                            workspace.members.push(package_name.clone());
+
+                            let entry = ManifestEntry {
+                                name: package_name.clone(),
+                                path: cargo_toml_path,
+                                manifest: manager.root_manifest.clone(),
+                            };
+
+                            manager.package_manifests.push(entry);
+                        }
+                    }
+                }
+
+                manager
+            }
 
             (None, Some(package)) => {
                 let workspace_path = match package.workspace {
@@ -115,7 +142,7 @@ impl WorkspaceManager {
                 }
             }
 
-            (_, _) => {
+            _ => {
                 bail!("Cargo.toml is not a valid workspace or package manifest");
             }
         };
@@ -215,17 +242,15 @@ mod tests {
 
     use super::*;
 
-    fn make_workspace_package(path: PathBuf, packages: u8) -> anyhow::Result<()> {
-        make_package(path.clone())?;
-        let workspace_cargo_toml = path.join("Cargo.toml");
-        let mut cargo_toml = std::fs::OpenOptions::new()
-            .append(true)
-            .open(workspace_cargo_toml.clone())?;
-        writeln!(&mut cargo_toml, "[workspace]")?;
+    const WORKSPACE_STUB: &'static str = "[workspace]\nresolver = \"3\"";
 
-        for _ in 0..packages {
-            let package_path = tempfile::TempDir::with_prefix_in("cot-test-", path.clone())?;
-            make_package(package_path.into_path())?;
+    fn make_workspace_package(path: PathBuf, packages: u8) -> anyhow::Result<()> {
+        let workspace_cargo_toml = path.join("Cargo.toml");
+        std::fs::write(workspace_cargo_toml, WORKSPACE_STUB)?;
+
+        for i in 0..packages {
+            let package_path = path.join(format!("cargo-test-crate-{i}"));
+            make_package(package_path)?;
         }
 
         Ok(())
@@ -235,13 +260,16 @@ mod tests {
             version_control: None,
             kind: NewProjectKind::Lib,
             auto_detect_kind: false,
-            path,
+            path: path.clone(),
             name: None,
             edition: None,
             registry: None,
         };
         let global_context = cargo::GlobalContext::default()?;
-        cargo::ops::init(&new_options, &global_context).map(|_| ())
+        match path.exists() {
+            true => cargo::ops::init(&new_options, &global_context).map(|_| ()),
+            false => cargo::ops::new(&new_options, &global_context),
+        }
     }
 
     use super::*;
@@ -273,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn load_valid_workspace_manifest() {
+    fn load_valid_virtual_workspace_manifest() {
         let cot_cli_root = env!("CARGO_MANIFEST_DIR");
         let cot_root = Path::new(cot_cli_root).parent().unwrap();
 
@@ -286,14 +314,21 @@ mod tests {
     #[test]
     fn load_valid_workspace_from_package_manifest() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        make_workspace_package(temp_dir.path().into(), 2).unwrap();
+        make_package(temp_dir.path().into()).unwrap();
+        let cargo_toml_path = temp_dir.path().join("Cargo.toml");
+        let mut handle = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&cargo_toml_path)
+            .unwrap();
+        writeln!(handle, "{WORKSPACE_STUB}").unwrap();
 
         let manifest = WorkspaceManager::from_path(&temp_dir.path())
             .unwrap()
             .unwrap();
 
         assert!(manifest.root_manifest.workspace.is_some());
-        assert_eq!(manifest.package_manifests.len(), 2);
+        assert_eq!(manifest.package_manifests.len(), 1);
+        assert_eq!(manifest.package_manifests[0].path, cargo_toml_path);
     }
 
     #[test]

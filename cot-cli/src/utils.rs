@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anstyle::{AnsiColor, Color, Effects, Style};
@@ -72,12 +73,11 @@ impl StatusType {
 #[derive(Debug)]
 pub(crate) struct WorkspaceManager {
     root_manifest: Manifest,
-    package_manifests: Vec<ManifestEntry>,
+    package_manifests: HashMap<String, ManifestEntry>,
 }
 
 #[derive(Debug)]
 struct ManifestEntry {
-    name: String,
     path: PathBuf,
     manifest: Manifest,
 }
@@ -107,12 +107,13 @@ impl WorkspaceManager {
                             workspace.members.push(package_name.clone());
 
                             let entry = ManifestEntry {
-                                name: package_name.clone(),
                                 path: cargo_toml_path,
                                 manifest: manager.root_manifest.clone(),
                             };
 
-                            manager.package_manifests.push(entry);
+                            manager
+                                .package_manifests
+                                .insert(package_name.clone(), entry);
                         }
                     }
                 }
@@ -137,7 +138,7 @@ impl WorkspaceManager {
                     }
                     _ => Self {
                         root_manifest: manifest,
-                        package_manifests: Vec::new(),
+                        package_manifests: HashMap::new(),
                     },
                 }
             }
@@ -166,11 +167,12 @@ impl WorkspaceManager {
                 let member_manifest =
                     Manifest::from_path(&member_path).expect("member manifests should be valid");
 
-                ManifestEntry {
-                    name: member.clone(),
+                let entry = ManifestEntry {
                     path: member_path,
                     manifest: member_manifest,
-                }
+                };
+
+                (member.clone(), entry)
             })
             .collect();
 
@@ -205,29 +207,38 @@ impl WorkspaceManager {
         None
     }
 
+    pub fn get_packages(&self) -> Vec<String> {
+        self.package_manifests.keys().cloned().collect()
+    }
+
     pub fn get_package_manifest(&self, package_name: &str) -> Option<&Manifest> {
         self.package_manifests
-            .iter()
-            .find(|p| p.name == package_name)
+            .get(package_name)
             .map(|m| &m.manifest)
     }
 
     pub fn get_package_manifest_by_path(&self, package_path: &Path) -> Option<&Manifest> {
-        let package_path = package_path
+        let mut package_path = package_path
             .canonicalize()
             .context("unable to canonicalize path")
             .ok()?;
 
-        self.package_manifests
-            .iter()
-            .find(|p| p.path == package_path)
-            .map(|m| &m.manifest)
+        if package_path.is_dir() {
+            package_path = package_path.join("Cargo.toml");
+        }
+
+        self.package_manifests.values().find_map(|m| {
+            if m.path == package_path {
+                Some(&m.manifest)
+            } else {
+                None
+            }
+        })
     }
 
     pub fn get_manifest_path(&self, package_name: &str) -> Option<&Path> {
         self.package_manifests
-            .iter()
-            .find(|p| p.name == package_name)
+            .get(package_name)
             .map(|m| m.path.as_path())
     }
 }
@@ -328,7 +339,14 @@ mod tests {
 
         assert!(manifest.root_manifest.workspace.is_some());
         assert_eq!(manifest.package_manifests.len(), 1);
-        assert_eq!(manifest.package_manifests[0].path, cargo_toml_path);
+        assert_eq!(
+            manifest
+                .package_manifests
+                .get(temp_dir.path().file_name().unwrap().to_str().unwrap())
+                .unwrap()
+                .path,
+            cargo_toml_path
+        );
     }
 
     #[test]
@@ -340,10 +358,13 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let first_package = &workspace.package_manifests[0];
-        let manifest = workspace.get_package_manifest(&first_package.name);
+        let first_package = &workspace.get_packages()[0];
+        let manifest = workspace.get_package_manifest(first_package);
         assert!(manifest.is_some());
-        assert_eq!(manifest.unwrap(), &first_package.manifest);
+        assert_eq!(
+            manifest.unwrap().package.as_ref().unwrap().name,
+            *first_package
+        );
 
         let manifest = workspace.get_package_manifest("non-existent");
         assert!(manifest.is_none());
@@ -358,10 +379,22 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let first_package = &workspace.package_manifests[0];
-        let manifest = workspace.get_package_manifest_by_path(&first_package.path);
+        let first_package = &workspace.get_packages()[0];
+        let first_package_path = temp_dir.path().join(format!("{first_package}/"));
+        let manifest = workspace.get_package_manifest_by_path(&first_package_path);
         assert!(manifest.is_some());
-        assert_eq!(manifest.unwrap(), &first_package.manifest);
+        assert_eq!(
+            manifest.unwrap().package.as_ref().unwrap().name,
+            *first_package
+        );
+
+        let first_package_path = temp_dir.path().join(first_package).join("Cargo.toml");
+        let manifest = workspace.get_package_manifest_by_path(&first_package_path);
+        assert!(manifest.is_some());
+        assert_eq!(
+            manifest.unwrap().package.as_ref().unwrap().name,
+            *first_package
+        );
 
         let non_existent = temp_dir.path().join("non-existent/Cargo.toml");
         let manifest = workspace.get_package_manifest_by_path(&non_existent);
@@ -377,10 +410,11 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let first_package = &workspace.package_manifests[0];
-        let path = workspace.get_manifest_path(&first_package.name);
+        let first_package = &workspace.get_packages()[0];
+        let first_package_path = temp_dir.path().join(first_package);
+        let path = workspace.get_manifest_path(&first_package);
         assert!(path.is_some());
-        assert_eq!(path.unwrap(), first_package.path.as_path());
+        assert_eq!(path.unwrap(), first_package_path.join("Cargo.toml"));
 
         let path = workspace.get_manifest_path("non-existent");
         assert!(path.is_none());

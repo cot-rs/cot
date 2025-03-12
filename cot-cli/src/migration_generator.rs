@@ -6,7 +6,6 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context};
-use cargo_toml::Manifest;
 use cot::db::migrations::{DynMigration, MigrationEngine};
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::SymbolResolver;
@@ -23,7 +22,7 @@ use crate::utils::{print_status_msg, StatusType, WorkspaceManager};
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
     if let Some(manager) = WorkspaceManager::from_path(path)? {
         let manifest = match &options.app_name {
-            Some(app_name) => manager.get_package_manifest(&app_name),
+            Some(app_name) => manager.get_package_manifest(app_name),
             None => manager.get_package_manifest_by_path(path),
         }
         .context("unable to find package manifest")?;

@@ -82,7 +82,7 @@ struct ManifestEntry {
     manifest: Manifest,
 }
 impl WorkspaceManager {
-    pub fn from_cargo_toml_path(cargo_toml_path: PathBuf) -> anyhow::Result<Self> {
+    pub(crate) fn from_cargo_toml_path(cargo_toml_path: &PathBuf) -> anyhow::Result<Self> {
         let cargo_toml_path = cargo_toml_path
             .canonicalize()
             .context("unable to canonicalize path")?;
@@ -95,7 +95,7 @@ impl WorkspaceManager {
                 let mut manager = Self::parse_workspace(&cargo_toml_path, manifest);
 
                 if let Some(package) = &manager.root_manifest.package {
-                    if let None = manager.get_package_manifest(package.name()) {
+                    if manager.get_package_manifest(package.name()).is_none() {
                         let mut workspace = manager
                             .root_manifest
                             .workspace
@@ -151,7 +151,7 @@ impl WorkspaceManager {
         Ok(manager)
     }
 
-    fn parse_workspace(cargo_toml_path: &PathBuf, manifest: Manifest) -> WorkspaceManager {
+    fn parse_workspace(cargo_toml_path: &Path, manifest: Manifest) -> WorkspaceManager {
         assert!(manifest.workspace.is_some());
         let workspace = manifest.workspace.as_ref().unwrap();
         let package_manifests = workspace
@@ -182,14 +182,14 @@ impl WorkspaceManager {
         }
     }
 
-    pub fn from_path(path: &Path) -> anyhow::Result<Option<Self>> {
+    pub(crate) fn from_path(path: &Path) -> anyhow::Result<Option<Self>> {
         let path = path.canonicalize().context("unable to canonicalize path")?;
         Self::find_cargo_toml(&path)
-            .map(|cargo_toml_path| Self::from_cargo_toml_path(cargo_toml_path))
+            .map(Self::from_cargo_toml_path)
             .transpose()
     }
 
-    pub fn find_cargo_toml(starting_dir: &Path) -> Option<PathBuf> {
+    pub(crate) fn find_cargo_toml(starting_dir: &Path) -> Option<PathBuf> {
         let mut current_dir = starting_dir;
 
         loop {
@@ -207,17 +207,18 @@ impl WorkspaceManager {
         None
     }
 
-    pub fn get_packages(&self) -> Vec<String> {
+    #[allow(unused)]
+    pub(crate) fn get_packages(&self) -> Vec<String> {
         self.package_manifests.keys().cloned().collect()
     }
 
-    pub fn get_package_manifest(&self, package_name: &str) -> Option<&Manifest> {
+    pub(crate) fn get_package_manifest(&self, package_name: &str) -> Option<&Manifest> {
         self.package_manifests
             .get(package_name)
             .map(|m| &m.manifest)
     }
 
-    pub fn get_package_manifest_by_path(&self, package_path: &Path) -> Option<&Manifest> {
+    pub(crate) fn get_package_manifest_by_path(&self, package_path: &Path) -> Option<&Manifest> {
         let mut package_path = package_path
             .canonicalize()
             .context("unable to canonicalize path")
@@ -236,7 +237,7 @@ impl WorkspaceManager {
         })
     }
 
-    pub fn get_manifest_path(&self, package_name: &str) -> Option<&Path> {
+    pub(crate) fn get_manifest_path(&self, package_name: &str) -> Option<&Path> {
         self.package_manifests
             .get(package_name)
             .map(|m| m.path.as_path())
@@ -250,8 +251,6 @@ mod tests {
 
     use cargo;
     use cargo::ops::NewProjectKind;
-
-    use super::*;
 
     const WORKSPACE_STUB: &'static str = "[workspace]\nresolver = \"3\"";
 

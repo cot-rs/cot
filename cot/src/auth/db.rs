@@ -24,7 +24,7 @@ use crate::auth::{
 use crate::config::SecretKey;
 use crate::db::migrations::SyncDynMigration;
 use crate::db::{model, query, DatabaseBackend, LimitedString, Model};
-use crate::form::{Form, FormContext};
+use crate::form::Form;
 use crate::request::{Request, RequestExt};
 use crate::App;
 

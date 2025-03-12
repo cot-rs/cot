@@ -156,11 +156,11 @@ impl AdminModelDeriveBuilder {
                 where
                     Self: Sized,
                 {
-                    ::std::boxed::Box::new(<Self as #crate_ident::form::Form>::Context::new())
+                    ::std::boxed::Box::new(<<Self as #crate_ident::form::Form>::Context as #crate_ident::form::FormContext>::new())
                 }
 
                 fn form_context_from_self(&self) -> ::std::boxed::Box<dyn #crate_ident::form::FormContext> {
-                    ::std::boxed::Box::new(<Self as Form>::to_context(self))
+                    ::std::boxed::Box::new(<Self as #crate_ident::form::Form>::to_context(self))
                 }
 
                 async fn save_from_request(

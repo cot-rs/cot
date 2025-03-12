@@ -128,6 +128,9 @@ impl Router {
                 path_params.insert(key.clone(), value.clone());
             }
             request.extensions_mut().insert(path_params);
+            if let Some(app_name) = result.app_name {
+                request.extensions_mut().insert(app_name);
+            }
             if let Some(name) = result.name {
                 request.extensions_mut().insert(name);
             }

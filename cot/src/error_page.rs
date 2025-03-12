@@ -93,12 +93,16 @@ impl ErrorPageTemplateBuilder {
     }
 
     #[must_use]
-    fn panic(panic_payload: &Box<dyn Any + Send>) -> Self {
+    fn panic(
+        panic_payload: &Box<dyn Any + Send>,
+        panic_location: Option<String>,
+        backtrace: Option<Backtrace>,
+    ) -> Self {
         Self {
             kind: Kind::Panic,
             panic_string: Self::get_panic_string(panic_payload),
-            panic_location: PANIC_LOCATION.take(),
-            backtrace: PANIC_BACKTRACE.take(),
+            panic_location,
+            backtrace,
             ..Default::default()
         }
     }
@@ -264,14 +268,17 @@ pub(super) fn handle_response_panic(
         .request_parts
         .as_ref()
         .map(ErrorPageTemplateBuilder::build_request_data);
+
+    let panic_location = PANIC_LOCATION.take();
+    let backtrace = PANIC_BACKTRACE.take();
     log_panic(
         panic_payload,
-        PANIC_LOCATION.take().as_deref(),
-        PANIC_BACKTRACE.take().as_ref(),
+        panic_location.as_deref(),
+        backtrace.as_ref(),
         request_data.as_ref(),
     );
     build_response(
-        build_panic_response(panic_payload, diagnostics),
+        build_panic_response(panic_payload, diagnostics, panic_location, backtrace),
         StatusCode::INTERNAL_SERVER_ERROR,
     )
 }
@@ -321,8 +328,10 @@ fn build_not_found_response(message: Option<String>, diagnostics: &Diagnostics) 
 fn build_panic_response(
     panic_payload: &Box<dyn Any + Send>,
     diagnostics: &Diagnostics,
+    panic_location: Option<String>,
+    backtrace: Option<Backtrace>,
 ) -> Result<String> {
-    ErrorPageTemplateBuilder::panic(panic_payload)
+    ErrorPageTemplateBuilder::panic(panic_payload, panic_location, backtrace)
         .diagnostics(diagnostics)
         .render()
 }
@@ -380,15 +389,16 @@ pub(super) fn error_page_panic_hook(info: &PanicHookInfo<'_>) {
     let location = info.location().map(|location| format!("{location}"));
     PANIC_LOCATION.replace(location);
 
-    PANIC_BACKTRACE.replace(Some(__cot_create_backtrace()));
+    let backtrace = __cot_create_backtrace();
+    PANIC_BACKTRACE.replace(Some(backtrace));
 }
 
 fn log_error(error: &Error, request_data: Option<&RequestData>) {
     let span = tracing::span!(Level::ERROR,
         "request_error",
-        error_type=%error.inner,
-        error_message= %error,
-        backtrace= ?error.backtrace()
+        error_type = %error.inner,
+        error_message = %error,
+        backtrace = ?error.backtrace()
     );
     let _enter = span.enter();
     if let Some(req) = request_data {

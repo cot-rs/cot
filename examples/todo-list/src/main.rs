@@ -4,9 +4,8 @@ use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::config::{DatabaseConfig, ProjectConfig};
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{model, query, Model};
+use cot::db::{model, query, Auto, Model};
 use cot::form::Form;
-use cot::middleware::SessionMiddleware;
 use cot::project::{WithApps, WithConfig};
 use cot::request::{Request, RequestExt};
 use cot::response::{Response, ResponseExt};
@@ -21,7 +20,7 @@ use rinja::Template;
 #[model]
 struct TodoItem {
     #[model(primary_key)]
-    id: i32,
+    id: Auto<i32>,
     title: String,
 }
 
@@ -54,7 +53,7 @@ async fn add_todo(mut request: Request) -> cot::Result<Response> {
 
     {
         TodoItem {
-            id: 0,
+            id: Auto::auto(),
             title: todo_form.title,
         }
         .save(request.db())
@@ -122,7 +121,6 @@ impl Project for TodoProject {
     ) -> BoxedHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
-            .middleware(SessionMiddleware::new())
             .build()
     }
 }

@@ -96,7 +96,7 @@ impl WorkspaceManager {
 
                 if let Some(package) = &manager.root_manifest.package {
                     if manager.get_package_manifest(package.name()).is_none() {
-                        let mut workspace = manager
+                        let workspace = manager
                             .root_manifest
                             .workspace
                             .as_mut()
@@ -185,6 +185,7 @@ impl WorkspaceManager {
     pub(crate) fn from_path(path: &Path) -> anyhow::Result<Option<Self>> {
         let path = path.canonicalize().context("unable to canonicalize path")?;
         Self::find_cargo_toml(&path)
+            .as_ref()
             .map(Self::from_cargo_toml_path)
             .transpose()
     }

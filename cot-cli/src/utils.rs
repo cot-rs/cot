@@ -82,7 +82,7 @@ struct ManifestEntry {
     manifest: Manifest,
 }
 impl WorkspaceManager {
-    pub(crate) fn from_cargo_toml_path(cargo_toml_path: &PathBuf) -> anyhow::Result<Self> {
+    pub(crate) fn from_cargo_toml_path(cargo_toml_path: &Path) -> anyhow::Result<Self> {
         let cargo_toml_path = cargo_toml_path
             .canonicalize()
             .context("unable to canonicalize path")?;
@@ -185,8 +185,7 @@ impl WorkspaceManager {
     pub(crate) fn from_path(path: &Path) -> anyhow::Result<Option<Self>> {
         let path = path.canonicalize().context("unable to canonicalize path")?;
         Self::find_cargo_toml(&path)
-            .as_ref()
-            .map(Self::from_cargo_toml_path)
+            .map(|p| Self::from_cargo_toml_path(&p))
             .transpose()
     }
 

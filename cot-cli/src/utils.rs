@@ -248,10 +248,14 @@ impl WorkspaceManager {
 mod tests {
     use std::io::Write;
 
-    use cargo;
-    use cargo::ops::NewProjectKind;
+    use super::*;
 
     const WORKSPACE_STUB: &'static str = "[workspace]\nresolver = \"3\"";
+
+    enum CargoCommand {
+        Init,
+        New,
+    }
 
     fn make_workspace_package(path: PathBuf, packages: u8) -> anyhow::Result<()> {
         let workspace_cargo_toml = path.join("Cargo.toml");
@@ -265,23 +269,24 @@ mod tests {
         Ok(())
     }
     fn make_package(path: PathBuf) -> anyhow::Result<()> {
-        let new_options = cargo::ops::NewOptions {
-            version_control: None,
-            kind: NewProjectKind::Lib,
-            auto_detect_kind: false,
-            path: path.clone(),
-            name: None,
-            edition: None,
-            registry: None,
-        };
-        let global_context = cargo::GlobalContext::default()?;
         match path.exists() {
-            true => cargo::ops::init(&new_options, &global_context).map(|_| ()),
-            false => cargo::ops::new(&new_options, &global_context),
+            true => create_cargo_project(&path, CargoCommand::Init),
+            false => create_cargo_project(&path, CargoCommand::New),
         }
     }
+    fn create_cargo_project(path: &Path, cmd: CargoCommand) -> anyhow::Result<()> {
+        let mut base = cot_cli::test_utils::cargo();
 
-    use super::*;
+        let cmd = match cmd {
+            CargoCommand::Init => base.arg("init"),
+            CargoCommand::New => base.arg("new"),
+        };
+
+        cmd.arg(path).output()?;
+
+        Ok(())
+    }
+
     #[test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
                               // `linux`

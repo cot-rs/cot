@@ -1,6 +1,5 @@
 use std::env;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 
 use cot_cli::new_project::{new_project, CotSource};
 
@@ -19,7 +18,7 @@ fn new_project_compile_test() {
     )
     .unwrap();
 
-    let output = cargo(&project_path)
+    let output = cot_cli::test_utils::project_cargo(&project_path)
         .arg("run")
         .arg("--quiet")
         .arg("--")
@@ -35,21 +34,4 @@ fn new_project_compile_test() {
         stdout.contains("Success verifying the configuration"),
         "status: {status}, stderr: {stderr}"
     );
-}
-
-fn raw_cargo() -> Command {
-    match env::var_os("CARGO") {
-        Some(cargo) => Command::new(cargo),
-        None => Command::new("cargo"),
-    }
-}
-
-fn cargo(project_path: &Path) -> Command {
-    let mut cmd = raw_cargo();
-    cmd.current_dir(project_path);
-    cmd.env("CARGO_TARGET_DIR", project_path.join("target"));
-    cmd.env_remove("RUSTFLAGS");
-    cmd.env("CARGO_INCREMENTAL", "0");
-
-    cmd
 }

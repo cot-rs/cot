@@ -2,4 +2,6 @@
 
 pub mod migration_generator;
 pub mod new_project;
+#[cfg(feature = "test_utils")]
+pub mod test_utils;
 mod utils;

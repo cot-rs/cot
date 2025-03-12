@@ -88,7 +88,7 @@ impl WorkspaceManager {
             .context("unable to canonicalize path")?;
 
         let manifest =
-            Manifest::from_path(&cargo_toml_path).with_context(|| "unable to read Cargo.toml")?;
+            Manifest::from_path(&cargo_toml_path).context("unable to read Cargo.toml")?;
 
         let manager = match (&manifest.workspace, &manifest.package) {
             (Some(_), _) => {
@@ -246,7 +246,6 @@ impl WorkspaceManager {
 
 #[cfg(test)]
 mod tests {
-
     use std::io::Write;
 
     use cargo;

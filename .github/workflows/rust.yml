@@ -79,6 +79,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
 
       - name: Run clippy
         run: cargo clippy --no-deps -- -D warnings
@@ -100,6 +102,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -145,6 +149,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
 
       - name: Run the external dependencies
         run: docker compose up -d
@@ -181,6 +187,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
 
       - name: Run fmt
         run: cargo fmt --all -- --check
@@ -202,6 +210,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
 
       - name: Run cargo-machete
         uses: bnjbvr/cargo-machete@v0.8.0
@@ -226,6 +236,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
 
       - name: Run cargo check with minimal versions
         run: |
@@ -256,6 +268,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
 
       - name: Run cargo check with every combination of features
         run: cargo hack check --feature-powerset --exclude-features db --no-dev-deps
@@ -283,6 +297,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
 
       - name: Miri setup
         run: cargo miri setup

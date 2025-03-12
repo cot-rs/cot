@@ -284,6 +284,8 @@ mod tests {
 
     use super::*;
     #[test]
+    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                              // `linux`
     fn find_cargo_toml() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_package(temp_dir.path().into()).unwrap();
@@ -294,6 +296,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                              // `linux`
     fn find_cargo_toml_recursive() {
         let temp_dir = tempfile::tempdir().unwrap();
         let nested_dir = temp_dir.path().join("nested");
@@ -311,6 +315,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                              // `linux`
     fn load_valid_virtual_workspace_manifest() {
         let cot_cli_root = env!("CARGO_MANIFEST_DIR");
         let cot_root = Path::new(cot_cli_root).parent().unwrap();
@@ -322,6 +328,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                              // `linux`
     fn load_valid_workspace_from_package_manifest() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_package(temp_dir.path().into()).unwrap();
@@ -349,6 +357,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                              // `linux`
     fn test_get_package_manifest() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
@@ -370,6 +380,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                              // `linux`
     fn test_get_package_manifest_by_path() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
@@ -401,6 +413,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                              // `linux`
     fn test_get_manifest_path() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();

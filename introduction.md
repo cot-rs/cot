@@ -138,7 +138,7 @@ You can also define dynamic routes by using the `Route::with_handler_and_name` m
 async fn hello_name(request: Request) -> cot::Result<Response> {
     let name: String = request.path_params().parse()?;
 
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(format!("Hello, {}!", name)))
+    Ok(Response::new_html(StatusCode::OK, Body::fixed(format!("Hello, {}!", name))))
 }
 
 // inside `impl App`:

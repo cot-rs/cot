@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn test_error_new() {
         let inner = ErrorRepr::StartServer {
-            source: io::Error::new(io::ErrorKind::Other, "server error"),
+            source: io::Error::other("server error"),
         };
 
         let error = Error::new(inner);

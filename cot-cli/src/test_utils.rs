@@ -9,6 +9,7 @@ fn raw_cargo() -> Command {
     }
 }
 
+#[must_use]
 pub fn cargo() -> Command {
     let mut cmd = raw_cargo();
     cmd.env_remove("RUSTFLAGS");
@@ -17,6 +18,7 @@ pub fn cargo() -> Command {
     cmd
 }
 
+#[must_use]
 pub fn project_cargo(project_path: &Path) -> Command {
     let mut cmd = cargo();
     cmd.current_dir(project_path);

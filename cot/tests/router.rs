@@ -23,7 +23,7 @@ async fn parameterized(request: Request) -> cot::Result<Response> {
 #[cot::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
 async fn test_index() {
-    let client = Client::new(project().await);
+    let client = Client::new(project());
 
     let response = client.await.get("/").await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
@@ -36,7 +36,7 @@ async fn test_index() {
 #[cot::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
 async fn path_params() {
-    let client = Client::new(project().await);
+    let client = Client::new(project());
 
     let response = client.await.get("/get/John").await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
@@ -47,7 +47,7 @@ async fn path_params() {
 }
 
 #[must_use]
-async fn project() -> impl Project {
+fn project() -> impl Project {
     struct RouterApp;
     impl App for RouterApp {
         fn name(&self) -> &'static str {

@@ -484,10 +484,6 @@ mod tests {
     #[cot::test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
     async fn collect_static_execute() {
-        let mut collect_static = CollectStatic;
-        let temp_dir = tempdir().unwrap();
-        let temp_path = temp_dir.path().join("static").clone();
-
         struct TestApp;
         impl App for TestApp {
             fn name(&self) -> &'static str {
@@ -499,16 +495,20 @@ mod tests {
             }
         }
 
-        let matches = CollectStatic
-            .subcommand()
-            .get_matches_from(vec!["test", temp_path.to_str().unwrap()]);
-
         struct TestProject;
         impl cot::Project for TestProject {
             fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
                 apps.register(TestApp);
             }
         }
+
+        let mut collect_static = CollectStatic;
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().join("static").clone();
+
+        let matches = CollectStatic
+            .subcommand()
+            .get_matches_from(vec!["test", temp_path.to_str().unwrap()]);
 
         let bootstrapper = Bootstrapper::new(TestProject).with_config(ProjectConfig::default());
         let result = collect_static.execute(&matches, bootstrapper).await;
@@ -538,7 +538,11 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[allow(clippy::future_not_send, clippy::await_holding_lock)]
     async fn test_check(config: &str) -> Result<()> {
+        struct TestProject;
+        impl cot::Project for TestProject {}
+
         let temp_dir = tempdir().unwrap();
         let config_path = temp_dir.path().join("config").clone();
         std::fs::create_dir_all(&config_path).unwrap();
@@ -546,9 +550,6 @@ mod tests {
 
         let mut check = Check;
         let matches = Check.subcommand().get_matches_from(Vec::<&str>::new());
-
-        struct TestProject;
-        impl cot::Project for TestProject {}
 
         // ensure the tests run sequentially when setting the current directory
         let _guard = serial_guard();
@@ -573,7 +574,7 @@ mod tests {
 
     #[test]
     fn get_user_friendly_error_io_error_other() {
-        let source = std::io::Error::new(std::io::ErrorKind::Other, "error");
+        let source = std::io::Error::other("error");
         let error = Error::new(ErrorRepr::StartServer { source });
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");

@@ -47,7 +47,7 @@ pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyho
         generator
             .write_migrations_module()
             .context("unable to write migrations.rs")?;
-    };
+    }
 
     Ok(())
 }
@@ -1659,7 +1659,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "TestModel".to_string(),
                 resolved_ty: parse_quote!(TestModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "test_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1716,7 +1716,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "TestModel".to_string(),
                 resolved_ty: parse_quote!(TestModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "test_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1771,7 +1771,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "NewModel".to_string(),
                 resolved_ty: parse_quote!(NewModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "new_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1826,7 +1826,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1878,7 +1878,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1947,7 +1947,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -2001,7 +2001,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -2048,7 +2048,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -2108,23 +2108,19 @@ mod tests {
 
         assert!(
             tokens_str.contains("remove_field"),
-            "Should call remove_field() but got: {}",
-            tokens_str
+            "Should call remove_field() but got: {tokens_str}"
         );
         assert!(
             tokens_str.contains("table_name"),
-            "Should call table_name() but got: {}",
-            tokens_str
+            "Should call table_name() but got: {tokens_str}"
         );
         assert!(
             tokens_str.contains("field"),
-            "Should call field() but got: {}",
-            tokens_str
+            "Should call field() but got: {tokens_str}"
         );
         assert!(
             tokens_str.contains("build"),
-            "Should call build() but got: {}",
-            tokens_str
+            "Should call build() but got: {tokens_str}"
         );
     }
     #[test]
@@ -2142,7 +2138,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -2179,7 +2175,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),

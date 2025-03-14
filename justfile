@@ -23,6 +23,9 @@ update-template-lockfile:
     cp $cargo_lock_path cot-cli/src/project_template/Cargo.lock.template
     rm -rf $tmpdir
 
+clippy:
+    cargo +stable clippy --no-deps --all-targets
+
 coverage:
     # generate coverage report as HTML
     # requires cargo-llvm-cov installed and nightly toolchain

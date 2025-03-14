@@ -331,14 +331,14 @@ mod tests {
 
     #[test]
     fn model_args_default() {
-        let args: ModelArgs = Default::default();
+        let args: ModelArgs = ModelArgs::default();
         assert_eq!(args.model_type, ModelType::Application);
         assert!(args.table_name.is_none());
     }
 
     #[test]
     fn model_type_default() {
-        let model_type: ModelType = Default::default();
+        let model_type: ModelType = ModelType::default();
         assert_eq!(model_type, ModelType::Application);
     }
 
@@ -498,8 +498,8 @@ mod tests {
         let opts = FieldOpts {
             ident: None,
             ty: parse_quote! { MyContainer<std::string::String> },
-            primary_key: Default::default(),
-            unique: Default::default(),
+            primary_key: darling::util::Flag::default(),
+            unique: darling::util::Flag::default(),
         };
 
         assert!(opts.find_type("my_crate::MyContainer", &resolver).is_some());

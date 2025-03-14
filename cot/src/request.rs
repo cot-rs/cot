@@ -738,15 +738,15 @@ mod tests {
 
     #[test]
     fn path_params_parse() {
-        let mut path_params = PathParams::new();
-        path_params.insert("hello".into(), "world".into());
-        path_params.insert("foo".into(), "bar".into());
-
         #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
         struct Params {
             hello: String,
             foo: String,
         }
+
+        let mut path_params = PathParams::new();
+        path_params.insert("hello".into(), "world".into());
+        path_params.insert("foo".into(), "bar".into());
 
         let params: Params = path_params.parse().unwrap();
         assert_eq!(

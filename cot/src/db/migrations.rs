@@ -2208,7 +2208,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "`table_name` is required")]
     fn test_remove_field_builder_missing_table_name() {
-        RemoveFieldBuilder::new()
+        let _ = RemoveFieldBuilder::new()
             .field(Field::new(
                 Identifier::new("name"),
                 <String as DatabaseField>::TYPE,
@@ -2219,7 +2219,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "`field` is required")]
     fn test_remove_field_builder_missing_field() {
-        RemoveFieldBuilder::new()
+        let _ = RemoveFieldBuilder::new()
             .table_name(Identifier::new("testapp__test_model"))
             .build();
     }

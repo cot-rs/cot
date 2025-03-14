@@ -649,6 +649,7 @@ mod tests {
     macro_rules! test_deserialize_value {
         ($test_name:ident, $ty:ty, $value:literal, $expected:literal) => {
             #[test]
+            #[allow(clippy::float_cmp)]
             fn $test_name() {
                 let path_params = create_path_params([("some_name", $value)]);
                 let deserializer = PathParamsDeserializer::new(&path_params);
@@ -664,23 +665,23 @@ mod tests {
     test_deserialize_value!(deserialize_bool_false, bool, "false", false);
     test_deserialize_value!(deserialize_i8, i8, "42", 42);
     test_deserialize_value!(deserialize_i16, i16, "2137", 2137);
-    test_deserialize_value!(deserialize_i32, i32, "2137420", 2137420);
-    test_deserialize_value!(deserialize_i64, i64, "2137420691337", 2137_420_691_337);
+    test_deserialize_value!(deserialize_i32, i32, "2137420", 2_137_420);
+    test_deserialize_value!(deserialize_i64, i64, "2137420691337", 2_137_420_691_337);
     test_deserialize_value!(
         deserialize_i128,
         i128,
         "21372137213721372137",
-        21372137213721372137
+        21_372_137_213_721_372_137
     );
     test_deserialize_value!(deserialize_u8, u8, "42", 42);
     test_deserialize_value!(deserialize_u16, u16, "2137", 2137);
-    test_deserialize_value!(deserialize_u32, u32, "2137420", 2137420);
-    test_deserialize_value!(deserialize_u64, u64, "2137420691337", 2137420691337);
+    test_deserialize_value!(deserialize_u32, u32, "2137420", 2_137_420);
+    test_deserialize_value!(deserialize_u64, u64, "2137420691337", 2_137_420_691_337);
     test_deserialize_value!(
         deserialize_u128,
         u128,
         "21372137213721372137",
-        21372137213721372137
+        21_372_137_213_721_372_137
     );
     test_deserialize_value!(deserialize_f32, f32, "2.137", 2.137);
     test_deserialize_value!(deserialize_f64, f64, "2.137", 2.137);

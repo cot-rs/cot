@@ -83,7 +83,7 @@ jobs:
         with:
           reporter: github-pr-check
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          clippy_flags: '--no-deps -- -D warnings'
+          clippy_flags: '--no-deps --all-targets -- -D warnings'
           fail_on_error: true
 
   external-deps:

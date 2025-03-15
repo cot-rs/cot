@@ -17,88 +17,80 @@ use quote::{format_ident, quote, ToTokens};
 use syn::{parse_quote, Meta};
 use tracing::{debug, trace};
 
-use crate::utils::{print_status_msg, StatusType, WorkspaceManager};
+use crate::utils::{print_status_msg, CargoTomlManager, PackageManager, StatusType};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
-    if let Some(manager) = WorkspaceManager::from_path(path)? {
-        let manifest = match &options.app_name {
-            Some(app_name) => manager.get_package_manifest(app_name),
-            None => manager.get_package_manifest_by_path(path),
+    if let Some(manager) = CargoTomlManager::from_path(path)? {
+        if let Some(app_name) = &options.app_name {
+            match manager.get_package_manager(app_name) {
+                Some(package_manager) => {
+                    make_package_migrations(package_manager, options)?;
+                    return Ok(());
+                }
+                None => {
+                    bail!("Package manager not found for the specified app name.")
+                }
+            }
         }
-        .context("unable to find package manifest")?;
 
-        let crate_name = manifest
-            .package
-            .as_ref()
-            .context("unable to find package in Cargo.toml")?
-            .name
-            .clone();
-        let manifest_path = manager
-            .get_manifest_path(&crate_name)
-            .expect("manifest must exist by this point");
-
-        let generator = MigrationGenerator::new(PathBuf::from(manifest_path), crate_name, options);
-        let migrations = generator
-            .generate_migrations_as_source()
-            .context("unable to generate migrations")?;
-        generator
-            .write_migrations(&migrations)
-            .context("unable to write migrations")?;
-        generator
-            .write_migrations_module()
-            .context("unable to write migrations.rs")?;
+        match manager {
+            CargoTomlManager::Workspace(workspace) => {
+                for package in workspace.get_packages() {
+                    make_package_migrations(package, options.clone())?;
+                }
+                Ok(())
+            }
+            CargoTomlManager::Package(package) => make_package_migrations(&package, options),
+        }
+    } else {
+        bail!("Cargo.toml not found in the specified directory or any parent directory.")
     }
+}
+
+fn make_package_migrations(
+    manager: &PackageManager,
+    options: MigrationGeneratorOptions,
+) -> anyhow::Result<()> {
+    let crate_name = manager.get_package_name().to_string();
+    let manifest_path = manager.get_manifest_path();
+
+    let generator = MigrationGenerator::new(manifest_path, crate_name, options);
+    let migrations = generator
+        .generate_migrations_as_source()
+        .context("unable to generate migrations")?;
+    generator
+        .write_migrations(&migrations)
+        .context("unable to write migrations")?;
+    generator
+        .write_migrations_module()
+        .context("unable to write migrations.rs")?;
 
     Ok(())
 }
 
 pub fn list_migrations(path: &Path) -> anyhow::Result<HashMap<String, Vec<String>>> {
-    match find_cargo_toml(
-        &path
-            .canonicalize()
-            .with_context(|| "unable to canonicalize Cargo.toml path")?,
-    ) {
-        Some(cargo_toml_path) => {
-            let manifest = Manifest::from_path(&cargo_toml_path)
-                .with_context(|| "unable to read Cargo.toml")?;
+    if let Some(manager) = CargoTomlManager::from_path(path)? {
+        let mut migration_list = HashMap::new();
 
-            let package_roots = match manifest.workspace {
-                Some(workspace) => workspace.members.iter().map(PathBuf::from).collect(),
-                None => vec![cargo_toml_path
-                    .parent()
-                    .with_context(|| "unable to find parent dir")?
-                    .to_path_buf()],
-            };
+        let packages = match manager {
+            CargoTomlManager::Workspace(ref workspace) => workspace.get_packages(),
+            CargoTomlManager::Package(ref package) => vec![package],
+        };
 
-            let mut migration_list = HashMap::new();
-            for package_root in package_roots {
-                let app_name = if let Some(cargo_toml_path) = find_cargo_toml(&package_root) {
-                    let manifest = Manifest::from_path(&cargo_toml_path)
-                        .with_context(|| "unable to read Cargo.toml")?;
-                    manifest
-                        .package
-                        .with_context(|| "unable to find package in Cargo.toml")?
-                        .name
-                } else {
-                    bail!(
-                        "Cargo.toml not found in the specified directory or any parent directory."
-                    )
-                };
+        for member in packages {
+            let migrations_dir = member.get_package_path().join("src").join("migrations");
 
-                let migrations_dir = package_root.join("src").join("migrations");
-                let migrations = MigrationGenerator::get_migration_list(&migrations_dir)?;
-                for migration in migrations {
-                    migration_list
-                        .entry(app_name.clone())
-                        .or_insert_with(Vec::new)
-                        .push(migration);
-                }
+            let migrations = MigrationGenerator::get_migration_list(&migrations_dir)?;
+            for migration in migrations {
+                migration_list
+                    .entry(member.get_package_name().to_string())
+                    .or_insert_with(Vec::new)
+                    .push(migration);
             }
-            Ok(migration_list)
         }
-        None => {
-            bail!("Cargo.toml not found in the specified directory or any parent directory.")
-        }
+        Ok(migration_list)
+    } else {
+        bail!("Cargo.toml not found in the specified directory or any parent directory.")
     }
 }
 

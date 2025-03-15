@@ -149,7 +149,9 @@ impl CargoTomlManager {
                     package_root: PathBuf::from(
                         cargo_toml_path
                             .parent()
-                            .expect("Cargo.toml should always have a parent"),
+                            .expect("Cargo.toml should always have a parent")
+                            .canonicalize()
+                            .context("unable to canonicalize path")?,
                     ),
                     manifest,
                 };

@@ -1,10 +1,12 @@
 use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 
 use cot_cli::migration_generator::{
     self, DynDependency, DynOperation, MigrationAsSource, MigrationGenerator,
     MigrationGeneratorOptions, SourceFile,
 };
+use cot_cli::test_utils;
 use syn::parse_quote;
 
 /// Test that the migration generator can generate a "create model" migration
@@ -246,21 +248,32 @@ fn find_source_files() {
 
 #[test]
 fn list_migrations() {
-    let cot_cli_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let example_dir = cot_cli_dir
-        .parent()
-        .unwrap()
-        .join("examples")
-        .join("todo-list");
+    let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+    let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
+    test_utils::make_package(temp_dir.path().into()).unwrap();
+    let mut main = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&temp_dir.path().join("src").join("main.rs"))
+        .unwrap();
+    write!(
+        main,
+        "#[model]\nstruct Test {{\n#[model(primary_key)]\nid: Auto<i32>\n}}"
+    )
+    .unwrap();
+    migration_generator::make_migrations(
+        temp_dir.path(),
+        MigrationGeneratorOptions {
+            app_name: None,
+            output_dir: None,
+        },
+    )
+    .unwrap();
 
-    let migrations = migration_generator::list_migrations(&example_dir).unwrap();
+    let migrations = migration_generator::list_migrations(temp_dir.path()).unwrap();
 
     assert_eq!(migrations.len(), 1);
-    assert!(migrations.contains_key("example-todo-list"));
-    assert_eq!(
-        migrations.get("example-todo-list").unwrap()[0],
-        "m_0001_initial"
-    );
+    assert!(migrations.contains_key(package_name));
+    assert_eq!(migrations.get(package_name).unwrap()[0], "m_0001_initial");
 }
 
 #[test]
@@ -274,14 +287,10 @@ fn list_migrations_missing_cargo_toml() {
 
 #[test]
 fn list_migrations_missing_migrations_dir() {
-    let cot_cli_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let example_dir = cot_cli_dir
-        .parent()
-        .unwrap()
-        .join("examples")
-        .join("hello-world");
+    let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+    test_utils::make_package(temp_dir.path().into()).unwrap();
 
-    let migrations = migration_generator::list_migrations(&example_dir).unwrap();
+    let migrations = migration_generator::list_migrations(temp_dir.path()).unwrap();
 
     assert!(migrations.is_empty());
 }

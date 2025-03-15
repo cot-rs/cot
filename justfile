@@ -1,9 +1,7 @@
 default:
     @just --choose {{ justfile() }}
 
-update-lockfiles:
-    update-workspace-lockfile
-    update-template-lockfile
+update-lockfiles: update-workspace-lockfile update-template-lockfile
 
 update-workspace-lockfile:
     cargo update

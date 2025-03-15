@@ -146,13 +146,11 @@ impl CargoTomlManager {
                 }
 
                 let manager = PackageManager {
-                    package_root: PathBuf::from(
-                        cargo_toml_path
-                            .parent()
-                            .expect("Cargo.toml should always have a parent")
-                            .canonicalize()
-                            .context("unable to canonicalize path")?,
-                    ),
+                    package_root: cargo_toml_path
+                        .parent()
+                        .expect("Cargo.toml should always have a parent")
+                        .canonicalize()
+                        .context("unable to canonicalize path")?,
                     manifest,
                 };
                 CargoTomlManager::Package(manager)
@@ -206,8 +204,7 @@ impl CargoTomlManager {
     }
 
     pub(crate) fn from_path(path: &Path) -> anyhow::Result<Option<Self>> {
-        let path = path.canonicalize().context("unable to canonicalize path")?;
-        Self::find_cargo_toml(&path)
+        Self::find_cargo_toml(path)
             .map(|p| Self::from_cargo_toml_path(&p))
             .transpose()
     }
@@ -419,7 +416,7 @@ mod tests {
         fn load_valid_workspace_from_package_manifest() {
             let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
             test_utils::make_package(temp_dir.path()).unwrap();
-            let cargo_toml_path = temp_dir.path().join("Cargo.toml").canonicalize().unwrap();
+            let cargo_toml_path = temp_dir.path().join("Cargo.toml");
             let mut handle = std::fs::OpenOptions::new()
                 .append(true)
                 .open(&cargo_toml_path)
@@ -457,10 +454,7 @@ mod tests {
             match manager {
                 CargoTomlManager::Package(manager) => {
                     assert_eq!(manager.get_package_name(), package_name);
-                    assert_eq!(
-                        manager.get_package_path(),
-                        temp_dir.path().canonicalize().unwrap()
-                    );
+                    assert_eq!(manager.get_package_path(), temp_dir.path());
                 }
                 _ => panic!("Expected package manifest"),
             }
@@ -671,10 +665,7 @@ mod tests {
         fn get_package_path() {
             let (temp_dir, manager) = get_package();
 
-            assert_eq!(
-                manager.get_package_path(),
-                temp_dir.path().canonicalize().unwrap()
-            );
+            assert_eq!(manager.get_package_path(), temp_dir.path());
         }
 
         #[test]
@@ -685,7 +676,7 @@ mod tests {
 
             assert_eq!(
                 manager.get_manifest_path(),
-                temp_dir.path().join("Cargo.toml").canonicalize().unwrap()
+                temp_dir.path().join("Cargo.toml")
             );
         }
 

@@ -11,7 +11,7 @@ use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use crate::migration_generator::{make_migrations, MigrationGeneratorOptions};
+use crate::migration_generator::{list_migrations, make_migrations, MigrationGeneratorOptions};
 use crate::new_project::{new_project, CotSource};
 
 #[derive(Debug, Parser)]
@@ -26,28 +26,51 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Create a new Cot project
-    New {
-        /// Path to the directory to create the new project in
-        path: PathBuf,
-        /// Set the resulting crate name (defaults to the directory name)
-        #[arg(long)]
-        name: Option<String>,
-        #[command(flatten)]
-        source: CotSourceArgs,
-    },
+    New(ProjectNewArgs),
+
+    /// Manage migrations for a Cot project
+    #[command(subcommand)]
+    Migration(MigrationCommands),
+}
+
+#[derive(Debug, Args)]
+struct ProjectNewArgs {
+    /// Path to the directory to create the new project in
+    path: PathBuf,
+    /// Set the resulting crate name (defaults to the directory name)
+    #[arg(long)]
+    name: Option<String>,
+    #[command(flatten)]
+    source: CotSourceArgs,
+}
+
+#[derive(Debug, Subcommand)]
+enum MigrationCommands {
+    /// List all migrations for a Cot project
+    List(MigrationListArgs),
     /// Generate migrations for a Cot project
-    MakeMigrations {
-        /// Path to the crate directory to generate migrations for (default:
-        /// current directory)
-        path: Option<PathBuf>,
-        /// Name of the app to use in the migration (default: crate name)
-        #[arg(long)]
-        app_name: Option<String>,
-        /// Directory to write the migrations to (default: migrations/ directory
-        /// in the crate's src/ directory)
-        #[arg(long)]
-        output_dir: Option<PathBuf>,
-    },
+    Make(MigrationMakeArgs),
+}
+
+#[derive(Debug, Args)]
+struct MigrationListArgs {
+    /// Path to the crate directory to list migrations for (default:
+    /// current directory)
+    path: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+struct MigrationMakeArgs {
+    /// Path to the crate directory to generate migrations for (default:
+    /// current directory)
+    path: Option<PathBuf>,
+    /// Name of the app to use in the migration (default: crate name)
+    #[arg(long)]
+    app_name: Option<String>,
+    /// Directory to write the migrations to (default: migrations/ directory
+    /// in the crate's src/ directory)
+    #[arg(long)]
+    output_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -73,44 +96,58 @@ fn main() -> anyhow::Result<()> {
         .init();
 
     match cli.command {
-        Commands::New {
-            path,
-            name,
-            source: cot_source,
-        } => {
-            let project_name = match name {
-                None => {
-                    let dir_name = path
-                        .file_name()
-                        .with_context(|| format!("file name not present: {}", path.display()))?;
-                    dir_name.to_string_lossy().into_owned()
-                }
-                Some(name) => name,
-            };
+        Commands::New(args) => handle_new_project(args),
+        Commands::Migration(cmd) => match cmd {
+            MigrationCommands::List(args) => handle_migration_list(args),
+            MigrationCommands::Make(args) => handle_migration_make(args),
+        },
+    }
+}
 
-            let cot_source = if cot_source.use_git {
-                CotSource::Git
-            } else if let Some(path) = &cot_source.cot_path {
-                CotSource::Path(path)
-            } else {
-                CotSource::PublishedCrate
-            };
-            new_project(&path, &project_name, &cot_source)
-                .with_context(|| "unable to create project")?;
+fn handle_new_project(ProjectNewArgs { path, name, source }: ProjectNewArgs) -> anyhow::Result<()> {
+    let project_name = match name {
+        None => {
+            let dir_name = path
+                .file_name()
+                .with_context(|| format!("file name not present: {}", path.display()))?;
+            dir_name.to_string_lossy().into_owned()
         }
-        Commands::MakeMigrations {
-            path,
-            app_name,
-            output_dir,
-        } => {
-            let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let options = MigrationGeneratorOptions {
-                app_name,
-                output_dir,
-            };
-            make_migrations(&path, options).with_context(|| "unable to create migrations")?;
+        Some(name) => name,
+    };
+
+    let cot_source = if source.use_git {
+        CotSource::Git
+    } else if let Some(path) = &source.cot_path {
+        CotSource::Path(path)
+    } else {
+        CotSource::PublishedCrate
+    };
+    new_project(&path, &project_name, &cot_source).with_context(|| "unable to create project")
+}
+
+fn handle_migration_list(MigrationListArgs { path }: MigrationListArgs) -> anyhow::Result<()> {
+    let path = path.unwrap_or_else(|| PathBuf::from("."));
+    let migrations = list_migrations(&path).with_context(|| "unable to list migrations")?;
+    for (app_name, migs) in migrations {
+        for mig in migs {
+            println!("{app_name}\t{mig}");
         }
     }
 
     Ok(())
+}
+
+fn handle_migration_make(
+    MigrationMakeArgs {
+        path,
+        app_name,
+        output_dir,
+    }: MigrationMakeArgs,
+) -> anyhow::Result<()> {
+    let path = path.unwrap_or_else(|| PathBuf::from("."));
+    let options = MigrationGeneratorOptions {
+        app_name,
+        output_dir,
+    };
+    make_migrations(&path, options).with_context(|| "unable to create migrations")
 }

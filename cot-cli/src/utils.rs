@@ -680,7 +680,7 @@ mod tests {
 
             assert_eq!(
                 manager.get_manifest_path(),
-                temp_dir.path().join("Cargo.toml")
+                temp_dir.path().join("Cargo.toml").canonicalize().unwrap()
             );
         }
 

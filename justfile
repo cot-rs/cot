@@ -1,6 +1,11 @@
 default:
     @just --choose {{ justfile() }}
 
+alias u := lockfiles
+alias c := clippy
+alias cov := coverage
+alias d := docs
+
 update-lockfiles: update-workspace-lockfile update-template-lockfile
 
 update-workspace-lockfile:

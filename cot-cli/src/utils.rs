@@ -455,7 +455,10 @@ mod tests {
             match manager {
                 CargoTomlManager::Package(manager) => {
                     assert_eq!(manager.get_package_name(), package_name);
-                    assert_eq!(manager.get_package_path(), temp_dir.path());
+                    assert_eq!(
+                        manager.get_package_path(),
+                        temp_dir.path().canonicalize().unwrap()
+                    );
                 }
                 _ => panic!("Expected package manifest"),
             }
@@ -646,51 +649,50 @@ mod tests {
                 assert_eq!(manager.get_workspace_root(), temp_dir.path());
             }
         }
+    }
+    mod package_manager {
+        use super::*;
 
-        mod package_manager {
-            use super::*;
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn get_package_name() {
+            let (temp_dir, manager) = get_package();
+            let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
 
-            #[test]
-            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                                      // `linux`
-            fn get_package_name() {
-                let (temp_dir, manager) = get_package();
-                let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
+            assert_eq!(manager.get_package_name(), package_name);
+        }
 
-                assert_eq!(manager.get_package_name(), package_name);
-            }
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn get_package_path() {
+            let (temp_dir, manager) = get_package();
 
-            #[test]
-            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                                      // `linux`
-            fn get_package_path() {
-                let (temp_dir, manager) = get_package();
+            assert_eq!(manager.get_package_path(), temp_dir.path());
+        }
 
-                assert_eq!(manager.get_package_path(), temp_dir.path());
-            }
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn get_manifest_path() {
+            let (temp_dir, manager) = get_package();
 
-            #[test]
-            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                                      // `linux`
-            fn get_manifest_path() {
-                let (temp_dir, manager) = get_package();
+            assert_eq!(
+                manager.get_manifest_path(),
+                temp_dir.path().join("Cargo.toml")
+            );
+        }
 
-                assert_eq!(
-                    manager.get_manifest_path(),
-                    temp_dir.path().join("Cargo.toml")
-                );
-            }
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn get_manifest() {
+            let (temp_dir, manager) = get_package();
+            let manifest_path = temp_dir.path().join("Cargo.toml");
+            let orig_manifest = Manifest::from_path(&manifest_path).unwrap();
 
-            #[test]
-            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                                      // `linux`
-            fn get_manifest() {
-                let (temp_dir, manager) = get_package();
-                let manifest_path = temp_dir.path().join("Cargo.toml");
-                let orig_manifest = Manifest::from_path(&manifest_path).unwrap();
-
-                assert_eq!(*manager.get_manifest(), orig_manifest);
-            }
+            assert_eq!(*manager.get_manifest(), orig_manifest);
         }
     }
 }

@@ -1,7 +1,7 @@
 default:
     @just --choose {{ justfile() }}
 
-alias u := lockfiles
+alias u := update-lockfiles
 alias c := clippy
 alias cov := coverage
 alias d := docs

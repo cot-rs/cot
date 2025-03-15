@@ -247,6 +247,7 @@ fn find_source_files() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
 fn list_migrations() {
     let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
     let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
@@ -286,6 +287,7 @@ fn list_migrations_missing_cargo_toml() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
 fn list_migrations_missing_migrations_dir() {
     let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
     test_utils::make_package(temp_dir.path()).unwrap();

@@ -78,6 +78,7 @@ pub mod router;
 pub mod static_files;
 pub mod test;
 pub(crate) mod utils;
+pub mod email;
 
 pub use body::Body;
 pub use cot_macros::{main, test};

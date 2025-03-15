@@ -1,15 +1,14 @@
+//! Email sending functionality using SMTP
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use derive_more::derive;
 use lettre::{
     message::{header, Message, MultiPart, SinglePart},
-    transport::smtp::{authentication::Credentials, client::SmtpConnection},
-    SmtpTransport, Transport,
+    transport::smtp::authentication::Credentials,
+    SmtpTransport, Transport
 };
-use thiserror::Error;
+
 /// Represents errors that can occur when sending an email.
 #[derive(Debug, thiserror::Error)]
 pub enum EmailError {
@@ -110,31 +109,46 @@ pub struct EmailAttachment {
 }
 
 /// SMTP Backend for sending emails
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SmtpEmailBackend {
+    /// The SMTP configuration.
     config: SmtpConfig,
-    connection: Option<Arc<Mutex<SmtpConnection>>>,
-    connection_created: Option<Instant>,
+    /// The SMTP transport.
+    /// This field is optional because the transport may not be initialized yet.
+    /// It will be initialized when the `open` method is called.
     transport: Option<SmtpTransport>,
 }
 
 impl SmtpEmailBackend {
+    #[must_use] 
+    /// Creates a new instance of `SmtpEmailBackend` with the given configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The SMTP configuration to use.
     pub fn new(config: SmtpConfig) -> Self {
         Self {
             config,
-            connection: None,
             transport: None,
-            connection_created: None,
         }
     }
 
     /// Open a connection to the SMTP server
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with resolving the SMTP host,
+    /// creating the TLS parameters, or connecting to the SMTP server.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the transport is not properly initialized.
     pub fn open(&mut self) -> Result<()> {
-        if self.connection.is_some() {
+        if self.transport.as_ref().unwrap().test_connection().is_ok() {
             return Ok(());
         }
 
-        let server_addr = format!("{}:{}", self.config.host, self.config.port)
+        let _socket_addr = format!("{}:{}", self.config.host, self.config.port)
             .to_socket_addrs()
             .map_err(|e| EmailError::ConnectionError(e.to_string()))?
             .next()
@@ -161,23 +175,28 @@ impl SmtpEmailBackend {
         self.transport = Some(transport_builder.build());
 
         // Connect to the SMTP server
-         //let connection: SmtpConnection = transport;
-         //.map_err(|e| EmailError::ConnectionError(e.to_string()))?
-         
-        // self.connection = Some(Arc::new(Mutex::new(connection)));
-        // self.connection_created = Some(Instant::now());
-      
+        if self.transport.as_ref().unwrap().test_connection().is_ok() {
+            Err(EmailError::ConnectionError("Failed to connect to SMTP server".to_string()))?;
+        }
         Ok(())
     }
 
     /// Close the connection to the SMTP server
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with closing the SMTP connection.
     pub fn close(&mut self) -> Result<()> {
-        self.connection = None;
-        self.connection_created = None;
+        self.transport = None;
         Ok(())
     }
 
     /// Send a single email message
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with opening the SMTP connection,
+    /// building the email message, or sending the email.
     pub fn send_message(&mut self, email: &EmailMessage) -> Result<()> {
         self.open()?;
 
@@ -189,14 +208,14 @@ impl SmtpEmailBackend {
         // Add recipients
         for recipient in &email.to {
             message_builder = message_builder.to(recipient.parse().map_err(|e| 
-                EmailError::MessageError(format!("Invalid recipient address: {}", e)))?);
+                EmailError::MessageError(format!("Invalid recipient address: {e}")))?);
         }
         
         // Add CC recipients
         if let Some(cc_recipients) = &email.cc {
             for recipient in cc_recipients {
                 message_builder = message_builder.cc(recipient.parse().map_err(|e| 
-                    EmailError::MessageError(format!("Invalid CC address: {}", e)))?);
+                    EmailError::MessageError(format!("Invalid CC address: {e}")))?);
             }
         }
         
@@ -204,14 +223,14 @@ impl SmtpEmailBackend {
         if let Some(bcc_recipients) = &email.bcc {
             for recipient in bcc_recipients {
                 message_builder = message_builder.bcc(recipient.parse().map_err(|e| 
-                    EmailError::MessageError(format!("Invalid BCC address: {}", e)))?);
+                    EmailError::MessageError(format!("Invalid BCC address: {e}")))?);
             }
         }
         
         // Add Reply-To addresses
         for reply_to in &email.reply_to {
             message_builder = message_builder.reply_to(reply_to.parse().map_err(|e| 
-                EmailError::MessageError(format!("Invalid reply-to address: {}", e)))?);
+                EmailError::MessageError(format!("Invalid reply-to address: {e}")))?);
         }
         
         // Add custom headers
@@ -242,7 +261,7 @@ impl SmtpEmailBackend {
                 multipart = multipart.singlepart(
                     SinglePart::builder()
                         .header(header::ContentType::parse(mimetype).map_err(|e| 
-                            EmailError::MessageError(format!("Invalid content type: {}", e)))?)
+                            EmailError::MessageError(format!("Invalid content type: {e}")))?)
                         .body(content.clone())
                 );
             }
@@ -286,13 +305,17 @@ impl SmtpEmailBackend {
     }
 
     /// Send multiple email messages
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with sending any of the emails.
     pub fn send_messages(&mut self, emails: &[EmailMessage]) -> Result<usize> {
         let mut sent_count = 0;
         
         for email in emails {
             match self.send_message(email) {
-                Ok(_) => sent_count += 1,
-                Err(e) if self.config.fail_silently => continue,
+                Ok(()) => sent_count += 1,
+                Err(_e) if self.config.fail_silently => continue,
                 Err(e) => return Err(e),
             }
         }
@@ -338,7 +361,7 @@ mod tests {
         };
         
         // Test with a simple configuration
-        let config = SmtpConfig {
+        let _config = SmtpConfig {
             host: "smtp.example.com".to_string(),
             port: 587,
             username: Some("user@example.com".to_string()),
@@ -392,7 +415,7 @@ mod tests {
         ];
         
         // Test with fail_silently = true
-        let config = SmtpConfig {
+        let _config = SmtpConfig {
             host: "smtp.example.com".to_string(),
             port: 587,
             fail_silently: true,
@@ -416,10 +439,10 @@ mod tests {
         assert_eq!(config.port, 25);
         assert_eq!(config.username, None);
         assert_eq!(config.password, None);
-        //assert_eq!(config.use_tls, false);
+        assert!(!config.use_tls);
         //assert_eq!(config.fail_silently, false);
         assert_eq!(config.timeout, Duration::from_secs(60));
-        //assert_eq!(config.use_ssl, false);
+        assert!(!config.use_ssl);
         assert_eq!(config.ssl_certfile, None);
         assert_eq!(config.ssl_keyfile, None);
     }

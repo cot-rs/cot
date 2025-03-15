@@ -250,10 +250,10 @@ fn find_source_files() {
 fn list_migrations() {
     let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
     let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
-    test_utils::make_package(temp_dir.path().into()).unwrap();
+    test_utils::make_package(temp_dir.path()).unwrap();
     let mut main = std::fs::OpenOptions::new()
         .append(true)
-        .open(&temp_dir.path().join("src").join("main.rs"))
+        .open(temp_dir.path().join("src").join("main.rs"))
         .unwrap();
     write!(
         main,
@@ -288,7 +288,7 @@ fn list_migrations_missing_cargo_toml() {
 #[test]
 fn list_migrations_missing_migrations_dir() {
     let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-    test_utils::make_package(temp_dir.path().into()).unwrap();
+    test_utils::make_package(temp_dir.path()).unwrap();
 
     let migrations = migration_generator::list_migrations(temp_dir.path()).unwrap();
 

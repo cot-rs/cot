@@ -35,6 +35,7 @@ enum CargoCommand {
     New,
 }
 
+#[must_use]
 pub fn get_nth_crate_name(i: u8) -> String {
     format!("cargo-test-crate-{i}")
 }

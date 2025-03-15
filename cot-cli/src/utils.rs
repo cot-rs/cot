@@ -671,7 +671,10 @@ mod tests {
         fn get_package_path() {
             let (temp_dir, manager) = get_package();
 
-            assert_eq!(manager.get_package_path(), temp_dir.path());
+            assert_eq!(
+                manager.get_package_path(),
+                temp_dir.path().canonicalize().unwrap()
+            );
         }
 
         #[test]

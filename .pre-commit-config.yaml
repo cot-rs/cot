@@ -29,3 +29,8 @@ repos:
     hooks:
       - id: fmt
         exclude: ^cot-cli/src/project_template/
+  - repo: https://github.com/instrumentl/pre-commit-just
+    rev: v0.1
+    hooks:
+      - id: format-justfile
+        name: "format justfiles"

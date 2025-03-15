@@ -91,16 +91,11 @@ pub(crate) struct PackageManager {
 
 impl CargoTomlManager {
     pub(crate) fn from_cargo_toml_path(cargo_toml_path: &Path) -> anyhow::Result<Self> {
-        let cargo_toml_path = cargo_toml_path
-            .canonicalize()
-            .context("unable to canonicalize path")?;
-
-        let manifest =
-            Manifest::from_path(&cargo_toml_path).context("unable to read Cargo.toml")?;
+        let manifest = Manifest::from_path(cargo_toml_path).context("unable to read Cargo.toml")?;
 
         let manager = match (&manifest.workspace, &manifest.package) {
             (Some(_), _) => {
-                let mut manager = Self::parse_workspace(&cargo_toml_path, manifest);
+                let mut manager = Self::parse_workspace(cargo_toml_path, manifest);
 
                 if let Some(package) = &manager.root_manifest.package {
                     if manager.get_package_manager(package.name()).is_none() {
@@ -146,11 +141,11 @@ impl CargoTomlManager {
                 }
 
                 let manager = PackageManager {
-                    package_root: cargo_toml_path
-                        .parent()
-                        .expect("Cargo.toml should always have a parent")
-                        .canonicalize()
-                        .context("unable to canonicalize path")?,
+                    package_root: PathBuf::from(
+                        cargo_toml_path
+                            .parent()
+                            .expect("Cargo.toml should always have a parent"),
+                    ),
                     manifest,
                 };
                 CargoTomlManager::Package(manager)
@@ -178,11 +173,7 @@ impl CargoTomlManager {
             .members
             .iter()
             .map(|member| {
-                let member_path = workspace_root
-                    .join(member)
-                    .canonicalize()
-                    .context("unable to canonicalize path")
-                    .expect("Cargo.toml should exist");
+                let member_path = workspace_root.join(member);
 
                 let member_manifest = Manifest::from_path(member_path.join("Cargo.toml"))
                     .expect("member manifest should be valid");
@@ -278,16 +269,12 @@ impl WorkspaceManager {
         &self,
         package_path: &Path,
     ) -> Option<&PackageManager> {
-        let mut package_path = package_path
-            .canonicalize()
-            .context("unable to canonicalize path")
-            .ok()?;
+        let mut package_path = package_path;
 
         if package_path.is_file() {
             package_path = package_path
                 .parent()
-                .expect("file path should always have a parent")
-                .into();
+                .expect("file path should always have a parent");
         }
 
         self.package_manifests

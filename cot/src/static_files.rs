@@ -12,7 +12,7 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use futures_core::ready;
-use http::{header, Request};
+use http::{Request, header};
 use pin_project_lite::pin_project;
 use tower::Service;
 
@@ -33,7 +33,7 @@ use crate::{Body, ProjectContext};
 ///
 /// ```
 /// use bytes::Bytes;
-/// use cot::{static_files, App};
+/// use cot::{App, static_files};
 ///
 /// pub struct ExampleApp;
 ///

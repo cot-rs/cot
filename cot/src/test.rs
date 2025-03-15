@@ -14,11 +14,11 @@ use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{AuthBackend, NoAuthBackend, User, UserId};
 use crate::config::ProjectConfig;
 #[cfg(feature = "db")]
+use crate::db::Database;
+#[cfg(feature = "db")]
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
-#[cfg(feature = "db")]
-use crate::db::Database;
 use crate::handler::BoxedHandler;
 use crate::project::prepare_request;
 use crate::request::{Request, RequestExt};
@@ -165,10 +165,10 @@ impl Client {
 /// # Examples
 ///
 /// ```
+/// use cot::Body;
 /// use cot::request::Request;
 /// use cot::response::{Response, ResponseExt};
 /// use cot::test::TestRequestBuilder;
-/// use cot::Body;
 /// use http::StatusCode;
 ///
 /// # #[tokio::main]
@@ -265,10 +265,10 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
+    /// use cot::Body;
     /// use cot::request::Request;
     /// use cot::response::{Response, ResponseExt};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::Body;
     /// use http::StatusCode;
     ///
     /// # #[tokio::main]
@@ -303,10 +303,10 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
+    /// use cot::Body;
     /// use cot::request::Request;
     /// use cot::response::{Response, ResponseExt};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::Body;
     /// use http::StatusCode;
     ///
     /// # #[tokio::main]
@@ -358,10 +358,10 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
+    /// use cot::Body;
     /// use cot::request::Request;
     /// use cot::response::{Response, ResponseExt};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::Body;
     /// use http::StatusCode;
     ///
     /// # #[tokio::main]
@@ -615,10 +615,10 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
+    /// use cot::Body;
     /// use cot::request::Request;
     /// use cot::response::{Response, ResponseExt};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::Body;
     /// use http::StatusCode;
     ///
     /// # #[tokio::main]

@@ -16,6 +16,7 @@ use hmac::{Hmac, Mac};
 use sha2::Sha512;
 use thiserror::Error;
 
+use crate::App;
 use crate::admin::{AdminModelManager, DefaultAdminModelManager};
 use crate::auth::{
     AuthBackend, AuthError, Password, PasswordHash, PasswordVerificationResult, Result,
@@ -23,10 +24,9 @@ use crate::auth::{
 };
 use crate::config::SecretKey;
 use crate::db::migrations::SyncDynMigration;
-use crate::db::{model, query, DatabaseBackend, LimitedString, Model};
+use crate::db::{DatabaseBackend, LimitedString, Model, model, query};
 use crate::form::Form;
 use crate::request::{Request, RequestExt};
-use crate::App;
 
 pub mod migrations;
 
@@ -75,8 +75,8 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUser;
     /// use cot::auth::Password;
+    /// use cot::auth::db::DatabaseUser;
     /// use cot::request::{Request, RequestExt};
     /// use cot::response::{Response, ResponseExt};
     /// use cot::{Body, StatusCode};
@@ -434,8 +434,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
     /// use cot::auth::Password;
+    /// use cot::auth::db::DatabaseUserCredentials;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));
@@ -450,8 +450,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
     /// use cot::auth::Password;
+    /// use cot::auth::db::DatabaseUserCredentials;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));
@@ -467,8 +467,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
     /// use cot::auth::Password;
+    /// use cot::auth::db::DatabaseUserCredentials;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));
@@ -502,8 +502,8 @@ impl DatabaseUserBackend {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserBackend;
     /// use cot::auth::AuthBackend;
+    /// use cot::auth::db::DatabaseUserBackend;
     /// use cot::config::ProjectConfig;
     /// use cot::project::WithApps;
     /// use cot::{Project, ProjectContext};
@@ -648,9 +648,11 @@ mod tests {
         assert_eq!(user_ref.username(), Some(Cow::from("testuser")));
         assert!(user_ref.is_active());
         assert!(user_ref.is_authenticated());
-        assert!(user_ref
-            .session_auth_hash(&SecretKey::new(b"supersecretkey"))
-            .is_some());
+        assert!(
+            user_ref
+                .session_auth_hash(&SecretKey::new(b"supersecretkey"))
+                .is_some()
+        );
     }
 
     #[cot::test]

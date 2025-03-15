@@ -278,7 +278,7 @@ pub trait FormContext: Debug {
     /// Returns a mutable reference to the validation errors for a target in the
     /// form context.
     fn errors_for_mut(&mut self, target: FormErrorTarget<'_>)
-        -> &mut Vec<FormFieldValidationError>;
+    -> &mut Vec<FormFieldValidationError>;
 
     /// Returns whether the form context has any validation errors.
     fn has_errors(&self) -> bool;

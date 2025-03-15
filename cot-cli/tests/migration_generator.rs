@@ -238,12 +238,16 @@ fn find_source_files() {
 
     let source_files = MigrationGenerator::find_source_files(tempdir.path()).unwrap();
     assert_eq!(source_files.len(), 2);
-    assert!(source_files
-        .iter()
-        .any(|f| f.file_name().unwrap() == file_name));
-    assert!(source_files
-        .iter()
-        .any(|f| f.file_name().unwrap() == nested_file_name));
+    assert!(
+        source_files
+            .iter()
+            .any(|f| f.file_name().unwrap() == file_name)
+    );
+    assert!(
+        source_files
+            .iter()
+            .any(|f| f.file_name().unwrap() == nested_file_name)
+    );
 }
 
 #[test]

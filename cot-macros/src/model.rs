@@ -1,10 +1,10 @@
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts};
-use darling::ast::NestedMeta;
 use darling::FromMeta;
+use darling::ast::NestedMeta;
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote, ToTokens, TokenStreamExt};
-use syn::punctuated::Punctuated;
+use quote::{ToTokens, TokenStreamExt, format_ident, quote};
 use syn::Token;
+use syn::punctuated::Punctuated;
 
 use crate::cot_ident;
 

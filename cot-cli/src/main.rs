@@ -11,8 +11,8 @@ use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use crate::migration_generator::{list_migrations, make_migrations, MigrationGeneratorOptions};
-use crate::new_project::{new_project, CotSource};
+use crate::migration_generator::{MigrationGeneratorOptions, list_migrations, make_migrations};
+use crate::new_project::{CotSource, new_project};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]

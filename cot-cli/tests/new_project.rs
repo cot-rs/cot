@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use cot_cli::new_project::{new_project, CotSource};
+use cot_cli::new_project::{CotSource, new_project};
 
 #[test]
 #[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri

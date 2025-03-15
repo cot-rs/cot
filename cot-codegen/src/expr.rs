@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::Token;
 use syn::parse::{Lookahead1, Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::Token;
 
 #[derive(Debug)]
 enum ItemToken {
@@ -385,7 +385,7 @@ impl Expr {
                     return Err(syn::Error::new(
                         lhs_item.span(),
                         "expected field, literal, or identifier",
-                    ))
+                    ));
                 }
             }
         };
@@ -436,7 +436,7 @@ impl Expr {
                     return Err(syn::Error::new(
                         op_item.span(),
                         "expected an operator or a method call",
-                    ))
+                    ));
                 }
             }
         }

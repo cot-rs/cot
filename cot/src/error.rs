@@ -7,7 +7,7 @@ use thiserror::Error;
 
 // Need to rename Backtrace to CotBacktrace, because otherwise it triggers special behavior
 // in thiserror library
-use crate::error::backtrace::{Backtrace as CotBacktrace, __cot_create_backtrace};
+use crate::error::backtrace::{__cot_create_backtrace, Backtrace as CotBacktrace};
 
 /// An error that can occur while using Cot.
 #[derive(Debug)]

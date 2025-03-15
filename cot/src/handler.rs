@@ -5,7 +5,7 @@ use tower::util::BoxCloneSyncService;
 
 use crate::error::ErrorRepr;
 use crate::request::Request;
-use crate::response::{not_found_response, Response};
+use crate::response::{Response, not_found_response};
 use crate::{Error, Result};
 
 /// A function that takes a request and returns a response.

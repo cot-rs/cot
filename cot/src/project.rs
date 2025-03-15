@@ -5,8 +5,8 @@
 /// # Examples
 ///
 /// ```no_run
-/// use cot::cli::CliMetadata;
 /// use cot::Project;
+/// use cot::cli::CliMetadata;
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -43,9 +43,9 @@ use crate::cli::Cli;
 use crate::config::DatabaseConfig;
 use crate::config::{AuthBackendConfig, ProjectConfig};
 #[cfg(feature = "db")]
-use crate::db::migrations::{MigrationEngine, SyncDynMigration};
-#[cfg(feature = "db")]
 use crate::db::Database;
+#[cfg(feature = "db")]
+use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error::ErrorRepr;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
@@ -53,7 +53,7 @@ use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCo
 use crate::request::{AppName, Request, RequestExt};
 use crate::response::{Response, ResponseExt};
 use crate::router::{Route, Router, RouterService};
-use crate::{cli, error_page, Body, Error, StatusCode};
+use crate::{Body, Error, StatusCode, cli, error_page};
 
 /// A building block for a Cot project.
 ///
@@ -165,8 +165,8 @@ pub trait App: Send + Sync {
 /// # Examples
 ///
 /// ```no_run
-/// use cot::cli::CliMetadata;
 /// use cot::Project;
+/// use cot::cli::CliMetadata;
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -194,8 +194,8 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
-    /// use cot::cli::CliMetadata;
     /// use cot::Project;
+    /// use cot::cli::CliMetadata;
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
@@ -228,8 +228,8 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::ProjectConfig;
     /// use cot::Project;
+    /// use cot::config::ProjectConfig;
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -1820,7 +1820,7 @@ fn build_custom_error_page(
 /// # Examples
 ///
 /// ```no_run
-/// use cot::{run_cli, App, Project};
+/// use cot::{App, Project, run_cli};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {}
@@ -2014,11 +2014,13 @@ mod tests {
             .with_apps(vec![], Arc::new(Router::empty()));
 
         let auth_backend = TestProject.auth_backend(&context);
-        assert!(auth_backend
-            .get_by_id(&TestRequestBuilder::get("/").build(), UserId::Int(0))
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            auth_backend
+                .get_by_id(&TestRequestBuilder::get("/").build(), UserId::Int(0))
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[cot::test]

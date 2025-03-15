@@ -8,8 +8,8 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use futures_util::TryFutureExt;
-use http_body_util::combinators::BoxBody;
 use http_body_util::BodyExt;
+use http_body_util::combinators::BoxBody;
 use tower::Service;
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 

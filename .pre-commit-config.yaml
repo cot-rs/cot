@@ -24,11 +24,15 @@ repos:
     hooks:
       - id: yamlfmt
         types_or: [json, yaml]
-  - repo: https://github.com/seqre/pre-commit-rust
-    rev: v0.1.0
+  - repo: local
     hooks:
       - id: fmt
+        name: cargo fmt
+        files: ^.*\.(rs|toml)$
         exclude: ^cot-cli/src/project_template/
+        language: rust
+        entry: cargo fmt
+        pass_filenames: false
   - repo: https://github.com/instrumentl/pre-commit-just
     rev: v0.1
     hooks:

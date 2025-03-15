@@ -11,7 +11,7 @@ use tracing::info;
 
 use crate::db::migrations::sorter::{MigrationSorter, MigrationSorterError};
 use crate::db::relations::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
-use crate::db::{model, query, Auto, ColumnType, Database, DatabaseField, Identifier, Result};
+use crate::db::{Auto, ColumnType, Database, DatabaseField, Identifier, Result, model, query};
 
 /// An error that occurred while running migrations.
 #[derive(Debug, Clone, Error)]

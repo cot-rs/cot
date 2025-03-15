@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use cot::db::migrations::{DynMigration, MigrationEngine};
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::SymbolResolver;
@@ -13,11 +13,11 @@ use darling::FromMeta;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
-use syn::{parse_quote, Meta};
+use quote::{ToTokens, format_ident, quote};
+use syn::{Meta, parse_quote};
 use tracing::{debug, trace};
 
-use crate::utils::{print_status_msg, CargoTomlManager, PackageManager, StatusType};
+use crate::utils::{CargoTomlManager, PackageManager, StatusType, print_status_msg};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
     if let Some(manager) = CargoTomlManager::from_path(path)? {

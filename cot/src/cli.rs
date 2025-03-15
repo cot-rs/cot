@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 pub use clap;
-use clap::{value_parser, Arg, ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command, value_parser};
 use derive_more::Debug;
 
 use crate::error::ErrorRepr;
@@ -466,10 +466,11 @@ mod tests {
         cli.add_task(MyTask);
 
         assert!(cli.tasks.contains_key(&Some("my-task".to_owned())));
-        assert!(cli
-            .command
-            .get_subcommands()
-            .any(|sc| sc.get_name() == "my-task"));
+        assert!(
+            cli.command
+                .get_subcommands()
+                .any(|sc| sc.get_name() == "my-task")
+        );
     }
 
     #[test]

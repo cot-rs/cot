@@ -16,8 +16,8 @@ members = [
 resolver = "2"
 
 [workspace.package]
-edition = "2021"
-rust-version = "1.84"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 homepage = "https://cot.rs"
 repository = "https://github.com/cot-rs/cot"

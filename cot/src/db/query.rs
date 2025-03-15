@@ -988,8 +988,8 @@ impl Expr {
     /// # Example
     ///
     /// ```
-    /// use cot::db::query::Expr;
     /// use cot::db::Identifier;
+    /// use cot::db::query::Expr;
     /// use sea_query::IntoColumnRef;
     ///
     /// let expr = Expr::eq(Expr::field("id"), Expr::value(5));
@@ -1374,7 +1374,7 @@ impl_num_expr!(f64);
 ///
 /// ```
 /// use cot::db::query::{Expr, ExprEq, Query};
-/// use cot::db::{model, query, Auto};
+/// use cot::db::{Auto, model, query};
 ///
 /// #[model]
 /// struct MyModel {

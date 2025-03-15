@@ -327,7 +327,7 @@ impl Display for ModulePath {
 
 #[cfg(test)]
 mod tests {
-    use quote::{quote, ToTokens};
+    use quote::{ToTokens, quote};
     use syn::parse_quote;
 
     use super::*;

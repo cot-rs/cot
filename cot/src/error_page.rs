@@ -3,10 +3,10 @@ use std::panic::PanicHookInfo;
 use std::sync::Arc;
 
 use rinja::Template;
-use tracing::{error, warn, Level};
+use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
-use crate::error::backtrace::{Backtrace, __cot_create_backtrace};
+use crate::error::backtrace::{__cot_create_backtrace, Backtrace};
 use crate::error::{Error, ErrorRepr};
 use crate::router::Router;
 use crate::{Result, StatusCode};

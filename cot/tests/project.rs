@@ -5,7 +5,7 @@ use cot::request::Request;
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::test::Client;
-use cot::{reverse, App, AppBuilder, Body, Project, ProjectContext, StatusCode};
+use cot::{App, AppBuilder, Body, Project, ProjectContext, StatusCode, reverse};
 
 #[cot::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`

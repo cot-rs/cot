@@ -4,12 +4,12 @@
 use cot::db::migrations::{Field, Operation};
 use cot::db::query::ExprEq;
 use cot::db::{
-    model, query, Auto, Database, DatabaseError, DatabaseField, ForeignKey,
-    ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy, Identifier, LimitedString, Model,
+    Auto, Database, DatabaseError, DatabaseField, ForeignKey, ForeignKeyOnDeletePolicy,
+    ForeignKeyOnUpdatePolicy, Identifier, LimitedString, Model, model, query,
 };
 use cot::test::TestDatabase;
-use fake::rand::rngs::StdRng;
 use fake::rand::SeedableRng;
+use fake::rand::rngs::StdRng;
 use fake::{Dummy, Fake, Faker};
 
 #[cot_macros::dbtest]

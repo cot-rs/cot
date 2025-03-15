@@ -53,9 +53,9 @@ pub fn make_workspace_package(path: &Path, packages: u8) -> anyhow::Result<()> {
 
 pub fn make_package(path: &Path) -> anyhow::Result<()> {
     if path.exists() {
-        create_cargo_project(&path, CargoCommand::Init)
+        create_cargo_project(path, CargoCommand::Init)
     } else {
-        create_cargo_project(&path, CargoCommand::New)
+        create_cargo_project(path, CargoCommand::New)
     }
 }
 

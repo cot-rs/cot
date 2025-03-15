@@ -329,7 +329,6 @@ mod tests {
     use std::io::Write;
 
     use cot_cli::test_utils;
-    use tempfile;
 
     use super::*;
 
@@ -372,7 +371,7 @@ mod tests {
             test_utils::make_package(temp_dir.path()).unwrap();
             let cargo_toml_path = temp_dir.path().join("Cargo.toml");
 
-            let found_path = CargoTomlManager::find_cargo_toml(&temp_dir.path()).unwrap();
+            let found_path = CargoTomlManager::find_cargo_toml(temp_dir.path()).unwrap();
             assert_eq!(found_path, cargo_toml_path);
         }
 
@@ -391,7 +390,7 @@ mod tests {
         #[test]
         fn find_cargo_toml_not_found() {
             let temp_dir = tempfile::tempdir().unwrap();
-            let found_path = CargoTomlManager::find_cargo_toml(&temp_dir.path());
+            let found_path = CargoTomlManager::find_cargo_toml(temp_dir.path());
             assert!(found_path.is_none());
         }
 
@@ -402,7 +401,7 @@ mod tests {
             let cot_cli_root = env!("CARGO_MANIFEST_DIR");
             let cot_root = Path::new(cot_cli_root).parent().unwrap();
 
-            let manager = CargoTomlManager::from_path(&cot_root).unwrap().unwrap();
+            let manager = CargoTomlManager::from_path(cot_root).unwrap().unwrap();
             match manager {
                 CargoTomlManager::Workspace(manager) => {
                     assert!(manager.get_root_manifest().workspace.is_some());
@@ -425,7 +424,7 @@ mod tests {
                 .unwrap();
             writeln!(handle, "{}", test_utils::WORKSPACE_STUB).unwrap();
 
-            let manager = CargoTomlManager::from_path(&temp_dir.path())
+            let manager = CargoTomlManager::from_path(temp_dir.path())
                 .unwrap()
                 .unwrap();
             match manager {
@@ -433,7 +432,7 @@ mod tests {
                     assert!(manager.get_root_manifest().workspace.is_some());
                     assert_eq!(manager.get_packages().len(), 1);
                     assert_eq!(
-                        manager.get_packages().get(0).unwrap().get_manifest_path(),
+                        manager.get_packages()[0].get_manifest_path(),
                         cargo_toml_path
                     );
                 }
@@ -447,9 +446,9 @@ mod tests {
         fn load_valid_package_manifest() {
             let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
             let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
-            test_utils::make_package(temp_dir.path().into()).unwrap();
+            test_utils::make_package(temp_dir.path()).unwrap();
 
-            let manager = CargoTomlManager::from_path(&temp_dir.path())
+            let manager = CargoTomlManager::from_path(temp_dir.path())
                 .unwrap()
                 .unwrap();
 
@@ -470,11 +469,11 @@ mod tests {
             test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
             let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
 
-            let manager = CargoTomlManager::from_path(&temp_dir.path())
+            let manager = CargoTomlManager::from_path(temp_dir.path())
                 .unwrap()
                 .unwrap();
 
-            assert!(manager.package_exists(&*test_utils::get_nth_crate_name(1)));
+            assert!(manager.package_exists(&test_utils::get_nth_crate_name(1)));
             assert!(!manager.package_exists("non-existent"));
         }
 
@@ -485,7 +484,7 @@ mod tests {
             let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
             test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
 
-            let manager = CargoTomlManager::from_path(&temp_dir.path())
+            let manager = CargoTomlManager::from_path(temp_dir.path())
                 .unwrap()
                 .unwrap();
 

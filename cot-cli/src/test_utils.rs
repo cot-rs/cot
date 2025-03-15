@@ -35,12 +35,16 @@ enum CargoCommand {
     New,
 }
 
+pub fn get_nth_crate_name(i: u8) -> String {
+    format!("cargo-test-crate-{i}")
+}
+
 pub fn make_workspace_package(path: &Path, packages: u8) -> anyhow::Result<()> {
     let workspace_cargo_toml = path.join("Cargo.toml");
     std::fs::write(workspace_cargo_toml, WORKSPACE_STUB)?;
 
     for i in 0..packages {
-        let package_path = path.join(format!("cargo-test-crate-{i}"));
+        let package_path = path.join(get_nth_crate_name(i + 1));
         make_package(&package_path)?;
     }
 

@@ -240,7 +240,13 @@ impl CargoTomlManager {
     pub(crate) fn get_package_manager(&self, package_name: &str) -> Option<&PackageManager> {
         match self {
             CargoTomlManager::Workspace(manager) => manager.get_package_manager(package_name),
-            CargoTomlManager::Package(manager) => Some(manager),
+            CargoTomlManager::Package(manager) => {
+                if manager.get_package_name() == package_name {
+                    Some(manager)
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -323,101 +329,259 @@ mod tests {
     use std::io::Write;
 
     use cot_cli::test_utils;
+    use tempfile;
 
     use super::*;
 
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn find_cargo_toml() {
+    fn get_package() -> (tempfile::TempDir, PackageManager) {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         test_utils::make_package(temp_dir.path()).unwrap();
-        let cargo_toml_path = temp_dir.path().join("Cargo.toml");
 
-        let found_path = CargoTomlManager::find_cargo_toml(&temp_dir.path()).unwrap();
-        assert_eq!(found_path, cargo_toml_path);
+        let CargoTomlManager::Package(manager) = CargoTomlManager::from_path(temp_dir.path())
+            .unwrap()
+            .unwrap()
+        else {
+            unreachable!()
+        };
+
+        (temp_dir, manager)
     }
 
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn find_cargo_toml_recursive() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let nested_dir = temp_dir.path().join("nested");
-        test_utils::make_package(&nested_dir).unwrap();
+    fn get_workspace(packages: u8) -> (tempfile::TempDir, WorkspaceManager) {
+        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+        test_utils::make_workspace_package(temp_dir.path(), packages).unwrap();
 
-        let found_path = CargoTomlManager::find_cargo_toml(&nested_dir).unwrap();
-        assert_eq!(found_path, nested_dir.join("Cargo.toml"));
+        let CargoTomlManager::Workspace(manager) = CargoTomlManager::from_path(temp_dir.path())
+            .unwrap()
+            .unwrap()
+        else {
+            unreachable!()
+        };
+
+        (temp_dir, manager)
     }
 
-    #[test]
-    fn find_cargo_toml_not_found() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let found_path = CargoTomlManager::find_cargo_toml(&temp_dir.path());
-        assert!(found_path.is_none());
-    }
+    mod cargo_toml_manager {
+        use super::*;
 
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn load_valid_virtual_workspace_manifest() {
-        let cot_cli_root = env!("CARGO_MANIFEST_DIR");
-        let cot_root = Path::new(cot_cli_root).parent().unwrap();
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn find_cargo_toml() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_package(temp_dir.path()).unwrap();
+            let cargo_toml_path = temp_dir.path().join("Cargo.toml");
 
-        let manager = CargoTomlManager::from_path(&cot_root).unwrap().unwrap();
-        match manager {
-            CargoTomlManager::Workspace(manager) => {
-                assert!(manager.get_root_manifest().workspace.is_some());
-                assert!(!manager.package_manifests.is_empty());
+            let found_path = CargoTomlManager::find_cargo_toml(&temp_dir.path()).unwrap();
+            assert_eq!(found_path, cargo_toml_path);
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn find_cargo_toml_recursive() {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let nested_dir = temp_dir.path().join("nested");
+            test_utils::make_package(&nested_dir).unwrap();
+
+            let found_path = CargoTomlManager::find_cargo_toml(&nested_dir).unwrap();
+            assert_eq!(found_path, nested_dir.join("Cargo.toml"));
+        }
+
+        #[test]
+        fn find_cargo_toml_not_found() {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let found_path = CargoTomlManager::find_cargo_toml(&temp_dir.path());
+            assert!(found_path.is_none());
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn load_valid_virtual_workspace_manifest() {
+            let cot_cli_root = env!("CARGO_MANIFEST_DIR");
+            let cot_root = Path::new(cot_cli_root).parent().unwrap();
+
+            let manager = CargoTomlManager::from_path(&cot_root).unwrap().unwrap();
+            match manager {
+                CargoTomlManager::Workspace(manager) => {
+                    assert!(manager.get_root_manifest().workspace.is_some());
+                    assert!(!manager.package_manifests.is_empty());
+                }
+                _ => panic!("Expected workspace manifest"),
             }
-            _ => panic!("Expected workspace manifest"),
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn load_valid_workspace_from_package_manifest() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_package(temp_dir.path()).unwrap();
+            let cargo_toml_path = temp_dir.path().join("Cargo.toml").canonicalize().unwrap();
+            let mut handle = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&cargo_toml_path)
+                .unwrap();
+            writeln!(handle, "{}", test_utils::WORKSPACE_STUB).unwrap();
+
+            let manager = CargoTomlManager::from_path(&temp_dir.path())
+                .unwrap()
+                .unwrap();
+            match manager {
+                CargoTomlManager::Workspace(manager) => {
+                    assert!(manager.get_root_manifest().workspace.is_some());
+                    assert_eq!(manager.get_packages().len(), 1);
+                    assert_eq!(
+                        manager.get_packages().get(0).unwrap().get_manifest_path(),
+                        cargo_toml_path
+                    );
+                }
+                _ => panic!("Expected workspace manifest"),
+            }
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn load_valid_package_manifest() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
+            test_utils::make_package(temp_dir.path().into()).unwrap();
+
+            let manager = CargoTomlManager::from_path(&temp_dir.path())
+                .unwrap()
+                .unwrap();
+
+            match manager {
+                CargoTomlManager::Package(manager) => {
+                    assert_eq!(manager.get_package_name(), package_name);
+                    assert_eq!(manager.get_package_path(), temp_dir.path());
+                }
+                _ => panic!("Expected package manifest"),
+            }
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn package_exists() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
+            let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
+
+            let manager = CargoTomlManager::from_path(&temp_dir.path())
+                .unwrap()
+                .unwrap();
+
+            assert!(manager.package_exists(&*test_utils::get_nth_crate_name(1)));
+            assert!(!manager.package_exists("non-existent"));
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn get_package_manager() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
+
+            let manager = CargoTomlManager::from_path(&temp_dir.path())
+                .unwrap()
+                .unwrap();
+
+            let first_package = test_utils::get_nth_crate_name(1);
+            let package = manager.get_package_manager(first_package.as_str());
+            assert!(package.is_some());
+            assert_eq!(
+                package
+                    .unwrap()
+                    .get_manifest()
+                    .package
+                    .as_ref()
+                    .unwrap()
+                    .name,
+                first_package.as_str()
+            );
+
+            let package = manager.get_package_manager("non-existent");
+            assert!(package.is_none());
         }
     }
 
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn load_valid_workspace_from_package_manifest() {
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        test_utils::make_package(temp_dir.path()).unwrap();
-        let cargo_toml_path = temp_dir.path().join("Cargo.toml").canonicalize().unwrap();
-        let mut handle = std::fs::OpenOptions::new()
-            .append(true)
-            .open(&cargo_toml_path)
-            .unwrap();
-        writeln!(handle, "{}", test_utils::WORKSPACE_STUB).unwrap();
+    mod workspace_manager {
+        use super::*;
 
-        let manager = CargoTomlManager::from_path(&temp_dir.path())
-            .unwrap()
-            .unwrap();
-        match manager {
-            CargoTomlManager::Workspace(manager) => {
-                assert!(manager.get_root_manifest().workspace.is_some());
-                assert_eq!(manager.get_packages().len(), 1);
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn get_packages() {
+            let (_, manager) = get_workspace(2);
+
+            assert_eq!(manager.get_packages().len(), 2);
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn get_package_names() {
+            let (_, manager) = get_workspace(2);
+
+            let mut packages = manager.get_package_names();
+            packages.sort();
+
+            assert_eq!(packages.len(), 2);
+            assert_eq!(packages[0], test_utils::get_nth_crate_name(1));
+            assert_eq!(packages[1], test_utils::get_nth_crate_name(2));
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                  // `linux`
+        fn test_get_package_manager_by_path() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_package_paths() {
+                let (temp_dir, manager) = get_workspace(2);
+
+                let mut packages = manager.get_package_paths();
+                packages.sort();
+
+                assert_eq!(packages.len(), 2);
                 assert_eq!(
-                    manager.get_packages().get(0).unwrap().get_manifest_path(),
-                    cargo_toml_path
+                    packages[0],
+                    temp_dir.path().join(test_utils::get_nth_crate_name(1))
+                );
+                assert_eq!(
+                    packages[1],
+                    temp_dir.path().join(test_utils::get_nth_crate_name(2))
                 );
             }
-            _ => panic!("Expected workspace manifest"),
-        }
-    }
 
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn test_get_package_manager() {
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_root_manifest() {
+                let (temp_dir, manager) = get_workspace(1);
+                let manifest_path = temp_dir.path().join("Cargo.toml");
+                let orig_manifest = Manifest::from_path(&manifest_path).unwrap();
 
-        let manager = CargoTomlManager::from_path(&temp_dir.path())
-            .unwrap()
-            .unwrap();
+                let manifest = manager.get_root_manifest();
 
-        match manager {
-            CargoTomlManager::Workspace(manager) => {
-                let first_package = manager.get_package_names()[0];
-                let package = manager.get_package_manager(first_package);
+                assert_eq!(*manifest, orig_manifest);
+            }
+
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_package_manager() {
+                let (_, manager) = get_workspace(2);
+                let package_name = test_utils::get_nth_crate_name(1);
+
+                let package = manager.get_package_manager(package_name.as_str());
+
                 assert!(package.is_some());
                 assert_eq!(
                     package
@@ -427,32 +591,22 @@ mod tests {
                         .as_ref()
                         .unwrap()
                         .name,
-                    *first_package
+                    package_name
                 );
 
-                let manifest = manager.get_package_manager("non-existent");
-                assert!(manifest.is_none());
+                let package = manager.get_package_manager("non-existent");
+                assert!(package.is_none());
             }
-            _ => panic!("Expected workspace manifest"),
-        }
-    }
 
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn test_get_package_manager_by_path() {
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_package_manager_by_path() {
+                let (temp_dir, manager) = get_workspace(1);
+                let package_name = test_utils::get_nth_crate_name(1);
+                let package_path = temp_dir.path().join(&package_name);
 
-        let manager = CargoTomlManager::from_path(temp_dir.path())
-            .unwrap()
-            .unwrap();
-
-        match manager {
-            CargoTomlManager::Workspace(manager) => {
-                let first_package = manager.get_package_names()[0];
-                let first_package_path = temp_dir.path().join(format!("{first_package}/"));
-                let package = manager.get_package_manager_by_path(&first_package_path);
+                let package = manager.get_package_manager_by_path(&package_path);
                 assert!(package.is_some());
                 assert_eq!(
                     package
@@ -462,11 +616,11 @@ mod tests {
                         .as_ref()
                         .unwrap()
                         .name,
-                    *first_package
+                    package_name
                 );
 
-                let first_package_path = temp_dir.path().join(first_package).join("Cargo.toml");
-                let package = manager.get_package_manager_by_path(&first_package_path);
+                let package_path = package_path.join("Cargo.toml");
+                let package = manager.get_package_manager_by_path(&package_path);
                 assert!(package.is_some());
                 assert_eq!(
                     package
@@ -476,14 +630,68 @@ mod tests {
                         .as_ref()
                         .unwrap()
                         .name,
-                    *first_package
+                    package_name
                 );
 
                 let non_existent = temp_dir.path().join("non-existent/Cargo.toml");
                 let package = manager.get_package_manager_by_path(&non_existent);
                 assert!(package.is_none());
             }
-            _ => panic!("Expected workspace manifest"),
+
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_workspace_root() {
+                let (temp_dir, manager) = get_workspace(1);
+
+                assert_eq!(manager.get_workspace_root(), temp_dir.path());
+            }
+        }
+
+        mod package_manager {
+            use super::*;
+
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_package_name() {
+                let (temp_dir, manager) = get_package();
+                let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
+
+                assert_eq!(manager.get_package_name(), package_name);
+            }
+
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_package_path() {
+                let (temp_dir, manager) = get_package();
+
+                assert_eq!(manager.get_package_path(), temp_dir.path());
+            }
+
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_manifest_path() {
+                let (temp_dir, manager) = get_package();
+
+                assert_eq!(
+                    manager.get_manifest_path(),
+                    temp_dir.path().join("Cargo.toml")
+                );
+            }
+
+            #[test]
+            #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
+                                      // `linux`
+            fn get_manifest() {
+                let (temp_dir, manager) = get_package();
+                let manifest_path = temp_dir.path().join("Cargo.toml");
+                let orig_manifest = Manifest::from_path(&manifest_path).unwrap();
+
+                assert_eq!(*manager.get_manifest(), orig_manifest);
+            }
         }
     }
 }

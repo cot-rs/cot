@@ -218,6 +218,7 @@ impl CargoTomlManager {
         None
     }
 
+    #[cfg(test)]
     pub(crate) fn package_exists(&self, package_name: &str) -> bool {
         match self {
             CargoTomlManager::Workspace(manager) => {
@@ -246,10 +247,12 @@ impl WorkspaceManager {
         self.package_manifests.values().collect()
     }
 
+    #[cfg(test)]
     pub(crate) fn get_package_names(&self) -> Vec<&str> {
         self.package_manifests.keys().map(String::as_str).collect()
     }
 
+    #[cfg(test)]
     pub(crate) fn get_package_paths(&self) -> Vec<&Path> {
         self.package_manifests
             .values()
@@ -257,6 +260,7 @@ impl WorkspaceManager {
             .collect()
     }
 
+    #[cfg(test)]
     pub(crate) fn get_root_manifest(&self) -> &Manifest {
         &self.root_manifest
     }
@@ -265,6 +269,7 @@ impl WorkspaceManager {
         self.package_manifests.get(package_name)
     }
 
+    #[cfg(test)]
     pub(crate) fn get_package_manager_by_path(
         &self,
         package_path: &Path,
@@ -282,6 +287,7 @@ impl WorkspaceManager {
             .find(|m| m.package_root == package_path)
     }
 
+    #[cfg(test)]
     pub(crate) fn get_workspace_root(&self) -> &Path {
         &self.workspace_root
     }
@@ -305,6 +311,7 @@ impl PackageManager {
         path.to_owned()
     }
 
+    #[cfg(test)]
     pub(crate) fn get_manifest(&self) -> &Manifest {
         &self.manifest
     }
@@ -393,7 +400,7 @@ mod tests {
                     assert!(manager.get_root_manifest().workspace.is_some());
                     assert!(!manager.package_manifests.is_empty());
                 }
-                _ => panic!("Expected workspace manifest"),
+                CargoTomlManager::Package(_) => panic!("Expected workspace manifest"),
             }
         }
 
@@ -422,7 +429,7 @@ mod tests {
                         cargo_toml_path
                     );
                 }
-                _ => panic!("Expected workspace manifest"),
+                CargoTomlManager::Package(_) => panic!("Expected workspace manifest"),
             }
         }
 
@@ -443,7 +450,7 @@ mod tests {
                     assert_eq!(manager.get_package_name(), package_name);
                     assert_eq!(manager.get_package_path(), temp_dir.path());
                 }
-                _ => panic!("Expected package manifest"),
+                CargoTomlManager::Workspace(_) => panic!("Expected package manifest"),
             }
         }
 
@@ -453,7 +460,6 @@ mod tests {
         fn package_exists() {
             let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
             test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
-            let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
 
             let manager = CargoTomlManager::from_path(temp_dir.path())
                 .unwrap()
@@ -512,7 +518,7 @@ mod tests {
             let (_, manager) = get_workspace(2);
 
             let mut packages = manager.get_package_names();
-            packages.sort();
+            packages.sort_unstable();
 
             assert_eq!(packages.len(), 2);
             assert_eq!(packages[0], test_utils::get_nth_crate_name(1));

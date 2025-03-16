@@ -1,5 +1,38 @@
 //! Email sending functionality using SMTP
-use std::collections::HashMap;
+//! #Examples
+//! To send an email using the `EmailBackend`, you need to create an instance of `SmtpConfig`
+//! ```
+//! fn send_example() -> Result<()> {
+//!     let email = EmailMessage {
+//!         subject: "Test Email".to_string(),
+//!         body: "This is a test email sent from Rust.".to_string(),
+//!         from_email: "from@example.com".to_string(),
+//!         to: vec!["to@example.com".to_string()],
+//!         cc: Some(vec!["cc@example.com".to_string()]),
+//!         bcc: Some(vec!["bcc@example.com".to_string()]),
+//!         reply_to: vec!["replyto@example.com".to_string()],
+//!         headers: HashMap::new(),
+//!         alternatives: vec![
+//!             ("This is a test email sent from Rust as HTML.".to_string(), "text/html".to_string())
+//!         ],
+//!         attachments: vec![],
+//!     };
+//!     let config = SmtpConfig {
+//!         host: "smtp.example.com".to_string(),
+//!         port: 587,
+//!         username: Some("user@example.com".to_string()),
+//!         password: Some("password".to_string()),
+//!         use_tls: true,
+//!         fail_silently: false,
+//!         ..Default::default()
+//!     };
+//!     let mut backend = EmailBackend::new(config);
+//!     backend.send_message(&email)?;
+//!     Ok(())
+//! }
+//! ```
+//!
+use std::{collections::HashMap, fmt};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 
@@ -15,7 +48,6 @@ pub enum EmailError {
     /// An error occurred while building the email message.
     #[error("Message error: {0}")]
     MessageError(String),
-    
     /// The email configuration is invalid.
     #[error("Invalid email configuration: {0}")]
     ConfigurationError(String),
@@ -68,6 +100,7 @@ impl Default for SmtpConfig {
             use_ssl: false,
             ssl_certfile: None,
             ssl_keyfile: None,
+            //  debug: false,
         }
     }
 }
@@ -110,18 +143,43 @@ pub struct EmailAttachment {
 
 /// SMTP Backend for sending emails
 #[derive(Debug)]
-pub struct SmtpEmailBackend {
+pub struct EmailBackend {
     /// The SMTP configuration.
     config: SmtpConfig,
     /// The SMTP transport.
     /// This field is optional because the transport may not be initialized yet.
     /// It will be initialized when the `open` method is called.
     transport: Option<SmtpTransport>,
-}
+    /// Whether or not to print debug information.
+    debug: bool,
 
-impl SmtpEmailBackend {
+}
+impl fmt::Display for EmailMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Subject: {}", self.subject)?;
+        writeln!(f, "From: {}", self.from_email)?;
+        writeln!(f, "To: {:?}", self.to)?;
+        if let Some(cc) = &self.cc {
+            writeln!(f, "CC: {cc:?}")?;
+        }
+        if let Some(bcc) = &self.bcc {
+            writeln!(f, "BCC: {bcc:?}")?;
+        }
+        writeln!(f, "Reply-To: {:?}", self.reply_to)?;
+        writeln!(f, "Headers: {:?}", self.headers)?;
+        writeln!(f, "Body: {}", self.body)?;
+        for (content, mimetype) in &self.alternatives {
+            writeln!(f, "Alternative part ({mimetype}): {content}")?;
+        }
+        for attachment in &self.attachments {
+            writeln!(f, "Attachment ({}): {} ({} bytes)", attachment.mimetype, attachment.filename, attachment.content.len())?;
+        }
+        Ok(())
+    }
+}
+impl EmailBackend {
     #[must_use] 
-    /// Creates a new instance of `SmtpEmailBackend` with the given configuration.
+    /// Creates a new instance of `EmailBackend` with the given configuration.
     ///
     /// # Arguments
     ///
@@ -130,6 +188,7 @@ impl SmtpEmailBackend {
         Self {
             config,
             transport: None,
+            debug: false,
         }
     }
 
@@ -190,6 +249,14 @@ impl SmtpEmailBackend {
         self.transport = None;
         Ok(())
     }
+    /// Dump the email message to stdout
+    /// 
+    /// # Errors
+    /// This function will return an `EmailError` if there is an issue with printing the email message.
+    pub fn dump_message(&self, email: &EmailMessage) -> Result<()> {
+        println!("{email}");
+        Ok(())
+    }
 
     /// Send a single email message
     ///
@@ -199,7 +266,9 @@ impl SmtpEmailBackend {
     /// building the email message, or sending the email.
     pub fn send_message(&mut self, email: &EmailMessage) -> Result<()> {
         self.open()?;
-
+        if self.debug {
+            self.dump_message(email)?;
+        }
         // Build the email message using lettre
         let mut message_builder = Message::builder()
             .from(email.from_email.parse().map_err(|e| EmailError::MessageError(format!("Invalid from address: {e}")))?)
@@ -440,7 +509,7 @@ mod tests {
         assert_eq!(config.username, None);
         assert_eq!(config.password, None);
         assert!(!config.use_tls);
-        //assert_eq!(config.fail_silently, false);
+        assert!(!config.fail_silently);
         assert_eq!(config.timeout, Duration::from_secs(60));
         assert!(!config.use_ssl);
         assert_eq!(config.ssl_certfile, None);

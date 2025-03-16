@@ -33,7 +33,7 @@ use tracing::debug;
 use crate::error::ErrorRepr;
 use crate::handler::RequestHandler;
 use crate::request::{AppName, PathParams, Request, RouteName};
-use crate::response::{not_found_response, Response};
+use crate::response::{Response, not_found_response};
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};
 
@@ -128,6 +128,9 @@ impl Router {
                 path_params.insert(key.clone(), value.clone());
             }
             request.extensions_mut().insert(path_params);
+            if let Some(app_name) = result.app_name {
+                request.extensions_mut().insert(app_name);
+            }
             if let Some(name) = result.name {
                 request.extensions_mut().insert(name);
             }
@@ -597,7 +600,7 @@ enum RouteInner {
 /// use cot::request::Request;
 /// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
-/// use cot::{reverse, App, AppBuilder, Body, Project, ProjectContext, StatusCode};
+/// use cot::{App, AppBuilder, Body, Project, ProjectContext, StatusCode, reverse};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
 ///     // any of below two lines returns the same:

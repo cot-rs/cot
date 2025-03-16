@@ -8,7 +8,7 @@ use crate::db::{DatabaseBackend, DatabaseError, Model, Result};
 /// # Examples
 ///
 /// ```
-/// use cot::db::{model, Auto, ForeignKey, Model};
+/// use cot::db::{Auto, ForeignKey, Model, model};
 /// use cot::request::{Request, RequestExt};
 /// use cot::response::Response;
 ///
@@ -201,7 +201,7 @@ impl From<ForeignKeyOnUpdatePolicy> for sea_query::ForeignKeyAction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{model, Auto};
+    use crate::db::{Auto, model};
 
     #[derive(Debug, Clone, PartialEq)]
     #[model]

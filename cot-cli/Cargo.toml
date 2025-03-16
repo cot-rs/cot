@@ -42,5 +42,9 @@ tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [dev-dependencies]
+cot-cli = { path = ".", features = ["test_utils"] }
 tempfile.workspace = true
 trybuild.workspace = true
+
+[features]
+test_utils = []

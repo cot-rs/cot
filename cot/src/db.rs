@@ -32,7 +32,7 @@ use sea_query::{
 use sea_query_binder::{SqlxBinder, SqlxValues};
 use sqlx::{Type, TypeInfo};
 use thiserror::Error;
-use tracing::{span, trace, Instrument, Level};
+use tracing::{Instrument, Level, span, trace};
 
 #[cfg(feature = "mysql")]
 use crate::db::impl_mysql::{DatabaseMySql, MySqlRow, MySqlValueRef};
@@ -53,7 +53,8 @@ pub enum DatabaseError {
     #[error("Error when building query: {0}")]
     QueryBuildingError(#[from] sea_query::error::Error),
     /// Type mismatch in database value.
-    #[error("Type mismatch in database value: expected `{expected}`, found `{found}`. Perhaps migration is needed."
+    #[error(
+        "Type mismatch in database value: expected `{expected}`, found `{found}`. Perhaps migration is needed."
     )]
     TypeMismatch {
         /// The expected type.
@@ -1381,7 +1382,7 @@ pub struct RowsNum(pub u64);
 /// # Examples
 ///
 /// ```
-/// use cot::db::{model, Auto, Model};
+/// use cot::db::{Auto, Model, model};
 /// # use cot::db::migrations::{Field, Operation};
 /// # use cot::db::{Database, Identifier, DatabaseField};
 /// # use cot::Result;

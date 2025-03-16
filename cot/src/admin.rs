@@ -25,10 +25,10 @@ use crate::auth::{AuthRequestExt, Password};
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
-use crate::request::{query_pairs, Request, RequestExt};
+use crate::request::{Request, RequestExt, query_pairs};
 use crate::response::{Response, ResponseExt};
 use crate::router::Router;
-use crate::{reverse_redirect, static_files, App, Body, Method, RequestHandler, StatusCode};
+use crate::{App, Body, Method, RequestHandler, StatusCode, reverse_redirect, static_files};
 
 struct AdminAuthenticated<T: Send + Sync>(T);
 

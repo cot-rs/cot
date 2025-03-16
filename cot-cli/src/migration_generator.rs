@@ -5,8 +5,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context};
-use cargo_toml::Manifest;
+use anyhow::{Context, bail};
 use cot::db::migrations::{DynMigration, MigrationEngine};
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::SymbolResolver;
@@ -14,43 +13,85 @@ use darling::FromMeta;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
-use syn::{parse_quote, Meta};
+use quote::{ToTokens, format_ident, quote};
+use syn::{Meta, parse_quote};
 use tracing::{debug, trace};
 
-use crate::utils::{find_cargo_toml, print_status_msg, StatusType};
+use crate::utils::{CargoTomlManager, PackageManager, StatusType, print_status_msg};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
-    match find_cargo_toml(
-        &path
-            .canonicalize()
-            .with_context(|| "unable to canonicalize Cargo.toml path")?,
-    ) {
-        Some(cargo_toml_path) => {
-            let manifest = Manifest::from_path(&cargo_toml_path)
-                .with_context(|| "unable to read Cargo.toml")?;
-            let crate_name = manifest
-                .package
-                .with_context(|| "unable to find package in Cargo.toml")?
-                .name;
+    if let Some(manager) = CargoTomlManager::from_path(path)? {
+        if let Some(app_name) = &options.app_name {
+            match manager.get_package_manager(app_name) {
+                Some(package_manager) => {
+                    make_package_migrations(package_manager, options)?;
+                    return Ok(());
+                }
+                None => {
+                    bail!("Package manager not found for the specified app name.")
+                }
+            }
+        }
 
-            let generator = MigrationGenerator::new(cargo_toml_path, crate_name, options);
-            let migrations = generator
-                .generate_migrations_as_source()
-                .with_context(|| "unable to generate migrations")?;
-            generator
-                .write_migrations(&migrations)
-                .with_context(|| "unable to write migrations")?;
-            generator
-                .write_migrations_module()
-                .with_context(|| "unable to write migrations.rs")?;
+        match manager {
+            CargoTomlManager::Workspace(workspace) => {
+                for package in workspace.get_packages() {
+                    make_package_migrations(package, options.clone())?;
+                }
+                Ok(())
+            }
+            CargoTomlManager::Package(package) => make_package_migrations(&package, options),
         }
-        None => {
-            bail!("Cargo.toml not found in the specified directory or any parent directory.")
-        }
+    } else {
+        bail!("Cargo.toml not found in the specified directory or any parent directory.")
     }
+}
+
+fn make_package_migrations(
+    manager: &PackageManager,
+    options: MigrationGeneratorOptions,
+) -> anyhow::Result<()> {
+    let crate_name = manager.get_package_name().to_string();
+    let manifest_path = manager.get_manifest_path();
+
+    let generator = MigrationGenerator::new(manifest_path, crate_name, options);
+    let migrations = generator
+        .generate_migrations_as_source()
+        .context("unable to generate migrations")?;
+    generator
+        .write_migrations(&migrations)
+        .context("unable to write migrations")?;
+    generator
+        .write_migrations_module()
+        .context("unable to write migrations.rs")?;
 
     Ok(())
+}
+
+pub fn list_migrations(path: &Path) -> anyhow::Result<HashMap<String, Vec<String>>> {
+    if let Some(manager) = CargoTomlManager::from_path(path)? {
+        let mut migration_list = HashMap::new();
+
+        let packages = match manager {
+            CargoTomlManager::Workspace(ref workspace) => workspace.get_packages(),
+            CargoTomlManager::Package(ref package) => vec![package],
+        };
+
+        for member in packages {
+            let migrations_dir = member.get_package_path().join("src").join("migrations");
+
+            let migrations = MigrationGenerator::get_migration_list(&migrations_dir)?;
+            for migration in migrations {
+                migration_list
+                    .entry(member.get_package_name().to_string())
+                    .or_insert_with(Vec::new)
+                    .push(migration);
+            }
+        }
+        Ok(migration_list)
+    } else {
+        bail!("Cargo.toml not found in the specified directory or any parent directory.")
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -467,13 +508,15 @@ impl MigrationGenerator {
     }
 
     fn get_migration_list(migrations_dir: &PathBuf) -> anyhow::Result<Vec<String>> {
-        Ok(std::fs::read_dir(migrations_dir)
-            .with_context(|| {
-                format!(
-                    "unable to read migrations directory: {}",
-                    migrations_dir.display()
-                )
-            })?
+        let dir = match std::fs::read_dir(migrations_dir) {
+            Ok(dir) => dir,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Vec::new());
+            }
+            Err(e) => return Err(e).context("unable to read migrations directory"),
+        };
+
+        let migrations = dir
             .filter_map(|entry| {
                 let entry = entry.ok()?;
                 let path = entry.path();
@@ -491,7 +534,9 @@ impl MigrationGenerator {
                     None
                 }
             })
-            .collect())
+            .collect();
+
+        Ok(migrations)
     }
 
     #[must_use]
@@ -705,9 +750,12 @@ impl MigrationOperationGenerator {
             ),
         );
 
-        todo!();
-        // line below should be removed once todo is implemented
-        #[allow(unreachable_code)]
+        let op = DynOperation::RemoveField {
+            table_name: migration_model.model.table_name.clone(),
+            model_ty: migration_model.model.resolved_ty.clone(),
+            field: Box::new(migration_field.clone()),
+        };
+
         print_status_msg(
             StatusType::Removed,
             &format!(
@@ -715,6 +763,8 @@ impl MigrationOperationGenerator {
                 &migration_field.field_name, migration_model.model.name
             ),
         );
+
+        op
     }
 }
 
@@ -956,6 +1006,12 @@ impl GeneratedMigration {
                             because it doesn't create a new model"
                         )
                     }
+                    DynOperation::RemoveField { .. } => {
+                        unreachable!(
+                            "RemoveField operation shouldn't be a dependency of CreateModel \
+                        because it doesn't create a new model"
+                        )
+                    }
                     DynOperation::RemoveModel { .. } => {
                         unreachable!(
                             "RemoveModel operation shouldn't be a dependency of CreateModel \
@@ -989,6 +1045,10 @@ impl GeneratedMigration {
                 // AddField only links two already existing models together, so
                 // removing it shouldn't ever affect whether a graph is cyclic
                 unreachable!("AddField operation should never create cycles")
+            }
+            DynOperation::RemoveField { .. } => {
+                // RemoveField doesn't create dependencies, it only removes a field
+                unreachable!("RemoveField operation should never create cycles")
             }
             DynOperation::RemoveModel { .. } => {
                 // RemoveModel doesn't create dependencies, it only removes a model
@@ -1088,6 +1148,10 @@ impl GeneratedMigration {
                     }
 
                     ops
+                }
+                DynOperation::RemoveField { .. } => {
+                    // RemoveField Doesnt Add Foreign Keys
+                    Vec::new()
                 }
                 DynOperation::RemoveModel { .. } => {
                     // RemoveModel Doesnt Add Foreign Keys
@@ -1234,6 +1298,12 @@ pub enum DynOperation {
         // boxed to reduce the size difference between enum variants
         field: Box<Field>,
     },
+    RemoveField {
+        table_name: String,
+        model_ty: syn::Type,
+        // boxed to reduce size difference between enum variations
+        field: Box<Field>,
+    },
     RemoveModel {
         table_name: String,
         model_ty: syn::Type,
@@ -1277,6 +1347,17 @@ impl Repr for DynOperation {
                 let field = field.repr();
                 quote! {
                     ::cot::db::migrations::Operation::add_field()
+                        .table_name(::cot::db::Identifier::new(#table_name))
+                        .field(#field)
+                        .build()
+                }
+            }
+            Self::RemoveField {
+                table_name, field, ..
+            } => {
+                let field = field.repr();
+                quote! {
+                    ::cot::db::migrations::Operation::remove_field()
                         .table_name(::cot::db::Identifier::new(#table_name))
                         .field(#field)
                         .build()
@@ -1624,7 +1705,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "TestModel".to_string(),
                 resolved_ty: parse_quote!(TestModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "test_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1681,7 +1762,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "TestModel".to_string(),
                 resolved_ty: parse_quote!(TestModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "test_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1736,7 +1817,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "NewModel".to_string(),
                 resolved_ty: parse_quote!(NewModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "new_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1791,7 +1872,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1827,7 +1908,74 @@ mod tests {
             _ => panic!("Expected DynOperation::RemoveModel"),
         }
     }
+    #[test]
+    fn make_remove_field_operation() {
+        let migration_model = ModelInSource {
+            model_item: parse_quote! {
+                struct UserModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                    email: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("UserModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "UserModel".to_string(),
+                resolved_ty: parse_quote!(UserModel),
+                model_type: ModelType::default(),
+                table_name: "user_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![
+                    Field {
+                        field_name: format_ident!("name"),
+                        column_name: "name".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                    Field {
+                        field_name: format_ident!("email"),
+                        column_name: "email".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                ],
+            },
+        };
 
+        let field = &migration_model.model.fields[1];
+        let operation =
+            MigrationOperationGenerator::make_remove_field_operation(&migration_model, field);
+
+        match &operation {
+            DynOperation::RemoveField {
+                table_name,
+                model_ty,
+                field,
+            } => {
+                assert_eq!(table_name, "user_model");
+                assert_eq!(model_ty, &parse_quote!(UserModel));
+                assert_eq!(field.column_name, "email");
+                assert_eq!(field.ty, parse_quote!(String));
+            }
+            _ => panic!("Expected DynOperation::RemoveField"),
+        }
+    }
     #[test]
     fn generate_operations_with_removed_model() {
         let app_models = vec![];
@@ -1845,7 +1993,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1899,7 +2047,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1946,7 +2094,7 @@ mod tests {
                 vis: syn::Visibility::Inherited,
                 original_name: "UserModel".to_string(),
                 resolved_ty: parse_quote!(UserModel),
-                model_type: Default::default(),
+                model_type: ModelType::default(),
                 table_name: "user_model".to_string(),
                 pk_field: Field {
                     field_name: format_ident!("id"),
@@ -1985,7 +2133,147 @@ mod tests {
 
         assert!(has_add_field, "Expected an AddField operation for 'email'");
     }
+    #[test]
+    fn repr_for_remove_field_operation() {
+        let op = DynOperation::RemoveField {
+            table_name: "test_table".to_string(),
+            model_ty: parse_quote!(TestModel),
+            field: Box::new(Field {
+                field_name: format_ident!("test_field"),
+                column_name: "test_field".to_string(),
+                ty: parse_quote!(String),
+                auto_value: false,
+                primary_key: false,
+                unique: false,
+                foreign_key: None,
+            }),
+        };
 
+        let tokens = op.repr();
+        let tokens_str = tokens.to_string();
+
+        assert!(
+            tokens_str.contains("remove_field"),
+            "Should call remove_field() but got: {tokens_str}"
+        );
+        assert!(
+            tokens_str.contains("table_name"),
+            "Should call table_name() but got: {tokens_str}"
+        );
+        assert!(
+            tokens_str.contains("field"),
+            "Should call field() but got: {tokens_str}"
+        );
+        assert!(
+            tokens_str.contains("build"),
+            "Should call build() but got: {tokens_str}"
+        );
+    }
+    #[test]
+    fn generate_operations_with_removed_field() {
+        let app_model = ModelInSource {
+            model_item: parse_quote! {
+                struct UserModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("UserModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "UserModel".to_string(),
+                resolved_ty: parse_quote!(UserModel),
+                model_type: ModelType::default(),
+                table_name: "user_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![Field {
+                    field_name: format_ident!("name"),
+                    column_name: "name".to_string(),
+                    ty: parse_quote!(String),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: None,
+                }],
+            },
+        };
+
+        let migration_model = ModelInSource {
+            model_item: parse_quote! {
+                struct UserModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    name: String,
+                    email: String,
+                }
+            },
+            model: Model {
+                name: format_ident!("UserModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "UserModel".to_string(),
+                resolved_ty: parse_quote!(UserModel),
+                model_type: ModelType::default(),
+                table_name: "user_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![
+                    Field {
+                        field_name: format_ident!("name"),
+                        column_name: "name".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                    Field {
+                        field_name: format_ident!("email"),
+                        column_name: "email".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                ],
+            },
+        };
+
+        let app_models = vec![app_model.clone()];
+        let migration_models = vec![migration_model.clone()];
+
+        let (modified_models, operations) =
+            MigrationGenerator::generate_operations(&app_models, &migration_models);
+
+        assert_eq!(modified_models.len(), 1);
+        assert!(!operations.is_empty(), "Expected at least one operation");
+
+        let has_remove_field = operations.iter().any(|op| match op {
+            DynOperation::RemoveField { field, .. } => field.column_name == "email",
+            _ => false,
+        });
+
+        assert!(
+            has_remove_field,
+            "Expected a RemoveField operation for 'email'"
+        );
+    }
     #[test]
     fn get_migration_list() {
         let tempdir = tempfile::tempdir().unwrap();

@@ -1,0 +1,19 @@
+C-lib:
+  - changed-files:
+      - any-glob-to-any-file: ['cot/**']
+
+C-cli:
+  - changed-files:
+      - any-glob-to-any-file: ['cot-cli/**']
+
+C-macros:
+  - changed-files:
+      - any-glob-to-any-file: ['cot-macros/**']
+
+C-codegen:
+  - changed-files:
+      - any-glob-to-any-file: ['cot-codegen/**']
+
+A-ci:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/**']

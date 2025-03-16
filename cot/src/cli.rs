@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 pub use clap;
-use clap::{value_parser, Arg, ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command, value_parser};
 use derive_more::Debug;
 
 use crate::error::ErrorRepr;
@@ -292,7 +292,42 @@ impl CliTask for RunServer {
         };
 
         let bootstrapper = bootstrapper.boot().await?;
-        crate::run(bootstrapper, &addr_port).await
+
+        let result = crate::run(bootstrapper, &addr_port).await;
+        if let Err(error) = &result {
+            if let Some(user_friendly_error) = Self::get_user_friendly_error(error, &addr_port) {
+                eprintln!("{user_friendly_error}");
+            }
+        }
+
+        result
+    }
+}
+
+impl RunServer {
+    fn get_user_friendly_error(error: &Error, addr_port: &str) -> Option<String> {
+        match &error.inner {
+            ErrorRepr::StartServer { source } => match source.kind() {
+                std::io::ErrorKind::AddrInUse => {
+                    let exec = std::env::args()
+                        .next()
+                        .unwrap_or_else(|| "<server binary>".to_owned());
+
+                    Some(format!(
+                        "The address you are trying to start the server at ({addr_port}) is \
+                        already in use by a different program. You might want to use the \
+                        -l/--listen option to specify a different port to run the server at. \
+                        For example, to run the server at port 8888:\n\
+                        \n\
+                        {exec} -l 8888\n\
+                        cargo run -- -l 8888\n\
+                        bacon serve -- -- -l 8888"
+                    ))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
     }
 }
 
@@ -431,10 +466,11 @@ mod tests {
         cli.add_task(MyTask);
 
         assert!(cli.tasks.contains_key(&Some("my-task".to_owned())));
-        assert!(cli
-            .command
-            .get_subcommands()
-            .any(|sc| sc.get_name() == "my-task"));
+        assert!(
+            cli.command
+                .get_subcommands()
+                .any(|sc| sc.get_name() == "my-task")
+        );
     }
 
     #[test]
@@ -449,10 +485,6 @@ mod tests {
     #[cot::test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
     async fn collect_static_execute() {
-        let mut collect_static = CollectStatic;
-        let temp_dir = tempdir().unwrap();
-        let temp_path = temp_dir.path().join("static").clone();
-
         struct TestApp;
         impl App for TestApp {
             fn name(&self) -> &'static str {
@@ -464,16 +496,20 @@ mod tests {
             }
         }
 
-        let matches = CollectStatic
-            .subcommand()
-            .get_matches_from(vec!["test", temp_path.to_str().unwrap()]);
-
         struct TestProject;
         impl cot::Project for TestProject {
             fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
                 apps.register(TestApp);
             }
         }
+
+        let mut collect_static = CollectStatic;
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().join("static").clone();
+
+        let matches = CollectStatic
+            .subcommand()
+            .get_matches_from(vec!["test", temp_path.to_str().unwrap()]);
 
         let bootstrapper = Bootstrapper::new(TestProject).with_config(ProjectConfig::default());
         let result = collect_static.execute(&matches, bootstrapper).await;
@@ -503,7 +539,11 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[allow(clippy::future_not_send, clippy::await_holding_lock)]
     async fn test_check(config: &str) -> Result<()> {
+        struct TestProject;
+        impl cot::Project for TestProject {}
+
         let temp_dir = tempdir().unwrap();
         let config_path = temp_dir.path().join("config").clone();
         std::fs::create_dir_all(&config_path).unwrap();
@@ -512,14 +552,46 @@ mod tests {
         let mut check = Check;
         let matches = Check.subcommand().get_matches_from(Vec::<&str>::new());
 
-        struct TestProject;
-        impl cot::Project for TestProject {}
-
         // ensure the tests run sequentially when setting the current directory
         let _guard = serial_guard();
 
         std::env::set_current_dir(&temp_dir).unwrap();
         let bootstrapper = Bootstrapper::new(TestProject).with_config_name("test")?;
         check.execute(&matches, bootstrapper).await
+    }
+
+    #[test]
+    fn get_user_friendly_error_addr_in_use() {
+        let source = std::io::Error::new(std::io::ErrorKind::AddrInUse, "error");
+        let error = Error::new(ErrorRepr::StartServer { source });
+
+        let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
+
+        assert!(message.is_some());
+        let message = message.unwrap();
+        assert!(message.contains("1.2.3.4:8123"));
+        assert!(message.contains("is already in use"));
+    }
+
+    #[test]
+    fn get_user_friendly_error_io_error_other() {
+        let source = std::io::Error::other("error");
+        let error = Error::new(ErrorRepr::StartServer { source });
+
+        let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
+
+        assert!(message.is_none());
+    }
+
+    #[test]
+    fn get_user_friendly_error_unsupported_error() {
+        let error = Error::new(ErrorRepr::NoViewToReverse {
+            app_name: None,
+            view_name: "test".to_string(),
+        });
+
+        let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
+
+        assert!(message.is_none());
     }
 }

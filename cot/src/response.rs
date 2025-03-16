@@ -42,8 +42,8 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::StatusCode;
+    /// use cot::response::{Response, ResponseExt};
     ///
     /// let response = Response::builder()
     ///     .status(StatusCode::OK)
@@ -110,8 +110,8 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::StatusCode;
+    /// use cot::response::{Response, ResponseExt};
     ///
     /// let response = Response::new_redirect("http://example.com");
     /// ```

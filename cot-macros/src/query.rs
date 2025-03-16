@@ -1,8 +1,8 @@
 use cot_codegen::expr::Expr;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::parse::{Parse, ParseStream};
 use syn::Token;
+use syn::parse::{Parse, ParseStream};
 
 use crate::cot_ident;
 

@@ -862,6 +862,10 @@ impl AuthRequestExt for Request {
     }
 
     async fn login(&mut self, user: Box<dyn User + Send + Sync + 'static>) -> Result<()> {
+        // Mitigate the session fixation attack by changing the session ID:
+        // https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#renew-the-session-id-after-any-privilege-level-change
+        self.session().cycle_id().await?;
+
         let user = UserExtension::from(user);
         if let Some(user_id) = user.id() {
             self.session_mut()
@@ -880,10 +884,7 @@ impl AuthRequestExt for Request {
     }
 
     async fn logout(&mut self) -> Result<()> {
-        self.session_mut().remove_value(USER_ID_SESSION_KEY).await?;
-        self.session_mut()
-            .remove_value(SESSION_HASH_SESSION_KEY)
-            .await?;
+        self.session().flush().await?;
         self.extensions_mut()
             .insert::<UserExtension>(Arc::new(AnonymousUser()));
 
@@ -1259,10 +1260,45 @@ mod tests {
         request.login(Box::new(mock_user)).await.unwrap();
         let user = request.user().await.unwrap();
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
+        assert!(!request.session().is_empty().await);
 
         request.logout().await.unwrap();
         let user = request.user().await.unwrap();
         assert!(user.username().is_none());
+
+        assert!(request.session().is_empty().await);
+    }
+
+    /// Test the session fixation attack mitigation
+    #[cot::test]
+    async fn login_cycle_id() {
+        let mut request = test_request(MockUser::new);
+
+        let mut mock_user = MockUser::new();
+        mock_user.expect_id().return_const(UserId::Int(1));
+        mock_user.expect_session_auth_hash().return_const(None);
+        mock_user
+            .expect_username()
+            .return_const(Some(Cow::from("mockuser_1")));
+        request.login(Box::new(mock_user)).await.unwrap();
+
+        request.session().save().await.unwrap();
+        let id_1 = request.session().id();
+        assert!(id_1.is_some());
+
+        let mut mock_user = MockUser::new();
+        mock_user.expect_id().return_const(UserId::Int(2));
+        mock_user.expect_session_auth_hash().return_const(None);
+        mock_user
+            .expect_username()
+            .return_const(Some(Cow::from("mockuser_2")));
+        request.login(Box::new(mock_user)).await.unwrap();
+
+        request.session().save().await.unwrap();
+        let id_2 = request.session().id();
+
+        assert!(id_2.is_some());
+        assert!(id_1 != id_2);
     }
 
     /// Test that the user is logged out when there is an invalid user ID in the

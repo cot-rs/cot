@@ -6,5 +6,5 @@ description = "TODO Admin App - Cot example."
 edition = "2021"
 
 [dependencies]
-cot = { path = "../../cot" }
+cot = { path = "../../cot", features = ["full"]}
 rinja = "0.3.5"

@@ -3,7 +3,7 @@ name = "example-todo-app"
 version = "0.1.0"
 publish = false
 description = "TODO Admin App - Cot example."
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 cot = { path = "../../cot", features = ["full"]}

@@ -3,7 +3,7 @@ name = "example-hello-world"
 version = "0.1.0"
 publish = false
 description = "Hello World - Cot example."
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 cot = { path = "../../cot" }

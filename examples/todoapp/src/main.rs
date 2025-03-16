@@ -7,7 +7,7 @@ use cot::admin::{AdminApp, AdminModel, AdminModelManager, DefaultAdminModelManag
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{model, query, Auto, Model};
+use cot::db::{Auto, Model, model, query};
 use cot::form::Form;
 use cot::middleware::{LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{RootHandlerBuilder, WithApps, WithConfig};
@@ -16,7 +16,7 @@ use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{
-    reverse_redirect, App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode,
+    App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode, reverse_redirect,
 };
 use rinja::Template;
 

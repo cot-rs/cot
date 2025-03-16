@@ -4,7 +4,7 @@ use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::config::{DatabaseConfig, ProjectConfig};
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{model, query, Auto, Model};
+use cot::db::{Auto, Model, model, query};
 use cot::form::Form;
 use cot::project::{WithApps, WithConfig};
 use cot::request::{Request, RequestExt};
@@ -12,7 +12,7 @@ use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{
-    reverse_redirect, App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode,
+    App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode, reverse_redirect,
 };
 use rinja::Template;
 

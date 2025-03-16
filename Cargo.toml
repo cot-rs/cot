@@ -7,6 +7,7 @@ members = [
     # Examples
     "examples/hello-world",
     "examples/todo-list",
+    "examples/todoapp",
     "examples/sessions",
     "examples/admin",
     "examples/json",

@@ -837,6 +837,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-todo-app"
+version = "0.1.0"
+dependencies = [
+ "cot",
+ "rinja",
+]
+
+[[package]]
 name = "example-todo-list"
 version = "0.1.0"
 dependencies = [

@@ -7,7 +7,7 @@ use cot::admin::{AdminApp, AdminModel, AdminModelManager, DefaultAdminModelManag
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{model, query, Auto, Model};
+use cot::db::{Auto, Model, model, query};
 use cot::form::Form;
 use cot::middleware::{LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{RootHandlerBuilder, WithApps, WithConfig};
@@ -16,7 +16,7 @@ use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{
-    reverse_redirect, App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode,
+    App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode, reverse_redirect,
 };
 use rinja::Template;
 
@@ -59,21 +59,6 @@ async fn index(mut request: Request) -> cot::Result<Response> {
 struct TodoForm {
     #[form(opt(max_length = 100))]
     title: String,
-}
-
-impl TodoForm {
-    fn xd(&self) {
-        use cot as kcrate_ident;
-        {
-            {
-                let xd = ::std::boxed::Box::new(
-                    <
-                        <Self as kcrate_ident::form::Form>::Context as kcrate_ident::form::FormContext>
-                        ::new()
-                );
-            }
-        }
-    }
 }
 
 async fn add_todo(mut request: Request) -> cot::Result<Response> {

@@ -61,21 +61,6 @@ struct TodoForm {
     title: String,
 }
 
-impl TodoForm {
-    fn xd(&self) {
-        use cot as kcrate_ident;
-        {
-            {
-                let xd = ::std::boxed::Box::new(
-                    <
-                        <Self as kcrate_ident::form::Form>::Context as kcrate_ident::form::FormContext>
-                        ::new()
-                );
-            }
-        }
-    }
-}
-
 async fn add_todo(mut request: Request) -> cot::Result<Response> {
     let todo_form = TodoForm::from_request(&mut request).await?.unwrap();
 

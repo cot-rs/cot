@@ -1,6 +1,6 @@
 [workspace]
 git_release_enable = false
-
+changelog_update = false
 git_release_body = """
 {{ changelog }}
 {% if remote.contributors %}
@@ -11,14 +11,31 @@ git_release_body = """
 {% endif %}
 """
 
-[[package]]
-name = "cot"  # name of the package to configure
-# include commits from internal crates in the changelog
-changelog_include = ["cot-codegen", "cot-macros"]
-# set the path of the changelog to the root of the repository
-changelog_path = "./CHANGELOG.md"
-git_release_enable = true  # create GitHub release
+[changelog]
+protect_breaking_commits = true
+commit_parsers = [
+    { message = "^.*\\(security\\)", group = "<!-- 0 -->Security", scope = "" },
+    { message = "^feat", group = "<!-- 1 -->New features" },
+    { message = "^fix", group = "<!-- 2 -->Fixes" },
+    { message = "^.*", group = "<!-- 3 -->Other" },
+]
+commit_preprocessors = [
+    # Replace multiple spaces with a single space.
+    { pattern = "  +", replace = " " },
+    # Replace the issue/PR number with the link. It will work for PRs as well as GitHub has a redirect.
+    { pattern = "\\(#([0-9]+)\\)", replace = "([#${1}](https://github.com/cot-rs/cot/pull/${1}))" },
+    # Hyperlink bare commit hashes like "abcd1234" in commit logs, with short commit hash as description.
+    { pattern = "([ \\n])(([a-f0-9]{7})[a-f0-9]*)", replace = "${1}commit [${3}](https://github.com/cot-rs/cot/commit/${2})" }
+]
 
 [[package]]
-name = "cot-cli"  # name of the package to configure
-git_release_enable = true  # create GitHub release
+name = "cot"
+changelog_update = true
+changelog_include = ["cot-codegen", "cot-macros"]
+changelog_path = "./CHANGELOG.md"
+git_release_enable = true
+
+[[package]]
+name = "cot-cli"
+changelog_update = true
+git_release_enable = true

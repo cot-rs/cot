@@ -2,7 +2,8 @@
 //! #Examples
 //! To send an email using the `EmailBackend`, you need to create an instance of `SmtpConfig`
 //! ```
-//! fn send_example() -> Result<()> {
+//! use cot::email::{EmailBackend, EmailMessage, SmtpConfig, EmailError};
+//! fn send_example() -> Result<(), EmailError> {
 //!     let email = EmailMessage {
 //!         subject: "Test Email".to_string(),
 //!         body: "This is a test email sent from Rust.".to_string(),

@@ -1690,14 +1690,13 @@ mod tests {
         }));
     }
 
-    #[test]
-    fn make_add_field_operation() {
-        let app_model = ModelInSource {
+    fn get_test_model() -> ModelInSource {
+        ModelInSource {
             model_item: parse_quote! {
                 struct TestModel {
                     #[model(primary_key)]
                     id: i32,
-                    field1: i32,
+                    field1: String,
                 }
             },
             model: Model {
@@ -1716,10 +1715,71 @@ mod tests {
                     unique: false,
                     foreign_key: None,
                 },
-                fields: vec![],
+                fields: vec![Field {
+                    field_name: format_ident!("field1"),
+                    column_name: "field1".to_string(),
+                    ty: parse_quote!(String),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: None,
+                }],
             },
-        };
+        }
+    }
+    fn get_bigger_test_model() -> ModelInSource {
+        ModelInSource {
+            model_item: parse_quote! {
+                struct TestModel {
+                    #[model(primary_key)]
+                    id: i32,
+                    field1: String,
+                    field2: f32,
+                }
+            },
+            model: Model {
+                name: format_ident!("TestModel"),
+                vis: syn::Visibility::Inherited,
+                original_name: "TestModel".to_string(),
+                resolved_ty: parse_quote!(TestModel),
+                model_type: ModelType::default(),
+                table_name: "test_model".to_string(),
+                pk_field: Field {
+                    field_name: format_ident!("id"),
+                    column_name: "id".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: true,
+                    primary_key: true,
+                    unique: false,
+                    foreign_key: None,
+                },
+                fields: vec![
+                    Field {
+                        field_name: format_ident!("field1"),
+                        column_name: "field1".to_string(),
+                        ty: parse_quote!(String),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                    Field {
+                        field_name: format_ident!("field2"),
+                        column_name: "field2".to_string(),
+                        ty: parse_quote!(f32),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: None,
+                    },
+                ],
+            },
+        }
+    }
 
+    #[test]
+    fn make_add_field_operation() {
+        let app_model = get_test_model();
         let field = Field {
             field_name: format_ident!("new_field"),
             column_name: "new_field".to_string(),
@@ -1749,42 +1809,7 @@ mod tests {
 
     #[test]
     fn make_create_model_operation() {
-        let app_model = ModelInSource {
-            model_item: parse_quote! {
-                struct TestModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    field1: i32,
-                }
-            },
-            model: Model {
-                name: format_ident!("TestModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "TestModel".to_string(),
-                resolved_ty: parse_quote!(TestModel),
-                model_type: ModelType::default(),
-                table_name: "test_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![Field {
-                    field_name: format_ident!("field1"),
-                    column_name: "field1".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: false,
-                    primary_key: false,
-                    unique: false,
-                    foreign_key: None,
-                }],
-            },
-        };
-
+        let app_model = get_test_model();
         let operation = MigrationOperationGenerator::make_create_model_operation(&app_model);
 
         match operation {
@@ -1804,42 +1829,7 @@ mod tests {
 
     #[test]
     fn generate_operations_with_new_model() {
-        let app_model = ModelInSource {
-            model_item: parse_quote! {
-                struct NewModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    name: String,
-                }
-            },
-            model: Model {
-                name: format_ident!("NewModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "NewModel".to_string(),
-                resolved_ty: parse_quote!(NewModel),
-                model_type: ModelType::default(),
-                table_name: "new_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![Field {
-                    field_name: format_ident!("name"),
-                    column_name: "name".to_string(),
-                    ty: parse_quote!(String),
-                    auto_value: false,
-                    primary_key: false,
-                    unique: false,
-                    foreign_key: None,
-                }],
-            },
-        };
-
+        let app_model = get_test_model();
         let app_models = vec![app_model.clone()];
         let migration_models = vec![];
 
@@ -1851,7 +1841,7 @@ mod tests {
 
         match &operations[0] {
             DynOperation::CreateModel { table_name, .. } => {
-                assert_eq!(table_name, "new_model");
+                assert_eq!(table_name, "test_model");
             }
             _ => panic!("Expected CreateModel operation"),
         }
@@ -1859,106 +1849,24 @@ mod tests {
 
     #[test]
     fn make_remove_model_operation() {
-        let migration_model = ModelInSource {
-            model_item: parse_quote! {
-                struct UserModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    name: String,
-                }
-            },
-            model: Model {
-                name: format_ident!("UserModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "UserModel".to_string(),
-                resolved_ty: parse_quote!(UserModel),
-                model_type: ModelType::default(),
-                table_name: "user_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![Field {
-                    field_name: format_ident!("name"),
-                    column_name: "name".to_string(),
-                    ty: parse_quote!(String),
-                    auto_value: false,
-                    primary_key: false,
-                    unique: false,
-                    foreign_key: None,
-                }],
-            },
-        };
-
+        let migration_model = get_test_model();
         let operation = MigrationOperationGenerator::make_remove_model_operation(&migration_model);
 
         match &operation {
             DynOperation::RemoveModel {
                 table_name, fields, ..
             } => {
-                assert_eq!(table_name, "user_model");
+                assert_eq!(table_name, "test_model");
                 assert_eq!(fields.len(), 1);
-                assert_eq!(fields[0].column_name, "name");
+                assert_eq!(fields[0].column_name, "field1");
             }
             _ => panic!("Expected DynOperation::RemoveModel"),
         }
     }
     #[test]
     fn make_remove_field_operation() {
-        let migration_model = ModelInSource {
-            model_item: parse_quote! {
-                struct UserModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    name: String,
-                    email: String,
-                }
-            },
-            model: Model {
-                name: format_ident!("UserModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "UserModel".to_string(),
-                resolved_ty: parse_quote!(UserModel),
-                model_type: ModelType::default(),
-                table_name: "user_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![
-                    Field {
-                        field_name: format_ident!("name"),
-                        column_name: "name".to_string(),
-                        ty: parse_quote!(String),
-                        auto_value: false,
-                        primary_key: false,
-                        unique: false,
-                        foreign_key: None,
-                    },
-                    Field {
-                        field_name: format_ident!("email"),
-                        column_name: "email".to_string(),
-                        ty: parse_quote!(String),
-                        auto_value: false,
-                        primary_key: false,
-                        unique: false,
-                        foreign_key: None,
-                    },
-                ],
-            },
-        };
-
-        let field = &migration_model.model.fields[1];
+        let migration_model = get_test_model();
+        let field = &migration_model.model.fields[0];
         let operation =
             MigrationOperationGenerator::make_remove_field_operation(&migration_model, field);
 
@@ -1968,9 +1876,9 @@ mod tests {
                 model_ty,
                 field,
             } => {
-                assert_eq!(table_name, "user_model");
-                assert_eq!(model_ty, &parse_quote!(UserModel));
-                assert_eq!(field.column_name, "email");
+                assert_eq!(table_name, "test_model");
+                assert_eq!(model_ty, &parse_quote!(TestModel));
+                assert_eq!(field.column_name, "field1");
                 assert_eq!(field.ty, parse_quote!(String));
             }
             _ => panic!("Expected DynOperation::RemoveField"),
@@ -1979,43 +1887,7 @@ mod tests {
     #[test]
     fn generate_operations_with_removed_model() {
         let app_models = vec![];
-
-        let migration_model = ModelInSource {
-            model_item: parse_quote! {
-                struct UserModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    name: String,
-                }
-            },
-            model: Model {
-                name: format_ident!("UserModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "UserModel".to_string(),
-                resolved_ty: parse_quote!(UserModel),
-                model_type: ModelType::default(),
-                table_name: "user_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![Field {
-                    field_name: format_ident!("name"),
-                    column_name: "name".to_string(),
-                    ty: parse_quote!(String),
-                    auto_value: false,
-                    primary_key: false,
-                    unique: false,
-                    foreign_key: None,
-                }],
-            },
-        };
-
+        let migration_model = get_test_model();
         let migration_models = vec![migration_model.clone()];
 
         let (_modified_models, operations) =
@@ -2025,7 +1897,7 @@ mod tests {
 
         match &operations[0] {
             DynOperation::RemoveModel { table_name, .. } => {
-                assert_eq!(table_name, "user_model");
+                assert_eq!(table_name, "test_model");
             }
             _ => panic!("Expected DynOperation::RemoveModel"),
         }
@@ -2033,89 +1905,8 @@ mod tests {
 
     #[test]
     fn generate_operations_with_modified_model() {
-        let app_model = ModelInSource {
-            model_item: parse_quote! {
-                struct UserModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    name: String,
-                    email: String,
-                }
-            },
-            model: Model {
-                name: format_ident!("UserModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "UserModel".to_string(),
-                resolved_ty: parse_quote!(UserModel),
-                model_type: ModelType::default(),
-                table_name: "user_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![
-                    Field {
-                        field_name: format_ident!("name"),
-                        column_name: "name".to_string(),
-                        ty: parse_quote!(String),
-                        auto_value: false,
-                        primary_key: false,
-                        unique: false,
-                        foreign_key: None,
-                    },
-                    Field {
-                        field_name: format_ident!("email"),
-                        column_name: "email".to_string(),
-                        ty: parse_quote!(String),
-                        auto_value: false,
-                        primary_key: false,
-                        unique: false,
-                        foreign_key: None,
-                    },
-                ],
-            },
-        };
-
-        let migration_model = ModelInSource {
-            model_item: parse_quote! {
-                struct UserModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    name: String,
-                }
-            },
-            model: Model {
-                name: format_ident!("UserModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "UserModel".to_string(),
-                resolved_ty: parse_quote!(UserModel),
-                model_type: ModelType::default(),
-                table_name: "user_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![Field {
-                    field_name: format_ident!("name"),
-                    column_name: "name".to_string(),
-                    ty: parse_quote!(String),
-                    auto_value: false,
-                    primary_key: false,
-                    unique: false,
-                    foreign_key: None,
-                }],
-            },
-        };
+        let app_model = get_bigger_test_model();
+        let migration_model = get_test_model();
 
         let app_models = vec![app_model.clone()];
         let migration_models = vec![migration_model.clone()];
@@ -2127,11 +1918,11 @@ mod tests {
         assert!(!operations.is_empty(), "Expected at least one operation");
 
         let has_add_field = operations.iter().any(|op| match op {
-            DynOperation::AddField { field, .. } => field.column_name == "email",
+            DynOperation::AddField { field, .. } => field.column_name == "field2",
             _ => false,
         });
 
-        assert!(has_add_field, "Expected an AddField operation for 'email'");
+        assert!(has_add_field, "Expected an AddField operation for 'field2'");
     }
     #[test]
     fn repr_for_remove_field_operation() {
@@ -2171,89 +1962,8 @@ mod tests {
     }
     #[test]
     fn generate_operations_with_removed_field() {
-        let app_model = ModelInSource {
-            model_item: parse_quote! {
-                struct UserModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    name: String,
-                }
-            },
-            model: Model {
-                name: format_ident!("UserModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "UserModel".to_string(),
-                resolved_ty: parse_quote!(UserModel),
-                model_type: ModelType::default(),
-                table_name: "user_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![Field {
-                    field_name: format_ident!("name"),
-                    column_name: "name".to_string(),
-                    ty: parse_quote!(String),
-                    auto_value: false,
-                    primary_key: false,
-                    unique: false,
-                    foreign_key: None,
-                }],
-            },
-        };
-
-        let migration_model = ModelInSource {
-            model_item: parse_quote! {
-                struct UserModel {
-                    #[model(primary_key)]
-                    id: i32,
-                    name: String,
-                    email: String,
-                }
-            },
-            model: Model {
-                name: format_ident!("UserModel"),
-                vis: syn::Visibility::Inherited,
-                original_name: "UserModel".to_string(),
-                resolved_ty: parse_quote!(UserModel),
-                model_type: ModelType::default(),
-                table_name: "user_model".to_string(),
-                pk_field: Field {
-                    field_name: format_ident!("id"),
-                    column_name: "id".to_string(),
-                    ty: parse_quote!(i32),
-                    auto_value: true,
-                    primary_key: true,
-                    unique: false,
-                    foreign_key: None,
-                },
-                fields: vec![
-                    Field {
-                        field_name: format_ident!("name"),
-                        column_name: "name".to_string(),
-                        ty: parse_quote!(String),
-                        auto_value: false,
-                        primary_key: false,
-                        unique: false,
-                        foreign_key: None,
-                    },
-                    Field {
-                        field_name: format_ident!("email"),
-                        column_name: "email".to_string(),
-                        ty: parse_quote!(String),
-                        auto_value: false,
-                        primary_key: false,
-                        unique: false,
-                        foreign_key: None,
-                    },
-                ],
-            },
-        };
+        let app_model = get_test_model();
+        let migration_model = get_bigger_test_model();
 
         let app_models = vec![app_model.clone()];
         let migration_models = vec![migration_model.clone()];
@@ -2265,13 +1975,13 @@ mod tests {
         assert!(!operations.is_empty(), "Expected at least one operation");
 
         let has_remove_field = operations.iter().any(|op| match op {
-            DynOperation::RemoveField { field, .. } => field.column_name == "email",
+            DynOperation::RemoveField { field, .. } => field.column_name == "field2",
             _ => false,
         });
 
         assert!(
             has_remove_field,
-            "Expected a RemoveField operation for 'email'"
+            "Expected a RemoveField operation for 'field2'"
         );
     }
     #[test]

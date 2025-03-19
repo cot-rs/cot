@@ -6,33 +6,25 @@
 //!     let email = EmailMessage {
 //!         subject: "Test Email".to_string(),
 //!         body: "This is a test email sent from Rust.".to_string(),
-//!         from_email: "from@example.com".to_string(),
-//!         to: vec!["to@example.com".to_string()],
-//!         cc: Some(vec!["cc@example.com".to_string()]),
-//!         bcc: Some(vec!["bcc@example.com".to_string()]),
-//!         reply_to: vec!["replyto@example.com".to_string()],
+//!         from_email: "from@cotexample.com".to_string(),
+//!         to: vec!["to@cotexample.com".to_string()],
+//!         cc: Some(vec!["cc@cotexample.com".to_string()]),
+//!         bcc: Some(vec!["bcc@cotexample.com".to_string()]),
+//!         reply_to: vec!["replyto@cotexample.com".to_string()],
 //!         alternatives: vec![
 //!             ("This is a test email sent from Rust as HTML.".to_string(), "text/html".to_string())
 //!         ],
 //!     };
-//!     let config = SmtpConfig {
-//!         host: "smtp.example.com".to_string(),
-//!         port: 587,
-//!         username: Some("user@example.com".to_string()),
-//!         password: Some("password".to_string()),
-//!         use_tls: true,
-//!         fail_silently: false,
-//!         ..Default::default()
-//!     };
+//!     let config = SmtpConfig::default();
 //!     let mut backend = EmailBackend::new(config);
 //!     backend.send_message(&email)?;
 //!     Ok(())
 //! }
 //! ```
 //!
+use std::fmt;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
-use std::fmt;
 
 use lettre::{
     message::{header, Message, MultiPart, SinglePart},
@@ -71,18 +63,10 @@ pub struct SmtpConfig {
     pub username: Option<String>,
     /// The password for SMTP authentication.
     pub password: Option<String>,
-    /// Whether to use TLS for the SMTP connection.
-    pub use_tls: bool,
     /// Whether to fail silently on errors.
     pub fail_silently: bool,
     /// The timeout duration for the SMTP connection.
     pub timeout: Duration,
-    /// Whether to use SSL for the SMTP connection.
-    pub use_ssl: bool,
-    /// The path to the SSL certificate file.
-    pub ssl_certfile: Option<String>,
-    /// The path to the SSL key file.
-    pub ssl_keyfile: Option<String>,
 }
 
 impl Default for SmtpConfig {
@@ -92,13 +76,8 @@ impl Default for SmtpConfig {
             port: 25,
             username: None,
             password: None,
-            use_tls: false,
             fail_silently: false,
             timeout: Duration::from_secs(60),
-            use_ssl: false,
-            ssl_certfile: None,
-            ssl_keyfile: None,
-            //  debug: false,
         }
     }
 }
@@ -122,17 +101,6 @@ pub struct EmailMessage {
     pub reply_to: Vec<String>,
     /// The alternative parts of the email (e.g., plain text and HTML versions).
     pub alternatives: Vec<(String, String)>, // (content, mimetype)
-}
-
-/// Represents an email attachment
-#[derive(Debug, Clone)]
-pub struct EmailAttachment {
-    /// The filename of the attachment.
-    pub filename: String,
-    /// The content of the attachment.
-    pub content: Vec<u8>,
-    /// The MIME type of the attachment.
-    pub mimetype: String,
 }
 
 /// SMTP Backend for sending emails
@@ -166,6 +134,7 @@ impl fmt::Display for EmailMessage {
         Ok(())
     }
 }
+
 impl EmailBackend {
     #[must_use]
     /// Creates a new instance of `EmailBackend` with the given configuration.
@@ -192,10 +161,19 @@ impl EmailBackend {
     ///
     /// This function will panic if the transport is not properly initialized.
     pub fn open(&mut self) -> Result<()> {
-        if self.transport.as_ref().unwrap().test_connection().is_ok() {
+        // Test if self.transport is None or if the connection is not working
+        if self.transport.is_some() && self.transport.as_ref().unwrap().test_connection().is_ok() {
             return Ok(());
         }
-
+        if self.config.host.is_empty() {
+            return Err(EmailError::ConfigurationError(
+                "SMTP host is required".to_string(),
+            ));
+        } else if self.config.port == 0 {
+            return Err(EmailError::ConfigurationError(
+                "SMTP port is required".to_string(),
+            ));
+        }
         let _socket_addr = format!("{}:{}", self.config.host, self.config.port)
             .to_socket_addrs()
             .map_err(|e| EmailError::ConnectionError(e.to_string()))?
@@ -214,25 +192,14 @@ impl EmailBackend {
             transport_builder = transport_builder.credentials(credentials);
         }
 
-        // Configure TLS/SSL
-        if self.config.use_tls {
-            let tls_parameters =
-                lettre::transport::smtp::client::TlsParameters::new(self.config.host.clone())
-                    .map_err(|e| EmailError::ConfigurationError(e.to_string()))?;
-            transport_builder = transport_builder.tls(
-                lettre::transport::smtp::client::Tls::Required(tls_parameters),
-            );
-        }
-
-        // Build the transport
-        self.transport = Some(transport_builder.build());
-
         // Connect to the SMTP server
-        if self.transport.as_ref().unwrap().test_connection().is_ok() {
-            Err(EmailError::ConnectionError(
+        let transport = transport_builder.build();
+        if transport.test_connection().is_err() {
+            return Err(EmailError::ConnectionError(
                 "Failed to connect to SMTP server".to_string(),
-            ))?;
+            ));
         }
+        self.transport = Some(transport);
         Ok(())
     }
 
@@ -344,11 +311,11 @@ impl EmailBackend {
             .multipart(email_body)
             .map_err(|e| EmailError::MessageError(e.to_string()))?;
 
-        // Send the email
         let mailer = SmtpTransport::builder_dangerous(&self.config.host)
             .port(self.config.port)
             .build();
 
+        // Send the email
         mailer
             .send(&email)
             .map_err(|e| EmailError::SendError(e.to_string()))?;
@@ -381,28 +348,15 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use mockall::predicate::*;
-    use mockall::*;
-
-    // Mock the SMTP transport for testing
-    mock! {
-        SmtpTransport {
-            fn send(&self, email: &Message) -> std::result::Result<(), lettre::transport::smtp::Error>;
-        }
-    }
 
     #[test]
     fn test_send_email() {
-        // Create a mock SMTP transport
-        let mut mock_transport = MockSmtpTransport::new();
-        mock_transport.expect_send().returning(|_| Ok(()));
-
         // Create a test email
         let email = EmailMessage {
             subject: "Test Email".to_string(),
             body: "This is a test email sent from Rust.".to_string(),
-            from_email: "from@example.com".to_string(),
-            to: vec!["to@example.com".to_string()],
+            from_email: "from@cotexample.com".to_string(),
+            to: vec!["to@cotexample.com".to_string()],
             cc: Some(vec![]),
             bcc: Some(vec![]),
             reply_to: vec![],
@@ -414,11 +368,10 @@ mod tests {
 
         // Test with a simple configuration
         let _config = SmtpConfig {
-            host: "smtp.example.com".to_string(),
+            host: "smtp.cotexample.com".to_string(),
             port: 587,
-            username: Some("user@example.com".to_string()),
+            username: Some("user@cotexample.com".to_string()),
             password: Some("password".to_string()),
-            use_tls: true,
             fail_silently: false,
             ..Default::default()
         };
@@ -429,7 +382,7 @@ mod tests {
 
         // Assert that the email structure is correct
         assert_eq!(email.subject, "Test Email");
-        assert_eq!(email.to, vec!["to@example.com"]);
+        assert_eq!(email.to, vec!["to@cotexample.com"]);
         assert_eq!(email.alternatives.len(), 1);
 
         // In a real test, we'd also verify that the backend behaves correctly
@@ -443,8 +396,8 @@ mod tests {
             EmailMessage {
                 subject: "Test Email 1".to_string(),
                 body: "This is test email 1.".to_string(),
-                from_email: "from@example.com".to_string(),
-                to: vec!["to1@example.com".to_string()],
+                from_email: "from@cotexample.com".to_string(),
+                to: vec!["to1@cotexample.com".to_string()],
                 cc: Some(vec![]),
                 bcc: Some(vec![]),
                 reply_to: vec![],
@@ -453,8 +406,8 @@ mod tests {
             EmailMessage {
                 subject: "Test Email 2".to_string(),
                 body: "This is test email 2.".to_string(),
-                from_email: "from@example.com".to_string(),
-                to: vec!["to2@example.com".to_string()],
+                from_email: "from@cotexample.com".to_string(),
+                to: vec!["to2@cotexample.com".to_string()],
                 cc: Some(vec![]),
                 bcc: Some(vec![]),
                 reply_to: vec![],
@@ -464,7 +417,7 @@ mod tests {
 
         // Test with fail_silently = true
         let _config = SmtpConfig {
-            host: "smtp.example.com".to_string(),
+            host: "smtp.cotexample.com".to_string(),
             port: 587,
             fail_silently: true,
             ..Default::default()
@@ -487,12 +440,8 @@ mod tests {
         assert_eq!(config.port, 25);
         assert_eq!(config.username, None);
         assert_eq!(config.password, None);
-        assert!(!config.use_tls);
         assert!(!config.fail_silently);
         assert_eq!(config.timeout, Duration::from_secs(60));
-        assert!(!config.use_ssl);
-        assert_eq!(config.ssl_certfile, None);
-        assert_eq!(config.ssl_keyfile, None);
     }
 
     #[test]
@@ -501,11 +450,11 @@ mod tests {
         let email = EmailMessage {
             subject: "Test Email".to_string(),
             body: "This is a test email sent from Rust.".to_string(),
-            from_email: "from@example.com".to_string(),
-            to: vec!["to@example.com".to_string()],
-            cc: Some(vec!["cc@example.com".to_string()]),
-            bcc: Some(vec!["bcc@example.com".to_string()]),
-            reply_to: vec!["replyto@example.com".to_string()],
+            from_email: "from@cotexample.com".to_string(),
+            to: vec!["to@cotexample.com".to_string()],
+            cc: Some(vec!["cc@cotexample.com".to_string()]),
+            bcc: Some(vec!["bcc@cotexample.com".to_string()]),
+            reply_to: vec!["replyto@cotexample.com".to_string()],
             alternatives: vec![(
                 "This is a test email sent from Rust as HTML.".to_string(),
                 "text/html".to_string(),
@@ -528,14 +477,74 @@ mod tests {
         //println!("{output}");
         // Check that the output contains the expected email details
         assert!(!output.contains("Subject: Test Email"));
-        assert!(!output.contains("From: from@example.com"));
-        assert!(!output.contains("To: [\"to@example.com\"]"));
-        assert!(!output.contains("CC: [\"cc@example.com\"]"));
-        assert!(!output.contains("BCC: [\"bcc@example.com\"]"));
-        assert!(!output.contains("Reply-To: [\"replyto@example.com\"]"));
+        assert!(!output.contains("From: from@cotexample.com"));
+        assert!(!output.contains("To: [\"to@cotexample.com\"]"));
+        assert!(!output.contains("CC: [\"cc@cotexample.com\"]"));
+        assert!(!output.contains("BCC: [\"bcc@cotexample.com\"]"));
+        assert!(!output.contains("Reply-To: [\"replyto@cotexample.com\"]"));
         assert!(!output.contains("Body: This is a test email sent from Rust."));
         assert!(!output.contains(
             "Alternative part (text/html): This is a test email sent from Rust as HTML."
         ));
+    }
+    #[test]
+    fn test_open_connection() {
+        let config = SmtpConfig {
+            host: "invalid-host".to_string(),
+            port: 587,
+            username: Some("user@cotexample.com".to_string()),
+            password: Some("password".to_string()),
+            ..Default::default()
+        };
+
+        let result = EmailBackend::new(config).open();
+        assert!(matches!(result, Err(EmailError::ConnectionError(_))));
+    }
+
+    #[test]
+    fn test_configuration_error() {
+        let config = SmtpConfig {
+            host: "localhost".to_string(),
+            port: 0,
+            username: Some("user@cotexample.com".to_string()),
+            password: Some("password".to_string()),
+            ..Default::default()
+        };
+
+        let result = EmailBackend::new(config).open();
+        assert!(matches!(result, Err(EmailError::ConfigurationError(_))));
+    }
+    // An integration test to send an email to localhost using the default configuration.
+    // TODO: Overcome compilation errors due to async_smtp
+    // use cot::email::{EmailBackend, EmailMessage, SmtpConfig};
+    // use async_smtp::smtp::server::MockServer;
+    #[test]
+    #[ignore]
+    fn test_send_email_localhsot() {
+        // Create a test email
+        let email = EmailMessage {
+            subject: "Test Email".to_string(),
+            body: "This is a test email sent from Rust.".to_string(),
+            from_email: "from@cotexample.com".to_string(),
+            to: vec!["to@cotexample.com".to_string()],
+            cc: Some(vec!["cc@cotexample.com".to_string()]),
+            bcc: Some(vec!["bcc@cotexample.com".to_string()]),
+            reply_to: vec!["replyto@cotexample.com".to_string()],
+            alternatives: vec![(
+                "This is a test email sent from Rust as HTML.".to_string(),
+                "text/html".to_string(),
+            )],
+        };
+        // Get the port it's running on
+        let port = 1025; //Mailhog default smtp port
+        // Create a new email backend
+        let config = SmtpConfig {
+            host: "localhost".to_string(),
+            port,
+            ..Default::default()
+        };
+        let mut backend = EmailBackend::new(config);
+        let _ = backend.open();
+        let _ = backend.send_message(&email);
     }
 }

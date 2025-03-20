@@ -90,12 +90,19 @@ struct CotSourceArgs {
 #[derive(Debug, Subcommand)]
 enum CliCommands {
     Manpages(ManpagesArgs),
+    Completions(CompletionsArgs),
 }
 
 #[derive(Debug, Args)]
 struct ManpagesArgs {
     /// Directory to write the manpages to
     output_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+struct CompletionsArgs {
+    /// Shell to generate completions for
+    shell: clap_complete::Shell,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -113,6 +120,7 @@ fn main() -> anyhow::Result<()> {
         Commands::New(args) => handle_new_project(args),
         Commands::Cli(cmd) => match cmd {
             CliCommands::Manpages(args) => handle_cli_manpages(args),
+            CliCommands::Completions(args) => handle_cli_completions(args),
         },
         Commands::Migration(cmd) => match cmd {
             MigrationCommands::List(args) => handle_migration_list(args),
@@ -173,4 +181,15 @@ fn handle_cli_manpages(ManpagesArgs { output_dir }: ManpagesArgs) -> anyhow::Res
     let cmd = Cli::command();
     let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("."));
     clap_mangen::generate_to(cmd, output_dir).context("unable to generate manpages")
+}
+
+fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> anyhow::Result<()> {
+    clap_complete::generate(
+        shell,
+        &mut Cli::command(),
+        "cot-cli",
+        &mut std::io::stdout(),
+    );
+
+    Ok(())
 }

@@ -58,6 +58,7 @@ bytes = "1.10"
 cargo_toml = "0.21"
 chrono = { version = "0.4", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
+clap_complete = "4.5"
 clap_mangen = "0.2"
 clap-verbosity-flag = { version = "3", default-features = false }
 cot = { version = "0.1.4", path = "cot" }

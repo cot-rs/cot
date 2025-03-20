@@ -137,7 +137,6 @@ pub struct SmtpEmailBackend {
 }
 /// Trait representing an email backend for sending emails.
 pub trait EmailBackend {
-    
     /// Creates a new instance of the email backend with the given configuration.
     ///
     /// # Arguments
@@ -161,7 +160,7 @@ pub trait EmailBackend {
     ///
     /// This function will return an `EmailError` if there is an issue with closing the SMTP connection.
     fn close(&mut self) -> Result<()>;
-    
+
     /// Send a single email message
     ///
     /// # Errors
@@ -169,7 +168,7 @@ pub trait EmailBackend {
     /// This function will return an `EmailError` if there is an issue with opening the SMTP connection,
     /// building the email message, or sending the email.
     fn send_message(&mut self, message: &EmailMessage) -> Result<()>;
-    
+
     /// Send multiple email messages
     ///
     /// # Errors
@@ -270,7 +269,7 @@ impl EmailBackend for SmtpEmailBackend {
         self.transport = None;
         Ok(())
     }
- 
+
     /// Send a single email message
     ///
     /// # Errors
@@ -372,8 +371,7 @@ impl EmailBackend for SmtpEmailBackend {
 
         Ok(())
     }
-
- }
+}
 impl SmtpEmailBackend {
     /// Dump the email message to the console for debugging purposes.
     ///
@@ -384,7 +382,6 @@ impl SmtpEmailBackend {
         println!("{}", email);
         Ok(())
     }
-   
 }
 #[cfg(test)]
 mod tests {

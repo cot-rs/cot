@@ -248,15 +248,62 @@ where
 /// A middleware that provides session management.
 ///
 /// By default, it uses an in-memory store for session data.
-#[derive(Debug, Copy, Clone)]
-pub struct SessionMiddleware;
+#[derive(Debug, Clone)]
+pub struct SessionMiddleware{
+    inner: SessionManagerLayer<MemoryStore>
+}
 
 impl SessionMiddleware {
     /// Crates a new instance of [`SessionMiddleware`].
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        let store = MemoryStore::default();
+        let layer = SessionManagerLayer::new(store).with_secure(false);
+        Self { inner: layer }
     }
+    /// Creates a new instance of [`SessionMiddleware`] from the application
+    /// context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::project::{RootHandlerBuilder, WithApps};
+    /// use cot::{BoxedHandler, Project, ProjectContext};
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {
+    ///     fn middlewares(
+    ///         &self,
+    ///         handler: RootHandlerBuilder,
+    ///         context: &ProjectContext<WithApps>,
+    ///     ) -> BoxedHandler {
+    ///         handler
+    ///             .middleware(SessionMiddleware::from_context(context))
+    ///             .build()
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn from_context(context: &crate::ProjectContext<crate::project::WithApps>) -> Self {
+        Self::new().secure(context.config().middlewares.session.secure)
+    }
+    /// Sets the secure flag for the session middleware.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    /// 
+    /// let middleware = SessionMiddleware::new().secure(false);
+    /// ```
+    #[must_use]
+    pub fn secure(self, secure: bool) -> Self{
+        Self{
+            inner: self.inner.with_secure(secure)
+        }
+    }
+
 }
 
 impl Default for SessionMiddleware {
@@ -269,12 +316,9 @@ impl<S> tower::Layer<S> for SessionMiddleware {
     type Service = <SessionManagerLayer<MemoryStore> as tower::Layer<S>>::Service;
 
     fn layer(&self, inner: S) -> Self::Service {
-        let session_store = MemoryStore::default();
-        let session_layer = SessionManagerLayer::new(session_store);
-        session_layer.layer(inner)
+        self.inner.layer(inner)
     }
 }
-
 #[cfg(feature = "live-reload")]
 type LiveReloadLayerType = tower::util::Either<
     (

@@ -2,7 +2,7 @@ use cot::__private::async_trait;
 use cot::admin::AdminApp;
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
-use cot::config::{DatabaseConfig, ProjectConfig};
+use cot::config::{DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig};
 use cot::middleware::{LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{WithApps, WithConfig};
 use cot::request::Request;
@@ -63,6 +63,15 @@ impl Project for AdminProject {
                     .url("sqlite://db.sqlite3?mode=rwc")
                     .build(),
             )
+            .middlewares(
+                MiddlewareConfig::builder()
+                    .session(
+                        SessionMiddlewareConfig::builder()
+                            .secure(false)
+                            .build()
+                    )
+                    .build()
+            )
             .build())
     }
 
@@ -79,7 +88,7 @@ impl Project for AdminProject {
     ) -> BoxedHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
-            .middleware(SessionMiddleware::new())
+            .middleware(SessionMiddleware::from_context(context))
             .middleware(LiveReloadMiddleware::new())
             .build()
     }

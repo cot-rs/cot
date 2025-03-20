@@ -964,12 +964,16 @@ impl Bootstrapper<Uninitialized> {
 }
 
 fn read_config(config: &str) -> cot::Result<ProjectConfig> {
+    use std::env;
     trace!(config, "Reading project configuration");
     let result = match std::fs::read_to_string(config) {
         Ok(config_content) => Ok(config_content),
         Err(_err) => {
             // try to read the config from the `config` directory if it's not a file
-            let path = PathBuf::from("config").join(config).with_extension("toml");
+            let path = PathBuf::from("examples/admin/config").join(config).with_extension("toml");
+            let cwd = env::current_dir();
+            println!("Reading project configuration from {:?} in {:?}", path, cwd.unwrap());
+            dbg!(&path);
             trace!(
                 config,
                 path = %path.display(),
@@ -987,7 +991,9 @@ fn read_config(config: &str) -> cot::Result<ProjectConfig> {
         })
     })?;
 
-    ProjectConfig::from_toml(&config_content)
+    let x = ProjectConfig::from_toml(&config_content);
+    println!("config: {:?}", x.as_ref());
+    x
 }
 
 impl Bootstrapper<WithConfig> {

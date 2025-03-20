@@ -65,12 +65,8 @@ impl Project for AdminProject {
             )
             .middlewares(
                 MiddlewareConfig::builder()
-                    .session(
-                        SessionMiddlewareConfig::builder()
-                            .secure(false)
-                            .build()
-                    )
-                    .build()
+                    .session(SessionMiddlewareConfig::builder().secure(false).build())
+                    .build(),
             )
             .build())
     }

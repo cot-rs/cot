@@ -249,8 +249,8 @@ where
 ///
 /// By default, it uses an in-memory store for session data.
 #[derive(Debug, Clone)]
-pub struct SessionMiddleware{
-    inner: SessionManagerLayer<MemoryStore>
+pub struct SessionMiddleware {
+    inner: SessionManagerLayer<MemoryStore>,
 }
 
 impl SessionMiddleware {
@@ -289,21 +289,20 @@ impl SessionMiddleware {
         Self::new().secure(context.config().middlewares.session.secure)
     }
     /// Sets the secure flag for the session middleware.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use cot::middleware::SessionMiddleware;
-    /// 
+    ///
     /// let middleware = SessionMiddleware::new().secure(false);
     /// ```
     #[must_use]
-    pub fn secure(self, secure: bool) -> Self{
-        Self{
-            inner: self.inner.with_secure(secure)
+    pub fn secure(self, secure: bool) -> Self {
+        Self {
+            inner: self.inner.with_secure(secure),
         }
     }
-
 }
 
 impl Default for SessionMiddleware {

@@ -972,7 +972,11 @@ fn read_config(config: &str) -> cot::Result<ProjectConfig> {
             // try to read the config from the `config` directory if it's not a file
             let path = PathBuf::from("config").join(config).with_extension("toml");
             let cwd = env::current_dir();
-            println!("Reading project configuration from {:?} in {:?}", path, cwd.unwrap());
+            println!(
+                "Reading project configuration from {:?} in {:?}",
+                path,
+                cwd.unwrap()
+            );
             dbg!(&path);
             trace!(
                 config,

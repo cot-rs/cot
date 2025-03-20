@@ -519,42 +519,41 @@ impl LiveReloadMiddlewareConfigBuilder {
 }
 
 /// The configuration for the session middleware.
-/// 
+///
 /// This is used as part of the [`MiddlewareConfig`] struct.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use cot::config::SessionMiddlewareConfig;
-/// 
+///
 /// let config = SessionMiddlewareConfig::builder().secure(false).build();
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
-pub struct SessionMiddlewareConfig{
+pub struct SessionMiddlewareConfig {
     /// Whether the session middleware is secure.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use cot::config::SessionMiddlewareConfig;
-    /// 
+    ///
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
 }
 
-
 impl SessionMiddlewareConfig {
     /// Create a new [`SessionMiddlewareConfigBuilder`] to build a
     /// [`SessionMiddlewareConfig`].
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use cot::config::SessionMiddlewareConfig;
-    /// 
+    ///
     /// let config = SessionMiddlewareConfig::builder().build();
     /// ```
     #[must_use]
@@ -563,24 +562,23 @@ impl SessionMiddlewareConfig {
     }
 }
 
-impl SessionMiddlewareConfigBuilder{
+impl SessionMiddlewareConfigBuilder {
     /// Builds the session middleware configuration.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use cot::config::SessionMiddlewareConfig;
-    /// 
+    ///
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     #[must_use]
     pub fn build(&self) -> SessionMiddlewareConfig {
-        SessionMiddlewareConfig{
-            secure: self.secure.unwrap_or_default()
+        SessionMiddlewareConfig {
+            secure: self.secure.unwrap_or_default(),
         }
     }
 }
-
 
 /// A secret key.
 ///

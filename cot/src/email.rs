@@ -28,9 +28,9 @@ use std::net::ToSocketAddrs;
 use std::time::Duration;
 
 use lettre::{
-    message::{header, Message, MultiPart, SinglePart},
-    transport::smtp::authentication::Credentials,
     SmtpTransport, Transport,
+    message::{Message, MultiPart, SinglePart, header},
+    transport::smtp::authentication::Credentials,
 };
 
 /// Represents errors that can occur when sending an email.

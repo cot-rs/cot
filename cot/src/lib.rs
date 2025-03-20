@@ -67,6 +67,7 @@ pub mod auth;
 mod body;
 pub mod cli;
 pub mod config;
+pub mod email;
 mod error_page;
 mod handler;
 pub mod html;
@@ -78,7 +79,6 @@ pub mod router;
 pub mod static_files;
 pub mod test;
 pub(crate) mod utils;
-pub mod email;
 
 pub use body::Body;
 pub use cot_macros::{main, test};

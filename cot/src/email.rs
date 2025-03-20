@@ -2,7 +2,7 @@
 //! #Examples
 //! To send an email using the `EmailBackend`, you need to create an instance of `SmtpConfig`
 //! ```
-//! use cot::email::{EmailBackend, EmailMessage, SmtpConfig, EmailError};
+//! use cot::email::{SmtpEmailBackend, EmailBackend, EmailMessage, SmtpConfig, EmailError};
 //! fn send_example() -> Result<(), EmailError> {
 //!     let email = EmailMessage {
 //!         subject: "Test Email".to_string(),
@@ -17,7 +17,7 @@
 //!         ],
 //!     };
 //!     let config = SmtpConfig::default();
-//!     let mut backend = EmailBackend::new(config);
+//!     let mut backend = SmtpEmailBackend::new(config);
 //!     backend.send_message(&email)?;
 //!     Ok(())
 //! }
@@ -103,19 +103,6 @@ pub struct EmailMessage {
     /// The alternative parts of the email (e.g., plain text and HTML versions).
     pub alternatives: Vec<(String, String)>, // (content, mimetype)
 }
-
-/// SMTP Backend for sending emails
-#[derive(Debug)]
-pub struct EmailBackend {
-    /// The SMTP configuration.
-    config: SmtpConfig,
-    /// The SMTP transport.
-    /// This field is optional because the transport may not be initialized yet.
-    /// It will be initialized when the `open` method is called.
-    transport: Option<SmtpTransport>,
-    /// Whether or not to print debug information.
-    debug: bool,
-}
 impl fmt::Display for EmailMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Subject: {}", self.subject)?;
@@ -136,14 +123,84 @@ impl fmt::Display for EmailMessage {
     }
 }
 
-impl EmailBackend {
+/// SMTP Backend for sending emails
+#[derive(Debug)]
+pub struct SmtpEmailBackend {
+    /// The SMTP configuration.
+    config: SmtpConfig,
+    /// The SMTP transport.
+    /// This field is optional because the transport may not be initialized yet.
+    /// It will be initialized when the `open` method is called.
+    transport: Option<SmtpTransport>,
+    /// Whether or not to print debug information.
+    debug: bool,
+}
+/// Trait representing an email backend for sending emails.
+pub trait EmailBackend {
+    
+    /// Creates a new instance of the email backend with the given configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The SMTP configuration to use.
+    fn new(config: SmtpConfig) -> Self;
+    /// Open a connection to the SMTP server.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with resolving the SMTP host,
+    /// creating the TLS parameters, or connecting to the SMTP server.
+    fn open(&mut self) -> Result<()>;
+    /// Close the connection to the SMTP server.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with closing the SMTP connection.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with closing the SMTP connection.
+    fn close(&mut self) -> Result<()>;
+    
+    /// Send a single email message
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with opening the SMTP connection,
+    /// building the email message, or sending the email.
+    fn send_message(&mut self, message: &EmailMessage) -> Result<()>;
+    
+    /// Send multiple email messages
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with sending any of the emails.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with sending any of the emails.
+    fn send_messages(&mut self, emails: &[EmailMessage]) -> Result<usize> {
+        let mut sent_count = 0;
+
+        for email in emails {
+            match self.send_message(email) {
+                Ok(()) => sent_count += 1,
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(sent_count)
+    }
+}
+
+impl EmailBackend for SmtpEmailBackend {
     #[must_use]
     /// Creates a new instance of `EmailBackend` with the given configuration.
     ///
     /// # Arguments
     ///
     /// * `config` - The SMTP configuration to use.
-    pub fn new(config: SmtpConfig) -> Self {
+    fn new(config: SmtpConfig) -> Self {
         Self {
             config,
             transport: None,
@@ -161,7 +218,7 @@ impl EmailBackend {
     /// # Panics
     ///
     /// This function will panic if the transport is not properly initialized.
-    pub fn open(&mut self) -> Result<()> {
+    fn open(&mut self) -> Result<()> {
         // Test if self.transport is None or if the connection is not working
         if self.transport.is_some() && self.transport.as_ref().unwrap().test_connection().is_ok() {
             return Ok(());
@@ -209,26 +266,18 @@ impl EmailBackend {
     /// # Errors
     ///
     /// This function will return an `EmailError` if there is an issue with closing the SMTP connection.
-    pub fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<()> {
         self.transport = None;
         Ok(())
     }
-    /// Dump the email message to stdout
-    ///
-    /// # Errors
-    /// This function will return an `EmailError` if there is an issue with printing the email message.
-    pub fn dump_message(&self, email: &EmailMessage) -> Result<()> {
-        println!("{email}");
-        Ok(())
-    }
-
+ 
     /// Send a single email message
     ///
     /// # Errors
     ///
     /// This function will return an `EmailError` if there is an issue with opening the SMTP connection,
     /// building the email message, or sending the email.
-    pub fn send_message(&mut self, email: &EmailMessage) -> Result<()> {
+    fn send_message(&mut self, email: &EmailMessage) -> Result<()> {
         self.open()?;
         if self.debug {
             self.dump_message(email)?;
@@ -324,26 +373,19 @@ impl EmailBackend {
         Ok(())
     }
 
-    /// Send multiple email messages
+ }
+impl SmtpEmailBackend {
+    /// Dump the email message to the console for debugging purposes.
     ///
     /// # Errors
     ///
-    /// This function will return an `EmailError` if there is an issue with sending any of the emails.
-    pub fn send_messages(&mut self, emails: &[EmailMessage]) -> Result<usize> {
-        let mut sent_count = 0;
-
-        for email in emails {
-            match self.send_message(email) {
-                Ok(()) => sent_count += 1,
-                Err(_e) if self.config.fail_silently => continue,
-                Err(e) => return Err(e),
-            }
-        }
-
-        Ok(sent_count)
+    /// This function will return an `EmailError` if there is an issue with writing the email message to the console.
+    pub fn dump_message(&self, email: &EmailMessage) -> Result<()> {
+        println!("{}", email);
+        Ok(())
     }
+   
 }
-
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -469,7 +511,7 @@ mod tests {
             let mut _stdout_cursor = Cursor::new(&mut buffer);
 
             let config = SmtpConfig::default();
-            let backend = EmailBackend::new(config);
+            let backend = SmtpEmailBackend::new(config);
             backend.dump_message(&email).unwrap();
         }
         // Convert buffer to string
@@ -498,7 +540,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = EmailBackend::new(config).open();
+        let result = SmtpEmailBackend::new(config).open();
         assert!(matches!(result, Err(EmailError::ConnectionError(_))));
     }
 
@@ -512,7 +554,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = EmailBackend::new(config).open();
+        let result = SmtpEmailBackend::new(config).open();
         assert!(matches!(result, Err(EmailError::ConfigurationError(_))));
     }
     // An integration test to send an email to localhost using the default configuration.
@@ -544,7 +586,7 @@ mod tests {
             port,
             ..Default::default()
         };
-        let mut backend = EmailBackend::new(config);
+        let mut backend = SmtpEmailBackend::new(config);
         let _ = backend.open();
         let _ = backend.send_message(&email);
     }

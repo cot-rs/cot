@@ -7,7 +7,7 @@ mod utils;
 use std::path::PathBuf;
 
 use anyhow::Context;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -31,6 +31,9 @@ enum Commands {
     /// Manage migrations for a Cot project
     #[command(subcommand)]
     Migration(MigrationCommands),
+
+    #[command(subcommand)]
+    Cli(CliCommands),
 }
 
 #[derive(Debug, Args)]
@@ -84,6 +87,17 @@ struct CotSourceArgs {
     cot_path: Option<PathBuf>,
 }
 
+#[derive(Debug, Subcommand)]
+enum CliCommands {
+    Manpages(ManpagesArgs),
+}
+
+#[derive(Debug, Args)]
+struct ManpagesArgs {
+    /// Directory to write the manpages to
+    output_dir: Option<PathBuf>,
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
@@ -97,6 +111,9 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::New(args) => handle_new_project(args),
+        Commands::Cli(cmd) => match cmd {
+            CliCommands::Manpages(args) => handle_cli_manpages(args),
+        },
         Commands::Migration(cmd) => match cmd {
             MigrationCommands::List(args) => handle_migration_list(args),
             MigrationCommands::Make(args) => handle_migration_make(args),
@@ -150,4 +167,10 @@ fn handle_migration_make(
         output_dir,
     };
     make_migrations(&path, options).with_context(|| "unable to create migrations")
+}
+
+fn handle_cli_manpages(ManpagesArgs { output_dir }: ManpagesArgs) -> anyhow::Result<()> {
+    let cmd = Cli::command();
+    let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("."));
+    clap_mangen::generate_to(cmd, output_dir).context("unable to generate manpages")
 }

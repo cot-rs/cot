@@ -67,6 +67,7 @@ pub mod auth;
 mod body;
 pub mod cli;
 pub mod config;
+pub mod email;
 mod error_page;
 mod handler;
 pub mod html;

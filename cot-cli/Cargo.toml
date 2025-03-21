@@ -24,7 +24,7 @@ anstyle.workspace = true
 anyhow.workspace = true
 cargo_toml.workspace = true
 chrono.workspace = true
-clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
+clap = { workspace = true, features = ["derive", "env", "wrap_help", "string"] }
 clap_complete.workspace = true
 clap_mangen.workspace = true
 clap-verbosity-flag = { workspace = true, features = ["tracing"] }

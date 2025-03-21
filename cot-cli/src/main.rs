@@ -32,6 +32,7 @@ enum Commands {
     #[command(subcommand)]
     Migration(MigrationCommands),
 
+    /// Manage Cot CLI
     #[command(subcommand)]
     Cli(CliCommands),
 }
@@ -89,14 +90,20 @@ struct CotSourceArgs {
 
 #[derive(Debug, Subcommand)]
 enum CliCommands {
+    /// Generate manpages for the Cot CLI
     Manpages(ManpagesArgs),
+    /// Generate completions for the Cot CLI
     Completions(CompletionsArgs),
 }
 
 #[derive(Debug, Args)]
 struct ManpagesArgs {
     /// Directory to write the manpages to
-    output_dir: Option<PathBuf>,
+    #[arg(short, long, default_value_os_t = std::env::current_dir().unwrap_or(PathBuf::from(".")))]
+    output_dir: PathBuf,
+    /// Create the directory if it doesn't exist
+    #[arg(short, long)]
+    create: bool,
 }
 
 #[derive(Debug, Args)]
@@ -177,19 +184,16 @@ fn handle_migration_make(
     make_migrations(&path, options).with_context(|| "unable to create migrations")
 }
 
-fn handle_cli_manpages(ManpagesArgs { output_dir }: ManpagesArgs) -> anyhow::Result<()> {
-    let cmd = Cli::command();
-    let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("."));
-    clap_mangen::generate_to(cmd, output_dir).context("unable to generate manpages")
+fn handle_cli_manpages(ManpagesArgs { output_dir, create }: ManpagesArgs) -> anyhow::Result<()> {
+    if create {
+        std::fs::create_dir_all(&output_dir).context("unable to create output directory")?;
+    }
+    clap_mangen::generate_to(Cli::command(), output_dir)
+        .context("unable to generate manpages in output directory")
 }
 
 fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> anyhow::Result<()> {
-    clap_complete::generate(
-        shell,
-        &mut Cli::command(),
-        "cot-cli",
-        &mut std::io::stdout(),
-    );
+    clap_complete::generate(shell, &mut Cli::command(), "cot", &mut std::io::stdout());
 
     Ok(())
 }

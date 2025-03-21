@@ -190,6 +190,7 @@ fn handle_cli_manpages(ManpagesArgs { output_dir, create }: ManpagesArgs) -> any
         .context("unable to generate manpages in output directory")
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> anyhow::Result<()> {
     clap_complete::generate(shell, &mut Cli::command(), "cot", &mut std::io::stdout());
 

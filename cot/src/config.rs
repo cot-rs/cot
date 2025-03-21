@@ -575,7 +575,7 @@ impl SessionMiddlewareConfigBuilder {
     #[must_use]
     pub fn build(&self) -> SessionMiddlewareConfig {
         SessionMiddlewareConfig {
-            secure: self.secure.unwrap_or_default(),
+            secure: self.secure.unwrap_or(true),
         }
     }
 }

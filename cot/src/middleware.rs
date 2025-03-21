@@ -258,7 +258,7 @@ impl SessionMiddleware {
     #[must_use]
     pub fn new() -> Self {
         let store = MemoryStore::default();
-        let layer = SessionManagerLayer::new(store).with_secure(false);
+        let layer = SessionManagerLayer::new(store);
         Self { inner: layer }
     }
     /// Creates a new instance of [`SessionMiddleware`] from the application

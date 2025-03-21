@@ -58,16 +58,16 @@ enum MigrationCommands {
 
 #[derive(Debug, Args)]
 struct MigrationListArgs {
-    /// Path to the crate directory to list migrations for (default:
-    /// current directory)
-    path: Option<PathBuf>,
+    /// Path to the crate directory to list migrations for
+    #[arg(default_value_os_t = std::env::current_dir().unwrap_or(PathBuf::from(".")))]
+    path: PathBuf,
 }
 
 #[derive(Debug, Args)]
 struct MigrationMakeArgs {
-    /// Path to the crate directory to generate migrations for (default:
-    /// current directory)
-    path: Option<PathBuf>,
+    /// Path to the crate directory to generate migrations for
+    #[arg(default_value_os_t = std::env::current_dir().unwrap_or(PathBuf::from(".")))]
+    path: PathBuf,
     /// Name of the app to use in the migration (default: crate name)
     #[arg(long)]
     app_name: Option<String>,
@@ -158,7 +158,6 @@ fn handle_new_project(ProjectNewArgs { path, name, source }: ProjectNewArgs) -> 
 }
 
 fn handle_migration_list(MigrationListArgs { path }: MigrationListArgs) -> anyhow::Result<()> {
-    let path = path.unwrap_or_else(|| PathBuf::from("."));
     let migrations = list_migrations(&path).with_context(|| "unable to list migrations")?;
     for (app_name, migs) in migrations {
         for mig in migs {
@@ -176,7 +175,6 @@ fn handle_migration_make(
         output_dir,
     }: MigrationMakeArgs,
 ) -> anyhow::Result<()> {
-    let path = path.unwrap_or_else(|| PathBuf::from("."));
     let options = MigrationGeneratorOptions {
         app_name,
         output_dir,

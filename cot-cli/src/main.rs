@@ -15,7 +15,12 @@ use crate::migration_generator::{MigrationGeneratorOptions, list_migrations, mak
 use crate::new_project::{CotSource, new_project};
 
 #[derive(Debug, Parser)]
-#[command(version, about, long_about = None)]
+#[command(
+    name = "cot",
+    version,
+    about,
+    long_about = None
+)]
 struct Cli {
     #[command(flatten)]
     verbose: Verbosity,
@@ -195,7 +200,80 @@ fn handle_cli_manpages(ManpagesArgs { output_dir, create }: ManpagesArgs) -> any
 
 #[allow(clippy::unnecessary_wraps)]
 fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> anyhow::Result<()> {
-    clap_complete::generate(shell, &mut Cli::command(), "cot", &mut std::io::stdout());
+    generate_completions(shell, &mut std::io::stdout());
 
     Ok(())
+}
+
+fn generate_completions(shell: clap_complete::Shell, writer: &mut impl std::io::Write) {
+    clap_complete::generate(shell, &mut Cli::command(), "cot", writer);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_project_wrong_directory() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let args = ProjectNewArgs {
+            path: temp_dir.path().to_path_buf(),
+            name: None,
+            source: CotSourceArgs {
+                use_git: false,
+                cot_path: None,
+            },
+        };
+
+        let result = handle_new_project(args);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn migration_list_wrong_directory() {
+        let args = MigrationListArgs {
+            path: Some(PathBuf::from("nonexistent")),
+        };
+
+        let result = handle_migration_list(args);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn migration_make_wrong_directory() {
+        let args = MigrationMakeArgs {
+            path: Some(PathBuf::from("nonexistent")),
+            app_name: None,
+            output_dir: None,
+        };
+
+        let result = handle_migration_make(args);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn generate_manpages() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let args = ManpagesArgs {
+            output_dir: Some(temp_dir.path().to_path_buf()),
+            create: true,
+        };
+
+        let result = handle_cli_manpages(args);
+
+        assert!(result.is_ok());
+        assert!(temp_dir.path().join("cot.1").exists());
+    }
+
+    #[test]
+    fn generate_completions_shell() {
+        let mut output = Vec::new();
+
+        generate_completions(clap_complete::Shell::Bash, &mut output);
+
+        assert!(!output.is_empty());
+    }
 }

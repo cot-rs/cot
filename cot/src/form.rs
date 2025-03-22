@@ -452,6 +452,30 @@ mod tests {
     use crate::headers::FORM_CONTENT_TYPE;
 
     #[cot::test]
+    async fn form_data_extract_get_empty() {
+        let mut request = http::Request::builder()
+            .method(http::Method::GET)
+            .uri("https://example.com")
+            .body(Body::empty())
+            .unwrap();
+
+        let bytes = form_data(&mut request).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b""));
+    }
+
+    #[cot::test]
+    async fn form_data_extract_get() {
+        let mut request = http::Request::builder()
+            .method(http::Method::GET)
+            .uri("https://example.com/?hello=world")
+            .body(Body::empty())
+            .unwrap();
+
+        let bytes = form_data(&mut request).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b"hello=world"));
+    }
+
+    #[cot::test]
     async fn form_data_extract() {
         let mut request = http::Request::builder()
             .method(http::Method::POST)

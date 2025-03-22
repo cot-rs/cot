@@ -58,16 +58,16 @@ enum MigrationCommands {
 
 #[derive(Debug, Args)]
 struct MigrationListArgs {
-    /// Path to the crate directory to list migrations for
-    #[arg(default_value_os_t = std::env::current_dir().unwrap_or(PathBuf::from(".")))]
-    path: PathBuf,
+    /// Path to the crate directory to list migrations for  [default: current
+    /// directory]
+    path: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
 struct MigrationMakeArgs {
-    /// Path to the crate directory to generate migrations for
-    #[arg(default_value_os_t = std::env::current_dir().unwrap_or(PathBuf::from(".")))]
-    path: PathBuf,
+    /// Path to the crate directory to generate migrations for [default: current
+    /// directory]
+    path: Option<PathBuf>,
     /// Name of the app to use in the migration (default: crate name)
     #[arg(long)]
     app_name: Option<String>,
@@ -98,9 +98,9 @@ enum CliCommands {
 
 #[derive(Debug, Args)]
 struct ManpagesArgs {
-    /// Directory to write the manpages to
-    #[arg(short, long, default_value_os_t = std::env::current_dir().unwrap_or(PathBuf::from(".")))]
-    output_dir: PathBuf,
+    /// Directory to write the manpages to [default: current directory]
+    #[arg(short, long)]
+    output_dir: Option<PathBuf>,
     /// Create the directory if it doesn't exist
     #[arg(short, long)]
     create: bool,
@@ -158,6 +158,7 @@ fn handle_new_project(ProjectNewArgs { path, name, source }: ProjectNewArgs) -> 
 }
 
 fn handle_migration_list(MigrationListArgs { path }: MigrationListArgs) -> anyhow::Result<()> {
+    let path = path.unwrap_or(PathBuf::from("."));
     let migrations = list_migrations(&path).with_context(|| "unable to list migrations")?;
     for (app_name, migs) in migrations {
         for mig in migs {
@@ -175,6 +176,7 @@ fn handle_migration_make(
         output_dir,
     }: MigrationMakeArgs,
 ) -> anyhow::Result<()> {
+    let path = path.unwrap_or(PathBuf::from("."));
     let options = MigrationGeneratorOptions {
         app_name,
         output_dir,
@@ -183,6 +185,7 @@ fn handle_migration_make(
 }
 
 fn handle_cli_manpages(ManpagesArgs { output_dir, create }: ManpagesArgs) -> anyhow::Result<()> {
+    let output_dir = output_dir.unwrap_or(PathBuf::from("."));
     if create {
         std::fs::create_dir_all(&output_dir).context("unable to create output directory")?;
     }

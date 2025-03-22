@@ -16,7 +16,7 @@ use http::{Request, header};
 use pin_project_lite::pin_project;
 use tower::Service;
 
-use crate::project::WithApps;
+use crate::project::WithDatabase;
 use crate::response::{Response, ResponseExt};
 use crate::{Body, ProjectContext};
 
@@ -114,8 +114,8 @@ impl Default for StaticFiles {
     }
 }
 
-impl From<&ProjectContext<WithApps>> for StaticFiles {
-    fn from(context: &ProjectContext<WithApps>) -> Self {
+impl From<&ProjectContext<WithDatabase>> for StaticFiles {
+    fn from(context: &ProjectContext<WithDatabase>) -> Self {
         let mut static_files = StaticFiles::new();
 
         for module in context.apps() {
@@ -170,7 +170,7 @@ impl StaticFilesMiddleware {
     /// Creates a new `StaticFilesMiddleware` instance from the application
     /// context.
     #[must_use]
-    pub fn from_context(context: &ProjectContext<WithApps>) -> Self {
+    pub fn from_context(context: &ProjectContext<WithDatabase>) -> Self {
         Self {
             static_files: Arc::new(StaticFiles::from(context)),
         }
@@ -406,7 +406,10 @@ mod tests {
 
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(ProjectConfig::default())
-            .with_apps();
+            .with_apps()
+            .with_database()
+            .await
+            .unwrap();
         let middleware = StaticFilesMiddleware::from_context(bootstrapper.context());
         let static_files = middleware.static_files;
 

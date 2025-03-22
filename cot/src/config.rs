@@ -227,10 +227,11 @@ impl ProjectConfig {
     /// ```
     #[must_use]
     pub fn dev_default() -> ProjectConfig {
-        ProjectConfig::builder()
-            .debug(true)
-            .register_panic_hook(true)
-            .build()
+        let mut builder = ProjectConfig::builder();
+        builder.debug(true).register_panic_hook(true);
+        #[cfg(feature = "db")]
+        builder.database(DatabaseConfig::builder().url("sqlite::memory:").build());
+        builder.build()
     }
 
     /// Create a new [`ProjectConfig`] from a TOML string.
@@ -292,7 +293,7 @@ impl ProjectConfigBuilder {
 ///
 /// let config = AuthBackendConfig::Database;
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AuthBackendConfig {
     /// No authentication backend.
@@ -300,6 +301,7 @@ pub enum AuthBackendConfig {
     /// This enables [`NoAuthBackend`](cot::auth::NoAuthBackend) to be used as
     /// the authentication backend, which effectively disables
     /// authentication.
+    #[default]
     None,
     /// Database authentication backend.
     ///
@@ -307,20 +309,6 @@ pub enum AuthBackendConfig {
     /// to be used as the authentication backend.
     #[cfg(feature = "db")]
     Database,
-}
-
-impl Default for AuthBackendConfig {
-    fn default() -> Self {
-        #[cfg(feature = "db")]
-        {
-            Self::Database
-        }
-
-        #[cfg(not(feature = "db"))]
-        {
-            Self::None
-        }
-    }
 }
 
 /// The configuration for the database.

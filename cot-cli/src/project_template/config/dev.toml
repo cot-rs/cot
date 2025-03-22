@@ -3,6 +3,9 @@ secret_key = "{{ dev_secret_key }}"
 [database]
 url = "sqlite://db.sqlite3?mode=rwc"
 
+[auth_backend]
+type = "database"
+
 [middlewares]
 live_reload.enabled = true
 

@@ -96,7 +96,9 @@ rustversion = "1"
 sea-query = { version = "0.32", default-features = false }
 sea-query-binder = { version = "0.7", default-features = false }
 serde = "1"
+serde_html_form = "0.2"
 serde_json = "1"
+serde_path_to_error = "0.1.17"
 sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false }
 subtle = { version = "2", default-features = false }

@@ -1,12 +1,11 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::project::{ErrorPageHandler, WithConfig};
-use cot::request::Request;
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::{App, AppBuilder, Body, Project, ProjectContext, StatusCode};
 
-async fn return_hello(_request: Request) -> cot::Result<Response> {
+async fn return_hello() -> cot::Result<Response> {
     panic!()
 }
 

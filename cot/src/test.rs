@@ -7,11 +7,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use derive_more::Debug;
 use tower::Service;
-use tower_sessions::{MemoryStore, Session};
+use tower_sessions::MemoryStore;
 
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;
-use crate::auth::{AuthBackend, NoAuthBackend, User, UserId};
+use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 use crate::config::ProjectConfig;
 #[cfg(feature = "db")]
 use crate::db::Database;
@@ -21,9 +21,10 @@ use crate::db::migrations::{
 };
 use crate::handler::BoxedHandler;
 use crate::project::prepare_request;
-use crate::request::{Request, RequestExt};
+use crate::request::Request;
 use crate::response::Response;
 use crate::router::Router;
+use crate::session::Session;
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
 
 /// A test client for making requests to a Cot project.
@@ -197,6 +198,7 @@ pub struct TestRequestBuilder {
     session: Option<Session>,
     config: Option<Arc<ProjectConfig>>,
     auth_backend: Option<AuthBackendWrapper>,
+    auth: Option<Auth>,
     #[cfg(feature = "db")]
     database: Option<Arc<Database>>,
     form_data: Option<Vec<(String, String)>>,
@@ -226,18 +228,16 @@ impl AuthBackendWrapper {
 impl AuthBackend for AuthBackendWrapper {
     async fn authenticate(
         &self,
-        request: &Request,
         credentials: &(dyn Any + Send + Sync),
     ) -> cot::auth::Result<Option<Box<dyn User + Send + Sync>>> {
-        self.inner.authenticate(request, credentials).await
+        self.inner.authenticate(credentials).await
     }
 
     async fn get_by_id(
         &self,
-        request: &Request,
         id: UserId,
     ) -> cot::auth::Result<Option<Box<dyn User + Send + Sync>>> {
-        self.inner.get_by_id(request, id).await
+        self.inner.get_by_id(id).await
     }
 }
 
@@ -250,6 +250,7 @@ impl Default for TestRequestBuilder {
             session: None,
             config: None,
             auth_backend: None,
+            auth: None,
             #[cfg(feature = "db")]
             database: None,
             form_data: None,
@@ -437,7 +438,8 @@ impl TestRequestBuilder {
     /// ```
     pub fn with_session(&mut self) -> &mut Self {
         let session_store = MemoryStore::default();
-        self.session = Some(Session::new(None, Arc::new(session_store), None));
+        let session_inner = tower_sessions::Session::new(None, Arc::new(session_store), None);
+        self.session = Some(Session::new(session_inner));
         self
     }
 
@@ -448,12 +450,15 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::request::RequestExt;
+    /// use cot::session::Session;
     /// use cot::test::TestRequestBuilder;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let mut request = TestRequestBuilder::get("/").with_session().build();
-    /// request.session_mut().insert("key", "value").await?;
+    /// Session::from_request(&request)
+    ///     .insert("key", "value")
+    ///     .await?;
     ///
     /// let mut request = TestRequestBuilder::get("/")
     ///     .with_session_from(&request)
@@ -462,7 +467,7 @@ impl TestRequestBuilder {
     /// # }
     /// ```
     pub fn with_session_from(&mut self, request: &Request) -> &mut Self {
-        self.session = Some(request.session().clone());
+        self.session = Some(Session::from_request(request).clone());
         self
     }
 
@@ -473,15 +478,17 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::request::RequestExt;
+    /// use cot::session::Session;
     /// use cot::test::TestRequestBuilder;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let mut request = TestRequestBuilder::get("/").with_session().build();
-    /// request.session_mut().insert("key", "value").await?;
+    /// let session = Session::from_request(&request);
+    /// session.insert("key", "value").await?;
     ///
     /// let mut request = TestRequestBuilder::get("/")
-    ///     .session(request.session().clone())
+    ///     .session(session.clone())
     ///     .build();
     /// # Ok(())
     /// # }
@@ -534,6 +541,10 @@ impl TestRequestBuilder {
     /// Note that this calls [`Self::auth_backend`], [`Self::with_session`],
     /// [`Self::database`], possibly overriding any values set by you earlier.
     ///
+    /// # Panics
+    ///
+    /// Panics if the auth object fails to be created.
+    ///
     /// # Examples
     ///
     /// ```
@@ -546,15 +557,29 @@ impl TestRequestBuilder {
     /// test_database.with_auth().run_migrations().await;
     /// let request = TestRequestBuilder::get("/")
     ///     .with_db_auth(test_database.database())
+    ///     .await
     ///     .build();
     /// # Ok(())
     /// # }
     /// ```
     #[cfg(feature = "db")]
-    pub fn with_db_auth(&mut self, db: Arc<Database>) -> &mut Self {
-        self.auth_backend(DatabaseUserBackend);
+    pub async fn with_db_auth(&mut self, db: Arc<Database>) -> &mut Self {
+        self.auth_backend(DatabaseUserBackend::new(Arc::clone(&db)));
         self.with_session();
         self.database(db);
+        self.auth = Some(
+            Auth::new(
+                self.session.clone().expect("Session was just set"),
+                self.auth_backend
+                    .clone()
+                    .expect("Auth backend was just set")
+                    .inner,
+                crate::config::SecretKey::from("000000"),
+                &[],
+            )
+            .await
+            .expect("Failed to create Auth"),
+        );
 
         self
     }
@@ -652,8 +677,8 @@ impl TestRequestBuilder {
         let auth_backend = std::mem::take(&mut self.auth_backend);
         #[allow(trivial_casts)]
         let auth_backend = match auth_backend {
-            Some(auth_backend) => Box::new(auth_backend) as Box<dyn AuthBackend>,
-            None => Box::new(NoAuthBackend),
+            Some(auth_backend) => Arc::new(auth_backend) as Arc<dyn AuthBackend>,
+            None => Arc::new(NoAuthBackend),
         };
 
         let context = ProjectContext::initialized(
@@ -668,6 +693,10 @@ impl TestRequestBuilder {
 
         if let Some(session) = &self.session {
             request.extensions_mut().insert(session.clone());
+        }
+
+        if let Some(auth) = &self.auth {
+            request.extensions_mut().insert(auth.clone());
         }
 
         if let Some(form_data) = &self.form_data {
@@ -923,6 +952,7 @@ impl TestDatabase {
     ///
     /// let request = TestRequestBuilder::get("/")
     ///     .with_db_auth(test_database.database())
+    ///     .await
     ///     .build();
     ///
     /// // do something with the request
@@ -1182,5 +1212,12 @@ impl DynMigration for TestMigration {
 pub(crate) fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
     let lock = LOCK.get_or_init(|| std::sync::Mutex::new(()));
-    lock.lock().expect("Failed to lock serial test guard")
+    match lock.lock() {
+        Ok(guard) => guard,
+        Err(poison_error) => {
+            lock.clear_poison();
+            // We can ignore poisoned mutexes because we don't store any data inside
+            poison_error.into_inner()
+        }
+    }
 }

@@ -42,7 +42,9 @@ rinja.workspace = true
 sea-query = { workspace = true }
 sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"] }
 serde = { workspace = true, features = ["derive"] }
+serde_html_form = { workspace = true }
 serde_json = { workspace = true, optional = true }
+serde_path_to_error = { workspace = true }
 sha2.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"] }
 subtle = { workspace = true, features = ["std"] }

@@ -5,3 +5,6 @@ url = "sqlite://db.sqlite3?mode=rwc"
 # Or:
 # url = "postgres://user:password@localhost:5432/database"
 # url = "mysql://user:password@localhost:3306/database"
+
+[auth_backend]
+type = "database"

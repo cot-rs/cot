@@ -1339,6 +1339,37 @@ impl DatabaseBackend for Database {
     }
 }
 
+#[async_trait]
+impl DatabaseBackend for std::sync::Arc<Database> {
+    async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
+        Database::insert_or_update(self, data).await
+    }
+
+    async fn insert<T: Model>(&self, data: &mut T) -> Result<()> {
+        Database::insert(self, data).await
+    }
+
+    async fn update<T: Model>(&self, data: &mut T) -> Result<()> {
+        Database::update(self, data).await
+    }
+
+    async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
+        Database::query(self, query).await
+    }
+
+    async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>> {
+        Database::get(self, query).await
+    }
+
+    async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool> {
+        Database::exists(self, query).await
+    }
+
+    async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult> {
+        Database::delete(self, query).await
+    }
+}
+
 /// Result of a statement execution.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StatementResult {

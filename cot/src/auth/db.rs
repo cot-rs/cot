@@ -6,6 +6,7 @@
 use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 // Importing `Auto` from `cot` instead of `crate` so that the migration generator
@@ -24,9 +25,8 @@ use crate::auth::{
 };
 use crate::config::SecretKey;
 use crate::db::migrations::SyncDynMigration;
-use crate::db::{DatabaseBackend, LimitedString, Model, model, query};
+use crate::db::{Database, DatabaseBackend, LimitedString, Model, model, query};
 use crate::form::Form;
-use crate::request::{Request, RequestExt};
 
 pub mod migrations;
 
@@ -102,6 +102,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -168,6 +169,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -222,6 +224,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -321,6 +324,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -367,6 +371,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -487,13 +492,9 @@ impl DatabaseUserCredentials {
 ///
 /// This backend supports authenticating users using the
 /// [`DatabaseUserCredentials`] struct and ignores all other credential types.
-#[derive(Debug, Copy, Clone)]
-pub struct DatabaseUserBackend;
-
-impl Default for DatabaseUserBackend {
-    fn default() -> Self {
-        Self::new()
-    }
+#[derive(Debug, Clone)]
+pub struct DatabaseUserBackend {
+    database: Arc<Database>,
 }
 
 impl DatabaseUserBackend {
@@ -502,23 +503,25 @@ impl DatabaseUserBackend {
     /// # Example
     ///
     /// ```
+    /// use std::sync::Arc;
+    ///
     /// use cot::auth::AuthBackend;
     /// use cot::auth::db::DatabaseUserBackend;
     /// use cot::config::ProjectConfig;
-    /// use cot::project::WithApps;
+    /// use cot::project::{AuthBackendContext, WithApps};
     /// use cot::{Project, ProjectContext};
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn auth_backend(&self, context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
-    ///         Box::new(DatabaseUserBackend::new())
+    ///     fn auth_backend(&self, context: &AuthBackendContext) -> Arc<dyn AuthBackend> {
+    ///         Arc::new(DatabaseUserBackend::new(context.database().clone()))
     ///         // note that it's usually better to just set the auth backend in the config
     ///     }
     /// }
     /// ```
     #[must_use]
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(database: Arc<Database>) -> Self {
+        Self { database }
     }
 }
 
@@ -526,12 +529,11 @@ impl DatabaseUserBackend {
 impl AuthBackend for DatabaseUserBackend {
     async fn authenticate(
         &self,
-        request: &Request,
         credentials: &(dyn Any + Send + Sync),
     ) -> Result<Option<Box<dyn User + Send + Sync>>> {
         if let Some(credentials) = credentials.downcast_ref::<DatabaseUserCredentials>() {
             #[allow(trivial_casts)] // Upcast to the correct Box type
-            Ok(DatabaseUser::authenticate(request.db(), credentials)
+            Ok(DatabaseUser::authenticate(&self.database, credentials)
                 .await
                 .map(|user| user.map(|user| Box::new(user) as Box<dyn User + Send + Sync>))?)
         } else {
@@ -539,17 +541,13 @@ impl AuthBackend for DatabaseUserBackend {
         }
     }
 
-    async fn get_by_id(
-        &self,
-        request: &Request,
-        id: UserId,
-    ) -> Result<Option<Box<dyn User + Send + Sync>>> {
+    async fn get_by_id(&self, id: UserId) -> Result<Option<Box<dyn User + Send + Sync>>> {
         let UserId::Int(id) = id else {
             return Err(AuthError::UserIdTypeNotSupported);
         };
 
         #[allow(trivial_casts)] // Upcast to the correct Box type
-        Ok(DatabaseUser::get_by_id(request.db(), id)
+        Ok(DatabaseUser::get_by_id(&self.database, id)
             .await?
             .map(|user| Box::new(user) as Box<dyn User + Send + Sync>))
     }

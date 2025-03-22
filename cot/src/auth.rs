@@ -11,11 +11,11 @@ pub mod db;
 
 use std::any::Any;
 use std::borrow::Cow;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
+use derive_more::with_trait::Debug;
 #[cfg(test)]
 use mockall::automock;
 use password_auth::VerifyError;
@@ -27,6 +27,7 @@ use crate::config::SecretKey;
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
 use crate::request::{Request, RequestExt};
+use crate::session::Session;
 
 /// An error that occurs during authentication.
 #[derive(Debug, Error)]
@@ -287,13 +288,30 @@ impl UserId {
     }
 }
 
+/// A helper wrapper over `Arc<dyn User>` to provide a `Debug` implementation.
+#[repr(transparent)]
+struct UserWrapper(Arc<dyn User + Send + Sync>);
+
+impl Debug for UserWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Arc<dyn User + Send + Sync>")
+            .field("id", &self.0.id())
+            .field("username", &self.0.username())
+            .field("is_active", &self.0.is_active())
+            .field("is_authenticated", &self.0.is_authenticated())
+            .field("last_login", &self.0.last_login())
+            .field("joined", &self.0.joined())
+            .finish()
+    }
+}
+
 /// An anonymous, unauthenticated user.
 ///
 /// This is used to represent a user that is not authenticated. It is returned
 /// by the [`AuthRequestExt::user()`] method when there is no active user
 /// session.
 #[derive(Debug, Copy, Clone, Default)]
-pub struct AnonymousUser();
+pub struct AnonymousUser;
 
 impl PartialEq for AnonymousUser {
     fn eq(&self, _other: &Self) -> bool {
@@ -757,30 +775,54 @@ impl From<String> for Password {
     }
 }
 
-mod private {
-    pub trait Sealed {}
+/// Authentication helper structure.
+///
+/// This is an object that provides methods to sign users in and out, by using
+/// the authentication backend defined in the project configuration. It is
+/// constructed by [`AuthMiddleware`](crate::middleware::AuthMiddleware) and
+/// included in every [`Request`] object as long as the middleware is active.
+///
+/// # Security
+///
+/// This is a wrapper around a reference-counted inner object, which contains
+/// the actual user data. It's safe and cheap to clone it and authenticate the
+/// user, as the change will be reflected in all clones.
+#[derive(Debug, Clone)]
+pub struct Auth {
+    inner: Arc<AuthInner>,
 }
 
-/// A trait providing some useful authentication methods for the [`Request`]
-/// type.
-#[async_trait]
-pub trait AuthRequestExt: private::Sealed {
+impl Auth {
+    #[cfg(feature = "db")] // only currently used in TestRequestBuilder if database is enabled
+    pub(crate) async fn new(
+        session: Session,
+        backend: Arc<dyn AuthBackend>,
+        secret_key: SecretKey,
+        fallback_secret_keys: &[SecretKey],
+    ) -> cot::Result<Self> {
+        let inner = AuthInner::new(session, backend, secret_key, fallback_secret_keys).await?;
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
+    }
+
+    pub(crate) async fn from_request(request: &mut Request) -> cot::Result<Self> {
+        let inner = AuthInner::from_request(request).await?;
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
+    }
+
     /// Returns the current user.
     ///
     /// This uses the auth backend configured in
     /// [`ProjectConfig::auth_backend`](crate::config::ProjectConfig::auth_backend).
     /// If the user is not authenticated, the [`AnonymousUser`] object is
     /// returned.
-    ///
-    /// This method caches the user object in the request extensions, so it
-    /// doesn't need to be fetched from the backend on every call.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the user object cannot be fetched from the backend.
-    ///
-    /// Returns an error if the underlying session backend fails.
-    async fn user(&mut self) -> Result<&dyn User>;
+    #[must_use]
+    pub fn user(&self) -> Arc<dyn User + Send + Sync> {
+        self.inner.user()
+    }
 
     /// Authenticates a user with the given credentials.
     ///
@@ -795,12 +837,14 @@ pub trait AuthRequestExt: private::Sealed {
     ///
     /// # Errors
     ///
-    /// Returns an error if the AuthBackend accepts the credentials but fails
-    /// to fetch the user object.
-    async fn authenticate(
-        &mut self,
+    /// Returns an error if the [`AuthBackend`] accepts the credentials but
+    /// fails to fetch the user object.
+    pub async fn authenticate(
+        &self,
         credentials: &(dyn Any + Send + Sync),
-    ) -> Result<Option<Box<dyn User + Send + Sync>>>;
+    ) -> Result<Option<Box<dyn User + Send + Sync>>> {
+        self.inner.authenticate(credentials).await
+    }
 
     /// Logs in a user.
     ///
@@ -812,7 +856,9 @@ pub trait AuthRequestExt: private::Sealed {
     ///
     /// Returns an error if the user object cannot be stored in the session
     /// object.
-    async fn login(&mut self, user: Box<dyn User + Send + Sync + 'static>) -> Result<()>;
+    pub async fn login(&self, user: Box<dyn User + Send + Sync + 'static>) -> Result<()> {
+        self.inner.login(user).await
+    }
 
     /// Logs out the current user.
     ///
@@ -824,91 +870,123 @@ pub trait AuthRequestExt: private::Sealed {
     ///
     /// Returns an error if the user object cannot be removed from the session
     /// object.
-    async fn logout(&mut self) -> Result<()>;
+    pub async fn logout(&self) -> Result<()> {
+        self.inner.logout().await
+    }
+}
+
+#[derive(Debug)]
+struct AuthInner {
+    session: Session,
+    #[debug("..")]
+    backend: Arc<dyn AuthBackend>,
+    secret_key: SecretKey,
+    // Using a standard Mutex object instead of an async version - it's unlikely this will ever be
+    // accessed from multiple threads, since it's tied to a single request. The mutex is used
+    // mostly to allow the `Auth` object to be cloned and passed around while maintaining the
+    // reference to the same `AuthInner` object with a mutable `user`.
+    #[debug("..")]
+    user: Mutex<UserWrapper>,
+}
+
+impl AuthInner {
+    async fn new(
+        session: Session,
+        backend: Arc<dyn AuthBackend>,
+        secret_key: SecretKey,
+        fallback_secret_keys: &[SecretKey],
+    ) -> cot::Result<Self> {
+        #[allow(trivial_casts)] // cast to Arc<dyn User + Send + Sync>
+        let user = get_user_with_saved_id(&session, &*backend, &secret_key, fallback_secret_keys)
+            .await?
+            .map_or_else(
+                || Arc::new(AnonymousUser) as Arc<dyn User + Send + Sync>,
+                Arc::from,
+            );
+
+        Ok(Self {
+            session,
+            backend,
+            secret_key,
+            user: Mutex::new(UserWrapper(user)),
+        })
+    }
+
+    async fn from_request(request: &mut Request) -> cot::Result<Self> {
+        let config = request.context().config();
+
+        let session = Session::from_request(request).clone();
+        let backend = request.context().auth_backend().clone();
+        let secret_key = config.secret_key.clone();
+
+        Self::new(session, backend, secret_key, &config.fallback_secret_keys).await
+    }
+
+    fn user(&self) -> Arc<dyn User + Send + Sync> {
+        Arc::clone(&self.user_lock().0)
+    }
+
+    async fn authenticate(
+        &self,
+        credentials: &(dyn Any + Send + Sync),
+    ) -> Result<Option<Box<dyn User + Send + Sync>>> {
+        self.backend.authenticate(credentials).await
+    }
+
+    async fn login(&self, user: Box<dyn User + Send + Sync + 'static>) -> Result<()> {
+        // Mitigate the session fixation attack by changing the session ID:
+        // https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#renew-the-session-id-after-any-privilege-level-change
+        self.session.cycle_id().await?;
+
+        if let Some(user_id) = user.id() {
+            self.session.insert(USER_ID_SESSION_KEY, user_id).await?;
+        }
+        let secret_key = &self.secret_key;
+        if let Some(session_auth_hash) = user.session_auth_hash(secret_key) {
+            self.session
+                .insert(SESSION_HASH_SESSION_KEY, session_auth_hash.as_bytes())
+                .await?;
+        }
+        *self.user_lock() = UserWrapper(Arc::from(user));
+
+        Ok(())
+    }
+
+    async fn logout(&self) -> Result<()> {
+        self.session.flush().await?;
+        *self.user_lock() = UserWrapper(Arc::new(AnonymousUser));
+
+        Ok(())
+    }
+
+    fn user_lock(&self) -> MutexGuard<'_, UserWrapper> {
+        self.user.lock().unwrap_or_else(|poison_error| {
+            // We don't have any invariants about the structure of the UserWrapper object,
+            // so we can safely clear the poison.
+            self.user.clear_poison();
+            poison_error.into_inner()
+        })
+    }
 }
 
 const USER_ID_SESSION_KEY: &str = "__cot_auth_user_id";
 const SESSION_HASH_SESSION_KEY: &str = "__cot_auth_session_hash";
 
-type UserExtension = Arc<dyn User + Send + Sync + 'static>;
-
-impl private::Sealed for Request {}
-
-#[async_trait]
-impl AuthRequestExt for Request {
-    async fn user(&mut self) -> Result<&dyn User> {
-        if self.extensions().get::<UserExtension>().is_none() {
-            if let Some(user) = get_user_with_saved_id(self).await? {
-                self.extensions_mut().insert(UserExtension::from(user));
-            } else {
-                self.logout().await?;
-            }
-        }
-
-        Ok(&**self
-            .extensions()
-            .get::<UserExtension>()
-            .expect("User extension should have just been added"))
-    }
-
-    async fn authenticate(
-        &mut self,
-        credentials: &(dyn Any + Send + Sync),
-    ) -> Result<Option<Box<dyn User + Send + Sync>>> {
-        self.context()
-            .auth_backend()
-            .authenticate(self, credentials)
-            .await
-    }
-
-    async fn login(&mut self, user: Box<dyn User + Send + Sync + 'static>) -> Result<()> {
-        // Mitigate the session fixation attack by changing the session ID:
-        // https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#renew-the-session-id-after-any-privilege-level-change
-        self.session().cycle_id().await?;
-
-        let user = UserExtension::from(user);
-        if let Some(user_id) = user.id() {
-            self.session_mut()
-                .insert(USER_ID_SESSION_KEY, user_id)
-                .await?;
-        }
-        let secret_key = &self.project_config().secret_key;
-        if let Some(session_auth_hash) = user.session_auth_hash(secret_key) {
-            self.session_mut()
-                .insert(SESSION_HASH_SESSION_KEY, session_auth_hash.as_bytes())
-                .await?;
-        }
-        self.extensions_mut().insert(user);
-
-        Ok(())
-    }
-
-    async fn logout(&mut self) -> Result<()> {
-        self.session().flush().await?;
-        self.extensions_mut()
-            .insert::<UserExtension>(Arc::new(AnonymousUser()));
-
-        Ok(())
-    }
-}
-
 async fn get_user_with_saved_id(
-    request: &mut Request,
+    session: &Session,
+    auth_backend: &dyn AuthBackend,
+    secret_key: &SecretKey,
+    fallback_secret_keys: &[SecretKey],
 ) -> Result<Option<Box<dyn User + Send + Sync>>> {
-    let Some(user_id) = request.session().get::<UserId>(USER_ID_SESSION_KEY).await? else {
+    let Some(user_id) = session.get::<UserId>(USER_ID_SESSION_KEY).await? else {
         return Ok(None);
     };
 
-    let Some(user) = request
-        .context()
-        .auth_backend()
-        .get_by_id(request, user_id)
-        .await?
-    else {
+    let Some(user) = auth_backend.get_by_id(user_id).await? else {
         return Ok(None);
     };
 
-    if session_auth_hash_valid(&*user, request).await? {
+    if session_auth_hash_valid(&*user, session, secret_key, fallback_secret_keys).await? {
         Ok(Some(user))
     } else {
         Ok(None)
@@ -917,16 +995,15 @@ async fn get_user_with_saved_id(
 
 async fn session_auth_hash_valid(
     user: &(dyn User + Send + Sync),
-    request: &mut Request,
+    session: &Session,
+    secret_key: &SecretKey,
+    fallback_secret_keys: &[SecretKey],
 ) -> Result<bool> {
-    let config = request.project_config();
-
-    let Some(user_hash) = user.session_auth_hash(&config.secret_key) else {
+    let Some(user_hash) = user.session_auth_hash(secret_key) else {
         return Ok(true);
     };
 
-    let stored_hash = request
-        .session()
+    let stored_hash = session
         .get::<Vec<u8>>(SESSION_HASH_SESSION_KEY)
         .await?
         .expect("Session hash should be present in the session object");
@@ -939,13 +1016,12 @@ async fn session_auth_hash_valid(
     // If the primary secret key doesn't match, try the fallback keys (in other
     // words, check if the session hash was generated with an old secret key)
     // and update the session hash with the new key if a match is found.
-    for fallback_key in &config.fallback_secret_keys {
+    for fallback_key in fallback_secret_keys {
         let user_hash_fallback = user
             .session_auth_hash(fallback_key)
             .expect("User should have a session hash for each secret key");
         if user_hash_fallback == stored_hash {
-            request
-                .session_mut()
+            session
                 .insert(SESSION_HASH_SESSION_KEY, user_hash.as_bytes())
                 .await?;
 
@@ -971,7 +1047,6 @@ pub trait AuthBackend: Send + Sync {
     /// Returns an error if the credentials type is not supported.
     async fn authenticate(
         &self,
-        request: &Request,
         credentials: &(dyn Any + Send + Sync),
     ) -> Result<Option<Box<dyn User + Send + Sync>>>;
 
@@ -996,7 +1071,7 @@ pub trait AuthBackend: Send + Sync {
     ///     let user = request
     ///         .context()
     ///         .auth_backend()
-    ///         .get_by_id(request, UserId::Int(1))
+    ///         .get_by_id(UserId::Int(1))
     ///         .await;
     ///
     ///     match user {
@@ -1013,11 +1088,7 @@ pub trait AuthBackend: Send + Sync {
     ///     }
     /// }
     /// ```
-    async fn get_by_id(
-        &self,
-        request: &Request,
-        id: UserId,
-    ) -> Result<Option<Box<dyn User + Send + Sync>>>;
+    async fn get_by_id(&self, id: UserId) -> Result<Option<Box<dyn User + Send + Sync>>>;
 }
 
 /// A no-op authentication backend.
@@ -1028,17 +1099,12 @@ pub struct NoAuthBackend;
 impl AuthBackend for NoAuthBackend {
     async fn authenticate(
         &self,
-        _request: &Request,
         _credentials: &(dyn Any + Send + Sync),
     ) -> Result<Option<Box<dyn User + Send + Sync>>> {
         Ok(None)
     }
 
-    async fn get_by_id(
-        &self,
-        _request: &Request,
-        _id: UserId,
-    ) -> Result<Option<Box<dyn User + Send + Sync>>> {
+    async fn get_by_id(&self, _id: UserId) -> Result<Option<Box<dyn User + Send + Sync>>> {
         Ok(None)
     }
 }
@@ -1061,17 +1127,12 @@ mod tests {
     impl<F: Fn() -> MockUser + Send + Sync + 'static> AuthBackend for MockAuthBackend<F> {
         async fn authenticate(
             &self,
-            _request: &Request,
             _credentials: &(dyn Any + Send + Sync),
         ) -> Result<Option<Box<dyn User + Send + Sync>>> {
             Ok(Some(Box::new((self.return_user)())))
         }
 
-        async fn get_by_id(
-            &self,
-            _request: &Request,
-            _id: UserId,
-        ) -> Result<Option<Box<dyn User + Send + Sync>>> {
+        async fn get_by_id(&self, _id: UserId) -> Result<Option<Box<dyn User + Send + Sync>>> {
             Ok(Some(Box::new((self.return_user)())))
         }
     }
@@ -1114,7 +1175,7 @@ mod tests {
 
     #[test]
     fn anonymous_user() {
-        let anonymous_user = AnonymousUser();
+        let anonymous_user = AnonymousUser;
         assert_eq!(anonymous_user.id(), None);
         assert_eq!(anonymous_user.username(), None);
         assert!(!anonymous_user.is_active());
@@ -1126,7 +1187,7 @@ mod tests {
             None
         );
 
-        let anonymous_user2 = AnonymousUser();
+        let anonymous_user2 = AnonymousUser;
         assert_eq!(anonymous_user, anonymous_user2);
     }
 
@@ -1205,7 +1266,8 @@ mod tests {
     async fn user_anonymous() {
         let mut request = test_request_with_auth_backend(NoAuthBackend {});
 
-        let user = request.user().await.unwrap();
+        let auth = Auth::from_request(&mut request).await.unwrap();
+        let user = auth.user();
         assert!(!user.is_authenticated());
         assert!(!user.is_active());
     }
@@ -1222,13 +1284,13 @@ mod tests {
             mock_user
         });
 
-        request
-            .session_mut()
+        Session::from_request(&request)
             .insert(USER_ID_SESSION_KEY, UserId::Int(1))
             .await
             .unwrap();
-        let user = request.user().await.unwrap();
-        assert_eq!(user.username(), Some(Cow::from("mockuser")));
+        let auth = Auth::from_request(&mut request).await.unwrap();
+
+        assert_eq!(auth.user().username(), Some(Cow::from("mockuser")));
     }
 
     #[cot::test]
@@ -1240,15 +1302,18 @@ mod tests {
                 .return_const(Some(Cow::from("mockuser")));
             mock_user
         });
+        let auth = Auth::from_request(&mut request).await.unwrap();
 
         let credentials: &(dyn Any + Send + Sync) = &();
-        let user = request.authenticate(credentials).await.unwrap().unwrap();
+        let user = auth.authenticate(credentials).await.unwrap().unwrap();
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
     }
 
     #[cot::test]
     async fn login_logout() {
         let mut request = test_request(MockUser::new);
+        let session = Session::from_request(&request).clone();
+        let auth = Auth::from_request(&mut request).await.unwrap();
 
         let mut mock_user = MockUser::new();
         mock_user.expect_id().return_const(UserId::Int(1));
@@ -1257,22 +1322,22 @@ mod tests {
             .expect_username()
             .return_const(Some(Cow::from("mockuser")));
 
-        request.login(Box::new(mock_user)).await.unwrap();
-        let user = request.user().await.unwrap();
-        assert_eq!(user.username(), Some(Cow::from("mockuser")));
-        assert!(!request.session().is_empty().await);
+        auth.login(Box::new(mock_user)).await.unwrap();
+        assert_eq!(auth.user().username(), Some(Cow::from("mockuser")));
+        assert!(!session.is_empty().await);
 
-        request.logout().await.unwrap();
-        let user = request.user().await.unwrap();
-        assert!(user.username().is_none());
+        auth.logout().await.unwrap();
+        assert!(auth.user().username().is_none());
 
-        assert!(request.session().is_empty().await);
+        assert!(session.is_empty().await);
     }
 
     /// Test the session fixation attack mitigation
     #[cot::test]
     async fn login_cycle_id() {
         let mut request = test_request(MockUser::new);
+        let session = Session::from_request(&request).clone();
+        let auth = Auth::from_request(&mut request).await.unwrap();
 
         let mut mock_user = MockUser::new();
         mock_user.expect_id().return_const(UserId::Int(1));
@@ -1280,10 +1345,10 @@ mod tests {
         mock_user
             .expect_username()
             .return_const(Some(Cow::from("mockuser_1")));
-        request.login(Box::new(mock_user)).await.unwrap();
+        auth.login(Box::new(mock_user)).await.unwrap();
 
-        request.session().save().await.unwrap();
-        let id_1 = request.session().id();
+        session.save().await.unwrap();
+        let id_1 = session.id();
         assert!(id_1.is_some());
 
         let mut mock_user = MockUser::new();
@@ -1292,10 +1357,10 @@ mod tests {
         mock_user
             .expect_username()
             .return_const(Some(Cow::from("mockuser_2")));
-        request.login(Box::new(mock_user)).await.unwrap();
+        auth.login(Box::new(mock_user)).await.unwrap();
 
-        request.session().save().await.unwrap();
-        let id_2 = request.session().id();
+        session.save().await.unwrap();
+        let id_2 = session.id();
 
         assert!(id_2.is_some());
         assert!(id_1 != id_2);
@@ -1307,13 +1372,13 @@ mod tests {
     async fn logout_on_invalid_user_id_in_session() {
         let mut request = test_request_with_auth_backend(NoAuthBackend {});
 
-        request
-            .session_mut()
+        Session::from_request(&request)
             .insert(USER_ID_SESSION_KEY, UserId::Int(1))
             .await
             .unwrap();
 
-        let user = request.user().await.unwrap();
+        let auth = Auth::from_request(&mut request).await.unwrap();
+        let user = auth.user();
         assert_eq!(user.username(), None);
         assert!(!user.is_authenticated());
     }
@@ -1336,20 +1401,19 @@ mod tests {
         };
 
         let mut request = test_request(create_user.clone());
+        let auth = Auth::from_request(&mut request).await.unwrap();
 
-        request.login(Box::new(create_user())).await.unwrap();
-        let user = request.user().await.unwrap();
-        assert_eq!(user.username(), Some(Cow::from("mockuser")));
+        auth.login(Box::new(create_user())).await.unwrap();
+        assert_eq!(auth.user().username(), Some(Cow::from("mockuser")));
 
         // Check the user can be retrieved again
-        request.extensions_mut().remove::<UserExtension>();
-        let user = request.user().await.unwrap();
-        assert_eq!(user.username(), Some(Cow::from("mockuser")));
+        let auth = Auth::from_request(&mut request).await.unwrap();
+        assert_eq!(auth.user().username(), Some(Cow::from("mockuser")));
 
         // Verify the user is logged out when the session hash changes
-        request.extensions_mut().remove::<UserExtension>();
         *session_auth_hash.lock().unwrap() = SessionAuthHash::new(&[4, 5, 6]);
-        let user = request.user().await.unwrap();
+        let auth = Auth::from_request(&mut request).await.unwrap();
+        let user = auth.user();
         assert!(!user.is_authenticated());
         assert_eq!(user.username(), None);
     }
@@ -1378,9 +1442,10 @@ mod tests {
         };
 
         let mut request = test_request(create_user);
+        let auth = Auth::from_request(&mut request).await.unwrap();
 
-        request.login(Box::new(create_user())).await.unwrap();
-        let user = request.user().await.unwrap();
+        auth.login(Box::new(create_user())).await.unwrap();
+        let user = auth.user();
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
 
         let replace_keys = move |request: &mut Request, secret_key, fallback_keys| {
@@ -1398,18 +1463,62 @@ mod tests {
             SecretKey::new(TEST_KEY_2),
             vec![SecretKey::new(TEST_KEY_1)],
         );
-        let user = request.user().await.unwrap();
+        let auth = Auth::from_request(&mut request).await.unwrap();
+        let user = auth.user();
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
 
         // Remove fallback key and verify the user is still logged in
         replace_keys(&mut request, SecretKey::new(TEST_KEY_2), vec![]);
-        let user = request.user().await.unwrap();
+        let auth = Auth::from_request(&mut request).await.unwrap();
+        let user = auth.user();
         assert_eq!(user.username(), Some(Cow::from("mockuser")));
 
         // Remove both keys and verify the user is logged out
         replace_keys(&mut request, SecretKey::new(TEST_KEY_3), vec![]);
-        let user = request.user().await.unwrap();
+        let auth = Auth::from_request(&mut request).await.unwrap();
+        let user = auth.user();
         assert_eq!(user.username(), None);
         assert!(!user.is_authenticated());
+    }
+
+    #[test]
+    fn user_wrapper_with_anonymous_user() {
+        let anon_user = AnonymousUser;
+        let user_wrapper = UserWrapper(Arc::new(anon_user));
+
+        let debug_output = format!("{user_wrapper:?}");
+
+        assert!(debug_output.contains("Arc<dyn User + Send + Sync>"));
+        assert!(debug_output.contains("id: None"));
+        assert!(debug_output.contains("username: None"));
+        assert!(debug_output.contains("is_active: false"));
+        assert!(debug_output.contains("is_authenticated: false"));
+        assert!(debug_output.contains("last_login: None"));
+        assert!(debug_output.contains("joined: None"));
+    }
+
+    #[test]
+    fn test_user_wrapper_debug() {
+        let mut mock_user = MockUser::new();
+        mock_user.expect_id().return_const(Some(UserId::Int(42)));
+        mock_user
+            .expect_username()
+            .return_const(Some(Cow::from("test_user")));
+        mock_user.expect_is_active().return_const(true);
+        mock_user.expect_is_authenticated().return_const(true);
+        let now = DateTime::parse_from_rfc3339("2023-01-01T12:00:00+00:00").unwrap();
+        mock_user.expect_last_login().return_const(Some(now));
+        mock_user.expect_joined().return_const(Some(now));
+
+        let user_wrapper = UserWrapper(Arc::new(mock_user));
+
+        let debug_output = format!("{user_wrapper:?}");
+
+        assert!(debug_output.contains("Arc<dyn User + Send + Sync>"));
+        assert!(debug_output.contains("id: Some(Int(42))"));
+        assert!(debug_output.contains("username: Some(\"test_user\")"));
+        assert!(debug_output.contains("is_active: true"));
+        assert!(debug_output.contains("is_authenticated: true"));
+        assert!(debug_output.contains("2023-01-01T12:00:00+00:00"));
     }
 }

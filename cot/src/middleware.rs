@@ -7,6 +7,7 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
+use futures_core::future::BoxFuture;
 use futures_util::TryFutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::BoxBody;
@@ -14,6 +15,7 @@ use tower::Service;
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 
 use crate::error::ErrorRepr;
+use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
 use crate::{Body, Error};
@@ -31,7 +33,7 @@ use crate::{Body, Error};
 ///
 /// ```
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{RootHandlerBuilder, WithApps};
+/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
 /// use cot::{BoxedHandler, Project, ProjectContext};
 ///
 /// struct MyProject;
@@ -39,7 +41,7 @@ use crate::{Body, Error};
 ///     fn middlewares(
 ///         &self,
 ///         handler: RootHandlerBuilder,
-///         context: &ProjectContext<WithApps>,
+///         context: &MiddlewareContext,
 ///     ) -> BoxedHandler {
 ///         handler
 ///             // IntoCotResponseLayer used internally in middleware()
@@ -103,15 +105,15 @@ pub struct IntoCotResponse<S> {
     inner: S,
 }
 
-impl<S, B, E> Service<Request> for IntoCotResponse<S>
+impl<S, ResBody, E> Service<Request> for IntoCotResponse<S>
 where
-    S: Service<Request, Response = http::Response<B>>,
-    B: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
+    S: Service<Request, Response = http::Response<ResBody>>,
+    ResBody: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
     E: std::error::Error + Send + Sync + 'static,
 {
     type Response = Response;
     type Error = S::Error;
-    type Future = futures_util::future::MapOk<S::Future, fn(http::Response<B>) -> Response>;
+    type Future = futures_util::future::MapOk<S::Future, fn(http::Response<ResBody>) -> Response>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -124,9 +126,9 @@ where
     }
 }
 
-fn map_response<B, E>(response: http::response::Response<B>) -> Response
+fn map_response<ResBody, E>(response: http::response::Response<ResBody>) -> Response
 where
-    B: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
+    ResBody: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
     E: std::error::Error + Send + Sync + 'static,
 {
     response.map(|body| Body::wrapper(BoxBody::new(body.map_err(map_err))))
@@ -145,7 +147,7 @@ where
 ///
 /// ```
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{RootHandlerBuilder, WithApps};
+/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
 /// use cot::{BoxedHandler, Project, ProjectContext};
 ///
 /// struct MyProject;
@@ -153,7 +155,7 @@ where
 ///     fn middlewares(
 ///         &self,
 ///         handler: RootHandlerBuilder,
-///         context: &ProjectContext<WithApps>,
+///         context: &MiddlewareContext,
 ///     ) -> BoxedHandler {
 ///         handler
 ///             // IntoCotErrorLayer used internally in middleware()
@@ -268,7 +270,7 @@ impl SessionMiddleware {
     ///
     /// ```
     /// use cot::middleware::SessionMiddleware;
-    /// use cot::project::{RootHandlerBuilder, WithApps};
+    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
     /// use cot::{BoxedHandler, Project, ProjectContext};
     ///
     /// struct MyProject;
@@ -276,7 +278,7 @@ impl SessionMiddleware {
     ///     fn middlewares(
     ///         &self,
     ///         handler: RootHandlerBuilder,
-    ///         context: &ProjectContext<WithApps>,
+    ///         context: &MiddlewareContext,
     ///     ) -> BoxedHandler {
     ///         handler
     ///             .middleware(SessionMiddleware::from_context(context))
@@ -285,9 +287,10 @@ impl SessionMiddleware {
     /// }
     /// ```
     #[must_use]
-    pub fn from_context(context: &crate::ProjectContext<crate::project::WithApps>) -> Self {
+    pub fn from_context(context: &MiddlewareContext) -> Self {
         Self::new().secure(context.config().middlewares.session.secure)
     }
+
     /// Sets the secure flag for the session middleware.
     ///
     /// # Examples
@@ -312,10 +315,194 @@ impl Default for SessionMiddleware {
 }
 
 impl<S> tower::Layer<S> for SessionMiddleware {
-    type Service = <SessionManagerLayer<MemoryStore> as tower::Layer<S>>::Service;
+    type Service = <SessionManagerLayer<MemoryStore> as tower::Layer<
+        <SessionWrapperLayer as tower::Layer<S>>::Service,
+    >>::Service;
 
     fn layer(&self, inner: S) -> Self::Service {
-        self.inner.layer(inner)
+        let session_store = MemoryStore::default();
+        let session_layer = SessionManagerLayer::new(session_store);
+        let session_wrapper_layer = SessionWrapperLayer::new();
+        let layers = (session_layer, session_wrapper_layer);
+
+        layers.layer(inner)
+    }
+}
+
+/// A middleware layer that wraps the session object in a
+/// [`crate::session::Session`].
+///
+/// This is only useful inside [`SessionMiddleware`] to expose session object as
+/// [`crate::session::Session`] to the request handlers. This shouldn't be
+/// useful on its own.
+#[derive(Debug, Copy, Clone)]
+pub struct SessionWrapperLayer;
+
+impl SessionWrapperLayer {
+    /// Create a new [`SessionWrapperLayer`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionWrapperLayer;
+    ///
+    /// let middleware = SessionWrapperLayer::new();
+    /// ```
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for SessionWrapperLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S> tower::Layer<S> for SessionWrapperLayer {
+    type Service = SessionWrapper<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        SessionWrapper { inner }
+    }
+}
+
+/// Service struct that wraps the session object in a
+/// [`crate::session::Session`].
+///
+/// Used by [`SessionWrapperLayer`].
+#[derive(Debug, Clone)]
+pub struct SessionWrapper<S> {
+    inner: S,
+}
+
+impl<ReqBody, ResBody, S> Service<http::Request<ReqBody>> for SessionWrapper<S>
+where
+    S: Service<http::Request<ReqBody>, Response = http::Response<ResBody>> + Clone + Send + 'static,
+    S::Future: Send,
+    ReqBody: Send + 'static,
+    ResBody: Default + Send,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut req: http::Request<ReqBody>) -> Self::Future {
+        let session = req
+            .extensions_mut()
+            .remove::<tower_sessions::Session>()
+            .expect("session extension must be present");
+        let session_wrapped = crate::session::Session::new(session);
+        req.extensions_mut().insert(session_wrapped);
+
+        self.inner.call(req)
+    }
+}
+
+/// A middleware that provides authentication functionality.
+///
+/// This middleware is used to authenticate requests and add the authenticated
+/// user to the request extensions. This adds the [`crate::auth::Auth`] object
+/// to the request which can be accessed by the request handlers.
+///
+/// # Examples
+///
+/// ```
+/// use cot::middleware::AuthMiddleware;
+/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
+/// use cot::{BoxedHandler, Project, ProjectContext};
+///
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn middlewares(
+///         &self,
+///         handler: RootHandlerBuilder,
+///         context: &MiddlewareContext,
+///     ) -> BoxedHandler {
+///         handler.middleware(AuthMiddleware::new()).build()
+///     }
+/// }
+/// ```
+#[derive(Debug, Copy, Clone)]
+pub struct AuthMiddleware;
+
+impl AuthMiddleware {
+    /// Create a new [`AuthMiddleware`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::AuthMiddleware;
+    ///
+    /// let middleware = AuthMiddleware::new();
+    /// ```
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for AuthMiddleware {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S> tower::Layer<S> for AuthMiddleware {
+    type Service = AuthService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        AuthService::new(inner)
+    }
+}
+
+/// Service that adds [`crate::auth::Auth`] to the request.
+///
+/// Used by [`AuthMiddleware`].
+#[derive(Debug, Clone)]
+pub struct AuthService<S> {
+    inner: S,
+}
+
+impl<S> AuthService<S> {
+    fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+impl<S> Service<Request> for AuthService<S>
+where
+    S: Service<Request, Response = Response, Error = Error> + Clone + Send + 'static,
+    S::Future: Send,
+{
+    type Response = S::Response;
+    type Error = Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut req: Request) -> Self::Future {
+        // The inner service may panic until ready, so it's important to clone
+        // it here and used the version that is ready. This is a common pattern when
+        // using `tower::Service`.
+        //
+        // https://docs.rs/tower/latest/tower/trait.Service.html#be-careful-when-cloning-inner-services
+        let clone = self.inner.clone();
+        let mut inner = std::mem::replace(&mut self.inner, clone);
+
+        Box::pin(async move {
+            let auth = crate::auth::Auth::from_request(&mut req).await?;
+            req.extensions_mut().insert(auth);
+
+            inner.call(req).await
+        })
     }
 }
 #[cfg(feature = "live-reload")]
@@ -356,7 +543,7 @@ type LiveReloadLayerType = tower::util::Either<
 ///
 /// ```
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{RootHandlerBuilder, WithApps};
+/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
 /// use cot::{BoxedHandler, Project, ProjectContext};
 ///
 /// struct MyProject;
@@ -364,7 +551,7 @@ type LiveReloadLayerType = tower::util::Either<
 ///     fn middlewares(
 ///         &self,
 ///         handler: RootHandlerBuilder,
-///         context: &ProjectContext<WithApps>,
+///         context: &MiddlewareContext,
 ///     ) -> BoxedHandler {
 ///         handler
 ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -385,7 +572,7 @@ impl LiveReloadMiddleware {
     ///
     /// ```
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{RootHandlerBuilder, WithApps};
+    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
     /// use cot::{BoxedHandler, Project, ProjectContext};
     ///
     /// struct MyProject;
@@ -393,7 +580,7 @@ impl LiveReloadMiddleware {
     ///     fn middlewares(
     ///         &self,
     ///         handler: RootHandlerBuilder,
-    ///         context: &ProjectContext<WithApps>,
+    ///         context: &MiddlewareContext,
     ///     ) -> BoxedHandler {
     ///         // only enable live reloading when compiled in debug mode
     ///         #[cfg(debug_assertions)]
@@ -414,7 +601,7 @@ impl LiveReloadMiddleware {
     ///
     /// ```
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{RootHandlerBuilder, WithApps};
+    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
     /// use cot::{BoxedHandler, Project, ProjectContext};
     ///
     /// struct MyProject;
@@ -422,7 +609,7 @@ impl LiveReloadMiddleware {
     ///     fn middlewares(
     ///         &self,
     ///         handler: RootHandlerBuilder,
-    ///         context: &ProjectContext<WithApps>,
+    ///         context: &MiddlewareContext,
     ///     ) -> BoxedHandler {
     ///         handler
     ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -439,7 +626,7 @@ impl LiveReloadMiddleware {
     /// live_reload.enabled = true
     /// ```
     #[must_use]
-    pub fn from_context(context: &crate::ProjectContext<crate::project::WithApps>) -> Self {
+    pub fn from_context(context: &crate::ProjectContext<crate::project::WithDatabase>) -> Self {
         Self::with_enabled(context.config().middlewares.live_reload.enabled)
     }
 

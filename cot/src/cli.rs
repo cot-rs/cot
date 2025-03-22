@@ -357,7 +357,7 @@ impl CliTask for CollectStatic {
             .expect("required argument");
         println!("Collecting static files into {:?}", dir);
 
-        let bootstrapper = bootstrapper.with_apps();
+        let bootstrapper = bootstrapper.with_apps().with_database().await?;
         StaticFiles::from(bootstrapper.context())
             .collect_into(dir)
             .map_err(|e| Error::new(ErrorRepr::CollectStatic { source: e }))?;

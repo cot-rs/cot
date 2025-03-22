@@ -8,7 +8,7 @@ use crate::request::PathParams;
 
 /// An error that occurs when deserializing path parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
-pub enum PathParamsDeserializerError {
+pub(super) enum PathParamsDeserializerError {
     /// Invalid number of path parameters
     #[error("Invalid number of path parameters: expected {expected}, got {actual}")]
     InvalidParamNumber {

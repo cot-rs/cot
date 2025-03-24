@@ -737,7 +737,6 @@ mod tests {
     fn request_ext_path_params() {
         let mut request = TestRequestBuilder::get("/").build();
 
-        // Insert path params manually
         let mut params = PathParams::new();
         params.insert("id".to_string(), "42".to_string());
         request.extensions_mut().insert(params);
@@ -749,7 +748,6 @@ mod tests {
     fn request_ext_path_params_mut() {
         let mut request = TestRequestBuilder::get("/").build();
 
-        // Add a param using path_params_mut
         request
             .path_params_mut()
             .insert("id".to_string(), "42".to_string());
@@ -795,7 +793,6 @@ mod tests {
     #[tokio::test]
     async fn request_ext_extract_parts() {
         async fn handler(mut request: Request) -> Result<Response> {
-            // Test extract_parts with Path extractor
             let Path(id): Path<String> = request.extract_parts().await?;
             assert_eq!(id, "42");
 
@@ -808,41 +805,53 @@ mod tests {
             .router(router.clone())
             .build();
 
-        // Test extract_parts with Path extractor
         router.handle(request).await.unwrap();
     }
 
     #[test]
-    fn parts_ext_implementations() {
+    fn parts_ext_path_params() {
         let (mut parts, _) = Request::new(Body::empty()).into_parts();
-
-        // Add path params
         let mut params = PathParams::new();
         params.insert("id".to_string(), "42".to_string());
         parts.extensions.insert(params);
 
-        // Test access to path params
         assert_eq!(parts.path_params().get("id"), Some("42"));
+    }
 
-        // Test mutating path params
+    #[test]
+    fn parts_ext_mutating_path_params() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
         parts
             .path_params_mut()
             .insert("page".to_string(), "1".to_string());
+
         assert_eq!(parts.path_params().get("page"), Some("1"));
+    }
 
-        // Test app name
+    #[test]
+    fn parts_ext_app_name() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
         parts.extensions.insert(AppName("test_app".to_string()));
+
         assert_eq!(parts.app_name(), Some("test_app"));
+    }
 
-        // Test route name
+    #[test]
+    fn parts_ext_route_name() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
         parts.extensions.insert(RouteName("test_route".to_string()));
-        assert_eq!(parts.route_name(), Some("test_route"));
 
-        // Test content type
+        assert_eq!(parts.route_name(), Some("test_route"));
+    }
+
+    #[test]
+    fn parts_ext_content_type() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
         parts.headers.insert(
             http::header::CONTENT_TYPE,
             http::HeaderValue::from_static("text/plain"),
         );
+
         assert_eq!(
             parts.content_type(),
             Some(&http::HeaderValue::from_static("text/plain"))
@@ -853,12 +862,10 @@ mod tests {
     async fn parts_extract_parts() {
         let (mut parts, _) = Request::new(Body::empty()).into_parts();
 
-        // Add path params
         let mut params = PathParams::new();
         params.insert("id".to_string(), "42".to_string());
         parts.extensions.insert(params);
 
-        // Test extract_parts with Path extractor
         let Path(id): Path<String> = parts.extract_parts().await.unwrap();
         assert_eq!(id, "42");
     }

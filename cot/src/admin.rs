@@ -197,10 +197,12 @@ async fn view_model(
         total_pages: u64,
     }
 
+    const DEFAULT_PAGE_SIZE: u64 = 10;
+
     let manager = get_manager(managers, &model_name)?;
 
     let page = pagination_params.page.unwrap_or(1);
-    let page_size = pagination_params.page_size.unwrap_or(10);
+    let page_size = pagination_params.page_size.unwrap_or(DEFAULT_PAGE_SIZE);
 
     let total_object_counts = manager.get_total_object_counts(&request).await?;
     let total_pages = total_object_counts.div_ceil(page_size);

@@ -1,8 +1,8 @@
 //! Extractors for request data.
 //!
-//! An extractor is a function that extracts data as a request. The main benefit
-//! of using an extractor is that it can be used directly as a parameter in a
-//! route handler.
+//! An extractor is a function that extracts data from a request. The main
+//! benefit of using an extractor is that it can be used directly as a parameter
+//! in a route handler.
 //!
 //! An extractor implements either [`FromRequest`] or [`FromRequestParts`].
 //! There are two variants because the request body can only be read once, so it
@@ -369,12 +369,6 @@ impl<F: Form> FromRequest for RequestForm<F> {
     }
 }
 
-impl FromRequestParts for Session {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        Ok(Session::from_extensions(&parts.extensions).clone())
-    }
-}
-
 /// An extractor that gets the database from the request extensions.
 ///
 /// # Example
@@ -412,6 +406,13 @@ impl FromRequestParts for RequestDb {
     }
 }
 
+// extractor impls for existing types
+impl FromRequestParts for Session {
+    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+        Ok(Session::from_extensions(&parts.extensions).clone())
+    }
+}
+
 impl FromRequestParts for Auth {
     async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
         let auth = parts
@@ -446,6 +447,52 @@ mod tests {
 
         let Json(data): Json<serde_json::Value> = Json::from_request(request).await.unwrap();
         assert_eq!(data, serde_json::json!({"hello": "world"}));
+    }
+
+    #[cfg(feature = "json")]
+    #[cot::test]
+    async fn json_empty() {
+        #[derive(Debug, Deserialize, PartialEq, Eq)]
+        struct TestData {}
+
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .header(http::header::CONTENT_TYPE, cot::headers::JSON_CONTENT_TYPE)
+            .body(Body::fixed(r#"{}"#))
+            .unwrap();
+
+        let Json(data): Json<TestData> = Json::from_request(request).await.unwrap();
+        assert_eq!(data, TestData {});
+    }
+
+    #[cfg(feature = "json")]
+    #[cot::test]
+    async fn json_struct() {
+        #[derive(Debug, Deserialize, PartialEq, Eq)]
+        struct TestDataInner {
+            hello: String,
+        }
+
+        #[derive(Debug, Deserialize, PartialEq, Eq)]
+        struct TestData {
+            inner: TestDataInner,
+        }
+
+        let request = http::Request::builder()
+            .method(http::Method::POST)
+            .header(http::header::CONTENT_TYPE, cot::headers::JSON_CONTENT_TYPE)
+            .body(Body::fixed(r#"{"inner":{"hello":"world"}}"#))
+            .unwrap();
+
+        let Json(data): Json<TestData> = Json::from_request(request).await.unwrap();
+        assert_eq!(
+            data,
+            TestData {
+                inner: TestDataInner {
+                    hello: "world".to_string(),
+                }
+            }
+        );
     }
 
     #[cot::test]
@@ -491,7 +538,7 @@ mod tests {
     }
 
     #[cot::test]
-    async fn empty_url_query() {
+    async fn url_query_empty() {
         #[derive(Deserialize, Debug, PartialEq)]
         struct EmptyParams {}
 
@@ -517,19 +564,26 @@ mod tests {
 
     #[cot::test]
     async fn request_form() {
-        #[derive(Form)]
+        #[derive(Debug, PartialEq, Eq, Form)]
         struct MyForm {
             hello: String,
+            foo: String,
         }
 
         let request = TestRequestBuilder::post("/")
-            .form_data(&[("hello", "world")])
+            .form_data(&[("hello", "world"), ("foo", "bar")])
             .build();
 
         let RequestForm(form_result): RequestForm<MyForm> =
             RequestForm::from_request(request).await.unwrap();
 
-        assert_eq!(form_result.unwrap().hello, "world");
+        assert_eq!(
+            form_result.unwrap(),
+            MyForm {
+                hello: "world".to_string(),
+                foo: "bar".to_string(),
+            }
+        );
     }
 
     #[cot::test]

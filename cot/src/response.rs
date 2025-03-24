@@ -141,7 +141,10 @@ impl ResponseExt for Response {
 
     #[cfg(feature = "json")]
     fn new_json<T: ?Sized + serde::Serialize>(status: StatusCode, data: &T) -> crate::Result<Self> {
-        let mut buf = Vec::with_capacity(128);
+        // a "reasonable default" for a JSON response size
+        const DEFAULT_JSON_SIZE: usize = 128;
+
+        let mut buf = Vec::with_capacity(DEFAULT_JSON_SIZE);
         let mut serializer = serde_json::Serializer::new(&mut buf);
         serde_path_to_error::serialize(data, &mut serializer)
             .map_err(|error| crate::Error::new(crate::error::ErrorRepr::Json(error)))?;

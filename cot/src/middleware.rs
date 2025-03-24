@@ -626,7 +626,7 @@ impl LiveReloadMiddleware {
     /// live_reload.enabled = true
     /// ```
     #[must_use]
-    pub fn from_context(context: &crate::ProjectContext<crate::project::WithDatabase>) -> Self {
+    pub fn from_context(context: &MiddlewareContext) -> Self {
         Self::with_enabled(context.config().middlewares.live_reload.enabled)
     }
 

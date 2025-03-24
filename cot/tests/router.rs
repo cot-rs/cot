@@ -1,11 +1,11 @@
 use bytes::Bytes;
 use cot::config::ProjectConfig;
-use cot::project::WithConfig;
+use cot::project::RegisterAppsContext;
 use cot::request::{Request, RequestExt};
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::test::Client;
-use cot::{App, AppBuilder, Body, Project, ProjectContext, StatusCode};
+use cot::{App, AppBuilder, Body, Project, StatusCode};
 
 async fn index(_request: Request) -> cot::Result<Response> {
     Ok(Response::new_html(
@@ -68,7 +68,7 @@ fn project() -> impl Project {
             Ok(ProjectConfig::default())
         }
 
-        fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+        fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
             apps.register_with_views(RouterApp, "");
         }
     }

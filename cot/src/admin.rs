@@ -643,12 +643,12 @@ impl AdminApp {
     ///
     /// ```
     /// use cot::admin::AdminApp;
-    /// use cot::project::WithConfig;
-    /// use cot::{AppBuilder, Project, ProjectContext};
+    /// use cot::project::RegisterAppsContext;
+    /// use cot::{AppBuilder, Project};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
-    ///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+    ///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
     ///         apps.register_with_views(AdminApp::new(), "/admin");
     ///     }
     /// }

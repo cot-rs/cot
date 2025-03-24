@@ -1,9 +1,9 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
-use cot::project::{ErrorPageHandler, WithConfig};
+use cot::project::{ErrorPageHandler, RegisterAppsContext};
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
-use cot::{App, AppBuilder, Body, Project, ProjectContext, StatusCode};
+use cot::{App, AppBuilder, Body, Project, StatusCode};
 
 async fn return_hello() -> cot::Result<Response> {
     panic!()
@@ -35,7 +35,7 @@ impl Project for HelloProject {
         Ok(config)
     }
 
-    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views(HelloApp, "");
     }
 

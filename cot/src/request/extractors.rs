@@ -458,7 +458,7 @@ mod tests {
         let request = http::Request::builder()
             .method(http::Method::POST)
             .header(http::header::CONTENT_TYPE, cot::headers::JSON_CONTENT_TYPE)
-            .body(Body::fixed(r#"{}"#))
+            .body(Body::fixed("{}"))
             .unwrap();
 
         let Json(data): Json<TestData> = Json::from_request(request).await.unwrap();

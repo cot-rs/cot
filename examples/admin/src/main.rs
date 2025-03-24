@@ -4,7 +4,7 @@ use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
 use cot::config::{DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig};
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
-use cot::project::{MiddlewareContext, WithConfig};
+use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
@@ -70,7 +70,7 @@ impl Project for AdminProject {
             .build())
     }
 
-    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register(DatabaseUserApp::new());
         apps.register_with_views(AdminApp::new(), "/admin");
         apps.register_with_views(HelloApp, "");

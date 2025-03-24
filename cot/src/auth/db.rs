@@ -571,8 +571,8 @@ impl DatabaseUserApp {
     /// ```no_run
     /// use cot::auth::db::DatabaseUserApp;
     /// use cot::config::{DatabaseConfig, ProjectConfig};
-    /// use cot::project::WithConfig;
-    /// use cot::{App, AppBuilder, Project, ProjectContext};
+    /// use cot::project::RegisterAppsContext;
+    /// use cot::{App, AppBuilder, Project};
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
@@ -582,8 +582,8 @@ impl DatabaseUserApp {
     ///             .build())
     ///     }
     ///
-    ///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
-    ///         use cot::project::WithConfig;
+    ///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+    ///         use cot::project::{RegisterAppsContext, WithConfig};
     ///         apps.register_with_views(DatabaseUserApp::new(), "");
     ///     }
     /// }

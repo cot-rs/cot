@@ -290,8 +290,8 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
-    /// use cot::project::{AppBuilder, WithConfig};
-    /// use cot::{App, Project, ProjectContext};
+    /// use cot::project::{AppBuilder, RegisterAppsContext};
+    /// use cot::{App, Project};
     ///
     /// struct MyApp;
     /// impl App for MyApp {
@@ -302,13 +302,13 @@ pub trait Project {
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
-    ///     fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+    ///     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
     ///         apps.register(MyApp);
     ///     }
     /// }
     /// ```
     #[allow(unused_variables)]
-    fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {}
+    fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {}
 
     /// Sets the authentication backend to use.
     ///
@@ -332,7 +332,7 @@ pub trait Project {
     ///     }
     /// }
     /// ```
-    fn auth_backend(&self, context: &ProjectContext<WithDatabase>) -> Arc<dyn AuthBackend> {
+    fn auth_backend(&self, context: &AuthBackendContext) -> Arc<dyn AuthBackend> {
         #[allow(trivial_casts)] // cast to Arc<dyn AuthBackend>
         match &context.config().auth_backend {
             AuthBackendConfig::None => Arc::new(NoAuthBackend) as Arc<dyn AuthBackend>,
@@ -597,8 +597,8 @@ where
 /// # Examples
 ///
 /// ```
-/// use cot::project::{AppBuilder, WithConfig};
-/// use cot::{App, Project, ProjectContext};
+/// use cot::project::{AppBuilder, RegisterAppsContext};
+/// use cot::{App, Project};
 ///
 /// struct MyApp;
 /// impl App for MyApp {
@@ -609,7 +609,7 @@ where
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
 ///         apps.register(MyApp);
 ///     }
 /// }
@@ -637,7 +637,7 @@ impl AppBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::project::WithConfig;
+    /// use cot::project::RegisterAppsContext;
     /// use cot::{App, Project};
     ///
     /// struct HelloApp;
@@ -650,11 +650,7 @@ impl AppBuilder {
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn register_apps(
-    ///         &self,
-    ///         apps: &mut cot::AppBuilder,
-    ///         _context: &cot::ProjectContext<WithConfig>,
-    ///     ) {
+    ///     fn register_apps(&self, apps: &mut cot::AppBuilder, _context: &RegisterAppsContext) {
     ///         apps.register(HelloApp);
     ///     }
     /// }
@@ -671,7 +667,7 @@ impl AppBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::project::WithConfig;
+    /// use cot::project::RegisterAppsContext;
     /// use cot::{App, Project};
     ///
     /// struct HelloApp;
@@ -684,11 +680,7 @@ impl AppBuilder {
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn register_apps(
-    ///         &self,
-    ///         apps: &mut cot::AppBuilder,
-    ///         _context: &cot::ProjectContext<WithConfig>,
-    ///     ) {
+    ///     fn register_apps(&self, apps: &mut cot::AppBuilder, _context: &RegisterAppsContext) {
     ///         apps.register_with_views(HelloApp, "/hello");
     ///     }
     /// }
@@ -2121,7 +2113,7 @@ mod tests {
     async fn bootstrapper() {
         struct TestProject;
         impl Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
                 apps.register_with_views(TestApp {}, "/app");
             }
         }

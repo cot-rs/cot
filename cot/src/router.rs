@@ -601,11 +601,11 @@ enum RouteInner {
 /// # Examples
 ///
 /// ```
-/// use cot::project::WithConfig;
+/// use cot::project::RegisterAppsContext;
 /// use cot::request::Request;
 /// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
-/// use cot::{App, AppBuilder, Body, Project, ProjectContext, StatusCode, reverse};
+/// use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
 ///     // any of below two lines returns the same:
@@ -635,7 +635,7 @@ enum RouteInner {
 /// struct MyProject;
 ///
 /// impl Project for MyProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
 ///         apps.register_with_views(MyApp, "");
 ///     }
 /// }

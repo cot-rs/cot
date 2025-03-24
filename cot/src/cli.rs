@@ -414,7 +414,8 @@ mod tests {
 
     use super::*;
     use crate::config::ProjectConfig;
-    use crate::{App, AppBuilder, ProjectContext};
+    use crate::project::RegisterAppsContext;
+    use crate::{App, AppBuilder};
 
     #[test]
     fn cli_new() {
@@ -498,7 +499,7 @@ mod tests {
 
         struct TestProject;
         impl cot::Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
                 apps.register(TestApp);
             }
         }

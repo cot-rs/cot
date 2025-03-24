@@ -1,11 +1,11 @@
 use bytes::Bytes;
 use cot::config::ProjectConfig;
-use cot::project::WithConfig;
+use cot::project::RegisterAppsContext;
 use cot::request::Request;
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::test::Client;
-use cot::{App, AppBuilder, Body, Project, ProjectContext, StatusCode, reverse};
+use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
 
 #[cot::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
@@ -46,7 +46,7 @@ async fn cot_project_router_sub_path() {
             Ok(ProjectConfig::default())
         }
 
-        fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+        fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
             apps.register_with_views(App1, "");
             apps.register_with_views(App2, "/app");
         }
@@ -96,7 +96,7 @@ async fn cot_router_reverse_local() {
             Ok(ProjectConfig::default())
         }
 
-        fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+        fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
             apps.register_with_views(App1, "");
             apps.register_with_views(App2, "");
         }

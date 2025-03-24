@@ -138,8 +138,8 @@ pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```no_run
-/// use cot::project::WithConfig;
-/// use cot::{App, AppBuilder, Project, ProjectContext};
+/// use cot::project::RegisterAppsContext;
+/// use cot::{App, AppBuilder, Project};
 ///
 /// struct HelloApp;
 ///
@@ -151,7 +151,7 @@ pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// struct HelloProject;
 /// impl Project for HelloProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
 ///         apps.register_with_views(HelloApp, "");
 ///     }
 /// }

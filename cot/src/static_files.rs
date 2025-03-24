@@ -16,9 +16,9 @@ use http::{Request, header};
 use pin_project_lite::pin_project;
 use tower::Service;
 
+use crate::Body;
 use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
-use crate::{Body, ProjectContext};
 
 /// Macro to define static files by specifying their paths.
 ///
@@ -286,7 +286,7 @@ mod tests {
 
     use super::*;
     use crate::config::ProjectConfig;
-    use crate::project::WithConfig;
+    use crate::project::RegisterAppsContext;
     use crate::{App, AppBuilder, Bootstrapper, Project};
 
     #[test]
@@ -398,7 +398,7 @@ mod tests {
 
         struct TestProject;
         impl Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
                 apps.register(App1);
                 apps.register(App2);
             }

@@ -659,3 +659,100 @@ impl<S> tower::Layer<S> for LiveReloadMiddleware {
 }
 
 // TODO: add Cot ORM-based session store
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use http::Request;
+    use tower::{Layer, ServiceExt};
+
+    use super::*;
+    use crate::auth::Auth;
+    use crate::session::Session;
+    use crate::test::TestRequestBuilder;
+
+    #[tokio::test]
+    async fn session_middleware_adds_session() {
+        let svc = tower::service_fn(|req: Request<Body>| async move {
+            assert!(req.extensions().get::<Session>().is_some());
+            Ok::<_, Error>(Response::new(Body::empty()))
+        });
+
+        let mut svc = SessionMiddleware::new().layer(svc);
+
+        let request = TestRequestBuilder::get("/").build();
+
+        svc.ready().await.unwrap().call(request).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn auth_middleware_adds_auth() {
+        let svc = tower::service_fn(|req: Request<Body>| async move {
+            let auth = req
+                .extensions()
+                .get::<Auth>()
+                .expect("Auth should be present");
+
+            assert!(!auth.user().is_authenticated());
+
+            Ok::<_, Error>(Response::new(Body::empty()))
+        });
+
+        let mut svc = AuthMiddleware::new().layer(svc);
+
+        let request = TestRequestBuilder::get("/").with_session().build();
+
+        svc.ready().await.unwrap().call(request).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[should_panic(
+        expected = "Session extension missing. Did you forget to add the SessionMiddleware?"
+    )]
+    async fn auth_middleware_requires_session() {
+        let svc = tower::service_fn(|_req: Request<Body>| async move {
+            Ok::<_, Error>(Response::new(Body::empty()))
+        });
+
+        let mut svc = AuthMiddleware::new().layer(svc);
+
+        let request = TestRequestBuilder::get("/").build();
+
+        // Should fail because Auth middleware requires session
+        let _result = svc.ready().await.unwrap().call(request).await;
+    }
+
+    #[tokio::test]
+    async fn auth_service_cloning() {
+        let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter_clone = counter.clone();
+
+        let svc = tower::service_fn(move |req: Request<Body>| {
+            let counter = counter_clone.clone();
+            async move {
+                counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+                assert!(req.extensions().get::<Auth>().is_some());
+
+                Ok::<_, Error>(Response::new(Body::empty()))
+            }
+        });
+
+        let mut svc = AuthMiddleware::new().layer(svc);
+        let svc = svc.ready().await.unwrap();
+
+        // Send multiple requests to test service cloning
+        let request1 = TestRequestBuilder::get("/").with_session().build();
+        let request2 = TestRequestBuilder::get("/").with_session().build();
+
+        // Process requests concurrently
+        let (res1, res2) = tokio::join!(svc.clone().call(request1), svc.call(request2));
+
+        assert!(res1.is_ok());
+        assert!(res2.is_ok());
+
+        // Counter should have been incremented twice
+        assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+}

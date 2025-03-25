@@ -38,6 +38,7 @@ use crate::response::{Response, not_found_response};
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};
 
+pub mod method;
 pub mod path;
 
 /// A router that can be used to route requests to their respective views.
@@ -165,6 +166,19 @@ impl Router {
                                 app_name: result.app_name.or_else(|| self.app_name.clone()),
                                 name: result.name,
                                 params: Self::matches_to_path_params(&matches, result.params),
+                            });
+                        }
+                    }
+                    #[cfg(feature = "openapi")]
+                    RouteInner::ApiHandler(handler) => {
+                        if matches_fully {
+                            return Some(HandlerFound {
+                                // TODO: consider removing this when Rust trait_upcasting is
+                                // stabilized and we bump the MSRV (lands in Rust 1.86)
+                                handler: handler.as_box_request_handler(),
+                                app_name: self.app_name.clone(),
+                                name: route.name.clone(),
+                                params: Self::matches_to_path_params(&matches, Vec::new()),
                             });
                         }
                     }
@@ -326,6 +340,70 @@ impl Router {
     pub fn is_empty(&self) -> bool {
         self.urls.is_empty()
     }
+
+    /// Returns the OpenAPI paths for the router.
+    ///
+    /// This might be useful if you want to manually serve the generated OpenAPI
+    /// specs.
+    #[cfg(feature = "openapi")]
+    #[must_use]
+    pub fn as_api(&self) -> aide::openapi::Paths {
+        let mut paths = aide::openapi::Paths::default();
+        let mut schema_generator = schemars::SchemaGenerator::default();
+
+        self.as_openapi_impl("", &[], &mut paths, &mut schema_generator);
+        paths
+    }
+
+    #[cfg(feature = "openapi")]
+    fn as_openapi_impl(
+        &self,
+        url: &str,
+        param_names: &[&str],
+        paths: &mut aide::openapi::Paths,
+        schema_generator: &mut schemars::SchemaGenerator,
+    ) {
+        for route in &self.urls {
+            Self::route_as_openapi(route, param_names, paths, schema_generator, url);
+        }
+    }
+
+    #[cfg(feature = "openapi")]
+    fn route_as_openapi(
+        route: &Route,
+        param_names: &[&str],
+        paths: &mut aide::openapi::Paths,
+        schema_generator: &mut schemars::SchemaGenerator,
+        url: &str,
+    ) {
+        match &route.view {
+            RouteInner::Router(router) => {
+                let mut params = Vec::from(param_names);
+                params.extend(route.url.param_names());
+
+                let url = format!("{url}{}", route.url);
+
+                router.as_openapi_impl(&url, &params, paths, schema_generator);
+            }
+            RouteInner::ApiHandler(handler) => {
+                let mut params = Vec::from(param_names);
+                params.extend(route.url.param_names());
+
+                let url = format!("{url}{}", route.url);
+
+                let mut route_context = crate::openapi::RouteContext::new();
+                route_context.param_names = &params;
+
+                paths.paths.insert(
+                    url,
+                    aide::openapi::ReferenceOr::Item(
+                        handler.as_api_route(&route_context, schema_generator),
+                    ),
+                );
+            }
+            RouteInner::Handler(_) => {}
+        }
+    }
 }
 
 impl Default for Router {
@@ -440,7 +518,8 @@ impl Route {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     // ...
+    /// #     unimplemented!()
     /// }
     ///
     /// let route = Route::with_handler("/", home);
@@ -453,7 +532,46 @@ impl Route {
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(ErrorHandlerWrapper(
+                handler,
+            )))),
+            name: None,
+        }
+    }
+
+    /// Create a new route with the given handler for inclusion in the OpenAPI
+    /// specs.
+    ///
+    /// See [`crate::openapi`] module documentation for more details on how to
+    /// generate OpenAPI specs automatically.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::Request;
+    /// use cot::response::Response;
+    /// use cot::router::method::openapi::api_get;
+    /// use cot::router::{Route, Router};
+    ///
+    /// async fn home(request: Request) -> cot::Result<Response> {
+    ///     // ...
+    /// #     unimplemented!()
+    /// }
+    ///
+    /// let route = Route::with_api_handler("/", api_get(home));
+    /// ```
+    #[must_use]
+    #[cfg(feature = "openapi")]
+    pub fn with_api_handler<HandlerParams, H>(url: &str, handler: H) -> Self
+    where
+        HandlerParams: 'static,
+        H: RequestHandler<HandlerParams> + crate::openapi::AsApiRoute + Send + Sync + 'static,
+    {
+        Self {
+            url: Arc::new(PathMatcher::new(url)),
+            view: RouteInner::ApiHandler(Arc::new(
+                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+            )),
             name: None,
         }
     }
@@ -465,13 +583,15 @@ impl Route {
     /// ```
     /// use cot::request::Request;
     /// use cot::response::Response;
+    /// use cot::router::method::openapi::api_get;
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     // ...
+    /// #     unimplemented!()
     /// }
     ///
-    /// let route = Route::with_handler_and_name("/", home, "home");
+    /// let route = Route::with_handler_and_name("/", api_get(home), "home");
     /// ```
     #[must_use]
     pub fn with_handler_and_name<N, HandlerParams, H>(url: &str, handler: H, name: N) -> Self
@@ -483,6 +603,44 @@ impl Route {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
+            name: Some(RouteName(name.into())),
+        }
+    }
+
+    /// Create a new route with the given handler and name for inclusion in the
+    /// OpenAPI specs.
+    ///
+    /// See [`crate::openapi`] module documentation for more details on how to
+    /// generate OpenAPI specs automatically.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::Request;
+    /// use cot::response::Response;
+    /// use cot::router::method::openapi::api_post;
+    /// use cot::router::{Route, Router};
+    ///
+    /// async fn home(request: Request) -> cot::Result<Response> {
+    ///     // ...
+    /// #     unimplemented!()
+    /// }
+    ///
+    /// let route = Route::with_api_handler_and_name("/", api_post(home), "home");
+    /// ```
+    #[must_use]
+    #[cfg(feature = "openapi")]
+    pub fn with_api_handler_and_name<N, HandlerParams, H>(url: &str, handler: H, name: N) -> Self
+    where
+        N: Into<String>,
+        HandlerParams: 'static,
+        H: RequestHandler<HandlerParams> + crate::openapi::AsApiRoute + Send + Sync + 'static,
+    {
+        Self {
+            url: Arc::new(PathMatcher::new(url)),
+            view: RouteInner::ApiHandler(Arc::new(
+                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+            )),
             name: Some(RouteName(name.into())),
         }
     }
@@ -560,6 +718,8 @@ impl Route {
         match &self.view {
             RouteInner::Handler(_) => RouteKind::Handler,
             RouteInner::Router(_) => RouteKind::Router,
+            #[cfg(feature = "openapi")]
+            RouteInner::ApiHandler(_) => RouteKind::Handler,
         }
     }
 
@@ -568,6 +728,8 @@ impl Route {
         match &self.view {
             RouteInner::Router(router) => Some(router),
             RouteInner::Handler(_) => None,
+            #[cfg(feature = "openapi")]
+            RouteInner::ApiHandler(_) => None,
         }
     }
 }
@@ -582,6 +744,41 @@ pub(crate) enum RouteKind {
 enum RouteInner {
     Handler(Arc<dyn BoxRequestHandler + Send + Sync>),
     Router(Router),
+    #[cfg(feature = "openapi")]
+    ApiHandler(Arc<dyn crate::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
+}
+
+struct ErrorHandlerWrapper<H>(H);
+
+impl<HandlerParams, H> RequestHandler<HandlerParams> for ErrorHandlerWrapper<H>
+where
+    H: RequestHandler<HandlerParams> + Send + Sync,
+{
+    async fn handle(&self, request: Request) -> Result<Response> {
+        let response = self.0.handle(request).await;
+
+        match response {
+            Ok(response) => Ok(response),
+            Err(error) => match error.inner {
+                ErrorRepr::NotFound { message } => Ok(not_found_response(message)),
+                _ => Err(error),
+            },
+        }
+    }
+}
+
+#[cfg(feature = "openapi")]
+impl<H> crate::openapi::AsApiRoute for ErrorHandlerWrapper<H>
+where
+    H: crate::openapi::AsApiRoute,
+{
+    fn as_api_route(
+        &self,
+        route_context: &crate::openapi::RouteContext<'_>,
+        schema_generator: &mut schemars::SchemaGenerator,
+    ) -> aide::openapi::PathItem {
+        self.0.as_api_route(route_context, schema_generator)
+    }
 }
 
 /// Get a URL for a view by its registered name and given params.
@@ -781,6 +978,10 @@ impl Debug for RouteInner {
         match &self {
             RouteInner::Handler(_) => f.debug_tuple("Handler").field(&"handler(...)").finish(),
             RouteInner::Router(router) => f.debug_tuple("Router").field(router).finish(),
+            #[cfg(feature = "openapi")]
+            RouteInner::ApiHandler(_) => {
+                f.debug_tuple("ApiHandler").field(&"handler(...)").finish()
+            }
         }
     }
 }
@@ -841,6 +1042,57 @@ mod tests {
                 Body::fixed(Bytes::from("OK")),
             ))
         }
+    }
+
+    #[cfg(feature = "openapi")]
+    impl crate::openapi::AsApiRoute for MockHandler {
+        fn as_api_route(
+            &self,
+            _route_context: &cot::openapi::RouteContext<'_>,
+            _schema_generator: &mut schemars::SchemaGenerator,
+        ) -> aide::openapi::PathItem {
+            aide::openapi::PathItem::default()
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "openapi")]
+    fn route_inner_debug() {
+        let route = Route::with_handler("/test", MockHandler);
+        assert!(format!("{route:?}").contains("Handler(\"handler(...)\")"));
+
+        let route = Route::with_router("/test", Router::empty());
+        assert!(format!("{route:?}").contains("Router(Router {"));
+
+        let route = Route::with_api_handler("/test", MockHandler);
+        assert!(format!("{route:?}").contains("ApiHandler(\"handler(...)\")"));
+    }
+
+    #[test]
+    #[cfg(feature = "openapi")]
+    fn route_kind() {
+        let handler_route = Route::with_handler("/test", MockHandler);
+        assert_eq!(handler_route.kind(), RouteKind::Handler);
+
+        let router_route = Route::with_router("/test", Router::empty());
+        assert_eq!(router_route.kind(), RouteKind::Router);
+
+        let api_route = Route::with_api_handler("/test", MockHandler);
+        assert_eq!(api_route.kind(), RouteKind::Handler);
+    }
+
+    #[test]
+    #[cfg(feature = "openapi")]
+    fn route_router() {
+        let router = Router::empty();
+        let route = Route::with_router("/test", router.clone());
+        assert!(route.router().is_some());
+
+        let route = Route::with_handler("/test", MockHandler);
+        assert!(route.router().is_none());
+
+        let route = Route::with_api_handler("/test", MockHandler);
+        assert!(route.router().is_none());
     }
 
     #[test]

@@ -71,6 +71,8 @@ mod error_page;
 mod handler;
 pub mod html;
 pub mod middleware;
+#[cfg(feature = "openapi")]
+pub mod openapi;
 pub mod project;
 pub mod request;
 pub mod response;
@@ -80,9 +82,13 @@ pub mod static_files;
 pub mod test;
 pub(crate) mod utils;
 
+#[cfg(feature = "openapi")]
+pub use aide;
 pub use body::Body;
 pub use cot_macros::{main, test};
 pub use error::Error;
+#[cfg(feature = "openapi")]
+pub use schemars;
 pub use {bytes, http};
 
 pub use crate::handler::{BoxedHandler, RequestHandler};

@@ -122,73 +122,95 @@ macro_rules! impl_request_handler_from_request {
     };
 }
 
-impl_request_handler!();
-impl_request_handler!(P1);
-impl_request_handler!(P1, P2);
-impl_request_handler!(P1, P2, P3);
-impl_request_handler!(P1, P2, P3, P4);
-impl_request_handler!(P1, P2, P3, P4, P5);
-impl_request_handler!(P1, P2, P3, P4, P5, P6);
-impl_request_handler!(P1, P2, P3, P4, P5, P6, P7);
-impl_request_handler!(P1, P2, P3, P4, P5, P6, P7, P8);
-impl_request_handler!(P1, P2, P3, P4, P5, P6, P7, P8, P9);
-impl_request_handler!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
+#[rustfmt::skip]
+macro_rules! handle_all_parameters {
+    ($name:ident) => {
+        $name!();
+        $name!(P1);
+        $name!(P1, P2);
+        $name!(P1, P2, P3);
+        $name!(P1, P2, P3, P4);
+        $name!(P1, P2, P3, P4, P5);
+        $name!(P1, P2, P3, P4, P5, P6);
+        $name!(P1, P2, P3, P4, P5, P6, P7);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
+    };
+}
 
-impl_request_handler_from_request!((P1));
-impl_request_handler_from_request!((P1), P2);
-impl_request_handler_from_request!(P1, (P2));
-impl_request_handler_from_request!((P1), P2, P3);
-impl_request_handler_from_request!(P1, (P2), P3);
-impl_request_handler_from_request!(P1, P2, (P3));
-impl_request_handler_from_request!((P1), P2, P3, P4);
-impl_request_handler_from_request!(P1, (P2), P3, P4);
-impl_request_handler_from_request!(P1, P2, (P3), P4);
-impl_request_handler_from_request!(P1, P2, P3, (P4));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6, P7);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6, P7);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6, P7);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6, P7);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6, P7);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6), P7);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, (P7));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6, P7, P8);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6, P7, P8);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6, P7, P8);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6, P7, P8);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6, P7, P8);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6), P7, P8);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, (P7), P8);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, (P8));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6), P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, (P7), P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, (P8), P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, P8, (P9));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6), P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, (P7), P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, (P8), P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, P8, (P9), P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, P8, P9, (P10));
+#[rustfmt::skip]
+macro_rules! handle_all_parameters_from_request {
+    ($name:ident) => {
+        $name!((P1));
+
+        $name!((P1), P2);
+        $name!(P1, (P2));
+
+        $name!((P1), P2, P3);
+        $name!(P1, (P2), P3);
+        $name!(P1, P2, (P3));
+
+        $name!((P1), P2, P3, P4);
+        $name!(P1, (P2), P3, P4);
+        $name!(P1, P2, (P3), P4);
+        $name!(P1, P2, P3, (P4));
+
+        $name!((P1), P2, P3, P4, P5);
+        $name!(P1, (P2), P3, P4, P5);
+        $name!(P1, P2, (P3), P4, P5);
+        $name!(P1, P2, P3, (P4), P5);
+        $name!(P1, P2, P3, P4, (P5));
+
+        $name!((P1), P2, P3, P4, P5, P6);
+        $name!(P1, (P2), P3, P4, P5, P6);
+        $name!(P1, P2, (P3), P4, P5, P6);
+        $name!(P1, P2, P3, (P4), P5, P6);
+        $name!(P1, P2, P3, P4, (P5), P6);
+        $name!(P1, P2, P3, P4, P5, (P6));
+
+        $name!((P1), P2, P3, P4, P5, P6, P7);
+        $name!(P1, (P2), P3, P4, P5, P6, P7);
+        $name!(P1, P2, (P3), P4, P5, P6, P7);
+        $name!(P1, P2, P3, (P4), P5, P6, P7);
+        $name!(P1, P2, P3, P4, (P5), P6, P7);
+        $name!(P1, P2, P3, P4, P5, (P6), P7);
+        $name!(P1, P2, P3, P4, P5, P6, (P7));
+
+        $name!((P1), P2, P3, P4, P5, P6, P7, P8);
+        $name!(P1, (P2), P3, P4, P5, P6, P7, P8);
+        $name!(P1, P2, (P3), P4, P5, P6, P7, P8);
+        $name!(P1, P2, P3, (P4), P5, P6, P7, P8);
+        $name!(P1, P2, P3, P4, (P5), P6, P7, P8);
+        $name!(P1, P2, P3, P4, P5, (P6), P7, P8);
+        $name!(P1, P2, P3, P4, P5, P6, (P7), P8);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (P8));
+
+        $name!((P1), P2, P3, P4, P5, P6, P7, P8, P9);
+        $name!(P1, (P2), P3, P4, P5, P6, P7, P8, P9);
+        $name!(P1, P2, (P3), P4, P5, P6, P7, P8, P9);
+        $name!(P1, P2, P3, (P4), P5, P6, P7, P8, P9);
+        $name!(P1, P2, P3, P4, (P5), P6, P7, P8, P9);
+        $name!(P1, P2, P3, P4, P5, (P6), P7, P8, P9);
+        $name!(P1, P2, P3, P4, P5, P6, (P7), P8, P9);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (P8), P9);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, (P9));
+
+        $name!((P1), P2, P3, P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, (P2), P3, P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, (P3), P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, (P4), P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, (P5), P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, (P6), P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, (P7), P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (P8), P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, (P9), P10);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9, (P10));
+    };
+}
+
+handle_all_parameters!(impl_request_handler);
+handle_all_parameters_from_request!(impl_request_handler_from_request);
 
 /// A wrapper around a handler that's used in
 /// [`Bootstrapper`](cot::Bootstrapper).

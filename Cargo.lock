@@ -563,6 +563,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "indexmap",
+ "mime",
  "mime_guess",
  "mockall",
  "password-auth",

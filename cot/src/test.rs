@@ -292,11 +292,7 @@ impl TestRequestBuilder {
     /// ```
     #[must_use]
     pub fn get(url: &str) -> Self {
-        Self {
-            method: http::Method::GET,
-            url: url.to_string(),
-            ..Self::default()
-        }
+        Self::with_method(url, crate::Method::GET)
     }
 
     /// Create a new POST request builder.
@@ -330,8 +326,42 @@ impl TestRequestBuilder {
     /// ```
     #[must_use]
     pub fn post(url: &str) -> Self {
+        Self::with_method(url, crate::Method::POST)
+    }
+
+    /// Create a new request builder with given HTTP method.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::Request;
+    /// use cot::response::{Response, ResponseExt};
+    /// use cot::test::TestRequestBuilder;
+    /// use cot::{Body, Method};
+    /// use http::StatusCode;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// async fn index(request: Request) -> cot::Result<Response> {
+    ///     Ok(Response::new_html(
+    ///         StatusCode::OK,
+    ///         Body::fixed("Resource deleted!"),
+    ///     ))
+    /// }
+    ///
+    /// let request = TestRequestBuilder::with_method("/", Method::DELETE).build();
+    ///
+    /// assert_eq!(
+    ///     index(request).await?.into_body().into_bytes().await?,
+    ///     "Resource deleted!"
+    /// );
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn with_method(url: &str, method: crate::Method) -> Self {
         Self {
-            method: http::Method::POST,
+            method,
             url: url.to_string(),
             ..Self::default()
         }

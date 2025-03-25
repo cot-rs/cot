@@ -685,12 +685,12 @@ impl AppBuilder {
     ///     }
     /// }
     /// ```
-    pub fn register_with_views<T: App + 'static>(&mut self, module: T, url_prefix: &str) {
-        let mut router = module.router();
-        router.set_app_name(AppName(module.name().to_owned()));
+    pub fn register_with_views<T: App + 'static>(&mut self, app: T, url_prefix: &str) {
+        let mut router = app.router();
+        router.set_app_name(AppName(app.name().to_owned()));
 
         self.urls.push(Route::with_router(url_prefix, router));
-        self.register(module);
+        self.register(app);
     }
 }
 

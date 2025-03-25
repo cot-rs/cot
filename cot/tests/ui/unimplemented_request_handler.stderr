@@ -11,6 +11,10 @@ error[E0277]: `fn(()) -> impl Future<Output = Result<Response<Body>, cot::Error>
   = note: make sure all parameters implement `FromRequest` or `FromRequestParts`
   = note: make sure there is at most one parameter implementing `FromRequest`
   = note: make sure the function takes no more than 10 parameters
+  = help: the following other types implement trait `RequestHandler<T>`:
+            `ApiMethodRouter` implements `RequestHandler`
+            `MethodRouter` implements `RequestHandler`
+            `NoApi<H>` implements `RequestHandler<HandlerParams>`
 note: required by a bound in `Route::with_handler`
  --> src/router.rs
   |

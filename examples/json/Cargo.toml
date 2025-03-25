@@ -6,5 +6,8 @@ description = "JSON - Cot example."
 edition = "2024"
 
 [dependencies]
-cot = { path = "../../cot" }
+cot = { path = "../../cot", features = ["openapi", "swagger-ui"] }
 serde = "1"
+aide = { version = "0.14", features = ["swagger"] }
+schemars = "0.8"
+indexmap = "2"

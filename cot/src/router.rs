@@ -38,6 +38,7 @@ use crate::response::{Response, not_found_response};
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};
 
+pub mod method;
 pub mod path;
 
 /// A router that can be used to route requests to their respective views.
@@ -165,6 +166,17 @@ impl Router {
                                 app_name: result.app_name.or_else(|| self.app_name.clone()),
                                 name: result.name,
                                 params: Self::matches_to_path_params(&matches, result.params),
+                            });
+                        }
+                    }
+                    #[cfg(feature = "openapi")]
+                    RouteInner::ApiHandler(handler) => {
+                        if matches_fully {
+                            return Some(HandlerFound {
+                                handler: &**handler,
+                                app_name: self.app_name.clone(),
+                                name: route.name.clone(),
+                                params: Self::matches_to_path_params(&matches, Vec::new()),
                             });
                         }
                     }
@@ -326,6 +338,51 @@ impl Router {
     pub fn is_empty(&self) -> bool {
         self.urls.is_empty()
     }
+
+    #[cfg(feature = "openapi")]
+    #[must_use]
+    pub fn as_api(&self) -> aide::openapi::Paths {
+        let mut paths = aide::openapi::Paths::default();
+        self.as_openapi_impl("", &[], &mut paths);
+        paths
+    }
+
+    #[cfg(feature = "openapi")]
+    pub(crate) fn as_openapi_impl(
+        &self,
+        url: &str,
+        param_names: &[&str],
+        paths: &mut aide::openapi::Paths,
+    ) {
+        for route in &self.urls {
+            match &route.view {
+                RouteInner::Router(router) => {
+                    let mut params = Vec::from(param_names);
+                    params.extend(route.url.param_names());
+
+                    let url = format!("{url}{}", route.url);
+
+                    router.as_openapi_impl(&url, &params, paths);
+                }
+                RouteInner::ApiHandler(handler) => {
+                    let mut params = Vec::from(param_names);
+                    params.extend(route.url.param_names());
+
+                    let url = format!("{url}{}", route.url);
+
+                    let route_context = crate::openapi::RouteContext {
+                        param_names: &params,
+                    };
+
+                    paths.paths.insert(
+                        url,
+                        aide::openapi::ReferenceOr::Item(handler.as_path_item(&route_context)),
+                    );
+                }
+                RouteInner::Handler(_) => {}
+            }
+        }
+    }
 }
 
 impl Default for Router {
@@ -453,7 +510,25 @@ impl Route {
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(ErrorHandlerWrapper(
+                handler,
+            )))),
+            name: None,
+        }
+    }
+
+    #[must_use]
+    #[cfg(feature = "openapi")]
+    pub fn with_api_handler<HandlerParams, H>(url: &str, handler: H) -> Self
+    where
+        HandlerParams: 'static,
+        H: RequestHandler<HandlerParams> + crate::openapi::AsPathItem + Send + Sync + 'static,
+    {
+        Self {
+            url: Arc::new(PathMatcher::new(url)),
+            view: RouteInner::ApiHandler(Arc::new(
+                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+            )),
             name: None,
         }
     }
@@ -560,6 +635,8 @@ impl Route {
         match &self.view {
             RouteInner::Handler(_) => RouteKind::Handler,
             RouteInner::Router(_) => RouteKind::Router,
+            #[cfg(feature = "openapi")]
+            RouteInner::ApiHandler(_) => RouteKind::Handler,
         }
     }
 
@@ -568,6 +645,8 @@ impl Route {
         match &self.view {
             RouteInner::Router(router) => Some(router),
             RouteInner::Handler(_) => None,
+            #[cfg(feature = "openapi")]
+            RouteInner::ApiHandler(_) => None,
         }
     }
 }
@@ -582,6 +661,40 @@ pub(crate) enum RouteKind {
 enum RouteInner {
     Handler(Arc<dyn BoxRequestHandler + Send + Sync>),
     Router(Router),
+    #[cfg(feature = "openapi")]
+    ApiHandler(Arc<dyn crate::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
+}
+
+struct ErrorHandlerWrapper<H>(H);
+
+impl<HandlerParams, H> RequestHandler<HandlerParams> for ErrorHandlerWrapper<H>
+where
+    H: RequestHandler<HandlerParams> + Send + Sync,
+{
+    async fn handle(&self, request: Request) -> Result<Response> {
+        let response = self.0.handle(request).await;
+
+        match response {
+            Ok(response) => Ok(response),
+            Err(error) => match error.inner {
+                ErrorRepr::NotFound { message } => Ok(not_found_response(message)),
+                _ => Err(error),
+            },
+        }
+    }
+}
+
+#[cfg(feature = "openapi")]
+impl<H> crate::openapi::AsPathItem for ErrorHandlerWrapper<H>
+where
+    H: crate::openapi::AsPathItem,
+{
+    fn as_path_item(
+        &self,
+        route_context: &crate::openapi::RouteContext<'_>,
+    ) -> aide::openapi::PathItem {
+        self.0.as_path_item(route_context)
+    }
 }
 
 /// Get a URL for a view by its registered name and given params.
@@ -781,6 +894,10 @@ impl Debug for RouteInner {
         match &self {
             RouteInner::Handler(_) => f.debug_tuple("Handler").field(&"handler(...)").finish(),
             RouteInner::Router(router) => f.debug_tuple("Router").field(router).finish(),
+            #[cfg(feature = "openapi")]
+            RouteInner::ApiHandler(_) => {
+                f.debug_tuple("ApiHandler").field(&"handler(...)").finish()
+            }
         }
     }
 }

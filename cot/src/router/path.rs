@@ -169,13 +169,14 @@ impl PathMatcher {
 
     #[must_use]
     fn param_len(&self) -> usize {
-        self.parts
-            .iter()
-            .map(|part| match part {
-                PathPart::Literal(..) => 0,
-                PathPart::Param { .. } => 1,
-            })
-            .sum()
+        self.param_names().count()
+    }
+
+    pub(super) fn param_names(&self) -> impl Iterator<Item = &str> {
+        self.parts.iter().filter_map(|part| match part {
+            PathPart::Literal(..) => None,
+            PathPart::Param { name } => Some(name.as_str()),
+        })
     }
 }
 

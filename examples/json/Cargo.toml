@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 cot = { path = "../../cot" }
 serde = "1"
+utoipa = "5"
+utoipa-swagger-ui = "9"

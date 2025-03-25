@@ -149,14 +149,14 @@ impl Router {
 
                 match &route.view {
                     RouteInner::Handler(handler) => {
-                        if matches_fully {
-                            return Some(HandlerFound {
-                                handler: &**handler,
-                                app_name: self.app_name.clone(),
-                                name: route.name.clone(),
-                                params: Self::matches_to_path_params(&matches, Vec::new()),
-                            });
-                        }
+                        // if matches_fully {
+                        return Some(HandlerFound {
+                            handler: &**handler,
+                            app_name: self.app_name.clone(),
+                            name: route.name.clone(),
+                            params: Self::matches_to_path_params(&matches, Vec::new()),
+                        });
+                        // }
                     }
                     RouteInner::Router(router) => {
                         if let Some(result) = router.get_handler(matches.remaining_path) {

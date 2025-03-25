@@ -82,8 +82,8 @@ use cot::admin::AdminModel;
 use cot::db::{model, Auto};
 use cot::form::Form;
 
-#[model]
 #[derive(Debug, Form, AdminModel)]
+#[model]
 struct BlogPost {
     #[model(primary_key)]
     id: Auto<i32>,
@@ -93,7 +93,15 @@ struct BlogPost {
 }
 ```
 
-Note however that in order to derive the `AdminModel` trait, you need to also derive the `Form` and `Model` traits (the latter is provided by the `#[model]` attribute). In addition to that, you primary key needs to be implementing the `FromStr` and `Display` traits, and your model needs to implement the `Display` trait.
+Note however that in order to derive the `AdminModel` trait, you need to also derive the `Form` and `Model` traits (the latter is provided by the `#[model]` attribute). In addition to that, your model needs to implement the `Display` trait—for instance, in the case above, we could add it like so:
+
+```rust
+impl Display for BlogPost {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.title)
+    }
+}
+```
 
 After adding the `AdminModel` trait, you can add your model to the admin panel using `DefaultAdminModelManager`. This is as easy as adding the following code to your `App` implementation:
 

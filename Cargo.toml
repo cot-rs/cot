@@ -119,6 +119,8 @@ tracing-subscriber = "0.3"
 tracing-test = "0.2"
 trybuild = { version = "1", features = ["diff"] }
 url = "2"
+utoipa = "5"
+utoipa-swagger-ui = { path = "/home/m4tx/projects/utoipa/utoipa-swagger-ui" }
 
 [profile.dev.package]
 insta.opt-level = 3

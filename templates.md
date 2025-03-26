@@ -54,7 +54,7 @@ struct IndexTemplate {
     items: Vec<Item>,
 }
 
-async fn index(_request: Request) -> cot::Result<Response> {
+async fn index() -> cot::Result<Response> {
     let items = vec![
         Item { title: "first item".to_string() },
         Item { title: "second item".to_string() },
@@ -148,22 +148,23 @@ Rendered output:
 
 Linking to other pages in your application is a frequent requirement, and hardcoding URLs in templates can become a maintenance hassle. To address this, Cot provides the `cot::reverse!()` macro. This macro generates URLs based on your route definitions, validating that you’ve passed any required parameters and that the route actually exists. If you ever change your URL structure, you'll only need to update the route definitions.
 
-`cot::reverse!()` expects a reference to the `Request` object, the route name, and any parameters needed by that route.
+`cot::reverse!()` expects a reference to the `Urls` object (which you can obtain by extracting it from the request), the route name, and any parameters needed by that route.
 
 ### Example
 
 `index.html`:
 
 ```html.j2
-{% let request = request %}
-<a href="{{ cot::reverse!(request, "index") }}">Home</a>
-<a href="{{ cot::reverse!(request, "user", id=42) }}">User 42</a>
+{% let urls = urls %}
+<a href="{{ cot::reverse!(urls, "index") }}">Home</a>
+<a href="{{ cot::reverse!(urls, "user", id=42) }}">User 42</a>
 ```
 
 `main.rs`:
 
 ```rust
 use cot::request::Request;
+use cot::request::extractors::Urls;
 use cot::response::{Response, ResponseExt};
 use cot::router::{Router, Route};
 use cot::{Body, StatusCode};
@@ -172,11 +173,11 @@ use rinja::Template;
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate<'a> {
-    request: &'a Request,
+    urls: &'a Urls,
 }
 
-async fn index(request: Request) -> cot::Result<Response> {
-    let template = IndexTemplate { request: &request };
+async fn index(urls: Urls) -> cot::Result<Response> {
+    let template = IndexTemplate { urls: &urls };
 
     Ok(Response::new_html(
         StatusCode::OK,
@@ -184,7 +185,7 @@ async fn index(request: Request) -> cot::Result<Response> {
     ))
 }
 
-async fn user(_request: Request) -> cot::Result<Response> {
+async fn user() -> cot::Result<Response> {
     todo!()
 }
 

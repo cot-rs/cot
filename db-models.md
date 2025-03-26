@@ -42,13 +42,15 @@ This will create a new file in your `migrations` directory in the crate's src di
 In order to write a model instance to the database, you can use the `save` method. Note that you need to have an instance of the `Database` structure to do this – typically you can get it from the request object in your view. Here's an example of how you can save a new link to the database inside a view:
 
 ```rust
-async fn create_link(request: Request) -> cot::Result<Response> {
+use cot::request::extractors::RequestDb;
+
+async fn create_link(RequestDb(db): RequestDb) -> cot::Result<Response> {
     let mut link = Link {
         id: Auto::default(),
         slug: LimitedString::new("slug").unwrap(),
         url: "https://example.com".to_string(),
     };
-    link.save(request.db()).await?;
+    link.save(db).await?;
 
     // ...
 }
@@ -60,7 +62,7 @@ Updating a model is similar to saving a new one, but you need to have an existin
 
 ```rust
 link.url = "https://example.org".to_string();
-link.save(request.db()).await?;
+link.save(db).await?;
 ```
 
 Note that `.save()` is a convenient method that can be used for both creating new rows and updating existing ones. If the primary key of the model is set to `Auto`, the method will always create a new row in the database. If the primary key is set to a specific value, the method will update the row with that primary key, or create a new one if it doesn't exist.
@@ -69,7 +71,7 @@ If you specifically want to update a row in the database for given primary key, 
 
 ```rust
 link.url = "https://example.org".to_string();
-link.update(request.db()).await?;
+link.update(db).await?;
 ```
 
 Similarly, if you want to insert a new row in the database and cause an error if a row with the same primary key already exists, you can use the `insert` method:
@@ -80,7 +82,7 @@ let mut link = Link {
     slug: LimitedString::new("slug").unwrap(),
     url: "https://example.com".to_string(),
 };
-link.insert(request.db()).await?;
+link.insert(db).await?;
 ```
 
 ### Retrieving models
@@ -93,7 +95,7 @@ The easiest way to work with the `Query` structure is the `query!` macro, which 
 use cot::db::query;
 
 let link = query!(Link, $slug == LimitedString::new("cot").unwrap())
-    .get(request.db())
+    .get(db)
     .await?;
 ```
 
@@ -104,7 +106,7 @@ As you can see, the `query!` macro takes the model type as the first argument, f
 To delete a model from the database, you can use the `delete` method of the `Query` object returned by the `query!` macro. Here's an example of how you can delete a link from the database:
 
 ```rust
-query!(Link, $slug == LimitedString::new("cot").unwrap()).delete(request.db()).await?;
+query!(Link, $slug == LimitedString::new("cot").unwrap()).delete(db).await?;
 ```
 
 ## Foreign keys
@@ -138,11 +140,11 @@ When you retrieve a model that has a foreign key relationship, Cot will not auto
 
 ```rust
 let mut link = query!(Link, $slug == LimitedString::new("cot").unwrap())
-    .get(request.db())
+    .get(db)
     .await?
     .expect("Link not found");
 
-let user = link.user.get(request.db()).await?;
+let user = link.user.get(db).await?;
 ```
 
 ## Database Configuration

@@ -87,7 +87,7 @@ At the heart of any web application is the ability to handle requests and return
 When you open the `src/main.rs` file, you'll see the following example view that has been generated for you:
 
 ```rust
-async fn index(request: Request) -> cot::Result<Response> {
+async fn index() -> cot::Result<Response> {
     let index_template = IndexTemplate {};
     let rendered = index_template.render()?;
 
@@ -114,7 +114,7 @@ This is how you specify the URL the view will be available at – in this case, 
 You can add more views by adding more routes to the `Router` by simply defining more functions and registering them in the `router` method:
 
 ```rust
-async fn hello(request: Request) -> cot::Result<Response> {
+async fn hello() -> cot::Result<Response> {
     Ok(Response::new_html(StatusCode::OK, Body::fixed("Hello World!")))
 }
 
@@ -130,14 +130,16 @@ fn router(&self) -> Router {
 
 Now, when you visit [`localhost:8000/hello`](http://localhost:8000/hello) you should see `Hello World!` displayed on the page!
 
-### Dynamic routes
+### Extractors and dynamic routes
 
-You can also define dynamic routes by using the `Route::with_handler_and_name` method with a parameter enclosed in curly braces (e.g. `{param_name}`). This parameter will be available in the `Request` object, and you can extract it using the `path_params().parse()` method. It will automatically infer the type of the parameter(s) based on the type of the variable you assign it to. Here's an example:
+You can also define dynamic routes by using the `Route::with_handler_and_name` method with a parameter enclosed in curly braces (e.g. `{param_name}`). How do we get the parameter value in the request handler's body, though?
+
+At the core of Cot's request handling are _extractors_, which allow you to extract data from the request and pass it to the handler as arguments. One of such extractors is the `Path` extractor, which allows you to extract path parameters from the URL. In order to use it, you need to define a parameter in the handler function, passing the parameter type as the generic parameter, like so:
 
 ```rust
-async fn hello_name(request: Request) -> cot::Result<Response> {
-    let name: String = request.path_params().parse()?;
+use cot::request::extractors::Path;
 
+async fn hello_name(Path(name): Path<String>) -> cot::Result<Response> {
     Ok(Response::new_html(StatusCode::OK, Body::fixed(format!("Hello, {}!", name))))
 }
 
@@ -152,7 +154,24 @@ fn router(&self) -> Router {
 }
 ```
 
-Now, when you visit [`localhost:8000/hello/John`](http://localhost:8000/hello/John), you should see `Hello, John!` displayed on the page!
+This works for multiple parameters, too—you just need to define a tuple of parameters in the handler function:
+
+```rust
+async fn hello_name(Path((first_name, last_name)): Path<(String, String)>) -> cot::Result<Response> {
+    Ok(Response::new_html(StatusCode::OK, Body::fixed(format!("Hello, {first_name} {last_name}!"))))
+}
+
+// inside `impl App`:
+
+fn router(&self) -> Router {
+    Router::with_urls([
+        // ...
+        Route::with_handler_and_name("/hello/{first_name}/{last_name}/", hello_name, "hello_name"),
+    ])
+}
+```
+
+Now, when you visit [`localhost:8000/hello/John/Smith/`](http://localhost:8000/hello/John), you should see `Hello, John Smith!` displayed on the page!
 
 ## Project structure
 

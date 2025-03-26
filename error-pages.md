@@ -136,12 +136,11 @@ Note that any messages that you pass to the `Error` structure will only be displ
 You can handle specific errors in your views:
 
 ```rust
-async fn view_article(request: Request) -> cot::Result<Response> {
-    // will display a 404 error page if the article ID is not an integer
-    let article_id: i32 = request
-        .path_params()
-        .parse()
-        .map_err(|_| Error::not_found_message("Invalid article ID".to_string()))?;
+async fn view_article(RequestDb(db): RequestDb, Path(article_id): Path<i32>) -> cot::Result<Response> {
+    // will display a 404 error page if the article ID is below 0
+    if article_id < 0 {
+        return Error::not_found_message("Invalid article ID".to_string());
+    }
 
     // will display a 404 page if the article is not found in the database
     let article = query!(Article, $id == article_id)

@@ -2,8 +2,6 @@
 title: Admin panel
 ---
 
-<div class="alert alert-warning" role="alert"><strong>Disclaimer</strong>: Cot is currently missing a lot of features and is <strong>not ready</strong> for production use. This guide is a work in progress and will be updated as Cot matures. That said, you are more than welcome to try it out and provide feedback!</div>
-
 The Cot admin panel provides an automatic interface for managing your models. It allows you to add, edit, delete and view records without writing any custom views or templates. This is perfect for prototyping your application and for managing your data in cases where you don't need a custom interface, as the Cot admin panel is automatically generated based on your models.
 
 ## Enabling the Admin Interface

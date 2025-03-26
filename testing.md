@@ -2,8 +2,6 @@
 title: Testing
 ---
 
-<div class="alert alert-warning" role="alert"><strong>Disclaimer</strong>: Cot is currently missing a lot of features and is <strong>not ready</strong> for production use. This guide is a work in progress and will be updated as Cot matures. That said, you are more than welcome to try it out and provide feedback!</div>
-
 Cot includes various built-in utilities to help you test your application. This guide will cover some of the most important ones.
 
 ## Why Test at All?

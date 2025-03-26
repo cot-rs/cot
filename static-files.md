@@ -2,10 +2,6 @@
 title: Static files
 ---
 
-<div class="alert alert-warning" role="alert"><strong>Disclaimer</strong>: Cot is currently missing a lot of features and is <strong>not ready</strong> for production use. This guide is a work in progress and will be updated as Cot matures. That said, you are more than welcome to try it out and provide feedback!</div>
-
-# Static Files
-
 Cot provides a straightforward system for serving static files - resources that don't require server-side processing, such as images, CSS, and JavaScript files.
 
 ## Configuration and Usage

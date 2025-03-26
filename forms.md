@@ -2,8 +2,6 @@
 title: Forms
 ---
 
-<div class="alert alert-warning" role="alert"><strong>Disclaimer</strong>: Cot is currently missing a lot of features and is <strong>not ready</strong> for production use. This guide is a work in progress and will be updated as Cot matures. That said, you are more than welcome to try it out and provide feedback!</div>
-
 Cot has form processing capabilities that allows you to create forms and handle form submissions with ease. Processing forms is as easy as creating a Rust structure, deriving a trait, and then using one function to process the form using the request data. Cot will automatically validate the form data and handle any errors that occur.
 
 ## Form trait

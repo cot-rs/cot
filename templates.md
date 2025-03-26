@@ -2,8 +2,6 @@
 title: Templates
 ---
 
-<div class="alert alert-warning" role="alert"><strong>Disclaimer</strong>: Cot is currently missing a lot of features and is <strong>not ready</strong> for production use. This guide is a work in progress and will be updated as Cot matures. That said, you are more than welcome to try it out and provide feedback!</div>
-
 Cot does not require you to use any specific templating engine. However, it provides a convenient integration with a powerful engine called [Rinja](https://rinja.readthedocs.io/). Rinja is very similar to Jinja2, which itself was inspired by Django's template engine. It allows you to build complex templates easily while providing type safety to help catch errors at compile time.
 
 ## Basic Syntax

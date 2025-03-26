@@ -15,12 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 1 -->New features
 
-- [**breaking**] use extractor pattern for request handlers ([#253](https://github.com/cot-rs/cot/pull/253))
+- [**breaking**] use extractor pattern for request handlers ([#253](https://github.com/cot-rs/cot/pull/253)),
+  introducing `FromRequest` and `FromRequestParts` traits and removing duplicated functionality from `RequestExt`
 - add `SessionMiddleware` configuration ([#251](https://github.com/cot-rs/cot/pull/251))
-- add a user-friendly message for AddrInUse error ([#233](https://github.com/cot-rs/cot/pull/233))
-- add support for remove field in automatic migration generator ([#232](https://github.com/cot-rs/cot/pull/232))
-- add basic pagination support for admin panel ([#217](https://github.com/cot-rs/cot/pull/217))
-- support "Remove Model" in Automatic Migration Generator ([#221](https://github.com/cot-rs/cot/pull/221))
+- user-friendly message for `AddrInUse` error ([#233](https://github.com/cot-rs/cot/pull/233))
+- support for "Remove Field" in automatic migration generator ([#232](https://github.com/cot-rs/cot/pull/232))
+- support for "Remove Model" in Automatic Migration Generator ([#221](https://github.com/cot-rs/cot/pull/221))
+- basic pagination support for admin panel ([#217](https://github.com/cot-rs/cot/pull/217))
+- display object paths when (de)serialization error happened with serde
+- add `RegisterAppsContext`, `AuthBackendContext`, `MiddlewareContext` as type aliases for `ProjectContext` in specific
+  bootstrapping phases that are more semantic and whose names won't change when changing the phases
 
 ### <!-- 2 -->Fixes
 
@@ -30,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### <!-- 3 -->Other
 
 - [**breaking**] upgrade edition to 2024 ([#244](https://github.com/cot-rs/cot/pull/244))
+- [**breaking**] remove methods from the `RequestExt` that duplicate extractors' functionalities
+- [**breaking**] `AuthRequestExt` trait is now replaced by `Auth` struct and `AuthMiddleware` is now required for
+- [**breaking**] add `WithDatabase` bootstrapping phase
+- `Urls` object can now be used with the `reverse!` macro and not only `Request`
 - *(clippy)* add --all-targets to clippy CI and fix all warnings ([#240](https://github.com/cot-rs/cot/pull/240))
 - add test for reverse!() reversing in the current app first ([#239](https://github.com/cot-rs/cot/pull/239))
 - more docs (up to 100% doc coverage) ([#229](https://github.com/cot-rs/cot/pull/229))

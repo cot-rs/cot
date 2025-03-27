@@ -12,7 +12,6 @@ use fake::rand::SeedableRng;
 use fake::rand::rngs::StdRng;
 use fake::{Dummy, Fake, Faker};
 
-
 #[derive(Debug, PartialEq)]
 #[model]
 struct TestModel {
@@ -20,7 +19,6 @@ struct TestModel {
     id: Auto<i32>,
     name: String,
 }
-
 
 #[cot_macros::dbtest]
 async fn model_crud(test_db: &mut TestDatabase) {
@@ -138,7 +136,6 @@ async fn model_macro_filtering(test_db: &mut TestDatabase) {
 async fn migrate_test_model(db: &Database) {
     CREATE_TEST_MODEL.forwards(db).await.unwrap();
 }
-
 
 const CREATE_TEST_MODEL: Operation = Operation::create_model()
     .table_name(Identifier::new("cot__test_model"))

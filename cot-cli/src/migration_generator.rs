@@ -280,10 +280,12 @@ impl MigrationGenerator {
                         symbol_resolver.resolve_struct(&mut item);
 
                         let args = Self::model_args_from_attr(&path, attr)?;
-                        let model_in_source =
-                            ModelInSource::from_item(
-                                self.crate_name.as_str(), item, &args, &symbol_resolver
-                            )?;
+                        let model_in_source = ModelInSource::from_item(
+                            self.crate_name.as_str(),
+                            item,
+                            &args,
+                            &symbol_resolver,
+                        )?;
 
                         match args.model_type {
                             ModelType::Application => {

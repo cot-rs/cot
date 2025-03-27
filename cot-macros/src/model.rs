@@ -96,13 +96,17 @@ impl ModelBuilder {
         let app_name = std::env::var("CARGO_PKG_NAME").unwrap();
         let table_name = match model.model_type {
             ModelType::Internal => model.table_name,
-            _ => format!("{}__{}", app_name.to_snake_case(), model.table_name.to_snake_case()),
+            _ => format!(
+                "{}__{}",
+                app_name.to_snake_case(),
+                model.table_name.to_snake_case()
+            ),
         };
         let mut model_builder = Self {
-            app_name: app_name,
+            app_name,
             name: model.name.clone(),
             vis: model.vis,
-            table_name: table_name,
+            table_name,
             pk_field: model.pk_field.clone(),
             fields_struct_name: format_ident!("{}Fields", model.name),
             fields_as_columns: Vec::with_capacity(field_count),

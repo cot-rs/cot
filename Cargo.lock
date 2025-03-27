@@ -462,6 +462,7 @@ dependencies = [
  "http-body-util",
  "humansize",
  "indexmap",
+ "mime",
  "mime_guess",
  "mockall",
  "password-auth",

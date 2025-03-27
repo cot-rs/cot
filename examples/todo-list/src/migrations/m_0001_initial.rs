@@ -3,12 +3,12 @@
 #[derive(Clone)]
 pub(super) struct Migration;
 impl ::cot::db::migrations::Migration for Migration {
-    const APP_NAME: &'static str = "example-todo-list";
+    const APP_NAME: &'static str = "todo-list";
     const MIGRATION_NAME: &'static str = "m_0001_initial";
     const DEPENDENCIES: &'static [::cot::db::migrations::MigrationDependency] = &[];
     const OPERATIONS: &'static [::cot::db::migrations::Operation] =
         &[::cot::db::migrations::Operation::create_model()
-            .table_name(::cot::db::Identifier::new("todo_item"))
+            .table_name(::cot::db::Identifier::new("todo_list__todo_item"))
             .fields(&[
                 ::cot::db::migrations::Field::new(
                     ::cot::db::Identifier::new("id"),

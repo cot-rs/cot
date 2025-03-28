@@ -1,6 +1,6 @@
-use cot::email::{EmailBackend, SmtpConfig, SmtpEmailBackend,SmtpTransportMode};
+use cot::email::{EmailBackend, SmtpConfig, SmtpEmailBackend, SmtpTransportMode};
 use lettre::message::header;
-use lettre::message::{Message, MultiPart,SinglePart};
+use lettre::message::{Message, MultiPart, SinglePart};
 /// This example demonstrates how to send an email using the `cot` library with a multi-part message
 /// containing both plain text and HTML content.
 /// It uses the `lettre` library for email transport and `MailHog` for testing.

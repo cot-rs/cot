@@ -1,5 +1,5 @@
 //! Email sending functionality using SMTP and other backends
-//! 
+//!
 //! #Examples
 //! To send an email using the `EmailBackend`, you need to create an instance of `SmtpConfig`
 //! ```
@@ -38,7 +38,7 @@
 //! ```
 //!
 use lettre::{
-    message::Message, transport::smtp::authentication::Credentials, SmtpTransport, Transport,
+    SmtpTransport, Transport, message::Message, transport::smtp::authentication::Credentials,
 };
 #[cfg(test)]
 use mockall::{automock, predicate::*};
@@ -315,7 +315,6 @@ pub trait EmailBackend {
 }
 
 impl EmailBackend for SmtpEmailBackend {
-
     /// Creates a new instance of `EmailBackend` with the given configuration.
     ///
     /// # Arguments
@@ -349,7 +348,7 @@ impl EmailBackend for SmtpEmailBackend {
     ///
     fn init(&mut self) -> Result<()> {
         if self.transport_state == TransportState::Initialized {
-            return Ok(())
+            return Ok(());
         }
         self.config.validate().map_err(|e| {
             EmailError::ConfigurationError(format!(
@@ -472,7 +471,6 @@ impl EmailBackend for SmtpEmailBackend {
 
         Ok(())
     }
-    
 }
 impl SmtpEmailBackend {
     /// Creates a new instance of `SmtpEmailBackend` from the given configuration and transport.
@@ -491,7 +489,7 @@ impl SmtpEmailBackend {
             config,
             transport: Some(transport),
             debug: false,
-            transport_state: TransportState::Uninitialized
+            transport_state: TransportState::Uninitialized,
         }
     }
 }
@@ -500,7 +498,7 @@ mod tests {
     //use std::io::Cursor;
     use super::*;
     use lettre::message::SinglePart;
-    use lettre::message::{header, MultiPart};
+    use lettre::message::{MultiPart, header};
 
     #[test]
     fn test_config_defaults_values() {
@@ -866,12 +864,12 @@ mod tests {
     #[test]
     fn test_init_only_username_connection() {
         // Create a mock transport that will fail connection test
-        let mock_transport = MockEmailTransport::new();        
+        let mock_transport = MockEmailTransport::new();
         //Mock the from_config method to return a transport
         // Create config and backend
         let config = SmtpConfig {
             mode: SmtpTransportMode::Unencrypted("localhost".to_string()),
-            username:Some("justtheruser".to_string()),
+            username: Some("justtheruser".to_string()),
             ..Default::default()
         };
         let mut backend = SmtpEmailBackend::from_config(config, Box::new(mock_transport));
@@ -884,7 +882,7 @@ mod tests {
     #[test]
     fn test_init_ok_unencrypted_connection() {
         // Create a mock transport that will fail connection test
-        let mock_transport = MockEmailTransport::new();        
+        let mock_transport = MockEmailTransport::new();
         // Create config and backend
         let config = SmtpConfig {
             mode: SmtpTransportMode::Unencrypted("localhost".to_string()),
@@ -900,13 +898,13 @@ mod tests {
     #[test]
     fn test_init_with_relay_credentials() {
         // Create a mock transport that will fail connection test
-        let mock_transport = MockEmailTransport::new();        
+        let mock_transport = MockEmailTransport::new();
         //Mock the from_config method to return a transport
         // Create config and backend
         let config = SmtpConfig {
             mode: SmtpTransportMode::Relay("localhost".to_string()),
-            username:Some("justtheruser".to_string()),
-            password:Some("asdf877DF".to_string()),
+            username: Some("justtheruser".to_string()),
+            password: Some("asdf877DF".to_string()),
             port: Some(25),
             ..Default::default()
         };
@@ -921,13 +919,13 @@ mod tests {
     #[test]
     fn test_init_with_tlsrelay_credentials() {
         // Create a mock transport that will fail connection test
-        let mock_transport = MockEmailTransport::new();        
+        let mock_transport = MockEmailTransport::new();
         //Mock the from_config method to return a transport
         // Create config and backend
         let config = SmtpConfig {
             mode: SmtpTransportMode::StartTlsRelay("junkyhost".to_string()),
-            username:Some("justtheruser".to_string()),
-            password:Some("asdf877DF".to_string()),
+            username: Some("justtheruser".to_string()),
+            password: Some("asdf877DF".to_string()),
             ..Default::default()
         };
         let mut backend = SmtpEmailBackend::from_config(config, Box::new(mock_transport));

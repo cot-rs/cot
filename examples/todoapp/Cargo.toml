@@ -1,8 +1,0 @@
-[package]
-name = "todoapp"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-cot = { git = "https://github.com/cot-rs/cot.git", features = ["full"] }
-rinja = "0.3"

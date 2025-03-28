@@ -3,8 +3,9 @@ name = "example-admin"
 version = "0.1.0"
 publish = false
 description = "Admin panel - Cot example."
-edition = "2021"
+edition = "2024"
 
 [dependencies]
+async-trait = "0.1"
 cot = { path = "../../cot", features = ["live-reload"] }
 rinja = "0.3.5"

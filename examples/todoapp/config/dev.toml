@@ -1,7 +1,0 @@
-secret_key = "e31272b9fc18b7fbc044f842f142343313e03f435c67051bb10bbfe7a9b7b85b"
-
-[database]
-url = "sqlite://db.sqlite3?mode=rwc"
-
-[middlewares]
-live_reload.enabled = true

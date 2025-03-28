@@ -12,6 +12,7 @@ members = [
     "examples/json",
     "examples/custom-task",
     "examples/custom-error-pages",
+    "examples/send-email",
 ]
 resolver = "2"
 
@@ -79,8 +80,7 @@ http-body = "1"
 http-body-util = "0.1"
 humansize = "2.1.3"
 indexmap = "2"
-lettre = { version = "0.11", features = ["smtp-transport", "builder"] }
-lettre_email = { version = "0.10", features = ["builder"] }
+lettre = { version = "0.11", features = ["smtp-transport", "builder", "native-tls"] }
 mime_guess = { version = "2", default-features = false }
 mockall = "0.13"
 password-auth = { version = "1", default-features = false }

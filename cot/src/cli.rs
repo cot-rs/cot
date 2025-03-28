@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 pub use clap;
-use clap::{value_parser, Arg, ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command, value_parser};
 use derive_more::Debug;
 
 use crate::error::ErrorRepr;
@@ -357,7 +357,7 @@ impl CliTask for CollectStatic {
             .expect("required argument");
         println!("Collecting static files into {:?}", dir);
 
-        let bootstrapper = bootstrapper.with_apps();
+        let bootstrapper = bootstrapper.with_apps().with_database().await?;
         StaticFiles::from(bootstrapper.context())
             .collect_into(dir)
             .map_err(|e| Error::new(ErrorRepr::CollectStatic { source: e }))?;
@@ -414,7 +414,8 @@ mod tests {
 
     use super::*;
     use crate::config::ProjectConfig;
-    use crate::{App, AppBuilder, ProjectContext};
+    use crate::project::RegisterAppsContext;
+    use crate::{App, AppBuilder};
 
     #[test]
     fn cli_new() {
@@ -466,10 +467,11 @@ mod tests {
         cli.add_task(MyTask);
 
         assert!(cli.tasks.contains_key(&Some("my-task".to_owned())));
-        assert!(cli
-            .command
-            .get_subcommands()
-            .any(|sc| sc.get_name() == "my-task"));
+        assert!(
+            cli.command
+                .get_subcommands()
+                .any(|sc| sc.get_name() == "my-task")
+        );
     }
 
     #[test]
@@ -484,10 +486,6 @@ mod tests {
     #[cot::test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
     async fn collect_static_execute() {
-        let mut collect_static = CollectStatic;
-        let temp_dir = tempdir().unwrap();
-        let temp_path = temp_dir.path().join("static").clone();
-
         struct TestApp;
         impl App for TestApp {
             fn name(&self) -> &'static str {
@@ -499,16 +497,20 @@ mod tests {
             }
         }
 
-        let matches = CollectStatic
-            .subcommand()
-            .get_matches_from(vec!["test", temp_path.to_str().unwrap()]);
-
         struct TestProject;
         impl cot::Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
                 apps.register(TestApp);
             }
         }
+
+        let mut collect_static = CollectStatic;
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().join("static").clone();
+
+        let matches = CollectStatic
+            .subcommand()
+            .get_matches_from(vec!["test", temp_path.to_str().unwrap()]);
 
         let bootstrapper = Bootstrapper::new(TestProject).with_config(ProjectConfig::default());
         let result = collect_static.execute(&matches, bootstrapper).await;
@@ -538,7 +540,11 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[allow(clippy::future_not_send, clippy::await_holding_lock)]
     async fn test_check(config: &str) -> Result<()> {
+        struct TestProject;
+        impl cot::Project for TestProject {}
+
         let temp_dir = tempdir().unwrap();
         let config_path = temp_dir.path().join("config").clone();
         std::fs::create_dir_all(&config_path).unwrap();
@@ -546,9 +552,6 @@ mod tests {
 
         let mut check = Check;
         let matches = Check.subcommand().get_matches_from(Vec::<&str>::new());
-
-        struct TestProject;
-        impl cot::Project for TestProject {}
 
         // ensure the tests run sequentially when setting the current directory
         let _guard = serial_guard();
@@ -573,7 +576,7 @@ mod tests {
 
     #[test]
     fn get_user_friendly_error_io_error_other() {
-        let source = std::io::Error::new(std::io::ErrorKind::Other, "error");
+        let source = std::io::Error::other("error");
         let error = Error::new(ErrorRepr::StartServer { source });
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");

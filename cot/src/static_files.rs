@@ -12,13 +12,13 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use futures_core::ready;
-use http::{header, Request};
+use http::{Request, header};
 use pin_project_lite::pin_project;
 use tower::Service;
 
-use crate::project::WithApps;
+use crate::Body;
+use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
-use crate::{Body, ProjectContext};
 
 /// Macro to define static files by specifying their paths.
 ///
@@ -33,7 +33,7 @@ use crate::{Body, ProjectContext};
 ///
 /// ```
 /// use bytes::Bytes;
-/// use cot::{static_files, App};
+/// use cot::{App, static_files};
 ///
 /// pub struct ExampleApp;
 ///
@@ -114,8 +114,8 @@ impl Default for StaticFiles {
     }
 }
 
-impl From<&ProjectContext<WithApps>> for StaticFiles {
-    fn from(context: &ProjectContext<WithApps>) -> Self {
+impl From<&MiddlewareContext> for StaticFiles {
+    fn from(context: &MiddlewareContext) -> Self {
         let mut static_files = StaticFiles::new();
 
         for module in context.apps() {
@@ -167,10 +167,10 @@ pub struct StaticFilesMiddleware {
 }
 
 impl StaticFilesMiddleware {
-    /// Creates a new `StaticFilesMiddleware` instance from the application
+    /// Creates a new `StaticFilesMiddleware` instance from the project
     /// context.
     #[must_use]
-    pub fn from_context(context: &ProjectContext<WithApps>) -> Self {
+    pub fn from_context(context: &MiddlewareContext) -> Self {
         Self {
             static_files: Arc::new(StaticFiles::from(context)),
         }
@@ -286,7 +286,7 @@ mod tests {
 
     use super::*;
     use crate::config::ProjectConfig;
-    use crate::project::WithConfig;
+    use crate::project::RegisterAppsContext;
     use crate::{App, AppBuilder, Bootstrapper, Project};
 
     #[test]
@@ -398,7 +398,7 @@ mod tests {
 
         struct TestProject;
         impl Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
                 apps.register(App1);
                 apps.register(App2);
             }
@@ -406,7 +406,10 @@ mod tests {
 
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(ProjectConfig::default())
-            .with_apps();
+            .with_apps()
+            .with_database()
+            .await
+            .unwrap();
         let middleware = StaticFilesMiddleware::from_context(bootstrapper.context());
         let static_files = middleware.static_files;
 

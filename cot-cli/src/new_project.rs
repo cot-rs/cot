@@ -5,7 +5,7 @@ use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use tracing::trace;
 
-use crate::utils::{print_status_msg, StatusType};
+use crate::utils::{StatusType, print_status_msg};
 
 macro_rules! project_file {
     ($name:literal) => {

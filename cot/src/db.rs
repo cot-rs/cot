@@ -32,7 +32,7 @@ use sea_query::{
 use sea_query_binder::{SqlxBinder, SqlxValues};
 use sqlx::{Type, TypeInfo};
 use thiserror::Error;
-use tracing::{span, trace, Instrument, Level};
+use tracing::{Instrument, Level, span, trace};
 
 #[cfg(feature = "mysql")]
 use crate::db::impl_mysql::{DatabaseMySql, MySqlRow, MySqlValueRef};
@@ -53,7 +53,8 @@ pub enum DatabaseError {
     #[error("Error when building query: {0}")]
     QueryBuildingError(#[from] sea_query::error::Error),
     /// Type mismatch in database value.
-    #[error("Type mismatch in database value: expected `{expected}`, found `{found}`. Perhaps migration is needed."
+    #[error(
+        "Type mismatch in database value: expected `{expected}`, found `{found}`. Perhaps migration is needed."
     )]
     TypeMismatch {
         /// The expected type.
@@ -1338,6 +1339,37 @@ impl DatabaseBackend for Database {
     }
 }
 
+#[async_trait]
+impl DatabaseBackend for std::sync::Arc<Database> {
+    async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
+        Database::insert_or_update(self, data).await
+    }
+
+    async fn insert<T: Model>(&self, data: &mut T) -> Result<()> {
+        Database::insert(self, data).await
+    }
+
+    async fn update<T: Model>(&self, data: &mut T) -> Result<()> {
+        Database::update(self, data).await
+    }
+
+    async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
+        Database::query(self, query).await
+    }
+
+    async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>> {
+        Database::get(self, query).await
+    }
+
+    async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool> {
+        Database::exists(self, query).await
+    }
+
+    async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult> {
+        Database::delete(self, query).await
+    }
+}
+
 /// Result of a statement execution.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StatementResult {
@@ -1381,7 +1413,7 @@ pub struct RowsNum(pub u64);
 /// # Examples
 ///
 /// ```
-/// use cot::db::{model, Auto, Model};
+/// use cot::db::{Auto, Model, model};
 /// # use cot::db::migrations::{Field, Operation};
 /// # use cot::db::{Database, Identifier, DatabaseField};
 /// # use cot::Result;

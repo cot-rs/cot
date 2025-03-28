@@ -6,6 +6,7 @@
 use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 // Importing `Auto` from `cot` instead of `crate` so that the migration generator
@@ -16,6 +17,7 @@ use hmac::{Hmac, Mac};
 use sha2::Sha512;
 use thiserror::Error;
 
+use crate::App;
 use crate::admin::{AdminModelManager, DefaultAdminModelManager};
 use crate::auth::{
     AuthBackend, AuthError, Password, PasswordHash, PasswordVerificationResult, Result,
@@ -23,10 +25,8 @@ use crate::auth::{
 };
 use crate::config::SecretKey;
 use crate::db::migrations::SyncDynMigration;
-use crate::db::{model, query, DatabaseBackend, LimitedString, Model};
+use crate::db::{Database, DatabaseBackend, LimitedString, Model, model, query};
 use crate::form::Form;
-use crate::request::{Request, RequestExt};
-use crate::App;
 
 pub mod migrations;
 
@@ -75,8 +75,8 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUser;
     /// use cot::auth::Password;
+    /// use cot::auth::db::DatabaseUser;
     /// use cot::request::{Request, RequestExt};
     /// use cot::response::{Response, ResponseExt};
     /// use cot::{Body, StatusCode};
@@ -102,6 +102,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -168,6 +169,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -222,6 +224,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -321,6 +324,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -367,6 +371,7 @@ impl DatabaseUser {
     /// #     test_database.with_auth().run_migrations().await;
     /// #     let request = TestRequestBuilder::get("/")
     /// #         .with_db_auth(test_database.database())
+    /// #         .await
     /// #         .build();
     /// #     view(&request).await?;
     /// #     test_database.cleanup().await?;
@@ -434,8 +439,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
     /// use cot::auth::Password;
+    /// use cot::auth::db::DatabaseUserCredentials;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));
@@ -450,8 +455,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
     /// use cot::auth::Password;
+    /// use cot::auth::db::DatabaseUserCredentials;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));
@@ -467,8 +472,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
     /// use cot::auth::Password;
+    /// use cot::auth::db::DatabaseUserCredentials;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));
@@ -487,13 +492,9 @@ impl DatabaseUserCredentials {
 ///
 /// This backend supports authenticating users using the
 /// [`DatabaseUserCredentials`] struct and ignores all other credential types.
-#[derive(Debug, Copy, Clone)]
-pub struct DatabaseUserBackend;
-
-impl Default for DatabaseUserBackend {
-    fn default() -> Self {
-        Self::new()
-    }
+#[derive(Debug, Clone)]
+pub struct DatabaseUserBackend {
+    database: Arc<Database>,
 }
 
 impl DatabaseUserBackend {
@@ -502,23 +503,25 @@ impl DatabaseUserBackend {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserBackend;
+    /// use std::sync::Arc;
+    ///
     /// use cot::auth::AuthBackend;
+    /// use cot::auth::db::DatabaseUserBackend;
     /// use cot::config::ProjectConfig;
-    /// use cot::project::WithApps;
+    /// use cot::project::{AuthBackendContext, WithApps};
     /// use cot::{Project, ProjectContext};
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn auth_backend(&self, context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
-    ///         Box::new(DatabaseUserBackend::new())
+    ///     fn auth_backend(&self, context: &AuthBackendContext) -> Arc<dyn AuthBackend> {
+    ///         Arc::new(DatabaseUserBackend::new(context.database().clone()))
     ///         // note that it's usually better to just set the auth backend in the config
     ///     }
     /// }
     /// ```
     #[must_use]
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(database: Arc<Database>) -> Self {
+        Self { database }
     }
 }
 
@@ -526,12 +529,11 @@ impl DatabaseUserBackend {
 impl AuthBackend for DatabaseUserBackend {
     async fn authenticate(
         &self,
-        request: &Request,
         credentials: &(dyn Any + Send + Sync),
     ) -> Result<Option<Box<dyn User + Send + Sync>>> {
         if let Some(credentials) = credentials.downcast_ref::<DatabaseUserCredentials>() {
             #[allow(trivial_casts)] // Upcast to the correct Box type
-            Ok(DatabaseUser::authenticate(request.db(), credentials)
+            Ok(DatabaseUser::authenticate(&self.database, credentials)
                 .await
                 .map(|user| user.map(|user| Box::new(user) as Box<dyn User + Send + Sync>))?)
         } else {
@@ -539,17 +541,13 @@ impl AuthBackend for DatabaseUserBackend {
         }
     }
 
-    async fn get_by_id(
-        &self,
-        request: &Request,
-        id: UserId,
-    ) -> Result<Option<Box<dyn User + Send + Sync>>> {
+    async fn get_by_id(&self, id: UserId) -> Result<Option<Box<dyn User + Send + Sync>>> {
         let UserId::Int(id) = id else {
             return Err(AuthError::UserIdTypeNotSupported);
         };
 
         #[allow(trivial_casts)] // Upcast to the correct Box type
-        Ok(DatabaseUser::get_by_id(request.db(), id)
+        Ok(DatabaseUser::get_by_id(&self.database, id)
             .await?
             .map(|user| Box::new(user) as Box<dyn User + Send + Sync>))
     }
@@ -573,8 +571,8 @@ impl DatabaseUserApp {
     /// ```no_run
     /// use cot::auth::db::DatabaseUserApp;
     /// use cot::config::{DatabaseConfig, ProjectConfig};
-    /// use cot::project::WithConfig;
-    /// use cot::{App, AppBuilder, Project, ProjectContext};
+    /// use cot::project::RegisterAppsContext;
+    /// use cot::{App, AppBuilder, Project};
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
@@ -584,8 +582,8 @@ impl DatabaseUserApp {
     ///             .build())
     ///     }
     ///
-    ///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
-    ///         use cot::project::WithConfig;
+    ///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+    ///         use cot::project::{RegisterAppsContext, WithConfig};
     ///         apps.register_with_views(DatabaseUserApp::new(), "");
     ///     }
     /// }
@@ -648,9 +646,11 @@ mod tests {
         assert_eq!(user_ref.username(), Some(Cow::from("testuser")));
         assert!(user_ref.is_active());
         assert!(user_ref.is_authenticated());
-        assert!(user_ref
-            .session_auth_hash(&SecretKey::new(b"supersecretkey"))
-            .is_some());
+        assert!(
+            user_ref
+                .session_auth_hash(&SecretKey::new(b"supersecretkey"))
+                .is_some()
+        );
     }
 
     #[cot::test]

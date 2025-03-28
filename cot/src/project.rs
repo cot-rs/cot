@@ -5,8 +5,8 @@
 /// # Examples
 ///
 /// ```no_run
-/// use cot::cli::CliMetadata;
 /// use cot::Project;
+/// use cot::cli::CliMetadata;
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -43,9 +43,9 @@ use crate::cli::Cli;
 use crate::config::DatabaseConfig;
 use crate::config::{AuthBackendConfig, ProjectConfig};
 #[cfg(feature = "db")]
-use crate::db::migrations::{MigrationEngine, SyncDynMigration};
-#[cfg(feature = "db")]
 use crate::db::Database;
+#[cfg(feature = "db")]
+use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error::ErrorRepr;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
@@ -53,7 +53,7 @@ use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCo
 use crate::request::{AppName, Request, RequestExt};
 use crate::response::{Response, ResponseExt};
 use crate::router::{Route, Router, RouterService};
-use crate::{cli, error_page, Body, Error, StatusCode};
+use crate::{Body, Error, StatusCode, cli, error_page};
 
 /// A building block for a Cot project.
 ///
@@ -165,8 +165,8 @@ pub trait App: Send + Sync {
 /// # Examples
 ///
 /// ```no_run
-/// use cot::cli::CliMetadata;
 /// use cot::Project;
+/// use cot::cli::CliMetadata;
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -194,8 +194,8 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
-    /// use cot::cli::CliMetadata;
     /// use cot::Project;
+    /// use cot::cli::CliMetadata;
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
@@ -228,8 +228,8 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::ProjectConfig;
     /// use cot::Project;
+    /// use cot::config::ProjectConfig;
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -290,8 +290,8 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
-    /// use cot::project::{AppBuilder, WithConfig};
-    /// use cot::{App, Project, ProjectContext};
+    /// use cot::project::{AppBuilder, RegisterAppsContext};
+    /// use cot::{App, Project};
     ///
     /// struct MyApp;
     /// impl App for MyApp {
@@ -302,13 +302,13 @@ pub trait Project {
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
-    ///     fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+    ///     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
     ///         apps.register(MyApp);
     ///     }
     /// }
     /// ```
     #[allow(unused_variables)]
-    fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {}
+    fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {}
 
     /// Sets the authentication backend to use.
     ///
@@ -319,23 +319,34 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
+    /// use std::sync::Arc;
+    ///
     /// use cot::auth::{AuthBackend, NoAuthBackend};
-    /// use cot::project::WithApps;
-    /// use cot::{App, Project, ProjectContext};
+    /// use cot::project::AuthBackendContext;
+    /// use cot::{App, Project};
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn auth_backend(&self, context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
-    ///         Box::new(NoAuthBackend)
+    ///     fn auth_backend(&self, context: &AuthBackendContext) -> Arc<dyn AuthBackend> {
+    ///         Arc::new(NoAuthBackend)
     ///     }
     /// }
     /// ```
-    fn auth_backend(&self, context: &ProjectContext<WithApps>) -> Box<dyn AuthBackend> {
-        #[allow(trivial_casts)] // cast to Box<dyn AuthBackend>
+    fn auth_backend(&self, context: &AuthBackendContext) -> Arc<dyn AuthBackend> {
+        #[allow(trivial_casts)] // cast to Arc<dyn AuthBackend>
         match &context.config().auth_backend {
-            AuthBackendConfig::None => Box::new(NoAuthBackend) as Box<dyn AuthBackend>,
+            AuthBackendConfig::None => Arc::new(NoAuthBackend) as Arc<dyn AuthBackend>,
             #[cfg(feature = "db")]
-            AuthBackendConfig::Database => Box::new(DatabaseUserBackend) as Box<dyn AuthBackend>,
+            AuthBackendConfig::Database => Arc::new(DatabaseUserBackend::new(
+                context
+                    .try_database()
+                    .expect(
+                        "Database missing when constructing database auth backend. \
+                        Make sure the database config is set up correctly or disable \
+                        authentication in the config.",
+                    )
+                    .clone(),
+            )) as Arc<dyn AuthBackend>,
         }
     }
 
@@ -348,7 +359,7 @@ pub trait Project {
     ///
     /// ```
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{RootHandlerBuilder, WithApps};
+    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
     /// use cot::{BoxedHandler, Project, ProjectContext};
     ///
     /// struct MyProject;
@@ -356,7 +367,7 @@ pub trait Project {
     ///     fn middlewares(
     ///         &self,
     ///         handler: RootHandlerBuilder,
-    ///         context: &ProjectContext<WithApps>,
+    ///         context: &MiddlewareContext,
     ///     ) -> BoxedHandler {
     ///         handler
     ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -368,7 +379,7 @@ pub trait Project {
     fn middlewares(
         &self,
         handler: RootHandlerBuilder,
-        context: &ProjectContext<WithApps>,
+        context: &MiddlewareContext,
     ) -> BoxedHandler {
         handler.build()
     }
@@ -464,6 +475,18 @@ pub trait Project {
     }
 }
 
+/// An alias for `ProjectContext` in appropriate phase for use with the
+/// [`Project::register_apps`] method.
+pub type RegisterAppsContext = ProjectContext<WithConfig>;
+
+/// An alias for `ProjectContext` in appropriate phase for use with the
+/// [`Project::auth_backend`] method.
+pub type AuthBackendContext = ProjectContext<WithDatabase>;
+
+/// An alias for `ProjectContext` in appropriate phase for use with the
+/// [`Project::middlewares`] method.
+pub type MiddlewareContext = ProjectContext<WithDatabase>;
+
 /// A helper struct to build the root handler for the project.
 ///
 /// This is mainly useful for attaching middlewares to the project.
@@ -472,7 +495,7 @@ pub trait Project {
 ///
 /// ```
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{RootHandlerBuilder, WithApps};
+/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
 /// use cot::{BoxedHandler, Project, ProjectContext};
 ///
 /// struct MyProject;
@@ -480,7 +503,7 @@ pub trait Project {
 ///     fn middlewares(
 ///         &self,
 ///         handler: RootHandlerBuilder,
-///         context: &ProjectContext<WithApps>,
+///         context: &MiddlewareContext,
 ///     ) -> BoxedHandler {
 ///         handler
 ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -507,7 +530,7 @@ where
     ///
     /// ```
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{RootHandlerBuilder, WithApps};
+    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
     /// use cot::{BoxedHandler, Project, ProjectContext};
     ///
     /// struct MyProject;
@@ -515,7 +538,7 @@ where
     ///     fn middlewares(
     ///         &self,
     ///         handler: RootHandlerBuilder,
-    ///         context: &ProjectContext<WithApps>,
+    ///         context: &MiddlewareContext,
     ///     ) -> BoxedHandler {
     ///         handler
     ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -548,7 +571,7 @@ where
     ///
     /// ```
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{RootHandlerBuilder, WithApps};
+    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
     /// use cot::{BoxedHandler, Project, ProjectContext};
     ///
     /// struct MyProject;
@@ -556,7 +579,7 @@ where
     ///     fn middlewares(
     ///         &self,
     ///         handler: RootHandlerBuilder,
-    ///         context: &ProjectContext<WithApps>,
+    ///         context: &MiddlewareContext,
     ///     ) -> BoxedHandler {
     ///         handler
     ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -574,8 +597,8 @@ where
 /// # Examples
 ///
 /// ```
-/// use cot::project::{AppBuilder, WithConfig};
-/// use cot::{App, Project, ProjectContext};
+/// use cot::project::{AppBuilder, RegisterAppsContext};
+/// use cot::{App, Project};
 ///
 /// struct MyApp;
 /// impl App for MyApp {
@@ -586,7 +609,7 @@ where
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
 ///         apps.register(MyApp);
 ///     }
 /// }
@@ -614,7 +637,7 @@ impl AppBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::project::WithConfig;
+    /// use cot::project::RegisterAppsContext;
     /// use cot::{App, Project};
     ///
     /// struct HelloApp;
@@ -627,11 +650,7 @@ impl AppBuilder {
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn register_apps(
-    ///         &self,
-    ///         apps: &mut cot::AppBuilder,
-    ///         _context: &cot::ProjectContext<WithConfig>,
-    ///     ) {
+    ///     fn register_apps(&self, apps: &mut cot::AppBuilder, _context: &RegisterAppsContext) {
     ///         apps.register(HelloApp);
     ///     }
     /// }
@@ -648,7 +667,7 @@ impl AppBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::project::WithConfig;
+    /// use cot::project::RegisterAppsContext;
     /// use cot::{App, Project};
     ///
     /// struct HelloApp;
@@ -661,11 +680,7 @@ impl AppBuilder {
     ///
     /// struct HelloProject;
     /// impl Project for HelloProject {
-    ///     fn register_apps(
-    ///         &self,
-    ///         apps: &mut cot::AppBuilder,
-    ///         _context: &cot::ProjectContext<WithConfig>,
-    ///     ) {
+    ///     fn register_apps(&self, apps: &mut cot::AppBuilder, _context: &RegisterAppsContext) {
     ///         apps.register_with_views(HelloApp, "/hello");
     ///     }
     /// }
@@ -1103,6 +1118,7 @@ impl Bootstrapper<WithApps> {
     /// # async fn main() -> cot::Result<()> {
     /// let bootstrapper = Bootstrapper::new(MyProject)
     ///     .with_config(ProjectConfig::default())
+    ///     .with_apps()
     ///     .boot()
     ///     .await?;
     /// let (context, handler) = bootstrapper.into_context_and_handler();
@@ -1112,17 +1128,47 @@ impl Bootstrapper<WithApps> {
     // Send not needed; Bootstrapper is run async in a single thread
     #[allow(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
-        let router_service = RouterService::new(Arc::clone(&self.context.router));
-        let handler = RootHandlerBuilder {
-            handler: router_service,
-        };
-        let handler = self.project.middlewares(handler, &self.context);
+        self.with_database().await?.boot().await
+    }
 
-        let auth_backend = self.project.auth_backend(&self.context);
+    /// Moves forward to the next phase of bootstrapping, the with-database
+    /// phase.
+    ///
+    /// See the [`BootstrapPhase`] and [`WithDatabase`] documentation for more
+    /// details.
+    ///
+    /// # Errors
+    ///
+    /// This method may return an error if it cannot initialize the database.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use cot::project::{Bootstrapper, WithApps};
+    /// use cot::{AppBuilder, Project};
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {}
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let bootstrapper = Bootstrapper::new(MyProject)
+    ///     .with_config(ProjectConfig::default())
+    ///     .with_apps()
+    ///     .with_database()
+    ///     .await?
+    ///     .boot()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    // Send not needed; Bootstrapper is run async in a single thread
+    #[allow(clippy::future_not_send)]
+    pub async fn with_database(self) -> cot::Result<Bootstrapper<WithDatabase>> {
         #[cfg(feature = "db")]
         let database = Self::init_database(&self.context.config.database).await?;
-        let context = self.context.with_auth_and_db(
-            auth_backend,
+        let context = self.context.with_database(
             #[cfg(feature = "db")]
             database,
         );
@@ -1130,7 +1176,7 @@ impl Bootstrapper<WithApps> {
         Ok(Bootstrapper {
             project: self.project,
             context,
-            handler,
+            handler: self.handler,
         })
     }
 
@@ -1143,6 +1189,62 @@ impl Bootstrapper<WithApps> {
             }
             None => Ok(None),
         }
+    }
+}
+
+impl Bootstrapper<WithDatabase> {
+    /// Builds the Cot project instance.
+    ///
+    /// This is the final step in the bootstrapping process. It initializes the
+    /// project with the given configuration and returns a [`Bootstrapper`]
+    /// instance that contains the project's context and handler.
+    ///
+    /// You shouldn't have to use this method directly most of the time. It's
+    /// mainly useful for controlling the bootstrapping process in custom
+    /// [`CliTask`](cli::CliTask)s.
+    ///
+    /// # Errors
+    ///
+    /// This method may return an error if it cannot initialize any of the
+    /// project's components, such as the database.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use cot::{Bootstrapper, Project};
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {}
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let bootstrapper = Bootstrapper::new(MyProject)
+    ///     .with_config(ProjectConfig::default())
+    ///     .boot()
+    ///     .await?;
+    /// let (context, handler) = bootstrapper.into_context_and_handler();
+    /// # Ok(())
+    /// # }
+    /// ```
+    // Function marked `async` to be consistent with the other `boot` methods
+    // Send not needed; Bootstrapper is run async in a single thread
+    #[allow(clippy::unused_async, clippy::future_not_send)]
+    pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
+        let router_service = RouterService::new(Arc::clone(&self.context.router));
+        let handler = RootHandlerBuilder {
+            handler: router_service,
+        };
+        let handler = self.project.middlewares(handler, &self.context);
+
+        let auth_backend = self.project.auth_backend(&self.context);
+        let context = self.context.with_auth(auth_backend);
+
+        Ok(Bootstrapper {
+            project: self.project,
+            context,
+            handler,
+        })
     }
 }
 
@@ -1185,6 +1287,14 @@ mod sealed {
 /// bootstrapper. It's used to ensure that you can't access nonexistent
 /// data until the bootstrapper has reached the corresponding phase.
 ///
+/// # Order of phases
+///
+/// 1. [`Uninitialized`]
+/// 2. [`WithConfig`]
+/// 3. [`WithApps`]
+/// 4. [`WithDatabase`]
+/// 5. [`Initialized`]
+///
 /// # Sealed
 ///
 /// This trait is sealed and can't be implemented outside the `cot`
@@ -1193,22 +1303,21 @@ mod sealed {
 /// # Examples
 ///
 /// ```
-/// ///
-/// use cot::project::{RootHandlerBuilder, WithApps, WithConfig};
+/// use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
 /// use cot::{AppBuilder, BoxedHandler, Project, ProjectContext};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
 ///     // `WithConfig` phase here
-///     fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
 ///         todo!();
 ///     }
 ///
-///     // `WithApps` phase here (which comes after `WithConfig`)
+///     // `WithDatabase` phase here (which comes after `WithConfig`)
 ///     fn middlewares(
 ///         &self,
 ///         handler: RootHandlerBuilder,
-///         context: &ProjectContext<WithApps>,
+///         context: &MiddlewareContext,
 ///     ) -> BoxedHandler {
 ///         todo!()
 ///     }
@@ -1226,11 +1335,11 @@ pub trait BootstrapPhase: sealed::Sealed {
     type Apps;
     /// The type of the router.
     type Router: Debug;
-    /// The type of the auth backend.
-    type AuthBackend;
     /// The type of the database.
     #[cfg(feature = "db")]
     type Database: Debug;
+    /// The type of the auth backend.
+    type AuthBackend;
 }
 
 /// First phase of bootstrapping a Cot project, the uninitialized phase.
@@ -1240,7 +1349,7 @@ pub trait BootstrapPhase: sealed::Sealed {
 /// See the details about the different bootstrap phases in the
 /// [`BootstrapPhase`] trait documentation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Uninitialized;
+pub enum Uninitialized {}
 
 impl sealed::Sealed for Uninitialized {}
 impl BootstrapPhase for Uninitialized {
@@ -1248,9 +1357,9 @@ impl BootstrapPhase for Uninitialized {
     type Config = ();
     type Apps = ();
     type Router = ();
-    type AuthBackend = ();
     #[cfg(feature = "db")]
     type Database = ();
+    type AuthBackend = ();
 }
 
 /// Second phase of bootstrapping a Cot project, the with-config phase.
@@ -1260,7 +1369,7 @@ impl BootstrapPhase for Uninitialized {
 /// See the details about the different bootstrap phases in the
 /// [`BootstrapPhase`] trait documentation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct WithConfig;
+pub enum WithConfig {}
 
 impl sealed::Sealed for WithConfig {}
 impl BootstrapPhase for WithConfig {
@@ -1268,9 +1377,9 @@ impl BootstrapPhase for WithConfig {
     type Config = Arc<ProjectConfig>;
     type Apps = ();
     type Router = ();
-    type AuthBackend = ();
     #[cfg(feature = "db")]
     type Database = ();
+    type AuthBackend = ();
 }
 
 /// Third phase of bootstrapping a Cot project, the with-apps phase.
@@ -1280,7 +1389,7 @@ impl BootstrapPhase for WithConfig {
 /// See the details about the different bootstrap phases in the
 /// [`BootstrapPhase`] trait documentation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct WithApps;
+pub enum WithApps {}
 
 impl sealed::Sealed for WithApps {}
 impl BootstrapPhase for WithApps {
@@ -1288,9 +1397,29 @@ impl BootstrapPhase for WithApps {
     type Config = <WithConfig as BootstrapPhase>::Config;
     type Apps = Vec<Box<dyn App>>;
     type Router = Arc<Router>;
-    type AuthBackend = ();
     #[cfg(feature = "db")]
     type Database = ();
+    type AuthBackend = ();
+}
+
+/// Fourth phase of bootstrapping a Cot project, the with-database phase.
+///
+/// # See also
+///
+/// See the details about the different bootstrap phases in the
+/// [`BootstrapPhase`] trait documentation.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum WithDatabase {}
+
+impl sealed::Sealed for WithDatabase {}
+impl BootstrapPhase for WithDatabase {
+    type RequestHandler = ();
+    type Config = <WithApps as BootstrapPhase>::Config;
+    type Apps = <WithApps as BootstrapPhase>::Apps;
+    type Router = <WithApps as BootstrapPhase>::Router;
+    #[cfg(feature = "db")]
+    type Database = Option<Arc<Database>>;
+    type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
 }
 
 /// The final phase of bootstrapping a Cot project, the initialized phase.
@@ -1300,17 +1429,17 @@ impl BootstrapPhase for WithApps {
 /// See the details about the different bootstrap phases in the
 /// [`BootstrapPhase`] trait documentation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Initialized;
+pub enum Initialized {}
 
 impl sealed::Sealed for Initialized {}
 impl BootstrapPhase for Initialized {
     type RequestHandler = BoxedHandler;
-    type Config = <WithApps as BootstrapPhase>::Config;
-    type Apps = <WithApps as BootstrapPhase>::Apps;
-    type Router = <WithApps as BootstrapPhase>::Router;
-    type AuthBackend = Box<dyn AuthBackend>;
+    type Config = <WithDatabase as BootstrapPhase>::Config;
+    type Apps = <WithDatabase as BootstrapPhase>::Apps;
+    type Router = <WithDatabase as BootstrapPhase>::Router;
     #[cfg(feature = "db")]
-    type Database = Option<Arc<Database>>;
+    type Database = <WithDatabase as BootstrapPhase>::Database;
+    type AuthBackend = Arc<dyn AuthBackend>;
 }
 
 /// Shared context and configs for all apps. Used in conjunction with the
@@ -1321,10 +1450,10 @@ pub struct ProjectContext<S: BootstrapPhase = Initialized> {
     #[debug("..")]
     apps: S::Apps,
     router: S::Router,
-    #[debug("..")]
-    auth_backend: S::AuthBackend,
     #[cfg(feature = "db")]
     database: S::Database,
+    #[debug("..")]
+    auth_backend: S::AuthBackend,
 }
 
 impl ProjectContext<Uninitialized> {
@@ -1334,9 +1463,9 @@ impl ProjectContext<Uninitialized> {
             config: (),
             apps: (),
             router: (),
-            auth_backend: (),
             #[cfg(feature = "db")]
             database: (),
+            auth_backend: (),
         }
     }
 
@@ -1345,14 +1474,14 @@ impl ProjectContext<Uninitialized> {
             config: Arc::new(config),
             apps: self.apps,
             router: self.router,
-            auth_backend: self.auth_backend,
             #[cfg(feature = "db")]
             database: self.database,
+            auth_backend: self.auth_backend,
         }
     }
 }
 
-impl ProjectContext<WithConfig> {
+impl<S: BootstrapPhase<Config = Arc<ProjectConfig>>> ProjectContext<S> {
     /// Returns the configuration for the project.
     ///
     /// # Examples
@@ -1376,45 +1505,23 @@ impl ProjectContext<WithConfig> {
     pub fn config(&self) -> &ProjectConfig {
         &self.config
     }
+}
 
+impl ProjectContext<WithConfig> {
     #[must_use]
     fn with_apps(self, apps: Vec<Box<dyn App>>, router: Arc<Router>) -> ProjectContext<WithApps> {
         ProjectContext {
             config: self.config,
             apps,
             router,
-            auth_backend: self.auth_backend,
             #[cfg(feature = "db")]
             database: self.database,
+            auth_backend: self.auth_backend,
         }
     }
 }
 
-impl ProjectContext<WithApps> {
-    /// Returns the configuration for the project.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     let config = request.context().config();
-    ///     // can also be accessed via:
-    ///     let config = request.project_config();
-    ///
-    ///     let db_url = &config.database.url;
-    ///
-    ///     // ...
-    /// #    todo!()
-    /// }
-    /// ```
-    #[must_use]
-    pub fn config(&self) -> &ProjectConfig {
-        &self.config
-    }
-
+impl<S: BootstrapPhase<Apps = Vec<Box<dyn App>>>> ProjectContext<S> {
     /// Returns the apps for the project.
     ///
     /// # Examples
@@ -1434,20 +1541,35 @@ impl ProjectContext<WithApps> {
     pub fn apps(&self) -> &[Box<dyn App>] {
         &self.apps
     }
+}
 
+impl ProjectContext<WithApps> {
     #[must_use]
-    fn with_auth_and_db(
+    fn with_database(
         self,
-        auth_backend: Box<dyn AuthBackend>,
         #[cfg(feature = "db")] database: Option<Arc<Database>>,
-    ) -> ProjectContext<Initialized> {
+    ) -> ProjectContext<WithDatabase> {
+        ProjectContext {
+            config: self.config,
+            apps: self.apps,
+            router: self.router,
+            #[cfg(feature = "db")]
+            database,
+            auth_backend: self.auth_backend,
+        }
+    }
+}
+
+impl ProjectContext<WithDatabase> {
+    #[must_use]
+    fn with_auth(self, auth_backend: Arc<dyn AuthBackend>) -> ProjectContext<Initialized> {
         ProjectContext {
             config: self.config,
             apps: self.apps,
             router: self.router,
             auth_backend,
             #[cfg(feature = "db")]
-            database,
+            database: self.database,
         }
     }
 }
@@ -1464,56 +1586,14 @@ impl ProjectContext<Initialized> {
             config,
             apps,
             router,
-            auth_backend,
             #[cfg(feature = "db")]
             database,
+            auth_backend,
         }
     }
+}
 
-    /// Returns the configuration for the project.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     let config = request.context().config();
-    ///     // can also be accessed via:
-    ///     let config = request.project_config();
-    ///
-    ///     let db_url = &config.database.url;
-    ///
-    ///     // ...
-    /// #    todo!()
-    /// }
-    /// ```
-    #[must_use]
-    pub fn config(&self) -> &ProjectConfig {
-        &self.config
-    }
-
-    /// Returns the apps for the project.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     let apps = request.context().apps();
-    ///
-    ///     // ...
-    /// #    todo!()
-    /// }
-    /// ```
-    #[must_use]
-    pub fn apps(&self) -> &[Box<dyn App>] {
-        &self.apps
-    }
-
+impl<S: BootstrapPhase<Router = Arc<Router>>> ProjectContext<S> {
     /// Returns the router for the project.
     ///
     /// # Examples
@@ -1534,10 +1614,11 @@ impl ProjectContext<Initialized> {
     /// }
     /// ```
     #[must_use]
-    pub fn router(&self) -> &Router {
+    pub fn router(&self) -> &Arc<Router> {
         &self.router
     }
-
+}
+impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
     /// Returns the authentication backend for the project.
     ///
     /// # Examples
@@ -1553,10 +1634,13 @@ impl ProjectContext<Initialized> {
     /// }
     /// ```
     #[must_use]
-    pub fn auth_backend(&self) -> &dyn AuthBackend {
-        self.auth_backend.as_ref()
+    pub fn auth_backend(&self) -> &Arc<dyn AuthBackend> {
+        &self.auth_backend
     }
+}
 
+#[cfg(feature = "db")]
+impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     /// Returns the database for the project, if it is enabled.
     ///
     /// # Examples
@@ -1602,9 +1686,10 @@ impl ProjectContext<Initialized> {
     /// #    todo!()
     /// }
     /// ```
-    #[must_use]
     #[cfg(feature = "db")]
-    pub fn database(&self) -> &Database {
+    #[must_use]
+    #[track_caller]
+    pub fn database(&self) -> &Arc<Database> {
         self.try_database().expect(
             "Database missing. Did you forget to add the database when configuring CotProject?",
         )
@@ -1820,7 +1905,7 @@ fn build_custom_error_page(
 /// # Examples
 ///
 /// ```no_run
-/// use cot::{run_cli, App, Project};
+/// use cot::{App, Project, run_cli};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {}
@@ -1905,7 +1990,6 @@ mod tests {
     use super::*;
     use crate::auth::UserId;
     use crate::config::SecretKey;
-    use crate::test::TestRequestBuilder;
 
     struct TestApp;
 
@@ -1948,7 +2032,7 @@ mod tests {
             fn middlewares(
                 &self,
                 handler: RootHandlerBuilder,
-                context: &ProjectContext<WithApps>,
+                context: &MiddlewareContext,
             ) -> BoxedHandler {
                 handler
                     .middleware(crate::static_files::StaticFilesMiddleware::from_context(
@@ -2011,14 +2095,17 @@ mod tests {
                     .auth_backend(AuthBackendConfig::None)
                     .build(),
             )
-            .with_apps(vec![], Arc::new(Router::empty()));
+            .with_apps(vec![], Arc::new(Router::empty()))
+            .with_database(None);
 
         let auth_backend = TestProject.auth_backend(&context);
-        assert!(auth_backend
-            .get_by_id(&TestRequestBuilder::get("/").build(), UserId::Int(0))
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            auth_backend
+                .get_by_id(UserId::Int(0))
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[cot::test]
@@ -2026,7 +2113,7 @@ mod tests {
     async fn bootstrapper() {
         struct TestProject;
         impl Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
                 apps.register_with_views(TestApp {}, "/app");
             }
         }

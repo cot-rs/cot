@@ -1,6 +1,12 @@
-update-lockfiles:
-    update-workspace-lockfile
-    update-template-lockfile
+default:
+    @just --choose {{ justfile() }}
+
+alias u := update-lockfiles
+alias c := clippy
+alias cov := coverage
+alias d := docs
+
+update-lockfiles: update-workspace-lockfile update-template-lockfile
 
 update-workspace-lockfile:
     cargo update
@@ -22,6 +28,9 @@ update-template-lockfile:
     sed -i 's/$proj_name/\{\{ project_name \}\}/' $cargo_lock_path
     cp $cargo_lock_path cot-cli/src/project_template/Cargo.lock.template
     rm -rf $tmpdir
+
+clippy:
+    cargo +stable clippy --no-deps --all-targets
 
 coverage:
     # generate coverage report as HTML

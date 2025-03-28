@@ -1,6 +1,6 @@
 [package]
 name = "cot-cli"
-version = "0.1.4"
+version = "0.2.0"
 description = "The Rust web framework for lazy developers - CLI tool."
 categories = ["command-line-utilities", "web-programming"]
 edition.workspace = true
@@ -24,7 +24,9 @@ anstyle.workspace = true
 anyhow.workspace = true
 cargo_toml.workspace = true
 chrono.workspace = true
-clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
+clap = { workspace = true, features = ["derive", "env", "wrap_help", "string"] }
+clap_complete.workspace = true
+clap_mangen.workspace = true
 clap-verbosity-flag = { workspace = true, features = ["tracing"] }
 darling.workspace = true
 cot.workspace = true

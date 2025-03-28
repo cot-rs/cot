@@ -11,7 +11,7 @@ use tracing::info;
 
 use crate::db::migrations::sorter::{MigrationSorter, MigrationSorterError};
 use crate::db::relations::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
-use crate::db::{model, query, Auto, ColumnType, Database, DatabaseField, Identifier, Result};
+use crate::db::{Auto, ColumnType, Database, DatabaseField, Identifier, Result, model, query};
 
 /// An error that occurred while running migrations.
 #[derive(Debug, Clone, Error)]
@@ -2208,7 +2208,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "`table_name` is required")]
     fn test_remove_field_builder_missing_table_name() {
-        RemoveFieldBuilder::new()
+        let _ = RemoveFieldBuilder::new()
             .field(Field::new(
                 Identifier::new("name"),
                 <String as DatabaseField>::TYPE,
@@ -2219,7 +2219,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "`field` is required")]
     fn test_remove_field_builder_missing_field() {
-        RemoveFieldBuilder::new()
+        let _ = RemoveFieldBuilder::new()
             .table_name(Identifier::new("testapp__test_model"))
             .build();
     }

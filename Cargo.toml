@@ -17,8 +17,8 @@ members = [
 resolver = "2"
 
 [workspace.package]
-edition = "2021"
-rust-version = "1.84"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 homepage = "https://cot.rs"
 repository = "https://github.com/cot-rs/cot"
@@ -59,10 +59,12 @@ bytes = "1.10"
 cargo_toml = "0.21"
 chrono = { version = "0.4", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
+clap_complete = "4"
+clap_mangen = "0.2.19"
 clap-verbosity-flag = { version = "3", default-features = false }
-cot = { version = "0.1.4", path = "cot" }
-cot_codegen = { version = "0.1.2", path = "cot-codegen" }
-cot_macros = { version = "0.1.2", path = "cot-macros" }
+cot = { version = "0.2.0", path = "cot" }
+cot_codegen = { version = "0.2.0", path = "cot-codegen" }
+cot_macros = { version = "0.2.0", path = "cot-macros" }
 darling = "0.20"
 derive_builder = "0.20"
 derive_more = "2"
@@ -96,7 +98,9 @@ rustversion = "1"
 sea-query = { version = "0.32", default-features = false }
 sea-query-binder = { version = "0.7", default-features = false }
 serde = "1"
+serde_html_form = "0.2"
 serde_json = "1"
+serde_path_to_error = "0.1.17"
 sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false }
 subtle = { version = "2", default-features = false }

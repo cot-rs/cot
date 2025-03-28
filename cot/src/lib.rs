@@ -76,6 +76,7 @@ pub mod project;
 pub mod request;
 pub mod response;
 pub mod router;
+pub mod session;
 pub mod static_files;
 pub mod test;
 pub(crate) mod utils;
@@ -87,7 +88,7 @@ pub use {bytes, http};
 
 pub use crate::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{
-    run, run_at, run_cli, App, AppBuilder, Bootstrapper, Project, ProjectContext,
+    App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };
 
 /// A type alias for a result that can return a [`cot::Error`].

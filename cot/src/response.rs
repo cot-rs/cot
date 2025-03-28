@@ -13,8 +13,8 @@
 //! ```
 
 use bytes::Bytes;
-use cot::error_page::ErrorPageTrigger;
 
+use crate::error_page::ErrorPageTrigger;
 use crate::headers::HTML_CONTENT_TYPE;
 #[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
@@ -42,8 +42,8 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::StatusCode;
+    /// use cot::response::{Response, ResponseExt};
     ///
     /// let response = Response::builder()
     ///     .status(StatusCode::OK)
@@ -110,8 +110,8 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::StatusCode;
+    /// use cot::response::{Response, ResponseExt};
     ///
     /// let response = Response::new_redirect("http://example.com");
     /// ```
@@ -141,10 +141,19 @@ impl ResponseExt for Response {
 
     #[cfg(feature = "json")]
     fn new_json<T: ?Sized + serde::Serialize>(status: StatusCode, data: &T) -> crate::Result<Self> {
+        // a "reasonable default" for a JSON response size
+        const DEFAULT_JSON_SIZE: usize = 128;
+
+        let mut buf = Vec::with_capacity(DEFAULT_JSON_SIZE);
+        let mut serializer = serde_json::Serializer::new(&mut buf);
+        serde_path_to_error::serialize(data, &mut serializer)
+            .map_err(|error| crate::Error::new(crate::error::ErrorRepr::Json(error)))?;
+        let data = String::from_utf8(buf).expect("JSON serialization always returns valid UTF-8");
+
         Ok(http::Response::builder()
             .status(status)
             .header(http::header::CONTENT_TYPE, JSON_CONTENT_TYPE)
-            .body(Body::fixed(serde_json::to_string(data)?))
+            .body(Body::fixed(data))
             .expect(RESPONSE_BUILD_FAILURE))
     }
 

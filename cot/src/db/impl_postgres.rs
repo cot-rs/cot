@@ -11,7 +11,7 @@ impl DatabasePostgres {
     }
 
     fn prepare_values(values: &mut sea_query_binder::SqlxValues) {
-        for value in &mut values.0 .0 {
+        for value in &mut values.0.0 {
             Self::tinyint_to_smallint(value);
             Self::unsigned_to_signed(value);
         }

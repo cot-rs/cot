@@ -28,12 +28,13 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use derive_more::with_trait::Debug;
+use http::request::Parts;
 use tracing::debug;
 
 use crate::error::ErrorRepr;
-use crate::handler::RequestHandler;
-use crate::request::{AppName, PathParams, Request, RouteName};
-use crate::response::{not_found_response, Response};
+use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
+use crate::request::{AppName, PathParams, Request, RequestExt, RouteName};
+use crate::response::{Response, not_found_response};
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};
 
@@ -336,7 +337,7 @@ impl Default for Router {
 #[derive(Debug)]
 struct HandlerFound<'a> {
     #[debug("handler(...)")]
-    handler: &'a (dyn RequestHandler + Send + Sync),
+    handler: &'a (dyn BoxRequestHandler + Send + Sync),
     app_name: Option<AppName>,
     name: Option<RouteName>,
     params: Vec<(String, String)>,
@@ -445,10 +446,14 @@ impl Route {
     /// let route = Route::with_handler("/", home);
     /// ```
     #[must_use]
-    pub fn with_handler<V: RequestHandler + Send + Sync + 'static>(url: &str, view: V) -> Self {
+    pub fn with_handler<HandlerParams, H>(url: &str, handler: H) -> Self
+    where
+        HandlerParams: 'static,
+        H: RequestHandler<HandlerParams> + Send + Sync + 'static,
+    {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(view)),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: None,
         }
     }
@@ -469,14 +474,15 @@ impl Route {
     /// let route = Route::with_handler_and_name("/", home, "home");
     /// ```
     #[must_use]
-    pub fn with_handler_and_name<T: Into<String>, V: RequestHandler + Send + Sync + 'static>(
-        url: &str,
-        view: V,
-        name: T,
-    ) -> Self {
+    pub fn with_handler_and_name<N, HandlerParams, H>(url: &str, handler: H, name: N) -> Self
+    where
+        N: Into<String>,
+        HandlerParams: 'static,
+        H: RequestHandler<HandlerParams> + Send + Sync + 'static,
+    {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(view)),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: Some(RouteName(name.into())),
         }
     }
@@ -575,7 +581,7 @@ pub(crate) enum RouteKind {
 
 #[derive(Clone)]
 enum RouteInner {
-    Handler(Arc<dyn RequestHandler + Send + Sync>),
+    Handler(Arc<dyn BoxRequestHandler + Send + Sync>),
     Router(Router),
 }
 
@@ -595,12 +601,11 @@ enum RouteInner {
 /// # Examples
 ///
 /// ```
-/// ///
-/// use cot::project::WithConfig;
+/// use cot::project::RegisterAppsContext;
 /// use cot::request::Request;
 /// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
-/// use cot::{reverse, App, AppBuilder, Body, Project, ProjectContext, StatusCode};
+/// use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
 ///     // any of below two lines returns the same:
@@ -630,7 +635,7 @@ enum RouteInner {
 /// struct MyProject;
 ///
 /// impl Project for MyProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
 ///         apps.register_with_views(MyApp, "");
 ///     }
 /// }
@@ -638,6 +643,7 @@ enum RouteInner {
 #[macro_export]
 macro_rules! reverse {
     ($request:expr, $view_name:literal $(, $($key:ident = $value:expr),*)?) => {{
+        #[allow(unused_imports)] // allow using either `Request` or `Urls` objects
         use $crate::request::RequestExt;
         let (app_name, view_name) = $crate::router::split_view_name($view_name);
         let app_name = app_name.or_else(|| $request.app_name());
@@ -645,6 +651,130 @@ macro_rules! reverse {
             .router()
             .reverse(app_name, view_name, &$crate::reverse_param_map!($( $($key = $value),* )?))
     }};
+}
+
+/// A helper structure to allow reversing URLs from a request handler.
+///
+/// This is mainly useful as an extractor to allow reversing URLs without
+/// access to a full [`Request`] object.
+///
+/// # Examples
+///
+/// ```
+/// use cot::request::Request;
+/// use cot::response::{Response, ResponseExt};
+/// use cot::router::{Route, Router, Urls};
+/// use cot::test::TestRequestBuilder;
+/// use cot::{Body, RequestHandler, StatusCode, reverse};
+///
+/// async fn my_handler(urls: Urls) -> cot::Result<Response> {
+///     let url = reverse!(urls, "home")?;
+///     Ok(Response::new_html(
+///         StatusCode::OK,
+///         Body::fixed(format!("{url}")),
+///     ))
+/// }
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// let router = Router::with_urls([Route::with_handler_and_name("/", my_handler, "home")]);
+/// let request = TestRequestBuilder::get("/").router(router).build();
+///
+/// assert_eq!(
+///     my_handler
+///         .handle(request)
+///         .await?
+///         .into_body()
+///         .into_bytes()
+///         .await?,
+///     "/"
+/// );
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone)]
+pub struct Urls {
+    app_name: Option<String>,
+    router: Arc<Router>,
+}
+
+impl Urls {
+    /// Create a new `Urls` object from a [`Request`] object.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::Request;
+    /// use cot::response::{Response, ResponseExt};
+    /// use cot::router::Urls;
+    /// use cot::{Body, StatusCode, reverse};
+    ///
+    /// async fn my_handler(request: Request) -> cot::Result<Response> {
+    ///     let urls = Urls::from_request(&request);
+    ///     let url = reverse!(urls, "home")?;
+    ///     Ok(Response::new_html(
+    ///         StatusCode::OK,
+    ///         Body::fixed(format!("Hello! The URL for this view is: {}", url)),
+    ///     ))
+    /// }
+    /// ```
+    pub fn from_request(request: &Request) -> Self {
+        Self {
+            app_name: request.app_name().map(ToOwned::to_owned),
+            router: Arc::clone(request.router()),
+        }
+    }
+
+    pub(crate) fn from_parts(request_parts: &Parts) -> Self {
+        Self {
+            app_name: request_parts.app_name().map(ToOwned::to_owned),
+            router: Arc::clone(request_parts.router()),
+        }
+    }
+
+    /// Get the app name the current route belongs to, or [`None`] if the
+    /// request is not routed.
+    ///
+    /// This is mainly useful for providing context to reverse redirects, where
+    /// you want to redirect to a route in the same app.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    /// use cot::router::Urls;
+    ///
+    /// async fn my_handler(urls: Urls) -> cot::Result<Response> {
+    ///     let app_name = urls.app_name();
+    ///     // ... do something with the app name
+    ///     # unimplemented!()
+    /// }
+    /// ```
+    #[must_use]
+    pub fn app_name(&self) -> Option<&str> {
+        self.app_name.as_deref()
+    }
+
+    /// Get the router.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    /// use cot::router::Urls;
+    ///
+    /// async fn my_handler(urls: Urls) -> cot::Result<Response> {
+    ///     let router = urls.router();
+    ///     // ... do something with the router
+    ///     # unimplemented!()
+    /// }
+    /// ```
+    #[must_use]
+    pub fn router(&self) -> &Router {
+        &self.router
+    }
 }
 
 impl Debug for RouteInner {
@@ -705,7 +835,6 @@ mod tests {
 
     struct MockHandler;
 
-    #[async_trait::async_trait]
     impl RequestHandler for MockHandler {
         async fn handle(&self, _request: Request) -> Result<Response> {
             Ok(Response::new_html(

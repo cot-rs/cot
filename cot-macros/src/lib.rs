@@ -5,19 +5,19 @@ mod main_fn;
 mod model;
 mod query;
 
-use darling::ast::NestedMeta;
 use darling::Error;
+use darling::ast::NestedMeta;
 use proc_macro::TokenStream;
 use proc_macro_crate::crate_name;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn};
+use syn::{ItemFn, parse_macro_input};
 
 use crate::admin::impl_admin_model_for_struct;
 use crate::dbtest::fn_to_dbtest;
 use crate::form::impl_form_for_struct;
 use crate::main_fn::{fn_to_cot_main, fn_to_cot_test};
 use crate::model::impl_model_for_struct;
-use crate::query::{query_to_tokens, Query};
+use crate::query::{Query, query_to_tokens};
 
 #[proc_macro_derive(Form, attributes(form))]
 pub fn derive_form(input: TokenStream) -> TokenStream {
@@ -138,8 +138,8 @@ pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```no_run
-/// use cot::project::WithConfig;
-/// use cot::{App, AppBuilder, Project, ProjectContext};
+/// use cot::project::RegisterAppsContext;
+/// use cot::{App, AppBuilder, Project};
 ///
 /// struct HelloApp;
 ///
@@ -151,7 +151,7 @@ pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// struct HelloProject;
 /// impl Project for HelloProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
 ///         apps.register_with_views(HelloApp, "");
 ///     }
 /// }

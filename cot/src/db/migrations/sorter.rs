@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
+use crate::db::Identifier;
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationDependencyInner, OperationInner,
 };
-use crate::db::Identifier;
-use crate::utils::graph::{apply_permutation, Graph};
+use crate::utils::graph::{Graph, apply_permutation};
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
@@ -146,8 +146,8 @@ impl From<&MigrationDependency> for MigrationLookup<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::migrations::{MigrationDependency, Operation};
     use crate::db::Identifier;
+    use crate::db::migrations::{MigrationDependency, Operation};
     use crate::test::TestMigration;
 
     #[test]

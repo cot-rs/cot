@@ -23,7 +23,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       matrix:
-        rust: [stable, nightly, "1.84"] # 1.84 is the MSRV
+        rust: [stable, nightly, "1.85"] # 1.85 is the MSRV
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     name: Build & test
@@ -79,12 +79,7 @@ jobs:
           save-if: false
 
       - name: Run clippy
-        uses: giraffate/clippy-action@v1
-        with:
-          reporter: github-pr-check
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          clippy_flags: '--no-deps -- -D warnings'
-          fail_on_error: true
+        run: cargo clippy --no-deps --all-targets -- -D warnings
 
   external-deps:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
@@ -132,6 +127,9 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Install LLVM
+        run: sudo apt-get install -y llvm
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master

@@ -3,20 +3,19 @@ mod migrations;
 use cot::bytes::Bytes;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
-use cot::middleware::LiveReloadMiddleware;
-use cot::project::{RootHandlerBuilder, WithApps, WithConfig};
-use cot::request::Request;
+use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{static_files, App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode};
+use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, static_files};
 use rinja::Template;
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {}
 
-async fn index(request: Request) -> cot::Result<Response> {
+async fn index() -> cot::Result<Response> {
     let index_template = IndexTemplate {};
     let rendered = index_template.render()?;
 
@@ -50,17 +49,19 @@ impl Project for {{ project_struct_name }} {
         cot::cli::metadata!()
     }
 
-    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views({{ app_name }}, "");
     }
 
     fn middlewares(
         &self,
         handler: RootHandlerBuilder,
-        context: &ProjectContext<WithApps>,
+        context: &MiddlewareContext,
     ) -> BoxedHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
+            .middleware(AuthMiddleware::new())
+            .middleware(SessionMiddleware::new())
             .middleware(LiveReloadMiddleware::from_context(context))
             .build()
     }

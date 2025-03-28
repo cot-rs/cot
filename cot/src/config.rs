@@ -227,10 +227,11 @@ impl ProjectConfig {
     /// ```
     #[must_use]
     pub fn dev_default() -> ProjectConfig {
-        ProjectConfig::builder()
-            .debug(true)
-            .register_panic_hook(true)
-            .build()
+        let mut builder = ProjectConfig::builder();
+        builder.debug(true).register_panic_hook(true);
+        #[cfg(feature = "db")]
+        builder.database(DatabaseConfig::builder().url("sqlite::memory:").build());
+        builder.build()
     }
 
     /// Create a new [`ProjectConfig`] from a TOML string.
@@ -292,7 +293,7 @@ impl ProjectConfigBuilder {
 ///
 /// let config = AuthBackendConfig::Database;
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AuthBackendConfig {
     /// No authentication backend.
@@ -300,6 +301,7 @@ pub enum AuthBackendConfig {
     /// This enables [`NoAuthBackend`](cot::auth::NoAuthBackend) to be used as
     /// the authentication backend, which effectively disables
     /// authentication.
+    #[default]
     None,
     /// Database authentication backend.
     ///
@@ -307,20 +309,6 @@ pub enum AuthBackendConfig {
     /// to be used as the authentication backend.
     #[cfg(feature = "db")]
     Database,
-}
-
-impl Default for AuthBackendConfig {
-    fn default() -> Self {
-        #[cfg(feature = "db")]
-        {
-            Self::Database
-        }
-
-        #[cfg(not(feature = "db"))]
-        {
-            Self::None
-        }
-    }
 }
 
 /// The configuration for the database.
@@ -413,6 +401,8 @@ impl DatabaseConfig {
 pub struct MiddlewareConfig {
     /// The configuration for the live reload middleware.
     pub live_reload: LiveReloadMiddlewareConfig,
+    /// The configuration for the session middleware.
+    pub session: SessionMiddlewareConfig,
 }
 
 impl MiddlewareConfig {
@@ -438,16 +428,18 @@ impl MiddlewareConfigBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::{LiveReloadMiddlewareConfig, MiddlewareConfig};
+    /// use cot::config::{LiveReloadMiddlewareConfig, MiddlewareConfig, SessionMiddlewareConfig};
     ///
     /// let config = MiddlewareConfig::builder()
     ///     .live_reload(LiveReloadMiddlewareConfig::builder().enabled(true).build())
+    ///     .session(SessionMiddlewareConfig::builder().secure(false).build())
     ///     .build();
     /// ```
     #[must_use]
     pub fn build(&self) -> MiddlewareConfig {
         MiddlewareConfig {
             live_reload: self.live_reload.clone().unwrap_or_default(),
+            session: self.session.clone().unwrap_or_default(),
         }
     }
 }
@@ -510,6 +502,68 @@ impl LiveReloadMiddlewareConfigBuilder {
     pub fn build(&self) -> LiveReloadMiddlewareConfig {
         LiveReloadMiddlewareConfig {
             enabled: self.enabled.unwrap_or_default(),
+        }
+    }
+}
+
+/// The configuration for the session middleware.
+///
+/// This is used as part of the [`MiddlewareConfig`] struct.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::SessionMiddlewareConfig;
+///
+/// let config = SessionMiddlewareConfig::builder().secure(false).build();
+/// ```
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct SessionMiddlewareConfig {
+    /// Whether the session middleware is secure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().secure(false).build();
+    /// ```
+    pub secure: bool,
+}
+
+impl SessionMiddlewareConfig {
+    /// Create a new [`SessionMiddlewareConfigBuilder`] to build a
+    /// [`SessionMiddlewareConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> SessionMiddlewareConfigBuilder {
+        SessionMiddlewareConfigBuilder::default()
+    }
+}
+
+impl SessionMiddlewareConfigBuilder {
+    /// Builds the session middleware configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().secure(false).build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> SessionMiddlewareConfig {
+        SessionMiddlewareConfig {
+            secure: self.secure.unwrap_or(true),
         }
     }
 }
@@ -718,6 +772,10 @@ mod tests {
             secret_key = "123abc"
             fallback_secret_keys = ["456def", "789ghi"]
             auth_backend = { type = "none" }
+            [middlewares]
+            live_reload.enabled = true
+            [middlewares.session]
+            secure = false
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
@@ -729,6 +787,8 @@ mod tests {
         assert_eq!(config.fallback_secret_keys[0].as_bytes(), b"456def");
         assert_eq!(config.fallback_secret_keys[1].as_bytes(), b"789ghi");
         assert_eq!(config.auth_backend, AuthBackendConfig::None);
+        assert!(config.middlewares.live_reload.enabled);
+        assert!(!config.middlewares.session.secure);
     }
 
     #[test]

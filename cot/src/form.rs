@@ -27,6 +27,7 @@ use std::borrow::Cow;
 use std::fmt::{Debug, Display};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
 /// This macro will generate an implementation of the [`Form`] trait for the
@@ -54,6 +55,7 @@ use async_trait::async_trait;
 pub use cot_macros::Form;
 use thiserror::Error;
 
+use crate::headers::FORM_CONTENT_TYPE;
 use crate::request;
 use crate::request::{Request, RequestExt};
 
@@ -216,8 +218,7 @@ pub trait Form: Sized {
     /// This method should return an error if the form data could not be read
     /// from the request.
     async fn build_context(request: &mut Request) -> Result<Self::Context, FormError> {
-        let form_data = request
-            .form_data()
+        let form_data = form_data(request)
             .await
             .map_err(|error| FormError::RequestError {
                 error: Box::new(error),
@@ -234,6 +235,33 @@ pub trait Form: Sized {
         }
 
         Ok(context)
+    }
+}
+
+/// Get the request body as bytes. If the request method is GET or HEAD, the
+/// query string is returned. Otherwise, if the request content type is
+/// `application/x-www-form-urlencoded`, then the body is read and returned.
+/// Otherwise, an error is thrown.
+///
+/// # Errors
+///
+/// Throws an error if the request method is not GET or HEAD and the content
+/// type is not `application/x-www-form-urlencoded`.
+/// Throws an error if the request body could not be read.
+pub async fn form_data(request: &mut Request) -> crate::Result<Bytes> {
+    if request.method() == http::Method::GET || request.method() == http::Method::HEAD {
+        if let Some(query) = request.uri().query() {
+            return Ok(Bytes::copy_from_slice(query.as_bytes()));
+        }
+
+        Ok(Bytes::new())
+    } else {
+        request.expect_content_type(FORM_CONTENT_TYPE)?;
+
+        let body = std::mem::take(request.body_mut());
+        let bytes = body.into_bytes().await?;
+
+        Ok(bytes)
     }
 }
 
@@ -278,7 +306,7 @@ pub trait FormContext: Debug {
     /// Returns a mutable reference to the validation errors for a target in the
     /// form context.
     fn errors_for_mut(&mut self, target: FormErrorTarget<'_>)
-        -> &mut Vec<FormFieldValidationError>;
+    -> &mut Vec<FormFieldValidationError>;
 
     /// Returns whether the form context has any validation errors.
     fn has_errors(&self) -> bool;
@@ -413,4 +441,49 @@ pub trait AsFormField {
 
     /// Returns `self` as a value that can be set with [`FormField::set_value`].
     fn to_field_value(&self) -> String;
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+
+    use crate::Body;
+    use crate::form::form_data;
+    use crate::headers::FORM_CONTENT_TYPE;
+
+    #[cot::test]
+    async fn form_data_extract_get_empty() {
+        let mut request = http::Request::builder()
+            .method(http::Method::GET)
+            .uri("https://example.com")
+            .body(Body::empty())
+            .unwrap();
+
+        let bytes = form_data(&mut request).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b""));
+    }
+
+    #[cot::test]
+    async fn form_data_extract_get() {
+        let mut request = http::Request::builder()
+            .method(http::Method::GET)
+            .uri("https://example.com/?hello=world")
+            .body(Body::empty())
+            .unwrap();
+
+        let bytes = form_data(&mut request).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b"hello=world"));
+    }
+
+    #[cot::test]
+    async fn form_data_extract() {
+        let mut request = http::Request::builder()
+            .method(http::Method::POST)
+            .header(http::header::CONTENT_TYPE, FORM_CONTENT_TYPE)
+            .body(Body::fixed("hello=world"))
+            .unwrap();
+
+        let bytes = form_data(&mut request).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b"hello=world"));
+    }
 }

@@ -4,12 +4,12 @@
 use cot::db::migrations::{Field, Operation};
 use cot::db::query::ExprEq;
 use cot::db::{
-    model, query, Auto, Database, DatabaseError, DatabaseField, ForeignKey,
-    ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy, Identifier, LimitedString, Model,
+    Auto, Database, DatabaseError, DatabaseField, ForeignKey, ForeignKeyOnDeletePolicy,
+    ForeignKeyOnUpdatePolicy, Identifier, LimitedString, Model, model, query,
 };
 use cot::test::TestDatabase;
-use fake::rand::rngs::StdRng;
 use fake::rand::SeedableRng;
+use fake::rand::rngs::StdRng;
 use fake::{Dummy, Fake, Faker};
 
 #[cot_macros::dbtest]
@@ -230,7 +230,7 @@ const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
 
 #[cot_macros::dbtest]
 async fn all_fields_model(db: &mut TestDatabase) {
-    migrate_all_fields_model(&db).await;
+    migrate_all_fields_model(db).await;
 
     assert_eq!(AllFieldsModel::objects().all(&**db).await.unwrap(), vec![]);
 
@@ -250,9 +250,7 @@ async fn all_fields_model(db: &mut TestDatabase) {
     for model in &models {
         assert!(
             models_from_db.contains(model),
-            "Could not find model {:?} in models_from_db: {:?}",
-            model,
-            models_from_db
+            "Could not find model {model:?} in models_from_db: {models_from_db:?}",
         );
     }
 }

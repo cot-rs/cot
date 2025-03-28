@@ -13,23 +13,22 @@
 //! ```
 
 use std::borrow::Cow;
+use std::future::Future;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use bytes::Bytes;
+use http::Extensions;
+use http::request::Parts;
 use indexmap::IndexMap;
-pub use path_params_deserializer::PathParamsDeserializerError;
-use tower_sessions::Session;
 
 #[cfg(feature = "db")]
 use crate::db::Database;
 use crate::error::ErrorRepr;
-use crate::headers::FORM_CONTENT_TYPE;
-#[cfg(feature = "json")]
-use crate::headers::JSON_CONTENT_TYPE;
+use crate::request::extractors::FromRequestParts;
 use crate::router::Router;
 use crate::{Body, Result};
 
+pub mod extractors;
 mod path_params_deserializer;
 
 /// HTTP request type.
@@ -46,8 +45,26 @@ mod private {
 ///
 /// This trait is sealed since it doesn't make sense to be implemented for types
 /// outside the context of Cot.
-#[async_trait]
 pub trait RequestExt: private::Sealed {
+    /// Runs an extractor implementing [`FromRequestParts`] on the request.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::extractors::Path;
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
+    ///     let path_params = request.extract_parts::<Path<String>>().await?;
+    ///     // ...
+    ///     # unimplemented!()
+    /// }
+    /// ```
+    fn extract_parts<E>(&mut self) -> impl Future<Output = Result<E>> + Send
+    where
+        E: FromRequestParts + 'static;
+
     /// Get the application context.
     ///
     /// # Examples
@@ -59,7 +76,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let context = request.context();
     ///     // ... do something with the context
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -76,7 +93,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let config = request.project_config();
     ///     // ... do something with the config
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -93,13 +110,13 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let router = request.router();
     ///     // ... do something with the router
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
-    fn router(&self) -> &Router;
+    fn router(&self) -> &Arc<Router>;
 
-    /// Get the app name teh current route belogns to, or [`None`] if the
+    /// Get the app name the current route belongs to, or [`None`] if the
     /// request is not routed.
     ///
     /// This is mainly useful for providing context to reverse redirects, where
@@ -114,7 +131,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let app_name = request.app_name();
     ///     // ... do something with the app name
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     fn app_name(&self) -> Option<&str>;
@@ -134,7 +151,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let route_name = request.route_name();
     ///     // ... do something with the route name
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -151,7 +168,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let path_params = request.path_params();
     ///     // ... do something with the path params
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -168,7 +185,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let path_params = request.path_params_mut();
     ///     // ... do something with the path params
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -185,127 +202,12 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let db = request.db();
     ///     // ... do something with the database
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[cfg(feature = "db")]
     #[must_use]
-    fn db(&self) -> &Database;
-
-    /// Get the session object.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn hello(request: Request) -> cot::Result<Response> {
-    ///     let name: String = request
-    ///         .session()
-    ///         .get("user_name")
-    ///         .await
-    ///         .expect("Invalid session value")
-    ///         .unwrap_or_default();
-    ///     println!("Hello, {}!", name);
-    ///
-    ///     // ...
-    ///     # todo!()
-    /// }
-    ///
-    /// async fn set_name(mut request: Request) -> cot::Result<Response> {
-    ///     request
-    ///         .session_mut()
-    ///         .insert("user_name", "test_user")
-    ///         .await
-    ///         .unwrap();
-    ///
-    ///     // ...
-    ///     # todo!()
-    /// }
-    /// ```
-    #[must_use]
-    fn session(&self) -> &Session;
-
-    /// Get the session object mutably.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn hello(request: Request) -> cot::Result<Response> {
-    ///     let name: String = request
-    ///         .session()
-    ///         .get("user_name")
-    ///         .await
-    ///         .expect("Invalid session value")
-    ///         .unwrap_or_default();
-    ///     println!("Hello, {}!", name);
-    ///
-    ///     // ...
-    ///     # todo!()
-    /// }
-    ///
-    /// async fn set_name(mut request: Request) -> cot::Result<Response> {
-    ///     request
-    ///         .session_mut()
-    ///         .insert("user_name", "test_user")
-    ///         .await
-    ///         .unwrap();
-    ///
-    ///     // ...
-    ///     # todo!()
-    /// }
-    /// ```
-    #[must_use]
-    fn session_mut(&mut self) -> &mut Session;
-
-    /// Get the request body as bytes. If the request method is GET or HEAD, the
-    /// query string is returned. Otherwise, if the request content type is
-    /// `application/x-www-form-urlencoded`, then the body is read and returned.
-    /// Otherwise, an error is thrown.
-    ///
-    /// # Errors
-    ///
-    /// Throws an error if the request method is not GET or HEAD and the content
-    /// type is not `application/x-www-form-urlencoded`.
-    /// Throws an error if the request body could not be read.
-    async fn form_data(&mut self) -> Result<Bytes>;
-
-    /// Get the request body as JSON and deserialize it into a type `T`
-    /// implementing `serde::de::DeserializeOwned`.
-    ///
-    /// The content type of the request must be `application/json`.
-    ///
-    /// # Errors
-    ///
-    /// Throws an error if the content type is not `application/json`.
-    /// Throws an error if the request body could not be read.
-    /// Throws an error if the request body could not be deserialized - either
-    /// because the JSON is invalid or because the deserialization to the target
-    /// structure failed.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::{Response, ResponseExt};
-    /// use serde::{Deserialize, Serialize};
-    ///
-    /// #[derive(Serialize, Deserialize)]
-    /// struct MyData {
-    ///     hello: String,
-    /// }
-    ///
-    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
-    ///     let data: MyData = request.json().await?;
-    ///     Ok(Response::new_json(cot::StatusCode::OK, &data)?)
-    /// }
-    /// ```
-    #[cfg(feature = "json")]
-    async fn json<T: serde::de::DeserializeOwned>(&mut self) -> Result<T>;
+    fn db(&self) -> &Arc<Database>;
 
     /// Get the content type of the request.
     ///
@@ -318,7 +220,7 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     let content_type = request.content_type();
     ///     // ... do something with the content type
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -339,16 +241,45 @@ pub trait RequestExt: private::Sealed {
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
     ///     request.expect_content_type("application/json")?;
     ///     // ...
-    ///     # todo!()
+    ///     # unimplemented!()
     /// }
     /// ```
-    fn expect_content_type(&mut self, expected: &'static str) -> Result<()>;
+    fn expect_content_type(&mut self, expected: &'static str) -> Result<()> {
+        let content_type = self
+            .content_type()
+            .map_or("".into(), |value| String::from_utf8_lossy(value.as_bytes()));
+        if content_type == expected {
+            Ok(())
+        } else {
+            Err(ErrorRepr::InvalidContentType {
+                expected,
+                actual: content_type.into_owned(),
+            }
+            .into())
+        }
+    }
+
+    #[doc(hidden)]
+    fn extensions(&self) -> &Extensions;
 }
 
 impl private::Sealed for Request {}
 
-#[async_trait]
 impl RequestExt for Request {
+    async fn extract_parts<E>(&mut self) -> Result<E>
+    where
+        E: FromRequestParts + 'static,
+    {
+        let request = std::mem::take(self);
+
+        let (mut parts, body) = request.into_parts();
+        let result = E::from_request_parts(&mut parts).await;
+
+        *self = Request::from_parts(parts, body);
+        result
+    }
+
+    #[track_caller]
     fn context(&self) -> &crate::ProjectContext {
         self.extensions()
             .get::<Arc<crate::ProjectContext>>()
@@ -359,7 +290,7 @@ impl RequestExt for Request {
         self.context().config()
     }
 
-    fn router(&self) -> &Router {
+    fn router(&self) -> &Arc<Router> {
         self.context().router()
     }
 
@@ -375,6 +306,7 @@ impl RequestExt for Request {
             .map(|RouteName(name)| name.as_str())
     }
 
+    #[track_caller]
     fn path_params(&self) -> &PathParams {
         self.extensions()
             .get::<PathParams>()
@@ -386,66 +318,76 @@ impl RequestExt for Request {
     }
 
     #[cfg(feature = "db")]
-    fn db(&self) -> &Database {
+    fn db(&self) -> &Arc<Database> {
         self.context().database()
-    }
-
-    fn session(&self) -> &Session {
-        self.extensions()
-            .get::<Session>()
-            .expect("Session extension missing. Did you forget to add the SessionMiddleware?")
-    }
-
-    fn session_mut(&mut self) -> &mut Session {
-        self.extensions_mut()
-            .get_mut::<Session>()
-            .expect("Session extension missing. Did you forget to add the SessionMiddleware?")
-    }
-
-    async fn form_data(&mut self) -> Result<Bytes> {
-        if self.method() == http::Method::GET || self.method() == http::Method::HEAD {
-            if let Some(query) = self.uri().query() {
-                return Ok(Bytes::copy_from_slice(query.as_bytes()));
-            }
-
-            Ok(Bytes::new())
-        } else {
-            self.expect_content_type(FORM_CONTENT_TYPE)?;
-
-            let body = std::mem::take(self.body_mut());
-            let bytes = body.into_bytes().await?;
-
-            Ok(bytes)
-        }
-    }
-
-    #[cfg(feature = "json")]
-    async fn json<T: serde::de::DeserializeOwned>(&mut self) -> Result<T> {
-        self.expect_content_type(JSON_CONTENT_TYPE)?;
-
-        let body = std::mem::take(self.body_mut());
-        let bytes = body.into_bytes().await?;
-
-        Ok(serde_json::from_slice(&bytes)?)
     }
 
     fn content_type(&self) -> Option<&http::HeaderValue> {
         self.headers().get(http::header::CONTENT_TYPE)
     }
 
-    fn expect_content_type(&mut self, expected: &'static str) -> Result<()> {
-        let content_type = self
-            .content_type()
-            .map_or("".into(), |value| String::from_utf8_lossy(value.as_bytes()));
-        if content_type == expected {
-            Ok(())
-        } else {
-            Err(ErrorRepr::InvalidContentType {
-                expected,
-                actual: content_type.into_owned(),
-            }
-            .into())
-        }
+    fn extensions(&self) -> &Extensions {
+        self.extensions()
+    }
+}
+
+impl private::Sealed for Parts {}
+
+impl RequestExt for Parts {
+    async fn extract_parts<E>(&mut self) -> Result<E>
+    where
+        E: FromRequestParts + 'static,
+    {
+        E::from_request_parts(self).await
+    }
+
+    fn context(&self) -> &crate::ProjectContext {
+        self.extensions
+            .get::<Arc<crate::ProjectContext>>()
+            .expect("AppContext extension missing")
+    }
+
+    fn project_config(&self) -> &crate::config::ProjectConfig {
+        self.context().config()
+    }
+
+    fn router(&self) -> &Arc<Router> {
+        self.context().router()
+    }
+
+    fn app_name(&self) -> Option<&str> {
+        self.extensions
+            .get::<AppName>()
+            .map(|AppName(name)| name.as_str())
+    }
+
+    fn route_name(&self) -> Option<&str> {
+        self.extensions
+            .get::<RouteName>()
+            .map(|RouteName(name)| name.as_str())
+    }
+
+    fn path_params(&self) -> &PathParams {
+        self.extensions
+            .get::<PathParams>()
+            .expect("PathParams extension missing")
+    }
+
+    fn path_params_mut(&mut self) -> &mut PathParams {
+        self.extensions.get_or_insert_default::<PathParams>()
+    }
+
+    #[cfg(feature = "db")]
+    fn db(&self) -> &Arc<Database> {
+        self.context().database()
+    }
+
+    fn content_type(&self) -> Option<&http::HeaderValue> {
+        self.headers.get(http::header::CONTENT_TYPE)
+    }
+
+    fn extensions(&self) -> &Extensions {
+        &self.extensions
     }
 }
 
@@ -470,7 +412,6 @@ pub(crate) struct RouteName(pub(crate) String);
 /// ```
 /// use cot::request::{PathParams, Request, RequestExt};
 /// use cot::response::Response;
-/// ///
 /// use cot::test::TestRequestBuilder;
 ///
 /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
@@ -690,9 +631,19 @@ impl PathParams {
     pub fn parse<'de, T: serde::Deserialize<'de>>(
         &'de self,
     ) -> std::result::Result<T, PathParamsDeserializerError> {
-        T::deserialize(path_params_deserializer::PathParamsDeserializer::new(self))
+        let deserializer = path_params_deserializer::PathParamsDeserializer::new(self);
+        serde_path_to_error::deserialize(deserializer).map_err(PathParamsDeserializerError)
     }
 }
+
+/// An error that occurs when deserializing path parameters.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("{0}")]
+pub struct PathParamsDeserializerError(
+    // A wrapper over the original deserializer error. The exact error reason
+    // shouldn't be useful to the user, hence we're not exposing it.
+    #[source] serde_path_to_error::Error<path_params_deserializer::PathParamsDeserializerError>,
+);
 
 pub(crate) fn query_pairs(bytes: &Bytes) -> impl Iterator<Item = (Cow<'_, str>, Cow<'_, str>)> {
     form_urlencoded::parse(bytes.as_ref())
@@ -701,31 +652,10 @@ pub(crate) fn query_pairs(bytes: &Bytes) -> impl Iterator<Item = (Cow<'_, str>, 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cot::test]
-    async fn form_data() {
-        let mut request = http::Request::builder()
-            .method(http::Method::POST)
-            .header(http::header::CONTENT_TYPE, FORM_CONTENT_TYPE)
-            .body(Body::fixed("hello=world"))
-            .unwrap();
-
-        let bytes = request.form_data().await.unwrap();
-        assert_eq!(bytes, Bytes::from_static(b"hello=world"));
-    }
-
-    #[cfg(feature = "json")]
-    #[cot::test]
-    async fn json() {
-        let mut request = http::Request::builder()
-            .method(http::Method::POST)
-            .header(http::header::CONTENT_TYPE, JSON_CONTENT_TYPE)
-            .body(Body::fixed(r#"{"hello":"world"}"#))
-            .unwrap();
-
-        let data: serde_json::Value = request.json().await.unwrap();
-        assert_eq!(data, serde_json::json!({"hello": "world"}));
-    }
+    use crate::request::extractors::Path;
+    use crate::response::Response;
+    use crate::router::{Route, Router};
+    use crate::test::TestRequestBuilder;
 
     #[test]
     fn path_params() {
@@ -738,15 +668,15 @@ mod tests {
 
     #[test]
     fn path_params_parse() {
-        let mut path_params = PathParams::new();
-        path_params.insert("hello".into(), "world".into());
-        path_params.insert("foo".into(), "bar".into());
-
         #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
         struct Params {
             hello: String,
             foo: String,
         }
+
+        let mut path_params = PathParams::new();
+        path_params.insert("hello".into(), "world".into());
+        path_params.insert("foo".into(), "bar".into());
 
         let params: Params = path_params.parse().unwrap();
         assert_eq!(
@@ -769,5 +699,174 @@ mod tests {
                 (Cow::from("foo"), Cow::from("bar"))
             ]
         );
+    }
+
+    #[test]
+    fn request_ext_app_name() {
+        let mut request = TestRequestBuilder::get("/").build();
+        assert_eq!(request.app_name(), None);
+
+        request
+            .extensions_mut()
+            .insert(AppName("test_app".to_string()));
+        assert_eq!(request.app_name(), Some("test_app"));
+    }
+
+    #[test]
+    fn request_ext_route_name() {
+        let mut request = TestRequestBuilder::get("/").build();
+        assert_eq!(request.route_name(), None);
+
+        request
+            .extensions_mut()
+            .insert(RouteName("test_route".to_string()));
+        assert_eq!(request.route_name(), Some("test_route"));
+    }
+
+    #[test]
+    fn request_ext_parts_route_name() {
+        let request = TestRequestBuilder::get("/").build();
+        let (mut parts, _body) = request.into_parts();
+        assert_eq!(parts.route_name(), None);
+
+        parts.extensions.insert(RouteName("test_route".to_string()));
+        assert_eq!(parts.route_name(), Some("test_route"));
+    }
+
+    #[test]
+    fn request_ext_path_params() {
+        let mut request = TestRequestBuilder::get("/").build();
+
+        let mut params = PathParams::new();
+        params.insert("id".to_string(), "42".to_string());
+        request.extensions_mut().insert(params);
+
+        assert_eq!(request.path_params().get("id"), Some("42"));
+    }
+
+    #[test]
+    fn request_ext_path_params_mut() {
+        let mut request = TestRequestBuilder::get("/").build();
+
+        request
+            .path_params_mut()
+            .insert("id".to_string(), "42".to_string());
+
+        assert_eq!(request.path_params().get("id"), Some("42"));
+    }
+
+    #[test]
+    fn request_ext_content_type() {
+        let mut request = TestRequestBuilder::get("/").build();
+        assert_eq!(request.content_type(), None);
+
+        request.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            http::HeaderValue::from_static("text/plain"),
+        );
+
+        assert_eq!(
+            request.content_type(),
+            Some(&http::HeaderValue::from_static("text/plain"))
+        );
+    }
+
+    #[test]
+    fn request_ext_expect_content_type() {
+        let mut request = TestRequestBuilder::get("/").build();
+
+        // Should fail with no content type
+        assert!(request.expect_content_type("text/plain").is_err());
+
+        request.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            http::HeaderValue::from_static("text/plain"),
+        );
+
+        // Should succeed with matching content type
+        assert!(request.expect_content_type("text/plain").is_ok());
+
+        // Should fail with non-matching content type
+        assert!(request.expect_content_type("application/json").is_err());
+    }
+
+    #[tokio::test]
+    async fn request_ext_extract_parts() {
+        async fn handler(mut request: Request) -> Result<Response> {
+            let Path(id): Path<String> = request.extract_parts().await?;
+            assert_eq!(id, "42");
+
+            Ok(Response::new(Body::empty()))
+        }
+
+        let router = Router::with_urls([Route::with_handler("/{id}/", handler)]);
+
+        let request = TestRequestBuilder::get("/42/")
+            .router(router.clone())
+            .build();
+
+        router.handle(request).await.unwrap();
+    }
+
+    #[test]
+    fn parts_ext_path_params() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
+        let mut params = PathParams::new();
+        params.insert("id".to_string(), "42".to_string());
+        parts.extensions.insert(params);
+
+        assert_eq!(parts.path_params().get("id"), Some("42"));
+    }
+
+    #[test]
+    fn parts_ext_mutating_path_params() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
+        parts
+            .path_params_mut()
+            .insert("page".to_string(), "1".to_string());
+
+        assert_eq!(parts.path_params().get("page"), Some("1"));
+    }
+
+    #[test]
+    fn parts_ext_app_name() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
+        parts.extensions.insert(AppName("test_app".to_string()));
+
+        assert_eq!(parts.app_name(), Some("test_app"));
+    }
+
+    #[test]
+    fn parts_ext_route_name() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
+        parts.extensions.insert(RouteName("test_route".to_string()));
+
+        assert_eq!(parts.route_name(), Some("test_route"));
+    }
+
+    #[test]
+    fn parts_ext_content_type() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
+        parts.headers.insert(
+            http::header::CONTENT_TYPE,
+            http::HeaderValue::from_static("text/plain"),
+        );
+
+        assert_eq!(
+            parts.content_type(),
+            Some(&http::HeaderValue::from_static("text/plain"))
+        );
+    }
+
+    #[tokio::test]
+    async fn parts_extract_parts() {
+        let (mut parts, _) = Request::new(Body::empty()).into_parts();
+
+        let mut params = PathParams::new();
+        params.insert("id".to_string(), "42".to_string());
+        parts.extensions.insert(params);
+
+        let Path(id): Path<String> = parts.extract_parts().await.unwrap();
+        assert_eq!(id, "42");
     }
 }

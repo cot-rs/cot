@@ -2,12 +2,11 @@ use cot::__private::async_trait;
 use cot::admin::AdminApp;
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
-use cot::config::{DatabaseConfig, ProjectConfig};
-use cot::middleware::{LiveReloadMiddleware, SessionMiddleware};
-use cot::project::{WithApps, WithConfig};
-use cot::request::Request;
+use cot::config::{DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig};
+use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
+use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::response::{Response, ResponseExt};
-use cot::router::{Route, Router};
+use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode};
 use rinja::Template;
@@ -15,11 +14,11 @@ use rinja::Template;
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
 struct IndexTemplate<'a> {
-    request: &'a Request,
+    urls: &'a Urls,
 }
 
-async fn index(request: Request) -> cot::Result<Response> {
-    let index_template = IndexTemplate { request: &request };
+async fn index(urls: Urls) -> cot::Result<Response> {
+    let index_template = IndexTemplate { urls: &urls };
     let rendered = index_template.render()?;
 
     Ok(Response::new_html(StatusCode::OK, Body::fixed(rendered)))
@@ -63,10 +62,15 @@ impl Project for AdminProject {
                     .url("sqlite://db.sqlite3?mode=rwc")
                     .build(),
             )
+            .middlewares(
+                MiddlewareConfig::builder()
+                    .session(SessionMiddlewareConfig::builder().secure(false).build())
+                    .build(),
+            )
             .build())
     }
 
-    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register(DatabaseUserApp::new());
         apps.register_with_views(AdminApp::new(), "/admin");
         apps.register_with_views(HelloApp, "");
@@ -75,10 +79,12 @@ impl Project for AdminProject {
     fn middlewares(
         &self,
         handler: cot::project::RootHandlerBuilder,
-        context: &ProjectContext<WithApps>,
+        context: &MiddlewareContext,
     ) -> BoxedHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
+            .middleware(SessionMiddleware::from_context(context))
+            .middleware(AuthMiddleware::new())
             .middleware(SessionMiddleware::new())
             .middleware(LiveReloadMiddleware::new())
             .build()

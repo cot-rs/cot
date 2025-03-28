@@ -2,7 +2,7 @@ use cot_codegen::model::FieldOpts;
 use darling::FromDeriveInput;
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 
 use crate::cot_ident;
 

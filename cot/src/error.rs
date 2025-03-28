@@ -7,7 +7,7 @@ use thiserror::Error;
 
 // Need to rename Backtrace to CotBacktrace, because otherwise it triggers special behavior
 // in thiserror library
-use crate::error::backtrace::{Backtrace as CotBacktrace, __cot_create_backtrace};
+use crate::error::backtrace::{__cot_create_backtrace, Backtrace as CotBacktrace};
 
 /// An error that can occur while using Cot.
 #[derive(Debug)]
@@ -150,8 +150,6 @@ impl_error_from_repr!(crate::db::DatabaseError);
 impl_error_from_repr!(tower_sessions::session::Error);
 impl_error_from_repr!(crate::form::FormError);
 impl_error_from_repr!(crate::auth::AuthError);
-#[cfg(feature = "json")]
-impl_error_from_repr!(serde_json::Error);
 impl_error_from_repr!(crate::request::PathParamsDeserializerError);
 
 #[derive(Debug, Error)]
@@ -225,7 +223,7 @@ pub(crate) enum ErrorRepr {
     /// An error occurred while trying to serialize or deserialize JSON.
     #[error("JSON error: {0}")]
     #[cfg(feature = "json")]
-    Json(#[from] serde_json::Error),
+    Json(serde_path_to_error::Error<serde_json::Error>),
     /// An error occurred inside a middleware-wrapped view.
     #[error(transparent)]
     MiddlewareWrapped {
@@ -234,6 +232,9 @@ pub(crate) enum ErrorRepr {
     /// An error occurred while trying to parse path parameters.
     #[error("Could not parse path parameters: {0}")]
     PathParametersParse(#[from] crate::request::PathParamsDeserializerError),
+    /// An error occurred while trying to parse query parameters.
+    #[error("Could not parse query parameters: {0}")]
+    QueryParametersParse(serde_path_to_error::Error<serde::de::value::Error>),
     /// An error occured in an [`AdminModel`](crate::admin::AdminModel).
     #[error("Admin error: {0}")]
     AdminError(#[source] Box<dyn std::error::Error + Send + Sync>),
@@ -248,7 +249,7 @@ mod tests {
     #[test]
     fn test_error_new() {
         let inner = ErrorRepr::StartServer {
-            source: io::Error::new(io::ErrorKind::Other, "server error"),
+            source: io::Error::other("server error"),
         };
 
         let error = Error::new(inner);

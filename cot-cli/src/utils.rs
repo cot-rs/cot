@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anstyle::{AnsiColor, Color, Effects, Style};
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use cargo_toml::Manifest;
 
 pub(crate) fn print_status_msg(status: StatusType, message: &str) {
@@ -71,31 +71,34 @@ impl StatusType {
 }
 
 #[derive(Debug)]
-pub(crate) struct WorkspaceManager {
-    root_manifest: Manifest,
-    package_manifests: HashMap<String, ManifestEntry>,
+pub(crate) enum CargoTomlManager {
+    Workspace(WorkspaceManager),
+    Package(PackageManager),
 }
 
 #[derive(Debug)]
-struct ManifestEntry {
-    path: PathBuf,
+pub(crate) struct WorkspaceManager {
+    workspace_root: PathBuf,
+    root_manifest: Manifest,
+    package_manifests: HashMap<String, PackageManager>,
+}
+
+#[derive(Debug)]
+pub(crate) struct PackageManager {
+    package_root: PathBuf,
     manifest: Manifest,
 }
-impl WorkspaceManager {
-    pub(crate) fn from_cargo_toml_path(cargo_toml_path: &Path) -> anyhow::Result<Self> {
-        let cargo_toml_path = cargo_toml_path
-            .canonicalize()
-            .context("unable to canonicalize path")?;
 
-        let manifest =
-            Manifest::from_path(&cargo_toml_path).context("unable to read Cargo.toml")?;
+impl CargoTomlManager {
+    pub(crate) fn from_cargo_toml_path(cargo_toml_path: &Path) -> anyhow::Result<Self> {
+        let manifest = Manifest::from_path(cargo_toml_path).context("unable to read Cargo.toml")?;
 
         let manager = match (&manifest.workspace, &manifest.package) {
             (Some(_), _) => {
-                let mut manager = Self::parse_workspace(&cargo_toml_path, manifest);
+                let mut manager = Self::parse_workspace(cargo_toml_path, manifest);
 
                 if let Some(package) = &manager.root_manifest.package {
-                    if manager.get_package_manifest(package.name()).is_none() {
+                    if manager.get_package_manager(package.name()).is_none() {
                         let workspace = manager
                             .root_manifest
                             .workspace
@@ -106,44 +109,49 @@ impl WorkspaceManager {
                             let package_name = package.name().to_string();
                             workspace.members.push(package_name.clone());
 
-                            let entry = ManifestEntry {
-                                path: cargo_toml_path,
+                            let entry = PackageManager {
+                                package_root: manager.workspace_root.clone(),
                                 manifest: manager.root_manifest.clone(),
                             };
 
-                            manager
-                                .package_manifests
-                                .insert(package_name.clone(), entry);
+                            manager.package_manifests.insert(package_name, entry);
                         }
                     }
                 }
 
-                manager
+                CargoTomlManager::Workspace(manager)
             }
 
             (None, Some(package)) => {
                 let workspace_path = match package.workspace {
-                    Some(ref workspace) => Path::new(workspace),
+                    Some(ref workspace) => Some(PathBuf::from(workspace).join("Cargo.toml")),
                     None => cargo_toml_path
-                        .parent()
+                        .parent() // dir containing Cargo.toml
                         .expect("Cargo.toml should always have a parent")
-                        .parent()
-                        .unwrap_or(Path::new(".")),
-                }
-                .join("Cargo.toml");
+                        .parent() // dir containing the Cargo crate
+                        .map(CargoTomlManager::find_cargo_toml)
+                        .unwrap_or_default(), // dir containing the workspace Cargo.toml
+                };
 
-                match Manifest::from_path(&workspace_path) {
-                    Ok(workspace) if workspace.workspace.is_some() => {
-                        Self::parse_workspace(&workspace_path, workspace)
+                if let Some(workspace_path) = workspace_path {
+                    if let Ok(manifest) = Manifest::from_path(&workspace_path) {
+                        let manager = Self::parse_workspace(&workspace_path, manifest);
+                        return Ok(CargoTomlManager::Workspace(manager));
                     }
-                    _ => Self {
-                        root_manifest: manifest,
-                        package_manifests: HashMap::new(),
-                    },
                 }
+
+                let manager = PackageManager {
+                    package_root: PathBuf::from(
+                        cargo_toml_path
+                            .parent()
+                            .expect("Cargo.toml should always have a parent"),
+                    ),
+                    manifest,
+                };
+                CargoTomlManager::Package(manager)
             }
 
-            _ => {
+            (None, None) => {
                 bail!("Cargo.toml is not a valid workspace or package manifest");
             }
         };
@@ -153,38 +161,41 @@ impl WorkspaceManager {
 
     fn parse_workspace(cargo_toml_path: &Path, manifest: Manifest) -> WorkspaceManager {
         assert!(manifest.workspace.is_some());
-        let workspace = manifest.workspace.as_ref().unwrap();
+        let workspace = manifest
+            .workspace
+            .as_ref()
+            .expect("workspace is known to be present");
+
+        let workspace_root = cargo_toml_path
+            .parent()
+            .expect("Cargo.toml should always have a parent");
         let package_manifests = workspace
             .members
             .iter()
             .map(|member| {
-                let member_path = cargo_toml_path
-                    .parent()
-                    .expect("Cargo.toml should always have a parent")
-                    .join(member)
-                    .join("Cargo.toml");
+                let member_path = workspace_root.join(member);
 
-                let member_manifest =
-                    Manifest::from_path(&member_path).expect("member manifests should be valid");
+                let member_manifest = Manifest::from_path(member_path.join("Cargo.toml"))
+                    .expect("member manifest should be valid");
 
-                let entry = ManifestEntry {
-                    path: member_path,
+                let entry = PackageManager {
+                    package_root: member_path,
                     manifest: member_manifest,
                 };
 
-                (member.clone(), entry)
+                (entry.get_package_name().to_string(), entry)
             })
             .collect();
 
-        Self {
+        WorkspaceManager {
+            workspace_root: PathBuf::from(workspace_root),
             root_manifest: manifest,
             package_manifests,
         }
     }
 
     pub(crate) fn from_path(path: &Path) -> anyhow::Result<Option<Self>> {
-        let path = path.canonicalize().context("unable to canonicalize path")?;
-        Self::find_cargo_toml(&path)
+        Self::find_cargo_toml(path)
             .map(|p| Self::from_cargo_toml_path(&p))
             .transpose()
     }
@@ -207,40 +218,74 @@ impl WorkspaceManager {
         None
     }
 
-    #[allow(unused)]
-    pub(crate) fn get_packages(&self) -> Vec<String> {
-        self.package_manifests.keys().cloned().collect()
+    pub(crate) fn get_package_manager(&self, package_name: &str) -> Option<&PackageManager> {
+        match self {
+            CargoTomlManager::Workspace(manager) => manager.get_package_manager(package_name),
+            CargoTomlManager::Package(manager) => {
+                if manager.get_package_name() == package_name {
+                    Some(manager)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+impl WorkspaceManager {
+    pub(crate) fn get_packages(&self) -> Vec<&PackageManager> {
+        self.package_manifests.values().collect()
     }
 
-    pub(crate) fn get_package_manifest(&self, package_name: &str) -> Option<&Manifest> {
-        self.package_manifests
-            .get(package_name)
-            .map(|m| &m.manifest)
+    #[cfg(test)]
+    pub(crate) fn get_root_manifest(&self) -> &Manifest {
+        &self.root_manifest
     }
 
-    pub(crate) fn get_package_manifest_by_path(&self, package_path: &Path) -> Option<&Manifest> {
-        let mut package_path = package_path
-            .canonicalize()
-            .context("unable to canonicalize path")
-            .ok()?;
+    pub(crate) fn get_package_manager(&self, package_name: &str) -> Option<&PackageManager> {
+        self.package_manifests.get(package_name)
+    }
 
-        if package_path.is_dir() {
-            package_path = package_path.join("Cargo.toml");
+    #[cfg(test)]
+    pub(crate) fn get_package_manager_by_path(
+        &self,
+        package_path: &Path,
+    ) -> Option<&PackageManager> {
+        let mut package_path = package_path;
+
+        if package_path.is_file() {
+            package_path = package_path
+                .parent()
+                .expect("file path should always have a parent");
         }
 
-        self.package_manifests.values().find_map(|m| {
-            if m.path == package_path {
-                Some(&m.manifest)
-            } else {
-                None
-            }
-        })
+        self.package_manifests
+            .values()
+            .find(|m| m.package_root == package_path)
+    }
+}
+
+impl PackageManager {
+    pub(crate) fn get_package_name(&self) -> &str {
+        self.manifest
+            .package
+            .as_ref()
+            .expect("package is known to be present")
+            .name()
     }
 
-    pub(crate) fn get_manifest_path(&self, package_name: &str) -> Option<&Path> {
-        self.package_manifests
-            .get(package_name)
-            .map(|m| m.path.as_path())
+    pub(crate) fn get_package_path(&self) -> &Path {
+        self.package_root.as_path()
+    }
+
+    pub(crate) fn get_manifest_path(&self) -> PathBuf {
+        let path = &self.get_package_path().join("Cargo.toml");
+        path.to_owned()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_manifest(&self) -> &Manifest {
+        &self.manifest
     }
 }
 
@@ -248,199 +293,293 @@ impl WorkspaceManager {
 mod tests {
     use std::io::Write;
 
+    use cot_cli::test_utils;
+
     use super::*;
 
-    const WORKSPACE_STUB: &'static str = "[workspace]\nresolver = \"3\"";
+    fn get_package() -> (tempfile::TempDir, PackageManager) {
+        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+        test_utils::make_package(temp_dir.path()).unwrap();
 
-    enum CargoCommand {
-        Init,
-        New,
-    }
-
-    fn make_workspace_package(path: PathBuf, packages: u8) -> anyhow::Result<()> {
-        let workspace_cargo_toml = path.join("Cargo.toml");
-        std::fs::write(workspace_cargo_toml, WORKSPACE_STUB)?;
-
-        for i in 0..packages {
-            let package_path = path.join(format!("cargo-test-crate-{i}"));
-            make_package(package_path)?;
-        }
-
-        Ok(())
-    }
-    fn make_package(path: PathBuf) -> anyhow::Result<()> {
-        match path.exists() {
-            true => create_cargo_project(&path, CargoCommand::Init),
-            false => create_cargo_project(&path, CargoCommand::New),
-        }
-    }
-    fn create_cargo_project(path: &Path, cmd: CargoCommand) -> anyhow::Result<()> {
-        let mut base = cot_cli::test_utils::cargo();
-
-        let cmd = match cmd {
-            CargoCommand::Init => base.arg("init"),
-            CargoCommand::New => base.arg("new"),
+        let CargoTomlManager::Package(manager) = CargoTomlManager::from_path(temp_dir.path())
+            .unwrap()
+            .unwrap()
+        else {
+            unreachable!()
         };
 
-        cmd.arg(path).output()?;
-
-        Ok(())
+        (temp_dir, manager)
     }
 
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn find_cargo_toml() {
+    fn get_workspace(packages: u8) -> (tempfile::TempDir, WorkspaceManager) {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        make_package(temp_dir.path().into()).unwrap();
-        let cargo_toml_path = temp_dir.path().join("Cargo.toml");
+        test_utils::make_workspace_package(temp_dir.path(), packages).unwrap();
 
-        let found_path = WorkspaceManager::find_cargo_toml(&temp_dir.path()).unwrap();
-        assert_eq!(found_path, cargo_toml_path);
-    }
-
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn find_cargo_toml_recursive() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let nested_dir = temp_dir.path().join("nested");
-        make_package(nested_dir.clone()).unwrap();
-
-        let found_path = WorkspaceManager::find_cargo_toml(&nested_dir).unwrap();
-        assert_eq!(found_path, nested_dir.join("Cargo.toml"));
-    }
-
-    #[test]
-    fn find_cargo_toml_not_found() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let found_path = WorkspaceManager::find_cargo_toml(&temp_dir.path());
-        assert!(found_path.is_none());
-    }
-
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn load_valid_virtual_workspace_manifest() {
-        let cot_cli_root = env!("CARGO_MANIFEST_DIR");
-        let cot_root = Path::new(cot_cli_root).parent().unwrap();
-
-        let manifest = WorkspaceManager::from_path(&cot_root).unwrap().unwrap();
-
-        assert!(manifest.root_manifest.workspace.is_some());
-        assert!(manifest.package_manifests.len() > 0);
-    }
-
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn load_valid_workspace_from_package_manifest() {
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        make_package(temp_dir.path().into()).unwrap();
-        let cargo_toml_path = temp_dir.path().join("Cargo.toml").canonicalize().unwrap();
-        let mut handle = std::fs::OpenOptions::new()
-            .append(true)
-            .open(&cargo_toml_path)
-            .unwrap();
-        writeln!(handle, "{WORKSPACE_STUB}").unwrap();
-
-        let manifest = WorkspaceManager::from_path(&temp_dir.path())
+        let CargoTomlManager::Workspace(manager) = CargoTomlManager::from_path(temp_dir.path())
             .unwrap()
-            .unwrap();
+            .unwrap()
+        else {
+            unreachable!()
+        };
 
-        assert!(manifest.root_manifest.workspace.is_some());
-        assert_eq!(manifest.package_manifests.len(), 1);
-        assert_eq!(
-            manifest
-                .package_manifests
-                .get(temp_dir.path().file_name().unwrap().to_str().unwrap())
+        (temp_dir, manager)
+    }
+
+    mod cargo_toml_manager {
+        use super::*;
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn find_cargo_toml() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_package(temp_dir.path()).unwrap();
+            let cargo_toml_path = temp_dir.path().join("Cargo.toml");
+
+            let found_path = CargoTomlManager::find_cargo_toml(temp_dir.path()).unwrap();
+            assert_eq!(found_path, cargo_toml_path);
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn find_cargo_toml_recursive() {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let nested_dir = temp_dir.path().join("nested");
+            test_utils::make_package(&nested_dir).unwrap();
+
+            let found_path = CargoTomlManager::find_cargo_toml(&nested_dir).unwrap();
+            assert_eq!(found_path, nested_dir.join("Cargo.toml"));
+        }
+
+        #[test]
+        fn find_cargo_toml_not_found() {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let found_path = CargoTomlManager::find_cargo_toml(temp_dir.path());
+            assert!(found_path.is_none());
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn load_valid_virtual_workspace_manifest() {
+            let cot_cli_root = env!("CARGO_MANIFEST_DIR");
+            let cot_root = Path::new(cot_cli_root).parent().unwrap();
+
+            let manager = CargoTomlManager::from_path(cot_root).unwrap().unwrap();
+            match manager {
+                CargoTomlManager::Workspace(manager) => {
+                    assert!(manager.get_root_manifest().workspace.is_some());
+                    assert!(!manager.package_manifests.is_empty());
+                }
+                CargoTomlManager::Package(_) => panic!("Expected workspace manifest"),
+            }
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn load_valid_workspace_from_package_manifest() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_package(temp_dir.path()).unwrap();
+            let cargo_toml_path = temp_dir.path().join("Cargo.toml");
+            let mut handle = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&cargo_toml_path)
+                .unwrap();
+            writeln!(handle, "{}", test_utils::WORKSPACE_STUB).unwrap();
+
+            let manager = CargoTomlManager::from_path(temp_dir.path())
                 .unwrap()
-                .path,
-            cargo_toml_path
-        );
-    }
+                .unwrap();
+            match manager {
+                CargoTomlManager::Workspace(manager) => {
+                    assert!(manager.get_root_manifest().workspace.is_some());
+                    assert_eq!(manager.get_packages().len(), 1);
+                    assert_eq!(
+                        manager.get_packages()[0].get_manifest_path(),
+                        cargo_toml_path
+                    );
+                }
+                CargoTomlManager::Package(_) => panic!("Expected workspace manifest"),
+            }
+        }
 
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn test_get_package_manifest() {
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn load_valid_package_manifest() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
+            test_utils::make_package(temp_dir.path()).unwrap();
 
-        let workspace = WorkspaceManager::from_path(temp_dir.path())
-            .unwrap()
-            .unwrap();
-
-        let first_package = &workspace.get_packages()[0];
-        let manifest = workspace.get_package_manifest(first_package);
-        assert!(manifest.is_some());
-        assert_eq!(
-            manifest.unwrap().package.as_ref().unwrap().name,
-            *first_package
-        );
-
-        let manifest = workspace.get_package_manifest("non-existent");
-        assert!(manifest.is_none());
-    }
-
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn test_get_package_manifest_by_path() {
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
-
-        let workspace = WorkspaceManager::from_path(temp_dir.path())
-            .unwrap()
-            .unwrap();
-
-        let first_package = &workspace.get_packages()[0];
-        let first_package_path = temp_dir.path().join(format!("{first_package}/"));
-        let manifest = workspace.get_package_manifest_by_path(&first_package_path);
-        assert!(manifest.is_some());
-        assert_eq!(
-            manifest.unwrap().package.as_ref().unwrap().name,
-            *first_package
-        );
-
-        let first_package_path = temp_dir.path().join(first_package).join("Cargo.toml");
-        let manifest = workspace.get_package_manifest_by_path(&first_package_path);
-        assert!(manifest.is_some());
-        assert_eq!(
-            manifest.unwrap().package.as_ref().unwrap().name,
-            *first_package
-        );
-
-        let non_existent = temp_dir.path().join("non-existent/Cargo.toml");
-        let manifest = workspace.get_package_manifest_by_path(&non_existent);
-        assert!(manifest.is_none());
-    }
-
-    #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS
-                              // `linux`
-    fn test_get_manifest_path() {
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        make_workspace_package(temp_dir.path().to_path_buf(), 1).unwrap();
-
-        let workspace = WorkspaceManager::from_path(temp_dir.path())
-            .unwrap()
-            .unwrap();
-
-        let first_package = &workspace.get_packages()[0];
-        let path = workspace.get_manifest_path(&first_package);
-        assert!(path.is_some());
-        assert_eq!(
-            path.unwrap(),
-            temp_dir
-                .path()
-                .join(first_package)
-                .join("Cargo.toml")
-                .canonicalize()
+            let manager = CargoTomlManager::from_path(temp_dir.path())
                 .unwrap()
-        );
+                .unwrap();
 
-        let path = workspace.get_manifest_path("non-existent");
-        assert!(path.is_none());
+            match manager {
+                CargoTomlManager::Package(manager) => {
+                    assert_eq!(manager.get_package_name(), package_name);
+                    assert_eq!(manager.get_package_path(), temp_dir.path());
+                }
+                CargoTomlManager::Workspace(_) => panic!("Expected package manifest"),
+            }
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn get_package_manager() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
+
+            let manager = CargoTomlManager::from_path(temp_dir.path())
+                .unwrap()
+                .unwrap();
+
+            let first_package = test_utils::get_nth_crate_name(1);
+            let package = manager.get_package_manager(first_package.as_str());
+            assert!(package.is_some());
+            assert_eq!(
+                package
+                    .unwrap()
+                    .get_manifest()
+                    .package
+                    .as_ref()
+                    .unwrap()
+                    .name,
+                first_package.as_str()
+            );
+
+            let package = manager.get_package_manager("non-existent");
+            assert!(package.is_none());
+        }
+    }
+
+    mod workspace_manager {
+        use super::*;
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn get_root_manifest() {
+            let (temp_dir, manager) = get_workspace(1);
+            let manifest_path = temp_dir.path().join("Cargo.toml");
+            let orig_manifest = Manifest::from_path(&manifest_path).unwrap();
+
+            let manifest = manager.get_root_manifest();
+
+            assert_eq!(*manifest, orig_manifest);
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn get_package_manager() {
+            let (_, manager) = get_workspace(2);
+            let package_name = test_utils::get_nth_crate_name(1);
+
+            let package = manager.get_package_manager(package_name.as_str());
+
+            assert!(package.is_some());
+            assert_eq!(
+                package
+                    .unwrap()
+                    .get_manifest()
+                    .package
+                    .as_ref()
+                    .unwrap()
+                    .name,
+                package_name
+            );
+
+            let package = manager.get_package_manager("non-existent");
+            assert!(package.is_none());
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn get_package_manager_by_path() {
+            let (temp_dir, manager) = get_workspace(1);
+            let package_name = test_utils::get_nth_crate_name(1);
+            let package_path = temp_dir.path().join(&package_name);
+
+            let package = manager.get_package_manager_by_path(&package_path);
+            assert!(package.is_some());
+            assert_eq!(
+                package
+                    .unwrap()
+                    .get_manifest()
+                    .package
+                    .as_ref()
+                    .unwrap()
+                    .name,
+                package_name
+            );
+
+            let package_path = package_path.join("Cargo.toml");
+            let package = manager.get_package_manager_by_path(&package_path);
+            assert!(package.is_some());
+            assert_eq!(
+                package
+                    .unwrap()
+                    .get_manifest()
+                    .package
+                    .as_ref()
+                    .unwrap()
+                    .name,
+                package_name
+            );
+
+            let non_existent = temp_dir.path().join("non-existent/Cargo.toml");
+            let package = manager.get_package_manager_by_path(&non_existent);
+            assert!(package.is_none());
+        }
+    }
+    mod package_manager {
+        use super::*;
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn get_package_name() {
+            let (temp_dir, manager) = get_package();
+            let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
+
+            assert_eq!(manager.get_package_name(), package_name);
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn get_package_path() {
+            let (temp_dir, manager) = get_package();
+
+            assert_eq!(manager.get_package_path(), temp_dir.path());
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn get_manifest_path() {
+            let (temp_dir, manager) = get_package();
+
+            assert_eq!(
+                manager.get_manifest_path(),
+                temp_dir.path().join("Cargo.toml")
+            );
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn get_manifest() {
+            let (temp_dir, manager) = get_package();
+            let manifest_path = temp_dir.path().join("Cargo.toml");
+            let orig_manifest = Manifest::from_path(&manifest_path).unwrap();
+
+            assert_eq!(*manager.get_manifest(), orig_manifest);
+        }
     }
 }

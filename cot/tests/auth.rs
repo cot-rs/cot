@@ -1,19 +1,21 @@
 use std::borrow::Cow;
 
 use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
-use cot::auth::{AuthRequestExt, Password};
+use cot::auth::{Auth, Password};
+use cot::request::RequestExt;
 use cot::test::{TestDatabase, TestRequestBuilder};
 
 #[cot_macros::dbtest]
 async fn database_user(test_db: &mut TestDatabase) {
     test_db.with_auth().run_migrations().await;
     let mut request_builder = TestRequestBuilder::get("/");
-    request_builder.with_db_auth(test_db.database());
+    request_builder.with_db_auth(test_db.database()).await;
+
+    let mut request = request_builder.clone().with_session().build();
+    let auth: Auth = request.extract_parts().await.unwrap();
 
     // Anonymous user
-    let mut request = request_builder.clone().with_session().build();
-    let user = request.user().await.unwrap();
-    assert!(!user.is_authenticated());
+    assert!(!auth.user().is_authenticated());
 
     // Authenticated user
     DatabaseUser::create_user(
@@ -24,7 +26,7 @@ async fn database_user(test_db: &mut TestDatabase) {
     .await
     .unwrap();
 
-    let user = request
+    let user = auth
         .authenticate(&DatabaseUserCredentials::new(
             "testuser".to_string(),
             Password::new("password123"),
@@ -36,13 +38,13 @@ async fn database_user(test_db: &mut TestDatabase) {
     assert_eq!(user.username(), Some(Cow::from("testuser")));
 
     // Log in
-    request.login(user).await.unwrap();
-    let user = request.user().await.unwrap();
+    auth.login(user).await.unwrap();
+    let user = auth.user();
     assert!(user.is_authenticated());
     assert_eq!(user.username(), Some(Cow::from("testuser")));
 
     // Invalid credentials
-    let user = request
+    let user = auth
         .authenticate(&DatabaseUserCredentials::new(
             "testuser".to_string(),
             Password::new("wrongpassword"),
@@ -53,12 +55,13 @@ async fn database_user(test_db: &mut TestDatabase) {
 
     // User persists between requests
     let mut request = request_builder.clone().with_session_from(&request).build();
-    let user = request.user().await.unwrap();
+    let auth: Auth = request.extract_parts().await.unwrap();
+
+    let user = auth.user();
     assert!(user.is_authenticated());
     assert_eq!(user.username(), Some(Cow::from("testuser")));
 
     // Log out
-    request.logout().await.unwrap();
-    let user = request.user().await.unwrap();
-    assert!(!user.is_authenticated());
+    auth.logout().await.unwrap();
+    assert!(!auth.user().is_authenticated());
 }

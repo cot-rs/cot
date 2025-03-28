@@ -2326,6 +2326,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "send-email"
+version = "0.1.0"
+dependencies = [
+ "cot",
+ "lettre",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.218"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -53,14 +53,12 @@ async fn add_todo(
 ) -> cot::Result<Response> {
     let todo_form = todo_form.unwrap();
 
-    {
-        TodoItem {
-            id: Auto::auto(),
-            title: todo_form.title,
-        }
-        .save(&db)
-        .await?;
+    TodoItem {
+        id: Auto::auto(),
+        title: todo_form.title,
     }
+    .save(&db)
+    .await?;
 
     Ok(reverse_redirect!(urls, "index")?)
 }
@@ -70,9 +68,7 @@ async fn remove_todo(
     RequestDb(db): RequestDb,
     Path(todo_id): Path<i32>,
 ) -> cot::Result<Response> {
-    {
-        query!(TodoItem, $id == todo_id).delete(&db).await?;
-    }
+    query!(TodoItem, $id == todo_id).delete(&db).await?;
 
     Ok(reverse_redirect!(urls, "index")?)
 }

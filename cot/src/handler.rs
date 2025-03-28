@@ -16,6 +16,14 @@ use crate::{Error, Result};
 /// usually need to implement this directly, as it is already
 /// implemented for closures and functions that take a [`Request`]
 /// and return a [`Result<Response>`].
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a valid request handler",
+    label = "not a valid request handler",
+    note = "make sure the function is marked `async`",
+    note = "make sure all parameters implement `FromRequest` or `FromRequestParts`",
+    note = "make sure there is at most one parameter implementing `FromRequest`",
+    note = "make sure the function takes no more than 10 parameters"
+)]
 pub trait RequestHandler<T = ()> {
     /// Handle the request and returns a response.
     ///

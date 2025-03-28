@@ -1,0 +1,9 @@
+error[E0277]: `MyForm` does not implement the `Form` trait
+ --> tests/ui/unimplemented_form.rs:6:15
+  |
+6 |     let _ = <<MyForm as Form>::Context as FormContext>::new();
+  |               ^^^^^^ `MyForm` is not a form
+  |
+  = help: the trait `cot::form::Form` is not implemented for `MyForm`
+  = note: add #[derive(cot::form::Form)] to the struct to automatically derive the trait
+  = help: the trait `cot::form::Form` is implemented for `DatabaseUser`

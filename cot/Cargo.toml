@@ -66,6 +66,7 @@ futures.workspace = true
 mockall.workspace = true
 tempfile.workspace = true
 tracing-test.workspace = true
+trybuild.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

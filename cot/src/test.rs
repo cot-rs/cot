@@ -1208,8 +1208,8 @@ impl DynMigration for TestMigration {
 ///
 /// This is mostly useful for tests that need to modify some global state (e.g.
 /// environment variables or current working directory).
-#[cfg(test)]
-pub(crate) fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
+#[doc(hidden)] // not part of the public API; used in cot-cli
+pub fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
     let lock = LOCK.get_or_init(|| std::sync::Mutex::new(()));
     match lock.lock() {

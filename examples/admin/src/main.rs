@@ -1,3 +1,4 @@
+use askama::Template;
 use cot::__private::async_trait;
 use cot::admin::AdminApp;
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
@@ -9,7 +10,6 @@ use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode};
-use rinja::Template;
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

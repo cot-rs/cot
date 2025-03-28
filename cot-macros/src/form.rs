@@ -181,7 +181,7 @@ impl FormDeriveBuilder {
             .push(quote!(::core::fmt::Display::fmt(&self.#field_ident, f)?));
 
         self.fields_as_display_trait_bound
-            .push(quote!(&'dummy <#ty as #crate_ident::form::AsFormField>::Type: ::core::fmt::Display + #crate_ident::__private::rinja::filters::HtmlSafe));
+            .push(quote!(&'dummy <#ty as #crate_ident::form::AsFormField>::Type: ::core::fmt::Display + #crate_ident::__private::askama::filters::HtmlSafe));
     }
 
     fn build_form_impl(&self) -> TokenStream {
@@ -354,7 +354,7 @@ impl FormDeriveBuilder {
             }
 
             #[automatically_derived]
-            impl #display_dummy_lifetime_decl #crate_ident::__private::rinja::filters::HtmlSafe for #context_struct_name #display_where_clause {}
+            impl #display_dummy_lifetime_decl #crate_ident::__private::askama::filters::HtmlSafe for #context_struct_name #display_where_clause {}
         }
     }
 

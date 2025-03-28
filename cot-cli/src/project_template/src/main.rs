@@ -1,5 +1,6 @@
 mod migrations;
 
+use askama::Template;
 use cot::bytes::Bytes;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
@@ -9,7 +10,6 @@ use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, static_files};
-use rinja::Template;
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

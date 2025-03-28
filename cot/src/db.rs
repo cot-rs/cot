@@ -1467,7 +1467,7 @@ impl<T> Auto<T> {
     /// assert!(matches!(auto, Auto::Auto));
     /// ```
     #[must_use]
-    #[allow(clippy::self_named_constructors)]
+    #[expect(clippy::self_named_constructors)]
     pub const fn auto() -> Self {
         Self::Auto
     }

@@ -67,7 +67,7 @@ impl Client {
     /// }
     /// ```
     #[must_use]
-    #[allow(clippy::future_not_send)] // used in the test code
+    #[expect(clippy::future_not_send)] // used in the test code
     pub async fn new<P>(project: P) -> Self
     where
         P: Project + 'static,
@@ -675,7 +675,7 @@ impl TestRequestBuilder {
         };
 
         let auth_backend = std::mem::take(&mut self.auth_backend);
-        #[allow(trivial_casts)]
+        #[expect(trivial_casts)]
         let auth_backend = match auth_backend {
             Some(auth_backend) => Arc::new(auth_backend) as Arc<dyn AuthBackend>,
             None => Arc::new(NoAuthBackend),

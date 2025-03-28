@@ -5,7 +5,7 @@ use crate::db::sea_query_db::impl_sea_query_db_backend;
 impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::postgres::PgPool, PostgresRow, PostgresValueRef, sea_query::PostgresQueryBuilder);
 
 impl DatabasePostgres {
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async)]
     async fn init(&self) -> crate::db::Result<()> {
         Ok(())
     }
@@ -31,7 +31,7 @@ impl DatabasePostgres {
     /// PostgreSQL doesn't support unsigned integers, so we need to convert
     /// them to signed integers.
     fn unsigned_to_signed(value: &mut sea_query::Value) {
-        #[allow(clippy::cast_possible_wrap)]
+        #[expect(clippy::cast_possible_wrap)]
         if let sea_query::Value::SmallUnsigned(num) = value {
             *value = sea_query::Value::SmallInt(num.map(|v| v as i16));
         } else if let sea_query::Value::Unsigned(num) = value {
@@ -45,7 +45,7 @@ impl DatabasePostgres {
         None
     }
 
-    #[allow(clippy::unused_self)] // to have a unified interface between database impls
+    #[expect(clippy::unused_self)] // to have a unified interface between database impls
     pub(super) fn sea_query_column_type_for(
         &self,
         column_type: crate::db::ColumnType,

@@ -26,9 +26,9 @@ pub(crate) enum StatusType {
     Removed,
 
     // Status types
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     Error, // Should be used in Error handling inside remove operations
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     Warning, // Should be used as cautionary messages.
 }
 

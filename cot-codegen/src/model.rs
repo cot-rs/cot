@@ -5,7 +5,7 @@ use syn::spanned::Spanned;
 #[cfg(feature = "symbol-resolver")]
 use crate::symbol_resolver::SymbolResolver;
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 #[derive(Debug, Default, FromMeta)]
 pub struct ModelArgs {
     #[darling(default)]
@@ -13,7 +13,7 @@ pub struct ModelArgs {
     pub table_name: Option<String>,
 }
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, FromMeta)]
 pub enum ModelType {
     #[default]
@@ -22,7 +22,7 @@ pub enum ModelType {
     Internal,
 }
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 #[derive(Debug, Clone, FromDeriveInput)]
 #[darling(forward_attrs(allow, doc, cfg), supports(struct_named))]
 pub struct ModelOpts {

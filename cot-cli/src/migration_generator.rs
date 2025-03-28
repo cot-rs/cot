@@ -373,7 +373,10 @@ impl MigrationGenerator {
                     modified_models.push(app_model.clone());
                 }
                 (Some(&app_model), Some(&migration_model)) => {
-                    if app_model.model != migration_model.model {
+                    if app_model.model.table_name != migration_model.model.table_name
+                        || app_model.model.pk_field != migration_model.model.pk_field
+                        || app_model.model.fields != migration_model.model.fields
+                    {
                         modified_models.push(app_model.clone());
                         operations.extend(
                             MigrationOperationGenerator::make_alter_model_operations(

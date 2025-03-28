@@ -38,7 +38,7 @@ use bytes::Bytes;
 ///
 /// In order for the [`FormContext`] to be renderable in templates, all the form
 /// fields (i.e. [`AsFormField::Type`]) must implement the [`Display`] and
-/// [`rinja::filters::HtmlSafe`] traits. If you are implementing your own form
+/// [`askama::filters::HtmlSafe`] traits. If you are implementing your own form
 /// field types, you should make sure they implement these traits (and you have
 /// to make sure the types are safe to render as HTML, possibly escaping user
 /// input if needed).

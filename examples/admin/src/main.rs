@@ -2,6 +2,7 @@ mod migrations;
 
 use std::fmt::{Display, Formatter};
 
+use askama::Template;
 use async_trait::async_trait;
 use cot::admin::{AdminApp, AdminModel, AdminModelManager, DefaultAdminModelManager};
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
@@ -19,7 +20,6 @@ use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode};
-use rinja::Template;
 
 #[derive(Debug, Clone, Form, AdminModel)]
 #[model]

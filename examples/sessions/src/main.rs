@@ -1,3 +1,4 @@
+use askama::Template;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::form::Form;
@@ -8,7 +9,6 @@ use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router, Urls};
 use cot::session::Session;
 use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, reverse_redirect};
-use rinja::Template;
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

@@ -6,6 +6,7 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
+use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
 /// Implements the [`AdminModel`] trait for a struct.
@@ -18,7 +19,6 @@ use bytes::Bytes;
 pub use cot_macros::AdminModel;
 use derive_more::Debug;
 use http::request::Parts;
-use rinja::Template;
 use serde::Deserialize;
 
 use crate::auth::{Auth, Password};

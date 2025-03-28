@@ -1,5 +1,6 @@
 mod migrations;
 
+use askama::Template;
 use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::config::{DatabaseConfig, ProjectConfig};
@@ -12,7 +13,6 @@ use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, reverse_redirect};
-use rinja::Template;
 
 #[derive(Debug, Clone)]
 #[model]

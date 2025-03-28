@@ -5,9 +5,9 @@ use std::num::{
     NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
 };
 
+use askama::filters::HtmlSafe;
 #[cfg(feature = "db")]
 use cot::db::Auto;
-use rinja::filters::HtmlSafe;
 
 use crate::auth::{Password, PasswordHash};
 #[cfg(feature = "db")]

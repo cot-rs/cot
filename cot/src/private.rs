@@ -6,12 +6,12 @@
 //!
 //! This is not a public API and should not be used directly.
 
+/// Askama's macros don't work when Askama is re-exported, so there's no point
+/// in re-exporting it publicly. However, we need to re-export it here so that
+/// our macros can implement traits from Askama.
+pub use askama;
 pub use async_trait::async_trait;
 pub use bytes::Bytes;
-/// Rinja's macros don't work when Rinja is re-exported, so there's no point in
-/// re-exporting it publicly. However, we need to re-export it here so that our
-/// macros can implement traits from Rinja.
-pub use rinja;
 pub use tokio;
 
 // used in the CLI

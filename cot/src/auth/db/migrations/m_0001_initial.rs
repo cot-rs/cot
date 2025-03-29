@@ -3,12 +3,12 @@
 #[derive(Debug, Copy, Clone)]
 pub(super) struct Migration;
 impl ::cot::db::migrations::Migration for Migration {
-    const APP_NAME: &'static str = "cot_auth";
+    const APP_NAME: &'static str = "cot";
     const MIGRATION_NAME: &'static str = "m_0001_initial";
     const DEPENDENCIES: &'static [::cot::db::migrations::MigrationDependency] = &[];
     const OPERATIONS: &'static [::cot::db::migrations::Operation] = &[
         ::cot::db::migrations::Operation::create_model()
-            .table_name(::cot::db::Identifier::new("database_user"))
+            .table_name(::cot::db::Identifier::new("cot__database_user"))
             .fields(
                 &[
                     ::cot::db::migrations::Field::new(

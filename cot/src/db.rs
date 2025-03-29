@@ -1433,7 +1433,7 @@ pub struct RowsNum(pub u64);
 /// # async fn main() -> Result<()> {
 ///
 /// # const OPERATION: Operation = Operation::create_model()
-/// #     .table_name(Identifier::new("my_model"))
+/// #     .table_name(Identifier::new("cot__my_model"))
 /// #     .fields(&[
 /// #         Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
 /// #             .primary_key()

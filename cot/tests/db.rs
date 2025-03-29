@@ -12,6 +12,14 @@ use fake::rand::SeedableRng;
 use fake::rand::rngs::StdRng;
 use fake::{Dummy, Fake, Faker};
 
+#[derive(Debug, PartialEq)]
+#[model]
+struct TestModel {
+    #[model(primary_key)]
+    id: Auto<i32>,
+    name: String,
+}
+
 #[cot_macros::dbtest]
 async fn model_crud(test_db: &mut TestDatabase) {
     migrate_test_model(&*test_db).await;
@@ -125,20 +133,12 @@ async fn model_macro_filtering(test_db: &mut TestDatabase) {
     assert!(objects.is_empty());
 }
 
-#[derive(Debug, PartialEq)]
-#[model]
-struct TestModel {
-    #[model(primary_key)]
-    id: Auto<i32>,
-    name: String,
-}
-
 async fn migrate_test_model(db: &Database) {
     CREATE_TEST_MODEL.forwards(db).await.unwrap();
 }
 
 const CREATE_TEST_MODEL: Operation = Operation::create_model()
-    .table_name(Identifier::new("test_model"))
+    .table_name(Identifier::new("cot__test_model"))
     .fields(&[
         Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
             .primary_key()
@@ -201,7 +201,7 @@ async fn migrate_all_fields_model(db: &Database) {
 }
 
 const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
-    .table_name(Identifier::new("all_fields_model"))
+    .table_name(Identifier::new("cot__all_fields_model"))
     .fields(&[
         Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
             .primary_key()
@@ -284,7 +284,7 @@ async fn foreign_keys(db: &mut TestDatabase) {
     }
 
     const CREATE_ARTIST: Operation = Operation::create_model()
-        .table_name(Identifier::new("artist"))
+        .table_name(Identifier::new("cot__artist"))
         .fields(&[
             Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
                 .primary_key()
@@ -293,7 +293,7 @@ async fn foreign_keys(db: &mut TestDatabase) {
         ])
         .build();
     const CREATE_TRACK: Operation = Operation::create_model()
-        .table_name(Identifier::new("track"))
+        .table_name(Identifier::new("cot__track"))
         .fields(&[
             Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
                 .primary_key()
@@ -368,7 +368,7 @@ async fn foreign_keys_option(db: &mut TestDatabase) {
     }
 
     const CREATE_PARENT: Operation = Operation::create_model()
-        .table_name(Identifier::new("parent"))
+        .table_name(Identifier::new("cot__parent"))
         .fields(&[
             Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
                 .primary_key()
@@ -376,7 +376,7 @@ async fn foreign_keys_option(db: &mut TestDatabase) {
         ])
         .build();
     const CREATE_CHILD: Operation = Operation::create_model()
-        .table_name(Identifier::new("child"))
+        .table_name(Identifier::new("cot__child"))
         .fields(&[
             Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
                 .primary_key()
@@ -452,7 +452,7 @@ async fn foreign_keys_cascade(db: &mut TestDatabase) {
     }
 
     const CREATE_PARENT: Operation = Operation::create_model()
-        .table_name(Identifier::new("parent"))
+        .table_name(Identifier::new("cot__parent"))
         .fields(&[
             Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
                 .primary_key()
@@ -460,7 +460,7 @@ async fn foreign_keys_cascade(db: &mut TestDatabase) {
         ])
         .build();
     const CREATE_CHILD: Operation = Operation::create_model()
-        .table_name(Identifier::new("child"))
+        .table_name(Identifier::new("cot__child"))
         .fields(&[
             Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
                 .primary_key()

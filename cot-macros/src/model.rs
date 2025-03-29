@@ -233,7 +233,7 @@ impl ModelBuilder {
             #[derive(::core::fmt::Debug)]
             #vis struct #fields_struct_name;
 
-            #[allow(non_upper_case_globals)]
+            #[expect(non_upper_case_globals)]
             impl #fields_struct_name {
                 #(#fields_as_field_refs)*
             }

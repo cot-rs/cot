@@ -492,7 +492,7 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         request: &Request,
         pagination: Pagination,
     ) -> cot::Result<Vec<Box<dyn AdminModel>>> {
-        #[allow(trivial_casts)] // Upcast to the correct Box type
+        #[expect(trivial_casts)] // Upcast to the correct Box type
         T::get_objects(request, pagination).await.map(|objects| {
             objects
                 .into_iter()
@@ -506,7 +506,7 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         request: &Request,
         id: &str,
     ) -> cot::Result<Option<Box<dyn AdminModel>>> {
-        #[allow(trivial_casts)] // Upcast to the correct Box type
+        #[expect(trivial_casts)] // Upcast to the correct Box type
         T::get_object_by_id(request, id)
             .await
             .map(|object| object.map(|object| Box::new(object) as Box<dyn AdminModel>))

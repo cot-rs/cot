@@ -67,7 +67,7 @@ impl Client {
     /// }
     /// ```
     #[must_use]
-    #[allow(clippy::future_not_send)] // used in the test code
+    #[expect(clippy::future_not_send)] // used in the test code
     pub async fn new<P>(project: P) -> Self
     where
         P: Project + 'static,
@@ -675,7 +675,7 @@ impl TestRequestBuilder {
         };
 
         let auth_backend = std::mem::take(&mut self.auth_backend);
-        #[allow(trivial_casts)]
+        #[expect(trivial_casts)]
         let auth_backend = match auth_backend {
             Some(auth_backend) => Arc::new(auth_backend) as Arc<dyn AuthBackend>,
             None => Arc::new(NoAuthBackend),
@@ -1208,8 +1208,8 @@ impl DynMigration for TestMigration {
 ///
 /// This is mostly useful for tests that need to modify some global state (e.g.
 /// environment variables or current working directory).
-#[cfg(test)]
-pub(crate) fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
+#[doc(hidden)] // not part of the public API; used in cot-cli
+pub fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
     let lock = LOCK.get_or_init(|| std::sync::Mutex::new(()));
     match lock.lock() {

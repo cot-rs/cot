@@ -26,7 +26,7 @@ pub(super) fn fn_to_cot_main(main_function_decl: ItemFn) -> syn::Result<TokenStr
 
                 #new_main_decl
             };
-            #[allow(clippy::expect_used)]
+            #[expect(clippy::expect_used)]
             {
                 return #crate_name::__private::tokio::runtime::Builder::new_multi_thread()
                     .enable_all()

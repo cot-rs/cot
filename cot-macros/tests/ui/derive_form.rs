@@ -7,7 +7,7 @@ struct MyForm {
     name2: std::string::String,
 }
 
-#[allow(unused)]
+#[expect(unused)]
 async fn test_endpoint(mut request: Request) {
     let form = MyForm::from_request(&mut request).await.unwrap().unwrap();
     println!("name = {}, name2 = {}", form.name, form.name2);

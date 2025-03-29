@@ -273,7 +273,7 @@ mod tests {
         const MIGRATION_NUM: usize = 100;
 
         let mut migrations = Vec::new();
-        #[allow(clippy::needless_range_loop)]
+        #[expect(clippy::needless_range_loop)]
         for i in 0..MIGRATION_NUM {
             let deps = (0..i)
                 .map(|i| MigrationDependency::migration("app1", MIGRATION_NAMES[i]))

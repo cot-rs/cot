@@ -73,7 +73,7 @@ impl AdminModelDeriveBuilder {
         }
     }
 
-    #[allow(clippy::too_many_lines)] // it's mostly the AdminModel impl
+    #[expect(clippy::too_many_lines)] // it's mostly the AdminModel impl
     fn build_admin_model_impl(&self) -> TokenStream {
         let crate_ident = cot_ident();
 

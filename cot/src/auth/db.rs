@@ -532,7 +532,7 @@ impl AuthBackend for DatabaseUserBackend {
         credentials: &(dyn Any + Send + Sync),
     ) -> Result<Option<Box<dyn User + Send + Sync>>> {
         if let Some(credentials) = credentials.downcast_ref::<DatabaseUserCredentials>() {
-            #[allow(trivial_casts)] // Upcast to the correct Box type
+            #[expect(trivial_casts)] // Upcast to the correct Box type
             Ok(DatabaseUser::authenticate(&self.database, credentials)
                 .await
                 .map(|user| user.map(|user| Box::new(user) as Box<dyn User + Send + Sync>))?)
@@ -546,7 +546,7 @@ impl AuthBackend for DatabaseUserBackend {
             return Err(AuthError::UserIdTypeNotSupported);
         };
 
-        #[allow(trivial_casts)] // Upcast to the correct Box type
+        #[expect(trivial_casts)] // Upcast to the correct Box type
         Ok(DatabaseUser::get_by_id(&self.database, id)
             .await?
             .map(|user| Box::new(user) as Box<dyn User + Send + Sync>))

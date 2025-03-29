@@ -98,7 +98,7 @@ pub trait App: Send + Sync {
     /// # Errors
     ///
     /// This method returns an error if the app fails to initialize.
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     async fn init(&self, context: &mut ProjectContext) -> crate::Result<()> {
         Ok(())
     }
@@ -282,7 +282,7 @@ pub trait Project {
     ///     }
     /// }
     /// ```
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn register_tasks(&self, cli: &mut Cli) {}
 
     /// Registers the apps for the project.
@@ -307,7 +307,7 @@ pub trait Project {
     ///     }
     /// }
     /// ```
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {}
 
     /// Sets the authentication backend to use.
@@ -333,7 +333,7 @@ pub trait Project {
     /// }
     /// ```
     fn auth_backend(&self, context: &AuthBackendContext) -> Arc<dyn AuthBackend> {
-        #[allow(trivial_casts)] // cast to Arc<dyn AuthBackend>
+        #[expect(trivial_casts)] // cast to Arc<dyn AuthBackend>
         match &context.config().auth_backend {
             AuthBackendConfig::None => Arc::new(NoAuthBackend) as Arc<dyn AuthBackend>,
             #[cfg(feature = "db")]
@@ -375,7 +375,7 @@ pub trait Project {
     ///     }
     /// }
     /// ```
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn middlewares(
         &self,
         handler: RootHandlerBuilder,
@@ -894,7 +894,7 @@ impl<S: BootstrapPhase> Bootstrapper<S> {
 }
 
 impl Bootstrapper<Uninitialized> {
-    #[allow(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
+    #[expect(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
     async fn run_cli(self) -> cot::Result<()> {
         let mut cli = Cli::new();
 
@@ -1041,7 +1041,7 @@ impl Bootstrapper<WithConfig> {
     /// # }
     /// ```
     // Send not needed; Bootstrapper is run async in a single thread
-    #[allow(clippy::future_not_send)]
+    #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_apps().boot().await
     }
@@ -1126,7 +1126,7 @@ impl Bootstrapper<WithApps> {
     /// # }
     /// ```
     // Send not needed; Bootstrapper is run async in a single thread
-    #[allow(clippy::future_not_send)]
+    #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_database().await?.boot().await
     }
@@ -1164,7 +1164,7 @@ impl Bootstrapper<WithApps> {
     /// # }
     /// ```
     // Send not needed; Bootstrapper is run async in a single thread
-    #[allow(clippy::future_not_send)]
+    #[expect(clippy::future_not_send)]
     pub async fn with_database(self) -> cot::Result<Bootstrapper<WithDatabase>> {
         #[cfg(feature = "db")]
         let database = Self::init_database(&self.context.config.database).await?;
@@ -1229,7 +1229,7 @@ impl Bootstrapper<WithDatabase> {
     /// ```
     // Function marked `async` to be consistent with the other `boot` methods
     // Send not needed; Bootstrapper is run async in a single thread
-    #[allow(clippy::unused_async, clippy::future_not_send)]
+    #[expect(clippy::unused_async, clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler = RootHandlerBuilder {
@@ -1705,7 +1705,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
 ///
 /// This function returns an error if the server fails to start.
 // Send not needed; Bootstrapper/CLI is run async in a single thread
-#[allow(clippy::future_not_send)]
+#[expect(clippy::future_not_send)]
 pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> cot::Result<()> {
     let listener = tokio::net::TcpListener::bind(address_str)
         .await
@@ -1728,7 +1728,7 @@ pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> 
 ///
 /// This function returns an error if the server fails to start.
 // Send not needed; Bootstrapper/CLI is run async in a single thread
-#[allow(clippy::future_not_send)]
+#[expect(clippy::future_not_send)]
 pub async fn run_at(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
@@ -1916,7 +1916,7 @@ fn build_custom_error_page(
 /// # Ok(())
 /// # }
 /// ```
-#[allow(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
+#[expect(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
 pub async fn run_cli(project: impl Project + 'static) -> cot::Result<()> {
     Bootstrapper::new(project).run_cli().await
 }

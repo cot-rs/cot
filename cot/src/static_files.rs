@@ -240,7 +240,7 @@ where
 pin_project! {
     /// Future representing the response for a static file request.
     #[project = ResponseFutureProj]
-    #[allow(missing_docs)]  // because of: https://github.com/taiki-e/pin-project-lite/issues/3
+    #[expect(missing_docs)]  // because of: https://github.com/taiki-e/pin-project-lite/issues/3
     pub enum ResponseFuture<F> {
         /// Response for a static file.
         StaticFileResponse {

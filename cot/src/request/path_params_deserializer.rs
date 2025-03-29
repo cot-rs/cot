@@ -381,7 +381,7 @@ impl<'de> ValueDeserializer<'de> {
         Self { key: None, value }
     }
 
-    #[allow(clippy::unnecessary_wraps)] // allows to use the same `deserialize_value!` macro
+    #[expect(clippy::unnecessary_wraps)] // allows to use the same `deserialize_value!` macro
     fn get_single_value(&self) -> Result<&'de str, PathParamsDeserializerError> {
         Ok(self.value)
     }

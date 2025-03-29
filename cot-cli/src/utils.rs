@@ -30,6 +30,7 @@ pub(crate) enum StatusType {
     Error, // Should be used in Error handling inside remove operations
     #[expect(dead_code)]
     Warning, // Should be used as cautionary messages.
+    Notice,
 }
 
 impl StatusType {
@@ -52,6 +53,7 @@ impl StatusType {
             // Status types
             StatusType::Warning => base_style.fg_color(Some(Color::Ansi(AnsiColor::Yellow))),
             StatusType::Error => base_style.fg_color(Some(Color::Ansi(AnsiColor::Red))),
+            StatusType::Notice => base_style.fg_color(Some(Color::Ansi(AnsiColor::White))),
         }
     }
     fn as_str(self) -> &'static str {
@@ -66,6 +68,7 @@ impl StatusType {
             StatusType::Removed => "Removed",
             StatusType::Warning => "Warning",
             StatusType::Error => "Error",
+            StatusType::Notice => "Notice",
         }
     }
 }
@@ -81,6 +84,19 @@ pub(crate) struct WorkspaceManager {
     workspace_root: PathBuf,
     root_manifest: Manifest,
     package_manifests: HashMap<String, PackageManager>,
+    /// If we are inside a specific package when creating a Workspace manager,
+    /// this will be the name of the package.
+    current_package: Option<String>,
+}
+
+impl WorkspaceManager {
+    pub(crate) fn get_current_package_manager(&self) -> Option<&PackageManager> {
+        self.current_package.as_ref().map(|name| {
+            self.package_manifests
+                .get(name)
+                .expect("current package should exist")
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -98,6 +114,8 @@ impl CargoTomlManager {
                 let mut manager = Self::parse_workspace(cargo_toml_path, manifest);
 
                 if let Some(package) = &manager.root_manifest.package {
+                    manager.current_package = Some(package.name.clone());
+
                     if manager.get_package_manager(package.name()).is_none() {
                         let workspace = manager
                             .root_manifest
@@ -135,7 +153,8 @@ impl CargoTomlManager {
 
                 if let Some(workspace_path) = workspace_path {
                     if let Ok(manifest) = Manifest::from_path(&workspace_path) {
-                        let manager = Self::parse_workspace(&workspace_path, manifest);
+                        let mut manager = Self::parse_workspace(&workspace_path, manifest);
+                        manager.current_package = Some(package.name.clone());
                         return Ok(CargoTomlManager::Workspace(manager));
                     }
                 }
@@ -191,11 +210,17 @@ impl CargoTomlManager {
             workspace_root: PathBuf::from(workspace_root),
             root_manifest: manifest,
             package_manifests,
+            current_package: None,
         }
     }
 
     pub(crate) fn from_path(path: &Path) -> anyhow::Result<Option<Self>> {
-        Self::find_cargo_toml(path)
+        let path = std::path::absolute(path).context("could not make the path absolute")?;
+        if !path.exists() {
+            bail!("path does not exist: `{}`", path.display());
+        }
+
+        Self::find_cargo_toml(&path)
             .map(|p| Self::from_cargo_toml_path(&p))
             .transpose()
     }
@@ -216,19 +241,6 @@ impl CargoTomlManager {
         }
 
         None
-    }
-
-    pub(crate) fn get_package_manager(&self, package_name: &str) -> Option<&PackageManager> {
-        match self {
-            CargoTomlManager::Workspace(manager) => manager.get_package_manager(package_name),
-            CargoTomlManager::Package(manager) => {
-                if manager.get_package_name() == package_name {
-                    Some(manager)
-                } else {
-                    None
-                }
-            }
-        }
     }
 }
 
@@ -293,6 +305,7 @@ impl PackageManager {
 mod tests {
     use std::io::Write;
 
+    use cot::test::serial_guard;
     use cot_cli::test_utils;
 
     use super::*;
@@ -381,6 +394,7 @@ mod tests {
         #[cfg_attr(miri, ignore)]
         fn load_valid_workspace_from_package_manifest() {
             let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
             test_utils::make_package(temp_dir.path()).unwrap();
             let cargo_toml_path = temp_dir.path().join("Cargo.toml");
             let mut handle = std::fs::OpenOptions::new()
@@ -399,6 +413,32 @@ mod tests {
                     assert_eq!(
                         manager.get_packages()[0].get_manifest_path(),
                         cargo_toml_path
+                    );
+                    assert_eq!(manager.current_package.as_deref(), Some(package_name));
+                }
+                CargoTomlManager::Package(_) => panic!("Expected workspace manifest"),
+            }
+        }
+
+        #[test]
+        // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
+        #[cfg_attr(miri, ignore)]
+        fn load_valid_workspace_from_workspace_manifest() {
+            let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+            test_utils::make_workspace_package(temp_dir.path(), 3).unwrap();
+
+            let cargo_toml_path = temp_dir.path().join("cargo-test-crate-1");
+            let manager = CargoTomlManager::from_path(&cargo_toml_path)
+                .unwrap()
+                .unwrap();
+
+            match manager {
+                CargoTomlManager::Workspace(manager) => {
+                    assert!(manager.get_root_manifest().workspace.is_some());
+                    assert_eq!(manager.get_packages().len(), 3);
+                    assert_eq!(
+                        manager.current_package.as_deref(),
+                        Some("cargo-test-crate-1")
                     );
                 }
                 CargoTomlManager::Package(_) => panic!("Expected workspace manifest"),
@@ -429,30 +469,29 @@ mod tests {
         #[test]
         // unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`
         #[cfg_attr(miri, ignore)]
-        fn get_package_manager() {
+        fn load_valid_package_manifest_current_dir() {
             let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-            test_utils::make_workspace_package(temp_dir.path(), 1).unwrap();
+            let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
+            test_utils::make_package(temp_dir.path()).unwrap();
 
-            let manager = CargoTomlManager::from_path(temp_dir.path())
+            // ensure the tests run sequentially when setting the current directory
+            let _guard = serial_guard();
+            std::env::set_current_dir(temp_dir.path().join("src")).unwrap();
+
+            let manager = CargoTomlManager::from_path(Path::new("."))
                 .unwrap()
                 .unwrap();
 
-            let first_package = test_utils::get_nth_crate_name(1);
-            let package = manager.get_package_manager(first_package.as_str());
-            assert!(package.is_some());
-            assert_eq!(
-                package
-                    .unwrap()
-                    .get_manifest()
-                    .package
-                    .as_ref()
-                    .unwrap()
-                    .name,
-                first_package.as_str()
-            );
-
-            let package = manager.get_package_manager("non-existent");
-            assert!(package.is_none());
+            match manager {
+                CargoTomlManager::Package(manager) => {
+                    assert_eq!(manager.get_package_name(), package_name);
+                    assert_eq!(
+                        manager.get_package_path().canonicalize().unwrap(),
+                        temp_dir.path().canonicalize().unwrap(),
+                    );
+                }
+                CargoTomlManager::Workspace(_) => panic!("Expected package manifest"),
+            }
         }
     }
 

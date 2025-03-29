@@ -20,30 +20,21 @@ use tracing::{debug, trace};
 use crate::utils::{CargoTomlManager, PackageManager, StatusType, print_status_msg};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
-    if let Some(manager) = CargoTomlManager::from_path(path)? {
-        if let Some(app_name) = &options.app_name {
-            match manager.get_package_manager(app_name) {
-                Some(package_manager) => {
-                    make_package_migrations(package_manager, options)?;
-                    return Ok(());
-                }
-                None => {
-                    bail!("Package manager not found for the specified app name.")
-                }
-            }
-        }
-
-        match manager {
-            CargoTomlManager::Workspace(workspace) => {
-                for package in workspace.get_packages() {
-                    make_package_migrations(package, options.clone())?;
-                }
-                Ok(())
-            }
-            CargoTomlManager::Package(package) => make_package_migrations(&package, options),
-        }
-    } else {
+    let Some(manager) = CargoTomlManager::from_path(path)? else {
         bail!("Cargo.toml not found in the specified directory or any parent directory.")
+    };
+
+    match manager {
+        CargoTomlManager::Workspace(workspace) => {
+            let Some(package) = workspace.get_current_package_manager() else {
+                bail!(
+                    "Generating migrations for workspaces is not supported yet. \
+                        Please generate migrations for each package separately."
+                );
+            };
+            make_package_migrations(package, options)
+        }
+        CargoTomlManager::Package(package) => make_package_migrations(&package, options),
     }
 }
 
@@ -58,6 +49,14 @@ fn make_package_migrations(
     let migrations = generator
         .generate_migrations_as_source()
         .context("unable to generate migrations")?;
+    let Some(migrations) = migrations else {
+        print_status_msg(
+            StatusType::Notice,
+            "No changes in models detected; no migrations were generated",
+        );
+        return Ok(());
+    };
+
     generator
         .write_migrations(&migrations)
         .context("unable to write migrations")?;
@@ -124,7 +123,7 @@ impl MigrationGenerator {
         }
     }
 
-    pub fn generate_migrations_as_source(&self) -> anyhow::Result<MigrationAsSource> {
+    pub fn generate_migrations_as_source(&self) -> anyhow::Result<Option<MigrationAsSource>> {
         let source_files = self.get_source_files()?;
         self.generate_migrations_as_source_from_files(source_files)
     }
@@ -132,14 +131,15 @@ impl MigrationGenerator {
     pub fn generate_migrations_as_source_from_files(
         &self,
         source_files: Vec<SourceFile>,
-    ) -> anyhow::Result<MigrationAsSource> {
-        if let Some(migration) = self.generate_migrations_as_generated_from_files(source_files)? {
-            let migration_name = migration.migration_name.clone();
-            let content = self.generate_migration_file_content(migration);
-            Ok(MigrationAsSource::new(migration_name, content))
-        } else {
-            bail!("unable to generate migrations from source files")
-        }
+    ) -> anyhow::Result<Option<MigrationAsSource>> {
+        let migrations = self
+            .generate_migrations_as_generated_from_files(source_files)?
+            .map(|migration| {
+                let migration_name = migration.migration_name.clone();
+                let content = self.generate_migration_file_content(migration);
+                MigrationAsSource::new(migration_name, content)
+            });
+        Ok(migrations)
     }
 
     /// Generate migrations and return internal structures that can be used to

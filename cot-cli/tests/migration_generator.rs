@@ -130,6 +130,7 @@ fn create_models_foreign_key_two_migrations() {
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
     let migration_file = generator
         .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
         .unwrap();
 
     let src = include_str!("migration_generator/foreign_key_two_migrations/step_2.rs");
@@ -168,6 +169,7 @@ fn create_model_compile_test() {
 
     let migration_opt = generator
         .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
         .unwrap();
     let MigrationAsSource {
         name: migration_name,

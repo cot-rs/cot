@@ -31,8 +31,8 @@
 
 use std::fmt::Write;
 
+use askama::filters::Escaper;
 use derive_more::{Deref, Display, From};
-use rinja::filters::Escaper;
 
 /// A type that represents HTML content as a string.
 ///
@@ -230,7 +230,7 @@ impl HtmlTag {
 
         for (key, value) in &self.attributes {
             write!(&mut result, " {key}=\"").expect(FAIL_MSG);
-            rinja::filters::Html
+            askama::filters::Html
                 .write_escaped_str(&mut result, value)
                 .expect(FAIL_MSG);
             write!(&mut result, "\"").expect(FAIL_MSG);

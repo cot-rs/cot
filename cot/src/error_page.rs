@@ -2,7 +2,7 @@ use std::any::Any;
 use std::panic::PanicHookInfo;
 use std::sync::Arc;
 
-use rinja::Template;
+use askama::Template;
 use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;

@@ -487,6 +487,7 @@ dependencies = [
  "tower-sessions",
  "tracing",
  "tracing-test",
+ "trybuild",
  "url",
 ]
 

@@ -114,6 +114,11 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
 /// }
 /// ```
 #[async_trait]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not marked as a database model",
+    label = "`{Self}` is not annotated with `#[cot::db::model]`",
+    note = "annotate `{Self}` with the `#[cot::db::model]` attribute"
+)]
 pub trait Model: Sized + Send + 'static {
     /// A helper structure for the fields of the model.
     ///

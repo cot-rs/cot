@@ -540,6 +540,11 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
 
 /// A model that can be managed by the admin panel.
 #[async_trait]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement the `AdminModel` trait",
+    label = "`{Self}` is not an admin model",
+    note = "add #[derive(cot::admin::AdminModel)] to the struct to automatically derive the trait"
+)]
 pub trait AdminModel: Any + Send + 'static {
     /// Returns the object as an `Any` trait object.
     // TODO: consider removing this when Rust trait_upcasting is stabilized and we

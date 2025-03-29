@@ -439,7 +439,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "cot"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "cot-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anstyle",
  "anyhow",
@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "cot_codegen"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "darling",
  "heck",
@@ -536,7 +536,7 @@ dependencies = [
 
 [[package]]
 name = "cot_macros"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "cot",
  "cot_codegen",

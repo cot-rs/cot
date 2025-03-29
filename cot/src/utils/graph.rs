@@ -59,7 +59,7 @@ impl Graph {
         Ok(sorted_indices_stack)
     }
 
-    #[allow(clippy::match_on_vec_items)]
+    #[expect(clippy::match_on_vec_items)]
     fn toposort_visit(
         &self,
         index: usize,

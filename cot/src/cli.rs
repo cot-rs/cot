@@ -182,7 +182,7 @@ impl Cli {
         CommonOptions::new(matches)
     }
 
-    #[allow(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
+    #[expect(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
     pub(crate) async fn execute(mut self, bootstrapper: Bootstrapper<WithConfig>) -> Result<()> {
         let matches = self.command.get_matches();
 
@@ -540,7 +540,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[allow(clippy::future_not_send, clippy::await_holding_lock)]
+    #[expect(clippy::future_not_send, clippy::await_holding_lock)]
     async fn test_check(config: &str) -> Result<()> {
         struct TestProject;
         impl cot::Project for TestProject {}

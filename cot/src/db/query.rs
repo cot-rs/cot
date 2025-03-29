@@ -204,7 +204,7 @@ impl<T: Model> Query<T> {
         self.add_filter_to_statement(&mut select);
         let row = db.fetch_option(&select).await?;
         let count = match row {
-            #[allow(clippy::cast_sign_loss)]
+            #[expect(clippy::cast_sign_loss)]
             Some(row) => row.get::<i64>(0)? as u64,
             None => 0,
         };
@@ -651,7 +651,7 @@ impl Expr {
     /// );
     /// ```
     #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub fn value<T: ToDbFieldValue>(value: T) -> Self {
         match value.to_db_field_value() {
             DbFieldValue::Value(value) => Self::Value(value),
@@ -893,7 +893,7 @@ impl Expr {
     ///     query!(MyModel, $id == $id_2 + 5)
     /// );
     /// ```
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     #[must_use]
     pub fn add(lhs: Self, rhs: Self) -> Self {
         Self::Add(Box::new(lhs), Box::new(rhs))
@@ -921,7 +921,7 @@ impl Expr {
     ///     query!(MyModel, $id == $id_2 - 5)
     /// );
     /// ```
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     #[must_use]
     pub fn sub(lhs: Self, rhs: Self) -> Self {
         Self::Sub(Box::new(lhs), Box::new(rhs))
@@ -949,7 +949,7 @@ impl Expr {
     ///     query!(MyModel, $id == $id_2 * 2)
     /// );
     /// ```
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     #[must_use]
     pub fn mul(lhs: Self, rhs: Self) -> Self {
         Self::Mul(Box::new(lhs), Box::new(rhs))
@@ -977,7 +977,7 @@ impl Expr {
     ///     query!(MyModel, $id == $id_2 / 2)
     /// );
     /// ```
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     #[must_use]
     pub fn div(lhs: Self, rhs: Self) -> Self {
         Self::Div(Box::new(lhs), Box::new(rhs))

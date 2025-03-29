@@ -1,0 +1,11 @@
+error[E0277]: `Model` does not implement the `AdminModel` trait
+ --> tests/ui/unimplemented_admin_model.rs:6:41
+  |
+6 |     let _: Box<dyn AdminModelManager> = Box::new(DefaultAdminModelManager::<Model>::new());
+  |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Model` is not an admin model
+  |
+  = help: the trait `AdminModel` is not implemented for `Model`
+  = note: add #[derive(cot::admin::AdminModel)] to the struct to automatically derive the trait
+  = help: the trait `AdminModel` is implemented for `DatabaseUser`
+  = note: required for `DefaultAdminModelManager<Model>` to implement `AdminModelManager`
+  = note: required for the cast from `Box<DefaultAdminModelManager<Model>>` to `Box<dyn AdminModelManager>`

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/cot-rs/cot/compare/cot-cli-v0.2.0...cot-cli-v0.2.1) - 2025-03-30
+
+### <!-- 2 -->Fixes
+
+- *(cli)* fix modified models detection ([#266](https://github.com/cot-rs/cot/pull/266))
+- *(cli)* tests relying on cwd ([#269](https://github.com/cot-rs/cot/pull/269))
+- *(cli)* migration generator not working in inner project directories ([#267](https://github.com/cot-rs/cot/pull/267))
+
+### <!-- 3 -->Other
+
+- use #[expect] instead of #[allow] where it makes sense ([#259](https://github.com/cot-rs/cot/pull/259))
+
 ## [0.2.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.1.4...cot-cli-v0.2.0) - 2025-03-25
 
 ### <!-- 1 -->New features

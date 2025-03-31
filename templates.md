@@ -164,9 +164,8 @@ Linking to other pages in your application is a frequent requirement, and hardco
 
 ```rust
 use cot::request::Request;
-use cot::router::Urls;
 use cot::response::{Response, ResponseExt};
-use cot::router::{Router, Route};
+use cot::router::{Router, Route, Urls};
 use cot::{Body, StatusCode};
 use rinja::Template;
 

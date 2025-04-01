@@ -93,7 +93,8 @@ impl ToTokens for ModelBuilder {
 impl ModelBuilder {
     fn from_model(model: Model) -> Self {
         let field_count = model.field_count();
-        let app_name = std::env::var("CARGO_PKG_NAME").unwrap();
+        let app_name = std::env::var("CARGO_PKG_NAME")
+            .expect("cargo should set the `CARGO_PKG_NAME` environment variable");
         let table_name = match model.model_type {
             ModelType::Internal => model.table_name,
             _ => format!(

@@ -10,6 +10,7 @@ use cot::db::migrations::{DynMigration, MigrationEngine};
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::SymbolResolver;
 use darling::FromMeta;
+use heck::ToSnakeCase;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use proc_macro2::TokenStream;
@@ -903,7 +904,7 @@ impl ModelInSource {
         let opts = ModelOpts::new_from_derive_input(&input)
             .map_err(|e| anyhow::anyhow!("cannot parse model: {}", e))?;
         let mut model = opts.as_model(args, symbol_resolver)?;
-        model.table_name = format!("{}__{}", app_name, model.table_name);
+        model.table_name = format!("{}__{}", app_name.to_snake_case(), model.table_name);
 
         Ok(Self {
             model_item: item,

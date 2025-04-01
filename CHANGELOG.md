@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/cot-rs/cot/compare/cot-v0.2.0...cot-v0.2.1) - 2025-03-30
+
+### <!-- 2 -->Fixes
+
+- *(cli)* migration generator not working in inner project directories ([#267](https://github.com/cot-rs/cot/pull/267))
+
+### <!-- 3 -->Other
+
+- use #[expect] instead of #[allow] where it makes sense ([#259](https://github.com/cot-rs/cot/pull/259))
+- add #[diagnostic::on_unimplemented] for key traits ([#260](https://github.com/cot-rs/cot/pull/260))
+- *(deps)* use database dependencies only with the "db" feature flag ([#264](https://github.com/cot-rs/cot/pull/264))
+
 ## [0.2.0](https://github.com/cot-rs/cot/compare/cot-v0.1.4...cot-v0.2.0) - 2025-03-25
 
 ### <!-- 0 -->Security

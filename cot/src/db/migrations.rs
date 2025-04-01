@@ -599,7 +599,7 @@ enum OperationInner {
 }
 
 /// A field in a model.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Copy, Clone)]
 pub struct Field {
     /// The name of the field
@@ -1839,7 +1839,7 @@ impl MigrationDependency {
 /// # }
 /// ```
 pub fn wrap_migrations(migrations: &[&'static SyncDynMigration]) -> Vec<Box<SyncDynMigration>> {
-    #[allow(trivial_casts)] // cast to the correct trait object type
+    #[expect(trivial_casts)] // cast to the correct trait object type
     migrations
         .iter()
         .copied()
@@ -1918,7 +1918,7 @@ mod tests {
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_multiple_migrations_run(test_db: &mut TestDatabase) {
-        #[allow(trivial_casts)] // cast to the correct trait object type
+        #[expect(trivial_casts)] // cast to the correct trait object type
         let engine = MigrationEngine::new([
             &TestMigration as &SyncDynMigration,
             &DummyMigration as &SyncDynMigration,

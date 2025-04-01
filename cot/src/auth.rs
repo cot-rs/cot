@@ -101,7 +101,7 @@ pub trait User {
     /// [`AnonymousUser`] always returns `None`.
     // mockall requires lifetimes to be specified here
     // (see related issue: https://github.com/asomers/mockall/issues/571)
-    #[allow(clippy::needless_lifetimes)]
+    #[expect(clippy::needless_lifetimes)]
     fn username<'a>(&'a self) -> Option<Cow<'a, str>> {
         None
     }
@@ -214,7 +214,7 @@ pub trait User {
     ///     }
     /// }
     /// ```
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn session_auth_hash(&self, secret_key: &SecretKey) -> Option<SessionAuthHash> {
         None
     }
@@ -896,7 +896,7 @@ impl AuthInner {
         secret_key: SecretKey,
         fallback_secret_keys: &[SecretKey],
     ) -> cot::Result<Self> {
-        #[allow(trivial_casts)] // cast to Arc<dyn User + Send + Sync>
+        #[expect(trivial_casts)] // cast to Arc<dyn User + Send + Sync>
         let user = get_user_with_saved_id(&session, &*backend, &secret_key, fallback_secret_keys)
             .await?
             .map_or_else(

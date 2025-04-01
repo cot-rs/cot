@@ -54,13 +54,18 @@ pub fn make_workspace_package(path: &Path, packages: u8) -> anyhow::Result<()> {
 
 pub fn make_package(path: &Path) -> anyhow::Result<()> {
     if path.exists() {
-        create_cargo_project(path, CargoCommand::Init)
+        create_cargo_project(path, path, CargoCommand::Init)
     } else {
-        create_cargo_project(path, CargoCommand::New)
+        create_cargo_project(
+            path,
+            path.parent()
+                .expect("parent directory must exist when creating a crate"),
+            CargoCommand::New,
+        )
     }
 }
 
-fn create_cargo_project(path: &Path, cmd: CargoCommand) -> anyhow::Result<()> {
+fn create_cargo_project(path: &Path, current_dir: &Path, cmd: CargoCommand) -> anyhow::Result<()> {
     let mut base = cargo();
 
     let cmd = match cmd {
@@ -68,6 +73,7 @@ fn create_cargo_project(path: &Path, cmd: CargoCommand) -> anyhow::Result<()> {
         CargoCommand::New => base.arg("new"),
     };
 
+    cmd.current_dir(current_dir);
     cmd.arg(path).output()?;
 
     Ok(())

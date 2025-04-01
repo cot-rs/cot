@@ -492,7 +492,7 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         request: &Request,
         pagination: Pagination,
     ) -> cot::Result<Vec<Box<dyn AdminModel>>> {
-        #[allow(trivial_casts)] // Upcast to the correct Box type
+        #[expect(trivial_casts)] // Upcast to the correct Box type
         T::get_objects(request, pagination).await.map(|objects| {
             objects
                 .into_iter()
@@ -506,7 +506,7 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         request: &Request,
         id: &str,
     ) -> cot::Result<Option<Box<dyn AdminModel>>> {
-        #[allow(trivial_casts)] // Upcast to the correct Box type
+        #[expect(trivial_casts)] // Upcast to the correct Box type
         T::get_object_by_id(request, id)
             .await
             .map(|object| object.map(|object| Box::new(object) as Box<dyn AdminModel>))
@@ -540,6 +540,11 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
 
 /// A model that can be managed by the admin panel.
 #[async_trait]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement the `AdminModel` trait",
+    label = "`{Self}` is not an admin model",
+    note = "add #[derive(cot::admin::AdminModel)] to the struct to automatically derive the trait"
+)]
 pub trait AdminModel: Any + Send + 'static {
     /// Returns the object as an `Any` trait object.
     // TODO: consider removing this when Rust trait_upcasting is stabilized and we

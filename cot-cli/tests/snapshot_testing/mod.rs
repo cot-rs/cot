@@ -69,10 +69,7 @@ pub fn cot_cli_cmd() -> Command {
 
 pub fn get_logging_filters() -> Vec<(&'static str, &'static str)> {
     vec![
-        (
-            r"/private/var/folders/([^/]+/)+?T/",
-            r"/PRIVATE_MACOS_PATH/",
-        ), // Redact macOS temp path
-        (r"(?m)^.*?Z\[0m ", "TIMESTAMP"), // Remove timestamp
+        (r"/private/var/folders/([^/]+/)+?T/", r"/tmp/"), // Redact macOS temp path
+        (r"(?m)^.*?Z\[0m ", "TIMESTAMP"),                // Remove timestamp
     ]
 }

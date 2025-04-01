@@ -207,7 +207,7 @@ async fn view_model(
     let total_object_counts = manager.get_total_object_counts(&request).await?;
     let total_pages = total_object_counts.div_ceil(page_size);
 
-    if page == 0 || page > total_pages {
+    if (page == 0 || page > total_pages) && total_pages > 0 {
         return Err(Error::not_found_message(format!("page {page} not found")));
     }
 

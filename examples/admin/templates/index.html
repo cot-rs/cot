@@ -8,7 +8,7 @@
     <title>Admin Panel example</title>
 </head>
 <body>
-<h1>Hello!</h1>
+<h1>Admin panel-controlled TODO list</h1>
 
 {% if todo_items.is_empty() %}
 <p>There are no TODO items.</p>
@@ -16,11 +16,7 @@
 <ul id="todo-list">
     {% for todo in todo_items %}
     <li>
-        {% let todo_id = todo.id %}
-        <form action="{{ cot::reverse!(urls, "remove-todo", todo_id = todo_id)? }}" method="post">
-        <span>{{ todo.title }}</span>
-        <button type="submit">Remove</button>
-        </form>
+        {{ todo.title }}
     </li>
     {% endfor %}
 </ul>

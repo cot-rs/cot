@@ -6,7 +6,9 @@ use async_trait::async_trait;
 use cot::admin::{AdminApp, AdminModel, AdminModelManager, DefaultAdminModelManager};
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
-use cot::config::{DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig};
+use cot::config::{
+    AuthBackendConfig, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
+};
 use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model};
 use cot::form::Form;
@@ -97,6 +99,7 @@ impl Project for AdminProject {
                     .url("sqlite://db.sqlite3?mode=rwc")
                     .build(),
             )
+            .auth_backend(AuthBackendConfig::Database)
             .middlewares(
                 MiddlewareConfig::builder()
                     .session(SessionMiddlewareConfig::builder().secure(false).build())

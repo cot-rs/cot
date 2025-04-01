@@ -3,9 +3,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::CommandFactory;
 
-use crate::args::{
-    Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, ProjectNewArgs,
-};
+use crate::args::*;
 use crate::migration_generator::{MigrationGeneratorOptions, list_migrations, make_migrations};
 use crate::new_project::{CotSource, new_project};
 
@@ -83,6 +81,8 @@ fn generate_completions(shell: clap_complete::Shell, writer: &mut impl std::io::
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn new_project_wrong_directory() {
         let temp_dir = tempfile::tempdir().unwrap();

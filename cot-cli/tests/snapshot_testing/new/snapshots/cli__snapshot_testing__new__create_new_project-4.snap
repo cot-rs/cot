@@ -1,0 +1,17 @@
+---
+source: cot-cli/tests/snapshot_testing/new/mod.rs
+description: "Verbosity level: info"
+info:
+  program: cot
+  args:
+    - new
+    - "-vvv"
+    - /tmp/cot-test-WCFWUl/project
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+[1m[92m    Creating[0m Cot project `project`
+[1m[32m     Created[0m Cot project `project`

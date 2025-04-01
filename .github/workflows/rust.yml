@@ -9,6 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  CI: true
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.

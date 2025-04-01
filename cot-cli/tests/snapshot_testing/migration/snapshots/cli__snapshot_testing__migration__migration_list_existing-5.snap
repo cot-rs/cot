@@ -1,0 +1,16 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+description: "Verbosity level: debug"
+info:
+  program: cot
+  args:
+    - migration
+    - list
+    - "-vvvv"
+---
+success: true
+exit_code: 0
+----- stdout -----
+cot-test-PROJECT-NAME	m_0001_initial
+
+----- stderr -----

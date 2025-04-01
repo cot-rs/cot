@@ -1,0 +1,28 @@
+---
+source: cot-cli/tests/snapshot_testing/help/mod.rs
+info:
+  program: cot
+  args:
+    - help
+    - migration
+    - make
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate migrations for a Cot project
+
+Usage: cot migration make [OPTIONS] [PATH]
+
+Arguments:
+  [PATH]  Path to the crate directory to generate migrations for [default: current directory]
+
+Options:
+      --app-name <APP_NAME>      Name of the app to use in the migration (default: crate name)
+  -v, --verbose...               Increase logging verbosity
+      --output-dir <OUTPUT_DIR>  Directory to write the migrations to (default: migrations/
+                                 directory in the crate's src/ directory)
+  -q, --quiet...                 Decrease logging verbosity
+  -h, --help                     Print help
+
+----- stderr -----

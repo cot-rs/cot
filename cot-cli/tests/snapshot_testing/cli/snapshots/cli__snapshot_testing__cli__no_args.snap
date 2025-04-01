@@ -1,0 +1,25 @@
+---
+source: cot-cli/tests/snapshot_testing/cli/mod.rs
+info:
+  program: cot
+  args:
+    - cli
+---
+success: false
+exit_code: 2
+----- stdout -----
+
+----- stderr -----
+Manage Cot CLI
+
+Usage: cot cli [OPTIONS] <COMMAND>
+
+Commands:
+  manpages     Generate manpages for the Cot CLI
+  completions  Generate completions for the Cot CLI
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -v, --verbose...  Increase logging verbosity
+  -q, --quiet...    Decrease logging verbosity
+  -h, --help        Print help

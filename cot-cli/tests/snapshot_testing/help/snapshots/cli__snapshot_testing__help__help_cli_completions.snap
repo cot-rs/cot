@@ -1,0 +1,25 @@
+---
+source: cot-cli/tests/snapshot_testing/help/mod.rs
+info:
+  program: cot
+  args:
+    - help
+    - cli
+    - completions
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate completions for the Cot CLI
+
+Usage: cot cli completions [OPTIONS] <SHELL>
+
+Arguments:
+  <SHELL>  Shell to generate completions for [possible values: bash, elvish, fish, powershell, zsh]
+
+Options:
+  -v, --verbose...  Increase logging verbosity
+  -q, --quiet...    Decrease logging verbosity
+  -h, --help        Print help
+
+----- stderr -----

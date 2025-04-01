@@ -1,0 +1,16 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+description: "Verbosity level: warn"
+info:
+  program: cot
+  args:
+    - migration
+    - list
+    - "-vv"
+---
+success: true
+exit_code: 0
+----- stdout -----
+cot-test-PROJECT-NAME	m_0001_initial
+
+----- stderr -----

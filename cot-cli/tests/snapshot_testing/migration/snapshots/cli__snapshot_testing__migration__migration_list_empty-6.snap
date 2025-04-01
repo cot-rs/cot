@@ -1,0 +1,15 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+description: "Verbosity level: trace"
+info:
+  program: cot
+  args:
+    - migration
+    - list
+    - "-vvvvv"
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----

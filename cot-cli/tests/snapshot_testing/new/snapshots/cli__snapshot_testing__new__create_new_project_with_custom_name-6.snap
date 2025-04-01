@@ -1,0 +1,29 @@
+---
+source: cot-cli/tests/snapshot_testing/new/mod.rs
+description: "Verbosity level: trace"
+info:
+  program: cot
+  args:
+    - new
+    - "--name"
+    - my_project
+    - "-vvvvv"
+    - /tmp/cot-test-6tzagh/project
+---
+success: true
+exit_code: 0
+----- stdout -----
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/Cargo.toml"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/Cargo.lock"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/bacon.toml"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/.gitignore"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/src/main.rs"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/src/migrations.rs"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/static/css/main.css"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/templates/index.html"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/config/dev.toml"
+[35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/cot-test-6tzagh/project/config/prod.toml.example"
+
+----- stderr -----
+[1m[92m    Creating[0m Cot project `my_project`
+[1m[32m     Created[0m Cot project `my_project`

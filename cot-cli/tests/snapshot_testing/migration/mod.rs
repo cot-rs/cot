@@ -73,13 +73,15 @@ fn migration_make_no_models() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         test_utils::make_package(temp_dir.path()).unwrap();
 
+        let mut filters = get_logging_filters();
+        filters.extend([
+            (r"cot-test-[^/]+", "TEMP_PATH"), // Remove temp dir path
+        ]);
+
         insta::with_settings!(
             {
                 description => format!("Verbosity level: {filter}"),
-                filters => vec![
-                    (r"(?m)^.*?Z\[0m ", "TIMESTAMP"),    // Remove timestamp
-                    (r"cot-test-[^/]+", "TEMP_PATH")        // Remove temp dir path
-                ]
+                filters => filters
             },
             { assert_cmd_snapshot!(cli.current_dir(temp_dir.path())) }
         );
@@ -104,13 +106,15 @@ fn migration_make_existing_model() {
         )
         .unwrap();
 
+        let mut filters = get_logging_filters();
+        filters.extend([
+            (r"cot-test-[^/]+", "TEMP_PATH"), // Remove temp dir path
+        ]);
+
         insta::with_settings!(
             {
                 description => format!("Verbosity level: {filter}"),
-                filters => vec![
-                    (r"(?m)^.*?Z\[0m ", "TIMESTAMP"),    // Remove timestamp
-                    (r"cot-test-[^/]+", "TEMP_PATH")        // Remove temp dir path
-                ]
+                filters => filters
             },
             { assert_cmd_snapshot!(cli.current_dir(temp_dir.path())) }
         );

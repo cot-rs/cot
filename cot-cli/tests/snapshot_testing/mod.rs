@@ -66,3 +66,13 @@ pub fn cot_cli_cmd() -> Command {
         Command::cargo_bin("cot").expect("cot-cli should be executable")
     }
 }
+
+pub fn get_logging_filters() -> Vec<(&'static str, &'static str)> {
+    vec![
+        (
+            r"/private/var/folders/([^/]+/)+?T/",
+            r"/PRIVATE_MACOS_PATH/",
+        ), // Redact macOS temp path
+        (r"(?m)^.*?Z\[0m ", "TIMESTAMP"), // Remove timestamp
+    ]
+}

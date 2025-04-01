@@ -9,15 +9,10 @@ fn create_new_project() {
         let tempdir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
 
-        let mut filters = get_logging_filters();
-        filters.extend([
-            (r"cot-test-[^/]+", "TEMP_PATH"), // Remove temp dir path
-        ]);
-
         insta::with_settings!(
             {
                 description => format!("Verbosity level: {filter}"),
-                filters => filters
+                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
             },
             {
             assert_cmd_snapshot!(cli.arg(tempdir.path().join("project")));
@@ -33,15 +28,10 @@ fn create_new_project_with_custom_name() {
         let tempdir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
 
-        let mut filters = get_logging_filters();
-        filters.extend([
-            (r"cot-test-[^/]+", "TEMP_PATH"), // Remove temp dir path
-        ]);
-
         insta::with_settings!(
             {
                 description => format!("Verbosity level: {filter}"),
-                filters => filters
+                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
             },
             {
             assert_cmd_snapshot!(cli.arg(tempdir.path().join("project")));

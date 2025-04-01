@@ -67,9 +67,17 @@ pub fn cot_cli_cmd() -> Command {
     }
 }
 
-pub fn get_logging_filters() -> Vec<(&'static str, &'static str)> {
-    vec![
-        (r"(/private)?/var/folders/([^/]+/)+?T/", r"/tmp/"), // Redact macOS temp path
-        (r"(?m)^.*?Z\[0m ", "TIMESTAMP"),                   // Remove timestamp
-    ]
-}
+const GENERIC_FILTERS: &[(&str, &str)] = &[
+    (r"(?m)^.*?Z\[0m ", "TIMESTAMP"), // Remove timestamp
+    (r"cot.exe", r"cot"),              // Redact Windows .exe
+];
+
+const TEMP_PATH_FILTERS: &[(&str, &str)] = &[
+    (r"(/private)?/var/folders/([^/]+/)+?T/", r"/tmp/"), // Redact macOS temp path
+    (r"(C:)?\\.*\\Temp", "/tmp"),                        // Redact Windows temp path
+    (r"\\{1,2}", "/"),                                   // Redact Windows path separators
+];
+
+const TEMP_PROJECT_FILTERS: &[(&str, &str)] = &[
+    (r"cot-test-[^/]+", "TEMP_PATH"), // Remove temp dir path
+];

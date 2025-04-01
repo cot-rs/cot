@@ -55,9 +55,9 @@ fn migration_list_existing() {
         insta::with_settings!(
             {
                 description => format!("Verbosity level: {filter}"),
-                filters => vec![
+                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, &[
                     (r"(?m)^(cot-test)[^ \t]+", "$1-PROJECT-NAME")  // Remove temp dir name
-                ]
+                ]].concat()
             },
             { assert_cmd_snapshot!(cli); }
         );
@@ -73,15 +73,10 @@ fn migration_make_no_models() {
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
         test_utils::make_package(temp_dir.path()).unwrap();
 
-        let mut filters = get_logging_filters();
-        filters.extend([
-            (r"cot-test-[^/]+", "TEMP_PATH"), // Remove temp dir path
-        ]);
-
         insta::with_settings!(
             {
                 description => format!("Verbosity level: {filter}"),
-                filters => filters
+                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
             },
             { assert_cmd_snapshot!(cli.current_dir(temp_dir.path())) }
         );
@@ -106,15 +101,10 @@ fn migration_make_existing_model() {
         )
         .unwrap();
 
-        let mut filters = get_logging_filters();
-        filters.extend([
-            (r"cot-test-[^/]+", "TEMP_PATH"), // Remove temp dir path
-        ]);
-
         insta::with_settings!(
             {
                 description => format!("Verbosity level: {filter}"),
-                filters => filters
+                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
             },
             { assert_cmd_snapshot!(cli.current_dir(temp_dir.path())) }
         );

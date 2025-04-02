@@ -1,9 +1,5 @@
 #![allow(unreachable_pub)] // triggers false positives because we have both a binary and library
 
-mod migration_generator;
-mod new_project;
-mod utils;
-
 use clap::Parser;
 use cot_cli::args::{Cli, CliCommands, Commands, MigrationCommands};
 use cot_cli::handlers;

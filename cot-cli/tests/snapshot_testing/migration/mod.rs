@@ -7,6 +7,7 @@ use cot_cli::{migration_generator, test_utils};
 use super::*;
 
 #[test]
+#[expect(clippy::cast_possible_truncation)]
 fn migration_list_empty() {
     let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
     test_utils::make_package(temp_dir.path()).unwrap();
@@ -14,7 +15,7 @@ fn migration_list_empty() {
     let mut cmd = cot_cli!("migration", "list");
     cmd.current_dir(temp_dir.path());
 
-    for (idx, mut cli) in cot_clis_with_verbosity(cmd).into_iter().enumerate() {
+    for (idx, mut cli) in cot_clis_with_verbosity(&cmd).into_iter().enumerate() {
         let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
 
         insta::with_settings!(
@@ -25,6 +26,7 @@ fn migration_list_empty() {
 }
 
 #[test]
+#[expect(clippy::cast_possible_truncation)]
 fn migration_list_existing() {
     let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
     test_utils::make_package(temp_dir.path()).unwrap();
@@ -49,7 +51,7 @@ fn migration_list_existing() {
     let mut cmd = cot_cli!("migration", "list");
     cmd.current_dir(temp_dir.path());
 
-    for (idx, mut cli) in cot_clis_with_verbosity(cmd).into_iter().enumerate() {
+    for (idx, mut cli) in cot_clis_with_verbosity(&cmd).into_iter().enumerate() {
         let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
 
         insta::with_settings!(
@@ -65,9 +67,10 @@ fn migration_list_existing() {
 }
 
 #[test]
+#[expect(clippy::cast_possible_truncation)]
 fn migration_make_no_models() {
     let cmd = cot_cli!("migration", "make");
-    for (idx, mut cli) in cot_clis_with_verbosity(cmd).into_iter().enumerate() {
+    for (idx, mut cli) in cot_clis_with_verbosity(&cmd).into_iter().enumerate() {
         let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
 
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
@@ -84,9 +87,10 @@ fn migration_make_no_models() {
 }
 
 #[test]
+#[expect(clippy::cast_possible_truncation)]
 fn migration_make_existing_model() {
     let cmd = cot_cli!("migration", "make");
-    for (idx, mut cli) in cot_clis_with_verbosity(cmd).into_iter().enumerate() {
+    for (idx, mut cli) in cot_clis_with_verbosity(&cmd).into_iter().enumerate() {
         let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
 
         let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();

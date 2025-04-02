@@ -1,16 +1,16 @@
 use std::process::Command;
 
-pub use assert_cmd::prelude::*;
-pub use insta_cmd::assert_cmd_snapshot;
+pub(crate) use assert_cmd::prelude::*;
+pub(crate) use insta_cmd::assert_cmd_snapshot;
 
-pub use crate::cot_cli;
+pub(crate) use crate::cot_cli;
 
 mod cli;
 mod help;
 mod migration;
 mod new;
 
-pub fn cot_clis_with_verbosity(cmd: Command) -> Vec<Command> {
+pub(crate) fn cot_clis_with_verbosity(cmd: &Command) -> Vec<Command> {
     let get_cmd = |arg: &str| {
         let mut cmd_clone = Command::new(cmd.get_program());
         cmd_clone.args(cmd.get_args());
@@ -38,7 +38,7 @@ pub fn cot_clis_with_verbosity(cmd: Command) -> Vec<Command> {
 macro_rules! cot_cli {
     ( $( $arg:expr ),* ) => {
         {
-            let mut cmd = crate::snapshot_testing::cot_cli_cmd();
+            let mut cmd = $crate::snapshot_testing::cot_cli_cmd();
             $(
                 cmd.arg($arg);
             )*
@@ -59,7 +59,7 @@ macro_rules! cot_cli {
 /// Docker image. For example:
 ///
 ///     COT_CLI_TEST_CMD="$PWD"/custom-cot-cli cargo test --test cli
-pub fn cot_cli_cmd() -> Command {
+pub(crate) fn cot_cli_cmd() -> Command {
     if let Ok(np) = std::env::var("COT_CLI_TEST_CMD") {
         Command::new(np)
     } else {

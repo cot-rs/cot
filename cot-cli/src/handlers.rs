@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::CommandFactory;
 
-use crate::args::*;
+use crate::args::{
+    Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, ProjectNewArgs,
+};
 use crate::migration_generator::{MigrationGeneratorOptions, list_migrations, make_migrations};
 use crate::new_project::{CotSource, new_project};
 
@@ -68,7 +70,6 @@ pub fn handle_cli_manpages(
         .context("unable to generate manpages in output directory")
 }
 
-#[expect(clippy::unnecessary_wraps)]
 pub fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> anyhow::Result<()> {
     generate_completions(shell, &mut std::io::stdout());
 
@@ -82,6 +83,7 @@ fn generate_completions(shell: clap_complete::Shell, writer: &mut impl std::io::
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::args::CotSourceArgs;
 
     #[test]
     fn new_project_wrong_directory() {

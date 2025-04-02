@@ -22,8 +22,7 @@ fn generate_manpages() {
     for path in expected_file_names {
         assert!(
             tempdir.path().join(path).exists(),
-            "{} manpage does not exist",
-            path
+            "{path} manpage does not exist",
         );
     }
 }

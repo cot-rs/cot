@@ -1,0 +1,27 @@
+---
+source: cot-cli/tests/snapshot_testing/help/mod.rs
+info:
+  program: cot
+  args:
+    - help
+    - new
+---
+success: true
+exit_code: 0
+----- stdout -----
+Create a new Cot project
+
+Usage: cot new [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>  Path to the directory to create the new project in
+
+Options:
+      --name <NAME>          Set the resulting crate name (defaults to the directory name)
+  -v, --verbose...           Increase logging verbosity
+  -q, --quiet...             Decrease logging verbosity
+      --use-git              Use the latest `cot` version from git instead of a published crate
+      --cot-path <COT_PATH>  Use `cot` from the specified path instead of a published crate
+  -h, --help                 Print help
+
+----- stderr -----

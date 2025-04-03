@@ -1,0 +1,25 @@
+---
+source: cot-cli/tests/snapshot_testing/help/mod.rs
+info:
+  program: cot
+  args:
+    - help
+    - migration
+    - list
+---
+success: true
+exit_code: 0
+----- stdout -----
+List all migrations for a Cot project
+
+Usage: cot migration list [OPTIONS] [PATH]
+
+Arguments:
+  [PATH]  Path to the crate directory to list migrations for  [default: current directory]
+
+Options:
+  -v, --verbose...  Increase logging verbosity
+  -q, --quiet...    Decrease logging verbosity
+  -h, --help        Print help
+
+----- stderr -----

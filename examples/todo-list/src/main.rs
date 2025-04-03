@@ -4,14 +4,14 @@ use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::config::{DatabaseConfig, ProjectConfig};
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{model, query, Auto, Model};
+use cot::db::{Auto, Model, model, query};
 use cot::form::Form;
 use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::request::extractors::{Path, RequestDb, RequestForm};
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{reverse_redirect, App, AppBuilder, Body, BoxedHandler, Project, StatusCode};
+use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, reverse_redirect};
 use rinja::Template;
 
 #[derive(Debug, Clone)]
@@ -53,14 +53,12 @@ async fn add_todo(
 ) -> cot::Result<Response> {
     let todo_form = todo_form.unwrap();
 
-    {
-        TodoItem {
-            id: Auto::auto(),
-            title: todo_form.title,
-        }
-        .save(&db)
-        .await?;
+    TodoItem {
+        id: Auto::auto(),
+        title: todo_form.title,
     }
+    .save(&db)
+    .await?;
 
     Ok(reverse_redirect!(urls, "index")?)
 }
@@ -70,9 +68,7 @@ async fn remove_todo(
     RequestDb(db): RequestDb,
     Path(todo_id): Path<i32>,
 ) -> cot::Result<Response> {
-    {
-        query!(TodoItem, $id == todo_id).delete(&db).await?;
-    }
+    query!(TodoItem, $id == todo_id).delete(&db).await?;
 
     Ok(reverse_redirect!(urls, "index")?)
 }

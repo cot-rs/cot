@@ -1,0 +1,21 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+description: "Verbosity level: warn"
+info:
+  program: cot
+  args:
+    - migration
+    - make
+    - "-vv"
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+[1m[92m    Creating[0m Model 'test'
+[1m[32m     Created[0m Model 'test'
+[1m[92m    Creating[0m Migration 'm_0001_initial'
+[1m[92m    Creating[0m Migration file '/tmp/TEMP_PATH/src/migrations/m_0001_initial.rs'
+[1m[32m     Created[0m Migration file '/tmp/TEMP_PATH/src/migrations/m_0001_initial.rs'
+[1m[32m     Created[0m Migration 'm_0001_initial'

@@ -565,7 +565,6 @@ impl Route {
 
     #[must_use]
     pub(crate) fn router(&self) -> Option<&Router> {
-        #[allow(clippy::match_wildcard_for_single_variants)]
         match &self.view {
             RouteInner::Router(router) => Some(router),
             RouteInner::Handler(_) => None,

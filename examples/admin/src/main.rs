@@ -1,24 +1,53 @@
-use cot::__private::async_trait;
-use cot::admin::AdminApp;
+mod migrations;
+
+use std::fmt::{Display, Formatter};
+
+use async_trait::async_trait;
+use cot::admin::{AdminApp, AdminModel, AdminModelManager, DefaultAdminModelManager};
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
-use cot::config::{DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig};
+use cot::config::{
+    AuthBackendConfig, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
+};
+use cot::db::migrations::SyncDynMigration;
+use cot::db::{Auto, Model, model};
+use cot::form::Form;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext};
+use cot::request::extractors::RequestDb;
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode};
 use rinja::Template;
 
+#[derive(Debug, Clone, Form, AdminModel)]
+#[model]
+struct TodoItem {
+    #[model(primary_key)]
+    id: Auto<i32>,
+    title: String,
+}
+
+impl Display for TodoItem {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.title)
+    }
+}
+
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
 struct IndexTemplate<'a> {
     urls: &'a Urls,
+    todo_items: Vec<TodoItem>,
 }
 
-async fn index(urls: Urls) -> cot::Result<Response> {
-    let index_template = IndexTemplate { urls: &urls };
+async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Response> {
+    let todo_items = TodoItem::objects().all(&db).await?;
+    let index_template = IndexTemplate {
+        urls: &urls,
+        todo_items,
+    };
     let rendered = index_template.render()?;
 
     Ok(Response::new_html(StatusCode::OK, Body::fixed(rendered)))
@@ -42,6 +71,14 @@ impl App for HelloApp {
         Ok(())
     }
 
+    fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+        cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
+    }
+
+    fn admin_model_managers(&self) -> Vec<Box<dyn AdminModelManager>> {
+        vec![Box::new(DefaultAdminModelManager::<TodoItem>::new())]
+    }
+
     fn router(&self) -> Router {
         Router::with_urls([Route::with_handler("/", index)])
     }
@@ -62,6 +99,7 @@ impl Project for AdminProject {
                     .url("sqlite://db.sqlite3?mode=rwc")
                     .build(),
             )
+            .auth_backend(AuthBackendConfig::Database)
             .middlewares(
                 MiddlewareConfig::builder()
                     .session(SessionMiddlewareConfig::builder().secure(false).build())

@@ -1,0 +1,17 @@
+---
+source: cot-cli/tests/snapshot_testing/new/mod.rs
+description: "Verbosity level: error"
+info:
+  program: cot
+  args:
+    - new
+    - "-v"
+    - /tmp/cot-test-m9dWuP/project
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+[1m[92m    Creating[0m Cot project `project`
+[1m[32m     Created[0m Cot project `project`

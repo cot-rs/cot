@@ -1,0 +1,199 @@
+---
+source: cot-cli/tests/snapshot_testing/cli/mod.rs
+info:
+  program: cot
+  args:
+    - cli
+    - completions
+    - powershell
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+using namespace System.Management.Automation
+using namespace System.Management.Automation.Language
+
+Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    $commandElements = $commandAst.CommandElements
+    $command = @(
+        'cot'
+        for ($i = 1; $i -lt $commandElements.Count; $i++) {
+            $element = $commandElements[$i]
+            if ($element -isnot [StringConstantExpressionAst] -or
+                $element.StringConstantType -ne [StringConstantType]::BareWord -or
+                $element.Value.StartsWith('-') -or
+                $element.Value -eq $wordToComplete) {
+                break
+        }
+        $element.Value
+    }) -join ';'
+
+    $completions = @(switch ($command) {
+        'cot' {
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('new', 'new', [CompletionResultType]::ParameterValue, 'Create a new Cot project')
+            [CompletionResult]::new('migration', 'migration', [CompletionResultType]::ParameterValue, 'Manage migrations for a Cot project')
+            [CompletionResult]::new('cli', 'cli', [CompletionResultType]::ParameterValue, 'Manage Cot CLI')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'cot;new' {
+            [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Set the resulting crate name (defaults to the directory name)')
+            [CompletionResult]::new('--cot-path', '--cot-path', [CompletionResultType]::ParameterName, 'Use `cot` from the specified path instead of a published crate')
+            [CompletionResult]::new('--use-git', '--use-git', [CompletionResultType]::ParameterName, 'Use the latest `cot` version from git instead of a published crate')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'cot;migration' {
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
+            [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'cot;migration;list' {
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'cot;migration;make' {
+            [CompletionResult]::new('--app-name', '--app-name', [CompletionResultType]::ParameterName, 'Name of the app to use in the migration (default: crate name)')
+            [CompletionResult]::new('--output-dir', '--output-dir', [CompletionResultType]::ParameterName, 'Directory to write the migrations to (default: migrations/ directory in the crate''s src/ directory)')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'cot;migration;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
+            [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'cot;migration;help;list' {
+            break
+        }
+        'cot;migration;help;make' {
+            break
+        }
+        'cot;migration;help;help' {
+            break
+        }
+        'cot;cli' {
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('manpages', 'manpages', [CompletionResultType]::ParameterValue, 'Generate manpages for the Cot CLI')
+            [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate completions for the Cot CLI')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'cot;cli;manpages' {
+            [CompletionResult]::new('-o', '-o', [CompletionResultType]::ParameterName, 'Directory to write the manpages to [default: current directory]')
+            [CompletionResult]::new('--output-dir', '--output-dir', [CompletionResultType]::ParameterName, 'Directory to write the manpages to [default: current directory]')
+            [CompletionResult]::new('-c', '-c', [CompletionResultType]::ParameterName, 'Create the directory if it doesn''t exist')
+            [CompletionResult]::new('--create', '--create', [CompletionResultType]::ParameterName, 'Create the directory if it doesn''t exist')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'cot;cli;completions' {
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'cot;cli;help' {
+            [CompletionResult]::new('manpages', 'manpages', [CompletionResultType]::ParameterValue, 'Generate manpages for the Cot CLI')
+            [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate completions for the Cot CLI')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'cot;cli;help;manpages' {
+            break
+        }
+        'cot;cli;help;completions' {
+            break
+        }
+        'cot;cli;help;help' {
+            break
+        }
+        'cot;help' {
+            [CompletionResult]::new('new', 'new', [CompletionResultType]::ParameterValue, 'Create a new Cot project')
+            [CompletionResult]::new('migration', 'migration', [CompletionResultType]::ParameterValue, 'Manage migrations for a Cot project')
+            [CompletionResult]::new('cli', 'cli', [CompletionResultType]::ParameterValue, 'Manage Cot CLI')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'cot;help;new' {
+            break
+        }
+        'cot;help;migration' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
+            [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
+            break
+        }
+        'cot;help;migration;list' {
+            break
+        }
+        'cot;help;migration;make' {
+            break
+        }
+        'cot;help;cli' {
+            [CompletionResult]::new('manpages', 'manpages', [CompletionResultType]::ParameterValue, 'Generate manpages for the Cot CLI')
+            [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate completions for the Cot CLI')
+            break
+        }
+        'cot;help;cli;manpages' {
+            break
+        }
+        'cot;help;cli;completions' {
+            break
+        }
+        'cot;help;help' {
+            break
+        }
+    })
+
+    $completions.Where{ $_.CompletionText -like "$wordToComplete*" } |
+        Sort-Object -Property ListItemText
+}
+
+----- stderr -----

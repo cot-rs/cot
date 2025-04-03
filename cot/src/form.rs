@@ -189,6 +189,11 @@ pub enum FormErrorTarget<'a> {
 /// }
 /// ```
 #[async_trait]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement the `Form` trait",
+    label = "`{Self}` is not a form",
+    note = "add #[derive(cot::form::Form)] to the struct to automatically derive the trait"
+)]
 pub trait Form: Sized {
     /// The context type associated with the form.
     type Context: FormContext;

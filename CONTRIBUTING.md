@@ -43,6 +43,22 @@ We are also using [`pre-commit`](https://pre-commit.com/) hooks to handle
 formatting and linting. See the `pre-commit` website for installation
 instructions. This handles formatting of all the files in the repository.
 
+### Snapshot tests
+
+Cot uses snapshot testing for the CLI to ensure that the output of commands
+remains consistent across changes. We
+use [cargo-insta](https://github.com/mitsuhiko/insta)
+and [insta-cmd](https://github.com/mitsuhiko/insta-cmd) for snapshot testing,
+which automate the whole process. Tool's documentation is
+available [here](https://insta.rs/docs/).
+
+When making changes to the CLI, you may need to update the snapshots if your
+changes intentionally modify the output. You can do this by running:
+
+```sh
+cargo insta test --review
+```
+
 ### Dependencies
 
 When adding a new dependency to the project, please consider if it's actually

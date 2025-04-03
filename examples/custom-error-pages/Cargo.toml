@@ -3,7 +3,7 @@ name = "example-custom-error-pages"
 version = "0.1.0"
 publish = false
 description = "Custom Error Pages - Cot example."
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 cot = { path = "../../cot" }

@@ -1,0 +1,17 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+description: "Verbosity level: info"
+info:
+  program: cot
+  args:
+    - migration
+    - make
+    - "-vvv"
+---
+success: true
+exit_code: 0
+----- stdout -----
+TIMESTAMP [34mDEBUG[0m [2mcot_cli::migration_generator[0m[2m:[0m Parsing file: "/tmp/TEMP_PATH/src/main.rs"
+
+----- stderr -----
+[1m[37m      Notice[0m No changes in models detected; no migrations were generated

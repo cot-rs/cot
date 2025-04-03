@@ -1,0 +1,15 @@
+---
+source: cot-cli/tests/snapshot_testing/cli/mod.rs
+info:
+  program: cot
+  args:
+    - cli
+    - manpages
+    - "-o"
+    - /tmp/.tmpMLyVId
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----

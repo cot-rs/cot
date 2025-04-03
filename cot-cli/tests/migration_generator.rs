@@ -9,6 +9,8 @@ use cot_cli::migration_generator::{
 use cot_cli::test_utils;
 use syn::parse_quote;
 
+pub const EXAMPLE_DATABASE_MODEL: &str = include_str!("resources/example_database_model.rs");
+
 /// Test that the migration generator can generate a "create model" migration
 /// for a given model that has an expected state.
 #[test]
@@ -130,6 +132,7 @@ fn create_models_foreign_key_two_migrations() {
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
     let migration_file = generator
         .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
         .unwrap();
 
     let src = include_str!("migration_generator/foreign_key_two_migrations/step_2.rs");
@@ -168,6 +171,7 @@ fn create_model_compile_test() {
 
     let migration_opt = generator
         .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
         .unwrap();
     let MigrationAsSource {
         name: migration_name,
@@ -260,11 +264,7 @@ fn list_migrations() {
         .append(true)
         .open(temp_dir.path().join("src").join("main.rs"))
         .unwrap();
-    write!(
-        main,
-        "#[model]\nstruct Test {{\n#[model(primary_key)]\nid: Auto<i32>\n}}"
-    )
-    .unwrap();
+    write!(main, "{EXAMPLE_DATABASE_MODEL}").unwrap();
     migration_generator::make_migrations(
         temp_dir.path(),
         MigrationGeneratorOptions {

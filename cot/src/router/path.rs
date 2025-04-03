@@ -241,7 +241,7 @@ impl ReverseParamMap {
     /// map.insert("id", "123");
     /// map.insert("id", "456");
     /// ```
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub fn insert<K: ToString, V: ToString>(&mut self, key: K, value: V) {
         self.params.insert(key.to_string(), value.to_string());
     }
@@ -256,7 +256,7 @@ impl ReverseParamMap {
 #[macro_export]
 macro_rules! reverse_param_map {
     ($($key:ident = $value:expr),*) => {{
-        #[allow(unused_mut)]
+        #[allow(unused_mut)] // for the case when there are no parameters
         let mut map = $crate::router::path::ReverseParamMap::new();
         $( map.insert(stringify!($key), &$value); )*
         map

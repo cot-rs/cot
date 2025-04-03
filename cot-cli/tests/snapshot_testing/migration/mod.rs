@@ -6,6 +6,8 @@ use cot_cli::{migration_generator, test_utils};
 
 use super::*;
 
+const EXAMPLE_DATABASE_MODEL: &str = include_str!("../../resources/example_database_model.rs");
+
 #[test]
 #[expect(clippy::cast_possible_truncation)]
 fn migration_list_empty() {
@@ -34,11 +36,7 @@ fn migration_list_existing() {
         .append(true)
         .open(temp_dir.path().join("src").join("main.rs"))
         .unwrap();
-    write!(
-        main,
-        "#[model]\nstruct Test {{\n#[model(primary_key)]\nid: Auto<i32>\n}}"
-    )
-    .unwrap();
+    write!(main, "{EXAMPLE_DATABASE_MODEL}").unwrap();
     migration_generator::make_migrations(
         temp_dir.path(),
         MigrationGeneratorOptions {
@@ -99,11 +97,7 @@ fn migration_make_existing_model() {
             .append(true)
             .open(temp_dir.path().join("src").join("main.rs"))
             .unwrap();
-        write!(
-            main,
-            "#[model]\nstruct Test {{\n#[model(primary_key)]\nid: Auto<i32>\n}}"
-        )
-        .unwrap();
+        write!(main, "{EXAMPLE_DATABASE_MODEL}").unwrap();
 
         insta::with_settings!(
             {

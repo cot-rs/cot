@@ -9,6 +9,8 @@ use cot_cli::migration_generator::{
 use cot_cli::test_utils;
 use syn::parse_quote;
 
+pub const EXAMPLE_DATABASE_MODEL: &str = include_str!("resources/example_database_model.rs");
+
 /// Test that the migration generator can generate a "create model" migration
 /// for a given model that has an expected state.
 #[test]
@@ -262,11 +264,7 @@ fn list_migrations() {
         .append(true)
         .open(temp_dir.path().join("src").join("main.rs"))
         .unwrap();
-    write!(
-        main,
-        "#[model]\nstruct Test {{\n#[model(primary_key)]\nid: Auto<i32>\n}}"
-    )
-    .unwrap();
+    write!(main, "{EXAMPLE_DATABASE_MODEL}").unwrap();
     migration_generator::make_migrations(
         temp_dir.path(),
         MigrationGeneratorOptions {

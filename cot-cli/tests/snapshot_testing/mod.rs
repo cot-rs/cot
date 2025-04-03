@@ -68,8 +68,8 @@ pub(crate) fn cot_cli_cmd() -> Command {
 }
 
 const GENERIC_FILTERS: &[(&str, &str)] = &[
-    (r"(?m)^.*?Z\[0m ", "TIMESTAMP"), // Remove timestamp
-    (r"cot.exe", r"cot"),              // Redact Windows .exe
+    (r"(?m)^.\[2m[\d-]+?T[\d:\.]+?Z.\[0m ", "TIMESTAMP "), // Remove timestamp
+    (r"cot\.exe", r"cot"),                                 // Redact Windows .exe
 ];
 
 const TEMP_PATH_FILTERS: &[(&str, &str)] = &[

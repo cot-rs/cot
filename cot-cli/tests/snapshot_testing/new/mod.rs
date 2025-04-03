@@ -16,7 +16,7 @@ fn create_new_project() {
                 filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
             },
             {
-            assert_cmd_snapshot!(cli.arg(tempdir.path().join("project")));
+                assert_cmd_snapshot!(cli.arg(tempdir.path().join("project")));
             }
         );
     }
@@ -36,7 +36,7 @@ fn create_new_project_with_custom_name() {
                 filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
             },
             {
-            assert_cmd_snapshot!(cli.arg(tempdir.path().join("project")));
+                assert_cmd_snapshot!(cli.arg(tempdir.path().join("project")));
             }
         );
     }

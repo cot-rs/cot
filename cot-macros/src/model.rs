@@ -1,6 +1,7 @@
-use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts};
+use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
 use darling::FromMeta;
 use darling::ast::NestedMeta;
+use heck::ToSnakeCase;
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, TokenStreamExt, format_ident, quote};
 use syn::Token;
@@ -69,6 +70,7 @@ fn remove_helper_field_attributes(fields: &mut syn::Fields) -> &Punctuated<syn::
 
 #[derive(Debug)]
 struct ModelBuilder {
+    app_name: String,
     name: Ident,
     vis: syn::Visibility,
     table_name: String,
@@ -91,10 +93,21 @@ impl ToTokens for ModelBuilder {
 impl ModelBuilder {
     fn from_model(model: Model) -> Self {
         let field_count = model.field_count();
+        let app_name = std::env::var("CARGO_PKG_NAME")
+            .expect("cargo should set the `CARGO_PKG_NAME` environment variable");
+        let table_name = match model.model_type {
+            ModelType::Internal => model.table_name,
+            _ => format!(
+                "{}__{}",
+                app_name.to_snake_case(),
+                model.table_name.to_snake_case()
+            ),
+        };
         let mut model_builder = Self {
+            app_name,
             name: model.name.clone(),
             vis: model.vis,
-            table_name: model.table_name,
+            table_name,
             pk_field: model.pk_field.clone(),
             fields_struct_name: format_ident!("{}Fields", model.name),
             fields_as_columns: Vec::with_capacity(field_count),
@@ -150,6 +163,7 @@ impl ModelBuilder {
         let orm_ident = orm_ident();
 
         let name = &self.name;
+        let app_name = &self.app_name;
         let table_name = &self.table_name;
         let fields_struct_name = &self.fields_struct_name;
         let fields_as_columns = &self.fields_as_columns;
@@ -170,7 +184,7 @@ impl ModelBuilder {
                 const COLUMNS: &'static [#orm_ident::Column] = &[
                     #(#fields_as_columns,)*
                 ];
-                const APP_NAME: &'static str = env!("CARGO_PKG_NAME");
+                const APP_NAME: &'static str = #app_name;
                 const TABLE_NAME: #orm_ident::Identifier = #orm_ident::Identifier::new(#table_name);
                 const PRIMARY_KEY_NAME: #orm_ident::Identifier = #orm_ident::Identifier::new(#pk_column_name);
 

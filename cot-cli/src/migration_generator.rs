@@ -10,6 +10,7 @@ use cot::db::migrations::{DynMigration, MigrationEngine};
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::SymbolResolver;
 use darling::FromMeta;
+use heck::ToSnakeCase;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use proc_macro2::TokenStream;
@@ -280,8 +281,12 @@ impl MigrationGenerator {
                         symbol_resolver.resolve_struct(&mut item);
 
                         let args = Self::model_args_from_attr(&path, attr)?;
-                        let model_in_source =
-                            ModelInSource::from_item(item, &args, &symbol_resolver)?;
+                        let model_in_source = ModelInSource::from_item(
+                            self.crate_name.as_str(),
+                            item,
+                            &args,
+                            &symbol_resolver,
+                        )?;
 
                         match args.model_type {
                             ModelType::Application => {
@@ -892,6 +897,7 @@ pub struct ModelInSource {
 
 impl ModelInSource {
     fn from_item(
+        app_name: &str,
         item: syn::ItemStruct,
         args: &ModelArgs,
         symbol_resolver: &SymbolResolver,
@@ -899,7 +905,8 @@ impl ModelInSource {
         let input: syn::DeriveInput = item.clone().into();
         let opts = ModelOpts::new_from_derive_input(&input)
             .map_err(|e| anyhow::anyhow!("cannot parse model: {}", e))?;
-        let model = opts.as_model(args, symbol_resolver)?;
+        let mut model = opts.as_model(args, symbol_resolver)?;
+        model.table_name = format!("{}__{}", app_name.to_snake_case(), model.table_name);
 
         Ok(Self {
             model_item: item,

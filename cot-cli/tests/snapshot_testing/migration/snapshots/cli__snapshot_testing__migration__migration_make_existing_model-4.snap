@@ -11,12 +11,12 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-TIMESTAMP [34mDEBUG[0m [2mcot_cli::migration_generator[0m[2m:[0m Parsing file: "/tmp/TEMP_PATH/src/main.rs"
+TIMESTAMP [34mDEBUG[0m [2mcot_cli::migration_generator[0m[2m:[0m Parsing file: "/tmp/TEMP_PATH/cot-test/src/main.rs"
 
 ----- stderr -----
-[1m[92m    Creating[0m Model 'test'
-[1m[32m     Created[0m Model 'test'
+[1m[92m    Creating[0m Model 'cot_test__test'
+[1m[32m     Created[0m Model 'cot_test__test'
 [1m[92m    Creating[0m Migration 'm_0001_initial'
-[1m[92m    Creating[0m Migration file '/tmp/TEMP_PATH/src/migrations/m_0001_initial.rs'
-[1m[32m     Created[0m Migration file '/tmp/TEMP_PATH/src/migrations/m_0001_initial.rs'
+[1m[92m    Creating[0m Migration file '/tmp/TEMP_PATH/cot-test/src/migrations/m_0001_initial.rs'
+[1m[32m     Created[0m Migration file '/tmp/TEMP_PATH/cot-test/src/migrations/m_0001_initial.rs'
 [1m[32m     Created[0m Migration 'm_0001_initial'

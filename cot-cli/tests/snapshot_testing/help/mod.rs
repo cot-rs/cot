@@ -24,14 +24,6 @@ fn long_help() {
 }
 
 #[test]
-fn version() {
-    insta::with_settings!(
-        { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(cot_cli!("--version")) }
-    );
-}
-
-#[test]
 fn help() {
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },

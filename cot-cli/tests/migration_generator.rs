@@ -28,11 +28,11 @@ fn create_model_state_test() {
     assert!(migration.dependencies.is_empty());
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "parent");
+    assert_eq!(table_name, "cot__parent");
     assert_eq!(fields.len(), 1);
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[1]);
-    assert_eq!(table_name, "my_model");
+    assert_eq!(table_name, "cot__my_model");
     assert_eq!(fields.len(), 4);
 
     let field = &fields[0];
@@ -76,11 +76,11 @@ fn create_models_foreign_key() {
 
     // Parent must be created before Child
     let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "parent");
+    assert_eq!(table_name, "cot__parent");
     assert_eq!(fields.len(), 1);
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[1]);
-    assert_eq!(table_name, "child");
+    assert_eq!(table_name, "cot__child");
     assert_eq!(fields.len(), 2);
 
     let field = &fields[0];
@@ -112,15 +112,15 @@ fn create_models_foreign_key_cycle() {
 
     // Parent must be created before Child
     let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "parent");
+    assert_eq!(table_name, "cot__parent");
     assert_eq!(fields.len(), 1);
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[1]);
-    assert_eq!(table_name, "child");
+    assert_eq!(table_name, "cot__child");
     assert_eq!(fields.len(), 2);
 
     let (table_name, field) = unwrap_add_field(&migration.operations[2]);
-    assert_eq!(table_name, "parent");
+    assert_eq!(table_name, "cot__parent");
     assert_eq!(field.field_name, "child");
 }
 
@@ -147,7 +147,7 @@ fn create_models_foreign_key_two_migrations() {
 
     assert_eq!(migration.dependencies.len(), 2);
     assert!(migration.dependencies.contains(&DynDependency::Migration {
-        app: "my_crate".to_string(),
+        app: "cot".to_string(),
         migration: "m_0001_initial".to_string()
     }));
     assert!(migration.dependencies.contains(&DynDependency::Model {
@@ -157,7 +157,7 @@ fn create_models_foreign_key_two_migrations() {
     assert_eq!(migration.operations.len(), 1);
 
     let (table_name, _fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "child");
+    assert_eq!(table_name, "cot__child");
 }
 
 /// Test that the migration generator can generate a "create model" migration
@@ -203,9 +203,9 @@ fn write_migrations_module() {
 
     let generator = MigrationGenerator::new(
         PathBuf::from("Cargo.toml"),
-        String::from("my_crate"),
+        String::from("cot"),
         MigrationGeneratorOptions {
-            app_name: Some("my_crate".to_string()),
+            app_name: Some("cot".to_string()),
             output_dir: Some(tempdir.path().to_path_buf()),
         },
     );
@@ -304,7 +304,7 @@ fn list_migrations_missing_migrations_dir() {
 fn test_generator() -> MigrationGenerator {
     MigrationGenerator::new(
         PathBuf::from("Cargo.toml"),
-        String::from("my_crate"),
+        String::from("cot"),
         MigrationGeneratorOptions::default(),
     )
 }

@@ -11,6 +11,6 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-cot-test-PROJECT-NAME	m_0001_initial
+cot-test	m_0001_initial
 
 ----- stderr -----

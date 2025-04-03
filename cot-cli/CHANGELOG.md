@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/cot-rs/cot/compare/cot-cli-v0.2.1...cot-cli-v0.2.2) - 2025-04-03
+
+### <!-- 3 -->Other
+
+- cli snapshot testing ([#272](https://github.com/cot-rs/cot/pull/272))
+
 ## [0.2.1](https://github.com/cot-rs/cot/compare/cot-cli-v0.2.0...cot-cli-v0.2.1) - 2025-03-30
 
 ### <!-- 2 -->Fixes

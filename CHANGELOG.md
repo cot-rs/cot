@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/cot-rs/cot/compare/cot-v0.2.1...cot-v0.2.2) - 2025-04-03
+
+### <!-- 2 -->Fixes
+
+- don't show 404 when there are 0 objects in admin panel ([#270](https://github.com/cot-rs/cot/pull/270))
+
+### <!-- 3 -->Other
+
+- update `admin` example with a custom `TodoItem` model ([#270](https://github.com/cot-rs/cot/pull/270))
+
 ## [0.2.1](https://github.com/cot-rs/cot/compare/cot-v0.2.0...cot-v0.2.1) - 2025-03-30
 
 ### <!-- 2 -->Fixes

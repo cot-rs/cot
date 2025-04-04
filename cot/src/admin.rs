@@ -457,13 +457,13 @@ pub struct DefaultAdminModelManager<T> {
     phantom_data: PhantomData<T>,
 }
 
-impl<T> Default for DefaultAdminModelManager<T> {
+impl<T: AdminModel + Send + Sync + 'static> Default for DefaultAdminModelManager<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> DefaultAdminModelManager<T> {
+impl<T: AdminModel + Send + Sync + 'static> DefaultAdminModelManager<T> {
     /// Creates a new instance of the default admin model manager.
     #[must_use]
     pub const fn new() -> Self {

@@ -121,9 +121,8 @@ impl Project for AdminProject {
     ) -> BoxedHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
-            .middleware(SessionMiddleware::from_context(context))
             .middleware(AuthMiddleware::new())
-            .middleware(SessionMiddleware::new())
+            .middleware(SessionMiddleware::from_context(context))
             .middleware(LiveReloadMiddleware::new())
             .build()
     }

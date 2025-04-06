@@ -474,7 +474,7 @@ impl Default for SessionMiddleware {
     }
 }
 
-impl<S: Debug> tower::Layer<S> for SessionMiddleware {
+impl<S> tower::Layer<S> for SessionMiddleware {
     type Service = <SessionManagerLayer<SessionStoreWrapper> as tower::Layer<
         <SessionWrapperLayer as tower::Layer<S>>::Service,
     >>::Service;

@@ -4,16 +4,18 @@
 //! are used to add functionality to the request/response cycle, such as
 //! session management, adding security headers, and more.
 
+use std::fmt::Debug;
+use std::sync::Arc;
 use std::task::{Context, Poll};
-
+use async_trait::async_trait;
 use bytes::Bytes;
 use futures_core::future::BoxFuture;
 use futures_util::TryFutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::BoxBody;
 use tower::Service;
-use tower_sessions::{MemoryStore, SessionManagerLayer};
-
+use tower_sessions::{MemoryStore, SessionManagerLayer, SessionStore};
+use tower_sessions::session::{Id, Record};
 use crate::error::ErrorRepr;
 use crate::project::MiddlewareContext;
 use crate::request::Request;
@@ -247,12 +249,32 @@ where
     })
 }
 
+#[derive(Debug, Clone)]
+pub struct SessionStoreWrapper(Arc<dyn SessionStore>);
+
+
+#[async_trait]
+impl SessionStore for SessionStoreWrapper {
+    async fn save(&self, session_record: &Record) -> tower_sessions::session_store::Result<()> {
+        self.0.save(session_record).await
+    }
+
+    async fn load(&self, session_id: &Id) -> tower_sessions::session_store::Result<Option<Record>> {
+        self.0.load(session_id).await
+    }
+
+    async fn delete(&self, session_id: &Id) -> tower_sessions::session_store::Result<()> {
+        self.0.delete(session_id).await
+    }
+}
+
+
 /// A middleware that provides session management.
 ///
 /// By default, it uses an in-memory store for session data.
 #[derive(Debug, Clone)]
 pub struct SessionMiddleware {
-    inner: SessionManagerLayer<MemoryStore>,
+    inner: SessionManagerLayer<SessionStoreWrapper>,
 }
 
 impl SessionMiddleware {
@@ -260,7 +282,7 @@ impl SessionMiddleware {
     #[must_use]
     pub fn new() -> Self {
         let store = MemoryStore::default();
-        let layer = SessionManagerLayer::new(store);
+        let layer = SessionManagerLayer::new(SessionStoreWrapper(Arc::new(store)));
         Self { inner: layer }
     }
     /// Creates a new instance of [`SessionMiddleware`] from the application
@@ -314,16 +336,14 @@ impl Default for SessionMiddleware {
     }
 }
 
-impl<S> tower::Layer<S> for SessionMiddleware {
-    type Service = <SessionManagerLayer<MemoryStore> as tower::Layer<
+impl<S: Debug> tower::Layer<S> for SessionMiddleware {
+    type Service = <SessionManagerLayer<SessionStoreWrapper> as tower::Layer<
         <SessionWrapperLayer as tower::Layer<S>>::Service,
     >>::Service;
 
     fn layer(&self, inner: S) -> Self::Service {
-        let session_store = MemoryStore::default();
-        let session_layer = SessionManagerLayer::new(session_store);
         let session_wrapper_layer = SessionWrapperLayer::new();
-        let layers = (session_layer, session_wrapper_layer);
+        let layers = (&self.inner, session_wrapper_layer);
 
         layers.layer(inner)
     }

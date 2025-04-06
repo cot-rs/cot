@@ -4,23 +4,23 @@
 //! are used to add functionality to the request/response cycle, such as
 //! session management, adding security headers, and more.
 
-use std::fmt::Debug;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use crate::error::ErrorRepr;
+use crate::project::MiddlewareContext;
+use crate::request::Request;
+use crate::response::Response;
+use crate::{Body, Error};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures_core::future::BoxFuture;
 use futures_util::TryFutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::BoxBody;
+use std::fmt::Debug;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 use tower::Service;
-use tower_sessions::{MemoryStore, SessionManagerLayer, SessionStore};
 use tower_sessions::session::{Id, Record};
-use crate::error::ErrorRepr;
-use crate::project::MiddlewareContext;
-use crate::request::Request;
-use crate::response::Response;
-use crate::{Body, Error};
+use tower_sessions::{MemoryStore, SessionManagerLayer, SessionStore};
 
 /// Middleware that converts a any [`http::Response`] generic type to a
 /// [`cot::response::Response`].
@@ -252,7 +252,6 @@ where
 #[derive(Debug, Clone)]
 pub struct SessionStoreWrapper(Arc<dyn SessionStore>);
 
-
 #[async_trait]
 impl SessionStore for SessionStoreWrapper {
     async fn save(&self, session_record: &Record) -> tower_sessions::session_store::Result<()> {
@@ -267,7 +266,6 @@ impl SessionStore for SessionStoreWrapper {
         self.0.delete(session_id).await
     }
 }
-
 
 /// A middleware that provides session management.
 ///

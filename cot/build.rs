@@ -29,7 +29,7 @@ fn build_css() {
         let css_dir = css_path
             .parent()
             .expect("failed to get CSS parent directory");
-        std::fs::create_dir_all(&css_dir).expect("failed to create CSS directory");
+        std::fs::create_dir_all(css_dir).expect("failed to create CSS directory");
         std::fs::write(css_path, css).expect("failed to write CSS");
     }
 }

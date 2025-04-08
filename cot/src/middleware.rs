@@ -263,6 +263,7 @@ impl SessionMiddleware {
         let layer = SessionManagerLayer::new(store);
         Self { inner: layer }
     }
+
     /// Creates a new instance of [`SessionMiddleware`] from the application
     /// context.
     ///
@@ -320,10 +321,8 @@ impl<S> tower::Layer<S> for SessionMiddleware {
     >>::Service;
 
     fn layer(&self, inner: S) -> Self::Service {
-        let session_store = MemoryStore::default();
-        let session_layer = SessionManagerLayer::new(session_store);
         let session_wrapper_layer = SessionWrapperLayer::new();
-        let layers = (session_layer, session_wrapper_layer);
+        let layers = (&self.inner, session_wrapper_layer);
 
         layers.layer(inner)
     }
@@ -684,6 +683,57 @@ mod tests {
         let request = TestRequestBuilder::get("/").build();
 
         svc.ready().await.unwrap().call(request).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn session_middleware_adds_cookie() {
+        let svc = tower::service_fn(|req: Request<Body>| async move {
+            let session = req.extensions().get::<Session>().unwrap();
+            session.insert("test", "test").await.unwrap();
+
+            Ok::<_, Error>(Response::new(Body::empty()))
+        });
+
+        let mut svc = SessionMiddleware::new().layer(svc);
+
+        let request = TestRequestBuilder::get("/").build();
+
+        let response = svc.ready().await.unwrap().call(request).await.unwrap();
+        assert!(response.headers().contains_key("set-cookie"));
+        let cookie_value = response
+            .headers()
+            .get("set-cookie")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(cookie_value.contains("id="));
+        assert!(cookie_value.contains("HttpOnly;"));
+        assert!(cookie_value.contains("SameSite=Strict;"));
+        assert!(cookie_value.contains("Secure;"));
+        assert!(cookie_value.contains("Path=/"));
+    }
+
+    #[tokio::test]
+    async fn session_middleware_adds_cookie_not_secure() {
+        let svc = tower::service_fn(|req: Request<Body>| async move {
+            let session = req.extensions().get::<Session>().unwrap();
+            session.insert("test", "test").await.unwrap();
+
+            Ok::<_, Error>(Response::new(Body::empty()))
+        });
+
+        let mut svc = SessionMiddleware::new().secure(false).layer(svc);
+
+        let request = TestRequestBuilder::get("/").build();
+
+        let response = svc.ready().await.unwrap().call(request).await.unwrap();
+        let cookie_value = response
+            .headers()
+            .get("set-cookie")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(!cookie_value.contains("Secure;"));
     }
 
     #[tokio::test]

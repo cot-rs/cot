@@ -43,6 +43,8 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: 'false'
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
@@ -53,7 +55,7 @@ jobs:
           tool: nextest
 
       - name: Fetch dependencies
-        run: cargo +${{ matrix.rust }} fetch
+        run: cargo +${{ matrix.rust }} fetch --locked
 
       - name: Build
         run: cargo +${{ matrix.rust }} build --all-features --tests

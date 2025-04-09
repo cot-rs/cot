@@ -11,6 +11,8 @@ env:
   CARGO_INCREMENTAL: 0
   # Required by cargo-insta: https://insta.rs/docs/quickstart/#continuous-integration
   CI: true
+  SCCACHE_GHA_ENABLED: true
+  RUSTC_WRAPPER: sccache
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
@@ -46,11 +48,6 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -93,11 +90,6 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-
       - name: Run clippy
         run: cargo clippy --no-deps --all-targets -- -D warnings
 
@@ -123,11 +115,6 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -182,11 +169,6 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-
       - name: Run the external dependencies
         run: docker compose up -d
 
@@ -228,11 +210,6 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-
       - name: Run fmt
         run: cargo fmt --all -- --check
 
@@ -258,11 +235,6 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Run cargo-machete
         uses: bnjbvr/cargo-machete@v0.8.0
@@ -292,11 +264,6 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Run cargo check with minimal versions
         run: |
@@ -332,11 +299,6 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Run cargo check with every combination of features
         run: cargo hack check --feature-powerset --exclude-features db --no-dev-deps

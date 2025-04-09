@@ -39,6 +39,11 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: 'false'
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -80,6 +85,11 @@ jobs:
           toolchain: stable
           components: clippy
 
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -105,6 +115,11 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
@@ -159,6 +174,11 @@ jobs:
               /usr/local/lib/dotnet \
               /usr/local/lib/swift
 
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -200,6 +220,11 @@ jobs:
           toolchain: nightly
           components: rustfmt
 
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -226,6 +251,11 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -251,6 +281,11 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
 
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
@@ -287,6 +322,11 @@ jobs:
         with:
           toolchain: nightly
 
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
+
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
@@ -317,18 +357,15 @@ jobs:
           toolchain: nightly
           components: miri
 
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
           tool: nextest
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Set sccache environment variables
-        run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
 
       - name: Miri setup
         run: cargo miri setup

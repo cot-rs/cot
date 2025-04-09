@@ -44,6 +44,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           cache-bin: 'false'
 
       - name: Run sccache-cache
@@ -88,6 +89,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -114,6 +116,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -167,6 +170,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -208,6 +212,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -234,6 +239,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -260,6 +266,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           save-if: 'false'
 
       - name: Install cargo-hack
@@ -295,6 +302,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           save-if: 'false'
 
       - name: Install cargo-hack
@@ -325,6 +333,7 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
+          shared-key: 'rust-ci'
           save-if: 'false'
 
       - name: Install cargo-nextest

@@ -43,8 +43,6 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
-        with:
-          cache-targets: 'false'
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9

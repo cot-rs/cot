@@ -90,6 +90,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'rust-ci'
+          cache-bin: 'false'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -117,6 +118,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'rust-ci'
+          cache-bin: 'false'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -171,6 +173,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'rust-ci'
+          cache-bin: 'false'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -213,6 +216,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'rust-ci'
+          cache-bin: 'false'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -240,6 +244,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'rust-ci'
+          cache-bin: 'false'
           save-if: 'false'
 
       - name: Run sccache-cache
@@ -267,6 +272,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'rust-ci'
+          cache-bin: 'false'
           save-if: 'false'
 
       - name: Install cargo-hack
@@ -303,6 +309,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'rust-ci'
+          cache-bin: 'false'
           save-if: 'false'
 
       - name: Install cargo-hack
@@ -334,6 +341,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: 'rust-ci'
+          cache-bin: 'false'
           save-if: 'false'
 
       - name: Install cargo-nextest

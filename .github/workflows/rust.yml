@@ -52,6 +52,9 @@ jobs:
         with:
           tool: nextest
 
+      - name: Fetch dependencies
+        run: cargo +${{ matrix.rust }} fetch
+
       - name: Build
         run: cargo +${{ matrix.rust }} build --all-features --tests
 

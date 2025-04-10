@@ -72,7 +72,7 @@ macro_rules! impl_request_handler {
     ($($ty:ident),*) => {
         impl<T, $($ty,)* R> RequestHandler<($($ty,)*)> for T
         where
-            T: Fn($($ty,)*) -> R + Clone + Send + Sync + 'static,
+            T: FnOnce($($ty,)*) -> R + Clone + Send + Sync + 'static,
             $($ty: FromRequestParts + Send,)*
             R: for<'a> Future<Output = Result<Response>> + Send,
         {
@@ -85,7 +85,7 @@ macro_rules! impl_request_handler {
                     let $ty = $ty::from_request_parts(&mut parts).await?;
                 )*
 
-                self($($ty,)*).await
+                self.clone()($($ty,)*).await
             }
         }
     };
@@ -95,7 +95,7 @@ macro_rules! impl_request_handler_from_request {
     ($($ty_lhs:ident,)* ($ty_from_request:ident) $(,$ty_rhs:ident)*) => {
         impl<T, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for T
         where
-            T: Fn($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> R + Clone + Send + Sync + 'static,
+            T: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> R + Clone + Send + Sync + 'static,
             $($ty_lhs: FromRequestParts + Send,)*
             $ty_from_request: FromRequest + Send,
             $($ty_rhs: FromRequestParts + Send,)*
@@ -116,7 +116,7 @@ macro_rules! impl_request_handler_from_request {
                 let request = Request::from_parts(parts, body);
                 let $ty_from_request = $ty_from_request::from_request(request).await?;
 
-                self($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await
+                self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await
             }
         }
     };

@@ -35,6 +35,7 @@ http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
 indexmap.workspace = true
+mime.workspace = true
 mime_guess.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
 pin-project-lite.workspace = true

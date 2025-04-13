@@ -702,7 +702,7 @@ impl ToDbValue for PasswordHash {
 /// let password = Password::new("pass");
 /// assert_eq!(&format!("{:?}", password), "Password(\"**********\")");
 /// ```
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Password(String);
 
 impl Debug for Password {

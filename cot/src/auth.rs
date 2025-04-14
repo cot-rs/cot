@@ -694,6 +694,20 @@ impl ToDbValue for PasswordHash {
 /// The implementation of the [`Debug`] trait for this type hides the password
 /// value to prevent it from being leaked in logs or other debug output.
 ///
+/// ## Password Comparison
+///
+/// When comparing passwords, there are two recommended approaches:
+///
+/// 1. The most secure approach is to use [`PasswordHash::from_password`] to
+///    create a hash from one password, and then use [`PasswordHash::verify`] to
+///    compare it with the other password. This method uses constant-time
+///    equality comparison, which protects against timing attacks.
+///
+/// 2. An alternative is to use the [`Password::as_str`] method and compare the
+///    strings directly. This approach uses non-constant-time comparison, which
+///    is less secure but may be acceptable in certain legitimate use cases
+///    where the security tradeoff is understood.
+///
 /// # Examples
 ///
 /// ```

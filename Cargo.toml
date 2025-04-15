@@ -48,6 +48,7 @@ pedantic = "warn"
 future_not_send = "warn"
 
 [workspace.dependencies]
+ahash = { version = "0.8.11", default-features = false }
 anstyle = "1.0.10"
 anyhow = "1.0.97"
 assert_cmd = "2"

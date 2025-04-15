@@ -68,6 +68,7 @@ tracing-test.workspace = true
 trybuild.workspace = true
 
 [build-dependencies]
+ahash.workspace = true
 grass.workspace = true
 
 [package.metadata.docs.rs]
@@ -76,6 +77,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-machete]
 ignored = [
+    # Used indirectly by `grass`, but it doesn't work with the latest versions of Rust if minimal dependency versions
+    # are used
+    "ahash",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly
     "time",
 ]

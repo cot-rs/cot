@@ -28,6 +28,7 @@ cot_macros.workspace = true
 derive_builder.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
+email_address.workspace = true
 form_urlencoded.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true

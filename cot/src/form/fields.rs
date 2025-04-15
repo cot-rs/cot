@@ -9,7 +9,7 @@ use askama::filters::HtmlSafe;
 #[cfg(feature = "db")]
 use cot::db::Auto;
 
-use crate::auth::{Password, PasswordHash};
+use crate::auth::{Email, Password, PasswordHash};
 #[cfg(feature = "db")]
 use crate::db::LimitedString;
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
@@ -198,6 +198,63 @@ impl AsFormField for PasswordHash {
         String::new()
     }
 }
+
+impl_form_field!(EmailField, EmailFieldOptions, "an email");
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct EmailFieldOptions {
+    pub max_length: Option<u32>,
+    pub min_length: Option<u32>,
+}
+
+impl Display for EmailField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag = HtmlTag::input("email");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+        if let Some(max_length) = self.custom_options.max_length {
+            tag.attr("maxlength", &max_length.to_string());
+        }
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", &min_length.to_string());
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl AsFormField for Email {
+    type Type = EmailField;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized,
+    {
+        let value = check_required(field)?;
+
+        if let Some(max_length) = field.custom_options.max_length {
+            if value.len() > max_length as usize {
+                return Err(FormFieldValidationError::maximum_length_exceeded(
+                    max_length,
+                ));
+            }
+        }
+
+        Ok(Email::from(value.parse()?))
+    }
+
+    fn to_field_value(&self) -> String {
+        self.as_str().to_owned()
+    }
+}
+
+impl HtmlSafe for EmailField {}
 
 impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer);
 

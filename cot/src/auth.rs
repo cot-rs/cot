@@ -706,7 +706,9 @@ impl ToDbValue for PasswordHash {
 /// 2. An alternative is to use the [`Password::as_str`] method and compare the
 ///    strings directly. This approach uses non-constant-time comparison, which
 ///    is less secure but may be acceptable in certain legitimate use cases
-///    where the security tradeoff is understood, e.g., in case you're creating a user registration form with the "retype your password" field, where both passwords come from the same source anyway.
+///    where the security tradeoff is understood, e.g., when you're creating a
+///    user registration form with the "retype your password" field, where both
+///    passwords come from the same source anyway.
 ///
 /// # Examples
 ///

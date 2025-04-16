@@ -9,9 +9,10 @@ use askama::filters::HtmlSafe;
 #[cfg(feature = "db")]
 use cot::db::Auto;
 
-use crate::auth::{Email, Password, PasswordHash};
+use crate::auth::{Password, PasswordHash};
 #[cfg(feature = "db")]
 use crate::db::LimitedString;
+use crate::form::types::Email;
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
 use crate::html::HtmlTag;
 
@@ -201,9 +202,14 @@ impl AsFormField for PasswordHash {
 
 impl_form_field!(EmailField, EmailFieldOptions, "an email");
 
+/// Custom options for [`EmailField`]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct EmailFieldOptions {
+    /// The maximum length of the field. used to set the `maxlength` attribute
+    /// in the HTML input element.
     pub max_length: Option<u32>,
+    /// The minimum length of the field. used to set the `minlength` attribute
+    /// in the HTML input element.
     pub min_length: Option<u32>,
 }
 
@@ -237,8 +243,16 @@ impl AsFormField for Email {
         Self: Sized,
     {
         let value = check_required(field)?;
+        let opts = &field.custom_options;
 
-        if let Some(max_length) = field.custom_options.max_length {
+        if let Some(max_length) = opts.max_length {
+            if let Some(min_length) = opts.min_length {
+                if min_length > max_length {
+                    return Err(FormFieldValidationError::from_string(format!(
+                        "min_length ({min_length}) exceeds max_length ({max_length})"
+                    )));
+                }
+            }
             if value.len() > max_length as usize {
                 return Err(FormFieldValidationError::maximum_length_exceeded(
                     max_length,
@@ -246,7 +260,7 @@ impl AsFormField for Email {
             }
         }
 
-        Ok(Email::from(value.parse()?))
+        Ok(value.parse()?)
     }
 
     fn to_field_value(&self) -> String {
@@ -605,6 +619,29 @@ mod tests {
         assert!(html.contains("type=\"password\""));
         assert!(html.contains("required"));
         assert!(html.contains("maxlength=\"10\""));
+    }
+
+    #[test]
+    fn email_field_render() {
+        let field = EmailField::with_options(
+            FormFieldOptions {
+                id: "test_id".to_owned(),
+                name: "test_name".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        let html = field.to_string();
+        assert!(html.contains("type=\"email\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("minlength=\"10\""));
+        assert!(html.contains("maxlength=\"50\""));
+        assert!(html.contains("name=\"test_name\""));
+        assert!(html.contains("id=\"test_id\""));
     }
 
     #[test]

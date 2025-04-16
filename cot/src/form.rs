@@ -22,6 +22,7 @@
 
 /// Built-in form fields that can be used in a form.
 pub mod fields;
+pub mod types;
 
 use std::borrow::Cow;
 use std::fmt::{Debug, Display};

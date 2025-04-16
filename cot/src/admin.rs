@@ -21,7 +21,8 @@ use derive_more::Debug;
 use http::request::Parts;
 use serde::Deserialize;
 
-use crate::auth::{Auth, Password};
+use crate::auth::Auth;
+use crate::form::types::Password;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };

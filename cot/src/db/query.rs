@@ -322,6 +322,30 @@ pub enum Expr {
     /// );
     /// ```
     Value(DbValue),
+    /// An `IsIn` expression.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::db::{model, query};
+    /// use cot::db::query::{Expr, Query};
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    /// };
+    ///
+    /// let expr = Expr::is_in(
+    ///     Expr::field("id"),
+    ///     vec![1, 2, 3]
+    /// );
+    /// assert_eq!(
+    ///     <Query<MyModel>>::new().filter(expr),
+    ///     query!(MyModel, $id in (1, 2, 3))
+    /// );
+    /// ```
+    IsIn(Box<Expr>, Vec<DbValue>),
     /// An `AND` expression.
     ///
     /// # Example
@@ -658,6 +682,39 @@ impl Expr {
             DbFieldValue::Auto => panic!("Cannot create query with a non-value field"),
         }
     }
+
+    /// Create a new `IN` expression.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::db::{model, query};
+    /// use cot::db::query::{Expr, Query};
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    /// };
+    ///
+    /// let expr = Expr::is_in(Expr::field("id"), vec![1, 2, 3]);
+    ///
+    /// assert_eq!(
+    ///     <Query<MyModel>>::new().filter(expr),
+    ///     query!(MyModel, $id IN (1, 2, 3))
+    /// );
+    /// ```
+    #[must_use]
+    pub fn is_in<T: ToDbFieldValue>(field: Self, values: Vec<T>) -> Self {
+        let db_values: Vec<DbValue> = values.into_iter()
+            .map(|v| match v.to_db_field_value() {
+                DbFieldValue::Value(val) => val,
+                DbFieldValue::Auto => panic!("Cannot use Auto value in IN expression"),
+            })
+            .collect();
+        Self::IsIn(Box::new(field), db_values)
+    }
+
 
     /// Create a new `AND` expression.
     ///
@@ -1007,6 +1064,14 @@ impl Expr {
         match self {
             Self::Field(identifier) => (*identifier).into_column_ref().into(),
             Self::Value(value) => (*value).clone().into(),
+            Self::IsIn(field, values) => {
+                let field_expr = field.as_sea_query_expr();
+                let values: Vec<sea_query::Value> = values.iter()
+                    .cloned()
+                    .map(Into::into)
+                    .collect();
+                field_expr.is_in(values)
+            },
             Self::And(lhs, rhs) => lhs.as_sea_query_expr().and(rhs.as_sea_query_expr()),
             Self::Or(lhs, rhs) => lhs.as_sea_query_expr().or(rhs.as_sea_query_expr()),
             Self::Eq(lhs, rhs) => lhs.as_sea_query_expr().eq(rhs.as_sea_query_expr()),

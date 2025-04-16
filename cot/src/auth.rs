@@ -13,6 +13,11 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+#[deprecated(
+    since = "0.3.0",
+    note = "use `cot::form::types::Password` instead"
+)]
+pub use crate::form::types::Password;
 use crate::config::SecretKey;
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
@@ -1221,19 +1226,6 @@ mod tests {
     fn session_auth_hash_debug() {
         let hash = SessionAuthHash::from([1, 2, 3].as_ref());
         assert_eq!(format!("{hash:?}"), "SessionAuthHash(\"**********\")");
-    }
-
-    #[test]
-    fn password_debug() {
-        let password = Password::new("password");
-        assert_eq!(format!("{password:?}"), "Password(\"**********\")");
-    }
-
-    #[test]
-    fn password_str() {
-        let password = Password::new("password");
-        assert_eq!(password.as_str(), "password");
-        assert_eq!(password.into_string(), "password");
     }
 
     const TEST_PASSWORD_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$QAAI3EMU1eTLT9NzzBhQjg$khq4zuHsEyk9trGjuqMBFYnTbpqkmn0wXGxFn1nkPBc";

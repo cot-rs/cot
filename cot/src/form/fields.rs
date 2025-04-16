@@ -752,6 +752,90 @@ mod tests {
     }
 
     #[test]
+    fn email_field_clean_valid() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("user@example.com"));
+        let email = Email::clean_value(&field).unwrap();
+
+        assert_eq!(email.as_str(), "user@example.com");
+    }
+
+    #[test]
+    fn email_field_clean_invalid_format() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("invalid-email"));
+        let result = Email::clean_value(&field);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn email_field_clean_exceeds_max_length() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(5),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("averylongemail@example.com"));
+        let result = Email::clean_value(&field);
+
+        assert!(matches!(result, Err(FormFieldValidationError::MaximumLengthExceeded { max_length: _ })));
+    }
+
+    #[test]
+    fn email_field_clean_invalid_length_options() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(50),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("user@example.com"));
+        let result = Email::clean_value(&field);
+
+        assert!(result.is_err());
+        if let Err(err) = result {
+            let msg = err.to_string();
+            assert!(msg.contains("min_length") && msg.contains("exceeds max_length"));
+        }
+    }
+
+    #[test]
     fn integer_field_clean_value() {
         let mut field = IntegerField::<i32>::with_options(
             FormFieldOptions {

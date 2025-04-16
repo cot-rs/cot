@@ -20,13 +20,14 @@ use thiserror::Error;
 use crate::App;
 use crate::admin::{AdminModelManager, DefaultAdminModelManager};
 use crate::auth::{
-    AuthBackend, AuthError, Password, PasswordHash, PasswordVerificationResult, Result,
-    SessionAuthHash, User, UserId,
+    AuthBackend, AuthError, PasswordHash, PasswordVerificationResult, Result, SessionAuthHash,
+    User, UserId,
 };
 use crate::config::SecretKey;
 use crate::db::migrations::SyncDynMigration;
 use crate::db::{Database, DatabaseBackend, LimitedString, Model, model, query};
 use crate::form::Form;
+use crate::form::types::Password;
 
 pub mod migrations;
 

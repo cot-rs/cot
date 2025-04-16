@@ -13,11 +13,8 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-#[deprecated(
-    since = "0.3.0",
-    note = "use `cot::form::types::Password` instead"
-)]
-pub use crate::form::types::Password;
+#[deprecated(since = "0.3.0", note = "use `cot::form::types::Password` instead")]
+pub type Password = crate::form::types::Password;
 use crate::config::SecretKey;
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
@@ -1137,6 +1134,7 @@ mod tests {
 
     use super::*;
     use crate::config::ProjectConfig;
+    use crate::form::types::Password;
     use crate::test::TestRequestBuilder;
 
     struct MockAuthBackend<F> {

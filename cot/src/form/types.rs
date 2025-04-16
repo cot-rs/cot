@@ -87,7 +87,8 @@ impl Email {
     /// let domain = email.as_inner().domain();
     /// assert_eq!(domain, "example.com");
     /// ```
-    #[must_use] pub fn as_inner(&self) -> &EmailAddress {
+    #[must_use]
+    pub fn as_inner(&self) -> &EmailAddress {
         &self.0
     }
 }
@@ -197,7 +198,6 @@ impl DatabaseField for Email {
 mod tests {
     use super::*;
     use std::convert::TryFrom;
-    
 
     #[test]
     fn test_valid_email_creation() {

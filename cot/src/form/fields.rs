@@ -808,7 +808,10 @@ mod tests {
         field.set_value(Cow::Borrowed("averylongemail@example.com"));
         let result = Email::clean_value(&field);
 
-        assert!(matches!(result, Err(FormFieldValidationError::MaximumLengthExceeded { max_length: _ })));
+        assert!(matches!(
+            result,
+            Err(FormFieldValidationError::MaximumLengthExceeded { max_length: _ })
+        ));
     }
 
     #[test]

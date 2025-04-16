@@ -13,6 +13,7 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+/// backwards compatible shim for form Password type.
 #[deprecated(since = "0.3.0", note = "use `cot::form::types::Password` instead")]
 pub type Password = crate::form::types::Password;
 use crate::config::SecretKey;
@@ -511,12 +512,13 @@ impl PasswordHash {
     /// # Examples
     ///
     /// ```
-    /// use cot::auth::{Password, PasswordHash};
+    /// use cot::auth::PasswordHash;
+    /// use cot::form::types::Password;
     ///
     /// let hash = PasswordHash::from_password(&Password::new("password"));
     /// ```
     #[must_use]
-    pub fn from_password(password: &Password) -> Self {
+    pub fn from_password(password: &crate::form::types::Password) -> Self {
         let hash = password_auth::generate_hash(password.as_str());
 
         if hash.len() > MAX_PASSWORD_HASH_LENGTH as usize {
@@ -538,7 +540,8 @@ impl PasswordHash {
     /// # Examples
     ///
     /// ```
-    /// use cot::auth::{Password, PasswordHash, PasswordVerificationResult};
+    /// use cot::auth::{PasswordHash, PasswordVerificationResult};
+    /// use cot::form::types::Password;
     ///
     /// let password = Password::new("password");
     /// let hash = PasswordHash::from_password(&password);
@@ -552,7 +555,7 @@ impl PasswordHash {
     ///     PasswordVerificationResult::Invalid => println!("Password is invalid"),
     /// }
     /// ```
-    pub fn verify(&self, password: &Password) -> PasswordVerificationResult {
+    pub fn verify(&self, password: &crate::form::types::Password) -> PasswordVerificationResult {
         const VALID_ERROR_STR: &str = "password hash should always be valid if created with `PasswordHash::new` or `PasswordHash::from_password`";
 
         match password_auth::verify_password(password.as_str(), &self.0) {
@@ -678,117 +681,6 @@ impl FromDbValue for PasswordHash {
 impl ToDbValue for PasswordHash {
     fn to_db_value(&self) -> DbValue {
         self.0.clone().into()
-    }
-}
-
-/// A password.
-///
-/// It is always recommended to store passwords in memory using this newtype
-/// instead of a raw String, as it has a [`Debug`] implementation that hides
-/// the password value.
-///
-/// For persisting passwords in the database, and verifying passwords against
-/// the hash, use [`PasswordHash`].
-///
-/// # Security
-///
-/// The implementation of the [`Debug`] trait for this type hides the password
-/// value to prevent it from being leaked in logs or other debug output.
-///
-/// ## Password Comparison
-///
-/// When comparing passwords, there are two recommended approaches:
-///
-/// 1. The most secure approach is to use [`PasswordHash::from_password`] to
-///    create a hash from one password, and then use [`PasswordHash::verify`] to
-///    compare it with the other password. This method uses constant-time
-///    equality comparison, which protects against timing attacks.
-///
-/// 2. An alternative is to use the [`Password::as_str`] method and compare the
-///    strings directly. This approach uses non-constant-time comparison, which
-///    is less secure but may be acceptable in certain legitimate use cases
-///    where the security tradeoff is understood, e.g., when you're creating a
-///    user registration form with the "retype your password" field, where both
-///    passwords come from the same source anyway.
-///
-/// # Examples
-///
-/// ```
-/// use cot::auth::Password;
-///
-/// let password = Password::new("pass");
-/// assert_eq!(&format!("{:?}", password), "Password(\"**********\")");
-/// ```
-#[derive(Clone)]
-pub struct Password(String);
-
-impl Debug for Password {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Password").field(&"**********").finish()
-    }
-}
-
-impl Password {
-    /// Creates a new password object.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::auth::Password;
-    ///
-    /// let password = Password::new("password");
-    /// ```
-    #[must_use]
-    pub fn new<T: Into<String>>(password: T) -> Self {
-        Self(password.into())
-    }
-
-    /// Returns the password as a string.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::auth::Password;
-    ///
-    /// let password = Password::new("password");
-    /// assert_eq!(password.as_str(), "password");
-    /// ```
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Consumes the object and returns the password as a string.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::auth::Password;
-    ///
-    /// let password = Password::new("password");
-    /// assert_eq!(password.into_string(), "password");
-    /// ```
-    #[must_use]
-    pub fn into_string(self) -> String {
-        self.0
-    }
-}
-
-impl From<&Password> for Password {
-    fn from(password: &Password) -> Self {
-        password.clone()
-    }
-}
-
-impl From<&str> for Password {
-    fn from(password: &str) -> Self {
-        Self::new(password)
-    }
-}
-
-impl From<String> for Password {
-    fn from(password: String) -> Self {
-        Self::new(password)
     }
 }
 

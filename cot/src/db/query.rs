@@ -706,7 +706,8 @@ impl Expr {
     /// ```
     #[must_use]
     pub fn is_in<T: ToDbFieldValue>(field: Self, values: Vec<T>) -> Self {
-        let db_values: Vec<DbValue> = values.into_iter()
+        let db_values: Vec<DbValue> = values
+            .into_iter()
             .map(|v| match v.to_db_field_value() {
                 DbFieldValue::Value(val) => val,
                 DbFieldValue::Auto => panic!("Cannot use Auto value in IN expression"),
@@ -714,7 +715,6 @@ impl Expr {
             .collect();
         Self::IsIn(Box::new(field), db_values)
     }
-
 
     /// Create a new `AND` expression.
     ///
@@ -1066,12 +1066,10 @@ impl Expr {
             Self::Value(value) => (*value).clone().into(),
             Self::IsIn(field, values) => {
                 let field_expr = field.as_sea_query_expr();
-                let values: Vec<sea_query::Value> = values.iter()
-                    .cloned()
-                    .map(Into::into)
-                    .collect();
+                let values: Vec<sea_query::Value> =
+                    values.iter().cloned().map(Into::into).collect();
                 field_expr.is_in(values)
-            },
+            }
             Self::And(lhs, rhs) => lhs.as_sea_query_expr().and(rhs.as_sea_query_expr()),
             Self::Or(lhs, rhs) => lhs.as_sea_query_expr().or(rhs.as_sea_query_expr()),
             Self::Eq(lhs, rhs) => lhs.as_sea_query_expr().eq(rhs.as_sea_query_expr()),

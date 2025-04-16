@@ -11,7 +11,6 @@ pub mod db;
 
 use std::any::Any;
 use std::borrow::Cow;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::config::SecretKey;
@@ -21,11 +20,7 @@ use crate::request::{Request, RequestExt};
 use crate::session::Session;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
-use cot::db::impl_mysql::MySqlValueRef;
-use cot::db::impl_postgres::PostgresValueRef;
-use cot::db::impl_sqlite::SqliteValueRef;
 use derive_more::with_trait::Debug;
-use email_address::{EmailAddress, Error};
 #[cfg(test)]
 use mockall::automock;
 use password_auth::VerifyError;
@@ -648,8 +643,6 @@ impl Debug for PasswordHash {
 }
 
 const MAX_PASSWORD_HASH_LENGTH: u32 = 128;
-// Maximum email length as specified in the RFC 5321
-const MAX_EMAIL_LENGTH: u32 = 254;
 
 #[cfg(feature = "db")]
 impl DatabaseField for PasswordHash {
@@ -795,82 +788,6 @@ impl From<String> for Password {
     fn from(password: String) -> Self {
         Self::new(password)
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct Email(EmailAddress);
-
-impl Email {
-    #[must_use]
-    fn new<S: AsRef<str>>(email: S) -> std::result::Result<Email, email_address::Error> {
-        EmailAddress::from_str(email.as_ref()).map(Self)
-    }
-
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
-
-    pub fn as_inner(&self) -> &EmailAddress {
-        &self.0
-    }
-}
-
-impl FromStr for Email {
-    type Err = email_address::Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Email::new(s)
-    }
-}
-
-impl TryFrom<&str> for Email {
-    type Error = email_address::Error;
-
-    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
-        Email::new(value)
-    }
-}
-
-impl TryFrom<String> for Email {
-    type Error = email_address::Error;
-
-    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
-        Email::new(value)
-    }
-}
-
-impl ToDbValue for Email {
-    fn to_db_value(&self) -> DbValue {
-        self.0.clone().to_string().into()
-    }
-}
-
-impl FromDbValue for Email {
-    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
-    }
-
-    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
-    }
-
-    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
-    }
-}
-
-impl DatabaseField for Email {
-    const TYPE: ColumnType = ColumnType::String(MAX_EMAIL_LENGTH);
 }
 
 /// Authentication helper structure.

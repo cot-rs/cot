@@ -4,6 +4,7 @@
 //! parsing, and converting user input within Cot. It includes general-purpose newtype wrappers
 //! and associated trait implementations to ensure consistent and safe processing of form data.
 
+use std::fmt::Debug;
 use std::str::FromStr;
 
 #[cfg(feature = "db")]
@@ -15,6 +16,101 @@ use email_address::EmailAddress;
 
 // Maximum email length as specified in the RFC 5321
 const MAX_EMAIL_LENGTH: u32 = 254;
+
+/// A password.
+///
+/// It is always recommended to store passwords in memory using this newtype
+/// instead of a raw String, as it has a [`Debug`] implementation that hides
+/// the password value.
+///
+/// For persisting passwords in the database, and verifying passwords against
+/// the hash, use [`PasswordHash`].
+///
+/// # Security
+///
+/// The implementation of the [`Debug`] trait for this type hides the password
+/// value to prevent it from being leaked in logs or other debug output.
+///
+/// # Examples
+///
+/// ```
+/// use cot::auth::Password;
+///
+/// let password = Password::new("pass");
+/// assert_eq!(&format!("{:?}", password), "Password(\"**********\")");
+/// ```
+#[derive(Clone)]
+pub struct Password(String);
+
+impl Debug for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Password").field(&"**********").finish()
+    }
+}
+
+impl Password {
+    /// Creates a new password object.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::types::Password;
+    ///
+    /// let password = Password::new("password");
+    /// ```
+    #[must_use]
+    pub fn new<T: Into<String>>(password: T) -> Self {
+        Self(password.into())
+    }
+
+    /// Returns the password as a string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::types::Password;
+    ///
+    /// let password = Password::new("password");
+    /// assert_eq!(password.as_str(), "password");
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Consumes the object and returns the password as a string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::types::Password;
+    ///
+    /// let password = Password::new("password");
+    /// assert_eq!(password.into_string(), "password");
+    /// ```
+    #[must_use]
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl From<&Password> for Password {
+    fn from(password: &Password) -> Self {
+        password.clone()
+    }
+}
+
+impl From<&str> for Password {
+    fn from(password: &str) -> Self {
+        Self::new(password)
+    }
+}
+
+impl From<String> for Password {
+    fn from(password: String) -> Self {
+        Self::new(password)
+    }
+}
 
 /// A validated email address.
 ///
@@ -198,6 +294,19 @@ impl DatabaseField for Email {
 mod tests {
     use super::*;
     use std::convert::TryFrom;
+
+    #[test]
+    fn password_debug() {
+        let password = Password::new("password");
+        assert_eq!(format!("{password:?}"), "Password(\"**********\")");
+    }
+
+    #[test]
+    fn password_str() {
+        let password = Password::new("password");
+        assert_eq!(password.as_str(), "password");
+        assert_eq!(password.into_string(), "password");
+    }
 
     #[test]
     fn test_valid_email_creation() {

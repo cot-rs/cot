@@ -16,11 +16,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// backwards compatible shim for form Password type.
 #[deprecated(since = "0.3.0", note = "use `cot::form::types::Password` instead")]
 pub type Password = crate::form::types::Password;
-use crate::config::SecretKey;
-#[cfg(feature = "db")]
-use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
-use crate::request::{Request, RequestExt};
-use crate::session::Session;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 use derive_more::with_trait::Debug;
@@ -30,6 +25,12 @@ use password_auth::VerifyError;
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
+
+use crate::config::SecretKey;
+#[cfg(feature = "db")]
+use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
+use crate::request::{Request, RequestExt};
+use crate::session::Session;
 
 /// An error that occurs during authentication.
 #[derive(Debug, Error)]

@@ -1,18 +1,20 @@
 //! Form Field Types for Cot
 //!
-//! This module provides a collection of form field types and utilities for validating,
-//! parsing, and converting user input within Cot. It includes general-purpose newtype wrappers
-//! and associated trait implementations to ensure consistent and safe processing of form data.
+//! This module provides a collection of form field types and utilities for
+//! validating, parsing, and converting user input within Cot. It includes
+//! general-purpose newtype wrappers and associated trait implementations to
+//! ensure consistent and safe processing of form data.
 
 use std::fmt::Debug;
 use std::str::FromStr;
 
-#[cfg(feature = "db")]
-use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
 use cot::db::impl_mysql::MySqlValueRef;
 use cot::db::impl_postgres::PostgresValueRef;
 use cot::db::impl_sqlite::SqliteValueRef;
 use email_address::EmailAddress;
+
+#[cfg(feature = "db")]
+use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
 
 // Maximum email length as specified in the RFC 5321
 const MAX_EMAIL_LENGTH: u32 = 254;
@@ -130,15 +132,17 @@ impl From<String> for Password {
 
 /// A validated email address.
 ///
-/// This is a newtype wrapper around [`EmailAddress`](email_address::EmailAddress) that provides
-/// validation and integration with Cot's database system. It ensures email addresses
+/// This is a newtype wrapper around
+/// [`EmailAddress`](email_address::EmailAddress) that provides validation and
+/// integration with Cot's database system. It ensures email addresses
 /// comply with RFC 5321/5322 standards.
 ///
 /// # Examples
 ///
 /// ```
-/// use cot::form::types::Email;
 /// use std::str::FromStr;
+///
+/// use cot::form::types::Email;
 ///
 /// // Parse from a string
 /// let email = Email::from_str("user@example.com").unwrap();
@@ -150,11 +154,13 @@ impl From<String> for Password {
 pub struct Email(EmailAddress);
 
 impl Email {
-    /// Creates a new `Email` from a string, validating that it's a proper email address.
+    /// Creates a new `Email` from a string, validating that it's a proper email
+    /// address.
     ///
     /// # Errors
     ///
-    /// Returns an error if the email address is invalid according to RFC standards.
+    /// Returns an error if the email address is invalid according to RFC
+    /// standards.
     ///
     /// # Examples
     ///
@@ -174,6 +180,7 @@ impl Email {
     ///
     /// ```
     /// use std::str::FromStr;
+    ///
     /// use cot::form::types::Email;
     ///
     /// let email = Email::from_str("user@example.com").unwrap();
@@ -193,6 +200,7 @@ impl Email {
     ///
     /// ```
     /// use std::str::FromStr;
+    ///
     /// use cot::form::types::Email;
     ///
     /// let email = Email::from_str("user@example.com").unwrap();
@@ -211,6 +219,7 @@ impl Email {
 ///
 /// ```
 /// use std::str::FromStr;
+///
 /// use cot::form::types::Email;
 ///
 /// let email = Email::from_str("user@example.com").unwrap();
@@ -267,9 +276,11 @@ impl ToDbValue for Email {
     }
 }
 
-/// Implements database value conversion for retrieving `Email` from the database.
+/// Implements database value conversion for retrieving `Email` from the
+/// database.
 ///
-/// This allows `Email` to be retrieved from the database and properly converted and validated.
+/// This allows `Email` to be retrieved from the database and properly converted
+/// and validated.
 #[cfg(feature = "db")]
 impl FromDbValue for Email {
     #[cfg(feature = "sqlite")]
@@ -308,8 +319,9 @@ impl DatabaseField for Email {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::convert::TryFrom;
+
+    use super::*;
 
     #[test]
     fn password_debug() {

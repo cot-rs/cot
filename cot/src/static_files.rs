@@ -56,8 +56,8 @@ use crate::response::{Response, ResponseExt};
 /// ```
 #[macro_export]
 macro_rules! static_files {
-    ($($path:literal),*) => {
-        vec![$(
+    ($($path:literal),* $(,)?) => {
+        ::std::vec![$(
             (
                 $path.to_string(),
                 $crate::__private::Bytes::from_static(
@@ -460,5 +460,24 @@ mod tests {
         static_files.collect_into(&temp_path).unwrap();
 
         assert!(fs::read_dir(&temp_path).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn static_files_macro() {
+        let static_files = static_files!("admin/admin.css");
+
+        assert_eq!(static_files.len(), 1);
+        assert_eq!(static_files[0].0, "admin/admin.css");
+        assert_eq!(
+            static_files[0].1,
+            Bytes::from_static(include_bytes!("../static/admin/admin.css"))
+        );
+    }
+
+    #[test]
+    fn static_files_macro_trailing_comma() {
+        let static_files = static_files!("admin/admin.css",);
+
+        assert_eq!(static_files.len(), 1);
     }
 }

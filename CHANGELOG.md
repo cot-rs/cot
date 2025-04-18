@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/cot-rs/cot/compare/cot-v0.2.2...cot-v0.3.0) - 2025-04-18
+
+### <!-- 1 -->New features
+
+- allow FnOnce for RequestHandlers ([#283](https://github.com/cot-rs/cot/pull/283))
+- use SCSS ([#278](https://github.com/cot-rs/cot/pull/278))
+- [**breaking**] append app name to table name ([#257](https://github.com/cot-rs/cot/pull/257))
+
+### <!-- 2 -->Fixes
+
+- build when minimal dependency versions are used ([#288](https://github.com/cot-rs/cot/pull/288))
+- actually use SessionMiddleware config ([#279](https://github.com/cot-rs/cot/pull/279))
+
+### <!-- 3 -->Other
+
+- allow trailing comma in static_files macro ([#291](https://github.com/cot-rs/cot/pull/291))
+- password comparison ([#285](https://github.com/cot-rs/cot/pull/285))
+- [**breaking**] migrate from rinja to askama ([#265](https://github.com/cot-rs/cot/pull/265))
+
 ## [0.2.2](https://github.com/cot-rs/cot/compare/cot-v0.2.1...cot-v0.2.2) - 2025-04-03
 
 ### <!-- 2 -->Fixes

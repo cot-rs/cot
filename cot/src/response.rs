@@ -20,6 +20,12 @@ use crate::headers::HTML_CONTENT_TYPE;
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::{Body, StatusCode};
 
+mod into_response;
+mod into_response_parts;
+
+pub use into_response::IntoResponse;
+pub use into_response_parts::IntoResponseParts;
+
 const RESPONSE_BUILD_FAILURE: &str = "Failed to build response";
 
 /// HTTP response type.

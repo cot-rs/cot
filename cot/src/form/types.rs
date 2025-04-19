@@ -8,8 +8,11 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
+#[cfg(feature = "db")]
 use cot::db::impl_mysql::MySqlValueRef;
+#[cfg(feature = "db")]
 use cot::db::impl_postgres::PostgresValueRef;
+#[cfg(feature = "db")]
 use cot::db::impl_sqlite::SqliteValueRef;
 use email_address::EmailAddress;
 
@@ -270,6 +273,7 @@ impl TryFrom<String> for Email {
 /// Implements database value conversion for `Email`.
 ///
 /// This allows `Email` to be stored in the database as a text value.
+#[cfg(feature = "db")]
 impl ToDbValue for Email {
     fn to_db_value(&self) -> DbValue {
         self.0.clone().to_string().into()

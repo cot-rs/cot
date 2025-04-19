@@ -587,7 +587,8 @@ impl PasswordHash {
     /// # Examples
     ///
     /// ```
-    /// use cot::auth::{Password, PasswordHash};
+    /// use cot::auth::PasswordHash;
+    /// use cot::form::types::Password;
     ///
     /// let hash = PasswordHash::from_password(&Password::new("password"));
     /// assert!(!hash.as_str().is_empty());
@@ -607,7 +608,8 @@ impl PasswordHash {
     /// # Examples
     ///
     /// ```
-    /// use cot::auth::{Password, PasswordHash};
+    /// use cot::auth::PasswordHash;
+    /// use cot::form::types::Password;
     ///
     /// let hash = PasswordHash::from_password(&Password::new("password"));
     /// assert!(!hash.into_string().is_empty());

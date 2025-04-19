@@ -22,6 +22,7 @@
 
 /// Built-in form fields that can be used in a form.
 pub mod fields;
+pub mod types;
 
 use std::borrow::Cow;
 use std::fmt::{Debug, Display};
@@ -154,6 +155,12 @@ impl FormFieldValidationError {
     #[must_use]
     pub const fn from_static(message: &'static str) -> Self {
         Self::Custom(Cow::Borrowed(message))
+    }
+}
+
+impl From<email_address::Error> for FormFieldValidationError {
+    fn from(error: email_address::Error) -> Self {
+        FormFieldValidationError::from_string(error.to_string())
     }
 }
 

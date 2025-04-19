@@ -49,10 +49,11 @@ future_not_send = "warn"
 
 [workspace.dependencies]
 ahash = { version = "0.8.11", default-features = false }
+aide = { version = "0.14", default-features = false }
 anstyle = "1.0.10"
 anyhow = "1.0.97"
-assert_cmd = "2"
 askama = "0.13"
+assert_cmd = "2"
 async-stream = "0.3"
 async-trait = "0.1"
 axum = { version = "0.8", default-features = false }
@@ -61,9 +62,9 @@ bytes = "1.10"
 cargo_toml = "0.22"
 chrono = { version = "0.4", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
+clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.2.26"
-clap-verbosity-flag = { version = "3", default-features = false }
 cot = { version = "0.2.2", path = "cot" }
 cot_codegen = { version = "0.2.1", path = "cot-codegen" }
 cot_macros = { version = "0.2.1", path = "cot-macros" }
@@ -97,6 +98,7 @@ proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 rand = { version = "0.9", default-features = false }
 rustversion = "1"
+schemars = { version = "0.8.22", default-features = false }
 sea-query = { version = "0.32", default-features = false }
 sea-query-binder = { version = "0.7", default-features = false }
 serde = "1"
@@ -106,6 +108,7 @@ serde_path_to_error = "0.1.17"
 sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false }
 subtle = { version = "2", default-features = false }
+swagger-ui-redist = { version = "0.1" }
 syn = { version = "2", default-features = false }
 sync_wrapper = "1"
 tempfile = "3"

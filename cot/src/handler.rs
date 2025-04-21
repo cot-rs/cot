@@ -142,69 +142,69 @@ macro_rules! handle_all_parameters {
 #[rustfmt::skip]
 macro_rules! handle_all_parameters_from_request {
     ($name:ident) => {
-        $name!((P1));
+        $name!((PX));
 
-        $name!((P1), P2);
-        $name!(P1, (P2));
+        $name!((PX), P2);
+        $name!(P1, (PX));
 
-        $name!((P1), P2, P3);
-        $name!(P1, (P2), P3);
-        $name!(P1, P2, (P3));
+        $name!((PX), P2, P3);
+        $name!(P1, (PX), P3);
+        $name!(P1, P2, (PX));
 
-        $name!((P1), P2, P3, P4);
-        $name!(P1, (P2), P3, P4);
-        $name!(P1, P2, (P3), P4);
-        $name!(P1, P2, P3, (P4));
+        $name!((PX), P2, P3, P4);
+        $name!(P1, (PX), P3, P4);
+        $name!(P1, P2, (PX), P4);
+        $name!(P1, P2, P3, (PX));
 
-        $name!((P1), P2, P3, P4, P5);
-        $name!(P1, (P2), P3, P4, P5);
-        $name!(P1, P2, (P3), P4, P5);
-        $name!(P1, P2, P3, (P4), P5);
-        $name!(P1, P2, P3, P4, (P5));
+        $name!((PX), P2, P3, P4, P5);
+        $name!(P1, (PX), P3, P4, P5);
+        $name!(P1, P2, (PX), P4, P5);
+        $name!(P1, P2, P3, (PX), P5);
+        $name!(P1, P2, P3, P4, (PX));
 
-        $name!((P1), P2, P3, P4, P5, P6);
-        $name!(P1, (P2), P3, P4, P5, P6);
-        $name!(P1, P2, (P3), P4, P5, P6);
-        $name!(P1, P2, P3, (P4), P5, P6);
-        $name!(P1, P2, P3, P4, (P5), P6);
-        $name!(P1, P2, P3, P4, P5, (P6));
+        $name!((PX), P2, P3, P4, P5, P6);
+        $name!(P1, (PX), P3, P4, P5, P6);
+        $name!(P1, P2, (PX), P4, P5, P6);
+        $name!(P1, P2, P3, (PX), P5, P6);
+        $name!(P1, P2, P3, P4, (PX), P6);
+        $name!(P1, P2, P3, P4, P5, (PX));
 
-        $name!((P1), P2, P3, P4, P5, P6, P7);
-        $name!(P1, (P2), P3, P4, P5, P6, P7);
-        $name!(P1, P2, (P3), P4, P5, P6, P7);
-        $name!(P1, P2, P3, (P4), P5, P6, P7);
-        $name!(P1, P2, P3, P4, (P5), P6, P7);
-        $name!(P1, P2, P3, P4, P5, (P6), P7);
-        $name!(P1, P2, P3, P4, P5, P6, (P7));
+        $name!((PX), P2, P3, P4, P5, P6, P7);
+        $name!(P1, (PX), P3, P4, P5, P6, P7);
+        $name!(P1, P2, (PX), P4, P5, P6, P7);
+        $name!(P1, P2, P3, (PX), P5, P6, P7);
+        $name!(P1, P2, P3, P4, (PX), P6, P7);
+        $name!(P1, P2, P3, P4, P5, (PX), P7);
+        $name!(P1, P2, P3, P4, P5, P6, (PX));
 
-        $name!((P1), P2, P3, P4, P5, P6, P7, P8);
-        $name!(P1, (P2), P3, P4, P5, P6, P7, P8);
-        $name!(P1, P2, (P3), P4, P5, P6, P7, P8);
-        $name!(P1, P2, P3, (P4), P5, P6, P7, P8);
-        $name!(P1, P2, P3, P4, (P5), P6, P7, P8);
-        $name!(P1, P2, P3, P4, P5, (P6), P7, P8);
-        $name!(P1, P2, P3, P4, P5, P6, (P7), P8);
-        $name!(P1, P2, P3, P4, P5, P6, P7, (P8));
+        $name!((PX), P2, P3, P4, P5, P6, P7, P8);
+        $name!(P1, (PX), P3, P4, P5, P6, P7, P8);
+        $name!(P1, P2, (PX), P4, P5, P6, P7, P8);
+        $name!(P1, P2, P3, (PX), P5, P6, P7, P8);
+        $name!(P1, P2, P3, P4, (PX), P6, P7, P8);
+        $name!(P1, P2, P3, P4, P5, (PX), P7, P8);
+        $name!(P1, P2, P3, P4, P5, P6, (PX), P8);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (PX));
 
-        $name!((P1), P2, P3, P4, P5, P6, P7, P8, P9);
-        $name!(P1, (P2), P3, P4, P5, P6, P7, P8, P9);
-        $name!(P1, P2, (P3), P4, P5, P6, P7, P8, P9);
-        $name!(P1, P2, P3, (P4), P5, P6, P7, P8, P9);
-        $name!(P1, P2, P3, P4, (P5), P6, P7, P8, P9);
-        $name!(P1, P2, P3, P4, P5, (P6), P7, P8, P9);
-        $name!(P1, P2, P3, P4, P5, P6, (P7), P8, P9);
-        $name!(P1, P2, P3, P4, P5, P6, P7, (P8), P9);
-        $name!(P1, P2, P3, P4, P5, P6, P7, P8, (P9));
+        $name!((PX), P2, P3, P4, P5, P6, P7, P8, P9);
+        $name!(P1, (PX), P3, P4, P5, P6, P7, P8, P9);
+        $name!(P1, P2, (PX), P4, P5, P6, P7, P8, P9);
+        $name!(P1, P2, P3, (PX), P5, P6, P7, P8, P9);
+        $name!(P1, P2, P3, P4, (PX), P6, P7, P8, P9);
+        $name!(P1, P2, P3, P4, P5, (PX), P7, P8, P9);
+        $name!(P1, P2, P3, P4, P5, P6, (PX), P8, P9);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (PX), P9);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, (PX));
 
-        $name!((P1), P2, P3, P4, P5, P6, P7, P8, P9, P10);
-        $name!(P1, (P2), P3, P4, P5, P6, P7, P8, P9, P10);
-        $name!(P1, P2, (P3), P4, P5, P6, P7, P8, P9, P10);
-        $name!(P1, P2, P3, (P4), P5, P6, P7, P8, P9, P10);
-        $name!(P1, P2, P3, P4, (P5), P6, P7, P8, P9, P10);
-        $name!(P1, P2, P3, P4, P5, (P6), P7, P8, P9, P10);
-        $name!(P1, P2, P3, P4, P5, P6, (P7), P8, P9, P10);
-        $name!(P1, P2, P3, P4, P5, P6, P7, (P8), P9, P10);
-        $name!(P1, P2, P3, P4, P5, P6, P7, P8, (P9), P10);
+        $name!((PX), P2, P3, P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, (PX), P3, P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, (PX), P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, (PX), P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, (PX), P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, (PX), P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, (PX), P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (PX), P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, (PX), P10);
         $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9, (P10));
     };
 }

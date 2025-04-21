@@ -7,7 +7,7 @@ use tower::util::BoxCloneSyncService;
 use crate::error::ErrorRepr;
 use crate::request::Request;
 use crate::request::extractors::{FromRequest, FromRequestParts};
-use crate::response::{Response, not_found_response};
+use crate::response::{IntoResponse, Response, not_found_response};
 use crate::{Error, Result};
 
 /// A function that takes a request and returns a response.
@@ -70,11 +70,12 @@ pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
 
 macro_rules! impl_request_handler {
     ($($ty:ident),*) => {
-        impl<T, $($ty,)* R> RequestHandler<($($ty,)*)> for T
+        impl<Func, $($ty,)* Fut, R> RequestHandler<($($ty,)*)> for Func
         where
-            T: FnOnce($($ty,)*) -> R + Clone + Send + Sync + 'static,
+            Func: FnOnce($($ty,)*) -> Fut + Clone + Send + Sync + 'static,
             $($ty: FromRequestParts + Send,)*
-            R: for<'a> Future<Output = Result<Response>> + Send,
+            Fut: Future<Output = Result<R>> + Send,
+            R: IntoResponse,
         {
             #[allow(non_snake_case)]
             async fn handle(&self, request: Request) -> Result<Response> {
@@ -85,7 +86,10 @@ macro_rules! impl_request_handler {
                     let $ty = $ty::from_request_parts(&mut parts).await?;
                 )*
 
-                self.clone()($($ty,)*).await
+                match self.clone()($($ty,)*).await {
+                    Ok(response) => Ok(response.into_response()),
+                    Err(error) => Err(error),
+                }
             }
         }
     };
@@ -116,7 +120,10 @@ macro_rules! impl_request_handler_from_request {
                 let request = Request::from_parts(parts, body);
                 let $ty_from_request = $ty_from_request::from_request(request).await?;
 
-                self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await
+                match self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await {
+                    Ok(response) => Ok(response.into_response()),
+                    Err(error) => Err(error),
+                }
             }
         }
     };

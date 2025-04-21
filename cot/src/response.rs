@@ -13,6 +13,7 @@
 //! ```
 
 use bytes::Bytes;
+use cot::html::Html;
 
 use crate::error_page::ErrorPageTrigger;
 use crate::headers::HTML_CONTENT_TYPE;
@@ -56,22 +57,6 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// ```
     #[must_use]
     fn builder() -> http::response::Builder;
-
-    /// Create a new HTML response.
-    ///
-    /// This creates a new [`Response`] object with a content type of
-    /// `text/html; charset=utf-8` and given status code and body.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, StatusCode};
-    ///
-    /// let response = Response::new_html(StatusCode::OK, Body::fixed("Hello world!"));
-    /// ```
-    #[must_use]
-    fn new_html(status: StatusCode, body: Body) -> Self;
 
     /// Create a new JSON response.
     ///
@@ -135,14 +120,6 @@ impl ResponseExt for Response {
         http::Response::builder()
     }
 
-    fn new_html(status: StatusCode, body: Body) -> Self {
-        http::Response::builder()
-            .status(status)
-            .header(http::header::CONTENT_TYPE, HTML_CONTENT_TYPE)
-            .body(body)
-            .expect(RESPONSE_BUILD_FAILURE)
-    }
-
     #[cfg(feature = "json")]
     fn new_json<T: ?Sized + serde::Serialize>(status: StatusCode, data: &T) -> crate::Result<Self> {
         // a "reasonable default" for a JSON response size
@@ -171,10 +148,7 @@ impl ResponseExt for Response {
 }
 
 pub(crate) fn not_found_response(message: Option<String>) -> Response {
-    let mut response = Response::new_html(
-        StatusCode::NOT_FOUND,
-        Body::fixed(Bytes::from("404 Not Found")),
-    );
+    let mut response = Html::new("404 Not Found").with_status(StatusCode::NOT_FOUND);
     response
         .extensions_mut()
         .insert(ErrorPageTrigger::NotFound { message });
@@ -187,17 +161,6 @@ mod tests {
     use crate::body::BodyInner;
     use crate::headers::HTML_CONTENT_TYPE;
     use crate::response::{Response, ResponseExt};
-
-    #[test]
-    fn response_new_html() {
-        let body = Body::fixed("<html></html>");
-        let response = Response::new_html(StatusCode::OK, body);
-        assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(
-            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            HTML_CONTENT_TYPE
-        );
-    }
 
     #[test]
     #[cfg(feature = "json")]

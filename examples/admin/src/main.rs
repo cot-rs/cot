@@ -13,6 +13,7 @@ use cot::config::{
 use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model};
 use cot::form::Form;
+use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::request::extractors::RequestDb;
@@ -42,7 +43,7 @@ struct IndexTemplate<'a> {
     todo_items: Vec<TodoItem>,
 }
 
-async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Response> {
+async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Html> {
     let todo_items = TodoItem::objects().all(&db).await?;
     let index_template = IndexTemplate {
         urls: &urls,
@@ -50,7 +51,7 @@ async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Response> {
     };
     let rendered = index_template.render()?;
 
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(rendered)))
+    Ok(Html::new(rendered))
 }
 
 struct HelloApp;

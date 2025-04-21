@@ -1,8 +1,9 @@
 use bytes::Bytes;
 use cot::config::ProjectConfig;
+use cot::html::Html;
 use cot::project::RegisterAppsContext;
 use cot::request::Request;
-use cot::response::{Response, ResponseExt};
+use cot::response::{IntoResponse, Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::test::Client;
 use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
@@ -11,7 +12,7 @@ use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
 async fn cot_project_router_sub_path() {
     async fn hello(_request: Request) -> cot::Result<Response> {
-        Ok(Response::new_html(StatusCode::OK, Body::fixed("OK")))
+        Ok(Html::new("OK").into_response())
     }
 
     struct App1;
@@ -62,10 +63,7 @@ async fn cot_project_router_sub_path() {
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
 async fn cot_router_reverse_local() {
     async fn get_index(request: Request) -> cot::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::OK,
-            Body::fixed(reverse!(request, "index")?),
-        ))
+        Ok(Html::new(reverse!(request, "index")?).into_response())
     }
 
     struct App1;

@@ -9,6 +9,8 @@ use std::marker::PhantomData;
 use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
+use cot::html::Html;
+use cot::response::IntoResponse;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.
@@ -54,7 +56,7 @@ impl<T, H: RequestHandler<T> + Send + Sync> RequestHandler<T> for AdminAuthentic
 async fn index(
     urls: Urls,
     AdminModelManagers(managers): AdminModelManagers,
-) -> crate::Result<Response> {
+) -> crate::Result<Html> {
     #[derive(Debug, Template)]
     #[template(path = "admin/model_list.html")]
     struct ModelListTemplate<'a> {
@@ -67,10 +69,7 @@ async fn index(
         urls: &urls,
         model_managers: managers,
     };
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Ok(Html::new(template.render()?))
 }
 
 #[derive(Debug, Form)]
@@ -114,10 +113,7 @@ async fn login(urls: Urls, auth: Auth, mut request: Request) -> crate::Result<Re
         urls: &urls,
         form: login_form_context,
     };
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Ok(Html::new(template.render()?).into_response())
 }
 
 async fn authenticate(auth: &Auth, login_form: LoginForm) -> cot::Result<bool> {
@@ -225,10 +221,7 @@ async fn view_model(
         total_pages,
     };
 
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Ok(Html::new(template.render()?).into_response())
 }
 
 async fn create_model_instance(
@@ -295,10 +288,7 @@ async fn edit_model_instance_impl(
         is_edit: object_id.is_some(),
     };
 
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Ok(Html::new(template.render()?).into_response())
 }
 
 async fn remove_model_instance(
@@ -335,10 +325,7 @@ async fn remove_model_instance(
             object: &*object,
         };
 
-        Ok(Response::new_html(
-            StatusCode::OK,
-            Body::fixed(template.render()?),
-        ))
+        Ok(Html::new(template.render()?).into_response())
     }
 }
 

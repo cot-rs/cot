@@ -28,6 +28,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
 use bytes::Bytes;
+use cot::html::Html;
+use cot::response::IntoResponse;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use http::request::Parts;
@@ -762,20 +764,15 @@ pub trait ErrorPageHandler: Send + Sync {
 struct DefaultNotFoundHandler;
 impl ErrorPageHandler for DefaultNotFoundHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::NOT_FOUND,
-            Body::fixed(include_str!("../templates/404.html")),
-        ))
+        Ok(Html::new(include_str!("../templates/404.html")).with_status(StatusCode::NOT_FOUND))
     }
 }
 
 struct DefaultServerErrorHandler;
 impl ErrorPageHandler for DefaultServerErrorHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Body::fixed(include_str!("../templates/500.html")),
-        ))
+        Ok(Html::new(include_str!("../templates/500.html"))
+            .with_status(StatusCode::INTERNAL_SERVER_ERROR))
     }
 }
 

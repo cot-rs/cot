@@ -2,9 +2,12 @@ use std::borrow::Cow;
 use std::convert::Infallible;
 
 use bytes::{Bytes, BytesMut};
-use cot::response::Response;
+use cot::headers::HTML_CONTENT_TYPE;
+use cot::response::{RESPONSE_BUILD_FAILURE, Response};
 use cot::{Body, StatusCode};
 use http;
+
+use crate::html::Html;
 
 /// Trait for generating responses.
 /// Types that implement `IntoResponse` can be returned from handlers.
@@ -113,7 +116,9 @@ impl IntoResponse for Response {
         self
     }
 }
+
 // Text implementations
+
 impl_into_response_for_type_and_mime!(&'static str, mime::TEXT_PLAIN_UTF_8);
 impl_into_response_for_type_and_mime!(String, mime::TEXT_PLAIN_UTF_8);
 
@@ -124,6 +129,7 @@ impl IntoResponse for Box<str> {
 }
 
 // Bytes implementations
+
 impl_into_response_for_type_and_mime!(&'static [u8], mime::APPLICATION_OCTET_STREAM);
 impl_into_response_for_type_and_mime!(Vec<u8>, mime::APPLICATION_OCTET_STREAM);
 impl_into_response_for_type_and_mime!(Bytes, mime::APPLICATION_OCTET_STREAM);
@@ -181,6 +187,31 @@ impl IntoResponse for http::Extensions {
 impl IntoResponse for http::response::Parts {
     fn into_response(self) -> Response {
         Response::from_parts(self, Body::empty())
+    }
+}
+
+// Data type structures implementations
+
+impl IntoResponse for Html {
+    /// Create a new HTML response.
+    ///
+    /// This creates a new [`Response`] object with a content type of
+    /// `text/html; charset=utf-8` and given status code and body.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::html::Html;
+    /// use cot::response::IntoResponse;
+    ///
+    /// let html = Html::new("<div>Hello</div>");
+    ///
+    /// let response = html.into_response();
+    /// ```
+    fn into_response(self) -> Response {
+        self.as_str().to_owned().into_response().with_content_type(
+            http::header::HeaderValue::from_static(mime::TEXT_HTML_UTF_8.as_ref()),
+        )
     }
 }
 

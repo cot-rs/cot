@@ -427,6 +427,7 @@ impl FromRequestParts for Auth {
 
 #[cfg(test)]
 mod tests {
+    use cot::html::Html;
     use serde::Deserialize;
 
     use super::*;
@@ -588,8 +589,8 @@ mod tests {
 
     #[cot::test]
     async fn urls_extraction() {
-        async fn handler() -> cot::Result<Response> {
-            Ok(Response::new_html(cot::StatusCode::OK, Body::empty()))
+        async fn handler() -> cot::Result<Html> {
+            Ok(Html::new(""))
         }
 
         let router = Router::with_urls([Route::with_handler_and_name(

@@ -825,6 +825,8 @@ macro_rules! reverse_redirect {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
+    use cot::html::Html;
+    use cot::response::IntoResponse;
 
     use super::*;
     use crate::request::Request;
@@ -836,10 +838,7 @@ mod tests {
 
     impl RequestHandler for MockHandler {
         async fn handle(&self, _request: Request) -> Result<Response> {
-            Ok(Response::new_html(
-                StatusCode::OK,
-                Body::fixed(Bytes::from("OK")),
-            ))
+            Ok(Html::new("OK").into_response())
         }
     }
 

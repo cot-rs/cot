@@ -10,9 +10,9 @@ use askama::filters::HtmlSafe;
 use cot::db::Auto;
 
 use crate::auth::PasswordHash;
+use crate::common_types::{Email, Password};
 #[cfg(feature = "db")]
 use crate::db::LimitedString;
-use crate::common_types::{Email, Password};
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
 use crate::html::HtmlTag;
 

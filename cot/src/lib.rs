@@ -66,6 +66,7 @@ pub mod admin;
 pub mod auth;
 mod body;
 pub mod cli;
+pub mod common_types;
 pub mod config;
 mod error_page;
 mod handler;
@@ -81,7 +82,6 @@ pub mod session;
 pub mod static_files;
 pub mod test;
 pub(crate) mod utils;
-pub mod common_types;
 
 #[cfg(feature = "openapi")]
 pub use aide;
@@ -94,7 +94,7 @@ pub use {bytes, http};
 
 pub use crate::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{
-    run, run_at, run_cli, App, AppBuilder, Bootstrapper, Project, ProjectContext,
+    App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };
 
 /// A type alias for a result that can return a [`cot::Error`].

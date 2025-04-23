@@ -1028,8 +1028,8 @@ mod tests {
     use mockall::predicate::eq;
 
     use super::*;
-    use crate::config::ProjectConfig;
     use crate::common_types::Password;
+    use crate::config::ProjectConfig;
     use crate::test::TestRequestBuilder;
 
     struct MockAuthBackend<F> {

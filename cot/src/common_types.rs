@@ -194,10 +194,8 @@ impl Email {
         self.0.as_str()
     }
 
-    /// Returns a reference to the underlying `EmailAddress`.
-    ///
-    /// This is useful when you need to access functionality provided by the
-    /// `email_address` crate directly.
+    /// Returns the domain part of the email address (the part after the '@'
+    /// symbol).
     ///
     /// # Examples
     ///
@@ -207,12 +205,102 @@ impl Email {
     /// use cot::common_types::Email;
     ///
     /// let email = Email::from_str("user@example.com").unwrap();
-    /// let domain = email.as_inner().domain();
-    /// assert_eq!(domain, "example.com");
+    /// assert_eq!(email.domain(), "example.com");
     /// ```
-    #[must_use]
-    pub fn as_inner(&self) -> &EmailAddress {
-        &self.0
+    pub fn domain(&self) -> &str {
+        self.0.domain()
+    }
+
+    /// Formats the email address as a URI, typically for use in `mailto:`
+    /// links.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    ///
+    /// use cot::common_types::Email;
+    ///
+    /// let email = Email::from_str("user@example.com").unwrap();
+    /// assert_eq!(email.to_uri(), "mailto:user@example.com");
+    /// ```
+    pub fn to_uri(&self) -> String {
+        self.0.to_uri()
+    }
+
+    /// Formats the email address with a display name.
+    ///
+    /// This creates a formatted email address with the format: `"Display Name"
+    /// <user@example.com>`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    ///
+    /// use cot::common_types::Email;
+    ///
+    /// let email = Email::from_str("user@example.com").unwrap();
+    /// assert_eq!(
+    ///     email.to_display("John Doe"),
+    ///     "\"John Doe\" <user@example.com>"
+    /// );
+    /// ```
+    pub fn to_display(&self, display_name: &str) -> String {
+        self.0.to_display(display_name)
+    }
+
+    /// Returns the full email address as a string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    ///
+    /// use cot::common_types::Email;
+    ///
+    /// let email = Email::from_str("user@example.com").unwrap();
+    /// assert_eq!(email.email(), "user@example.com");
+    /// ```
+    pub fn email(&self) -> String {
+        self.0.email()
+    }
+
+    /// Returns the local part of the email address (the part before the '@'
+    /// symbol).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    ///
+    /// use cot::common_types::Email;
+    ///
+    /// let email = Email::from_str("user@example.com").unwrap();
+    /// assert_eq!(email.local_part(), "user");
+    /// ```
+    pub fn local_part(&self) -> &str {
+        self.0.local_part()
+    }
+
+    /// Returns the display part of the email address.
+    ///
+    /// For simple email addresses, this is typically the same as the local
+    /// part. For email addresses with display names, this returns the
+    /// display name portion.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    ///
+    /// use cot::common_types::Email;
+    ///
+    /// let email = Email::from_str("user@example.com").unwrap();
+    /// assert_eq!(email.display_part(), "user");
+    /// ```
+    pub fn display_part(&self) -> &str {
+        self.0.display_part()
     }
 }
 
@@ -344,7 +432,7 @@ mod tests {
     fn test_valid_email_creation() {
         let email = Email::new("user@example.com").unwrap();
         assert_eq!(email.as_str(), "user@example.com");
-        assert_eq!(email.as_inner().domain(), "example.com");
+        assert_eq!(email.domain(), "example.com");
     }
 
     #[test]

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use cot::auth::Auth;
 use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
-use cot::form::types::Password;
+use cot::common_types::Password;
 use cot::request::RequestExt;
 use cot::test::{TestDatabase, TestRequestBuilder};
 

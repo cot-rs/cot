@@ -22,7 +22,7 @@ use http::request::Parts;
 use serde::Deserialize;
 
 use crate::auth::Auth;
-use crate::form::types::Password;
+use crate::common_types::Password;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };

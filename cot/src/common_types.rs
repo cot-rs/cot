@@ -75,7 +75,7 @@ impl Password {
     /// # Examples
     ///
     /// ```
-    /// use cot::form::types::Password;
+    /// use cot::common_types::Password;
     ///
     /// let password = Password::new("password");
     /// ```
@@ -89,7 +89,7 @@ impl Password {
     /// # Examples
     ///
     /// ```
-    /// use cot::form::types::Password;
+    /// use cot::common_types::Password;
     ///
     /// let password = Password::new("password");
     /// assert_eq!(password.as_str(), "password");
@@ -104,7 +104,7 @@ impl Password {
     /// # Examples
     ///
     /// ```
-    /// use cot::form::types::Password;
+    /// use cot::common_types::Password;
     ///
     /// let password = Password::new("password");
     /// assert_eq!(password.into_string(), "password");
@@ -145,7 +145,7 @@ impl From<String> for Password {
 /// ```
 /// use std::str::FromStr;
 ///
-/// use cot::form::types::Email;
+/// use cot::common_types::Email;
 ///
 /// // Parse from a string
 /// let email = Email::from_str("user@example.com").unwrap();
@@ -168,7 +168,7 @@ impl Email {
     /// # Examples
     ///
     /// ```
-    /// use cot::form::types::Email;
+    /// use cot::common_types::Email;
     ///
     /// let email = Email::new("user@example.com").unwrap();
     /// assert!(Email::new("invalid").is_err());
@@ -184,7 +184,7 @@ impl Email {
     /// ```
     /// use std::str::FromStr;
     ///
-    /// use cot::form::types::Email;
+    /// use cot::common_types::Email;
     ///
     /// let email = Email::from_str("user@example.com").unwrap();
     /// assert_eq!(email.as_str(), "user@example.com");
@@ -204,7 +204,7 @@ impl Email {
     /// ```
     /// use std::str::FromStr;
     ///
-    /// use cot::form::types::Email;
+    /// use cot::common_types::Email;
     ///
     /// let email = Email::from_str("user@example.com").unwrap();
     /// let domain = email.as_inner().domain();
@@ -223,7 +223,7 @@ impl Email {
 /// ```
 /// use std::str::FromStr;
 ///
-/// use cot::form::types::Email;
+/// use cot::common_types::Email;
 ///
 /// let email = Email::from_str("user@example.com").unwrap();
 /// ```
@@ -240,7 +240,7 @@ impl FromStr for Email {
 /// # Examples
 ///
 /// ```
-/// use cot::form::types::Email;
+/// use cot::common_types::Email;
 ///
 /// let email = Email::try_from("user@example.com").unwrap();
 /// ```
@@ -257,7 +257,7 @@ impl TryFrom<&str> for Email {
 /// # Examples
 ///
 /// ```
-/// use cot::form::types::Email;
+/// use cot::common_types::Email;
 ///
 /// let email = Email::try_from(String::from("user@example.com")).unwrap();
 /// ```

@@ -27,7 +27,7 @@ use crate::config::SecretKey;
 use crate::db::migrations::SyncDynMigration;
 use crate::db::{Database, DatabaseBackend, LimitedString, Model, model, query};
 use crate::form::Form;
-use crate::form::types::Password;
+use crate::common_types::Password;
 
 pub mod migrations;
 

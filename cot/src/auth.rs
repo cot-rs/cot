@@ -14,8 +14,8 @@ use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 /// backwards compatible shim for form Password type.
-#[deprecated(since = "0.3.0", note = "use `cot::form::types::Password` instead")]
-pub type Password = crate::form::types::Password;
+#[deprecated(since = "0.3.0", note = "use `cot::common_types::Password` instead")]
+pub type Password = crate::common_types::Password;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 use derive_more::with_trait::Debug;
@@ -514,12 +514,12 @@ impl PasswordHash {
     ///
     /// ```
     /// use cot::auth::PasswordHash;
-    /// use cot::form::types::Password;
+    /// use cot::common_types::Password;
     ///
     /// let hash = PasswordHash::from_password(&Password::new("password"));
     /// ```
     #[must_use]
-    pub fn from_password(password: &crate::form::types::Password) -> Self {
+    pub fn from_password(password: &crate::common_types::Password) -> Self {
         let hash = password_auth::generate_hash(password.as_str());
 
         if hash.len() > MAX_PASSWORD_HASH_LENGTH as usize {
@@ -542,7 +542,7 @@ impl PasswordHash {
     ///
     /// ```
     /// use cot::auth::{PasswordHash, PasswordVerificationResult};
-    /// use cot::form::types::Password;
+    /// use cot::common_types::Password;
     ///
     /// let password = Password::new("password");
     /// let hash = PasswordHash::from_password(&password);
@@ -556,7 +556,7 @@ impl PasswordHash {
     ///     PasswordVerificationResult::Invalid => println!("Password is invalid"),
     /// }
     /// ```
-    pub fn verify(&self, password: &crate::form::types::Password) -> PasswordVerificationResult {
+    pub fn verify(&self, password: &crate::common_types::Password) -> PasswordVerificationResult {
         const VALID_ERROR_STR: &str = "password hash should always be valid if created with `PasswordHash::new` or `PasswordHash::from_password`";
 
         match password_auth::verify_password(password.as_str(), &self.0) {
@@ -588,7 +588,7 @@ impl PasswordHash {
     ///
     /// ```
     /// use cot::auth::PasswordHash;
-    /// use cot::form::types::Password;
+    /// use cot::common_types::Password;
     ///
     /// let hash = PasswordHash::from_password(&Password::new("password"));
     /// assert!(!hash.as_str().is_empty());
@@ -609,7 +609,7 @@ impl PasswordHash {
     ///
     /// ```
     /// use cot::auth::PasswordHash;
-    /// use cot::form::types::Password;
+    /// use cot::common_types::Password;
     ///
     /// let hash = PasswordHash::from_password(&Password::new("password"));
     /// assert!(!hash.into_string().is_empty());
@@ -1029,7 +1029,7 @@ mod tests {
 
     use super::*;
     use crate::config::ProjectConfig;
-    use crate::form::types::Password;
+    use crate::common_types::Password;
     use crate::test::TestRequestBuilder;
 
     struct MockAuthBackend<F> {

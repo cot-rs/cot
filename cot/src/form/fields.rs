@@ -205,10 +205,10 @@ impl_form_field!(EmailField, EmailFieldOptions, "an email");
 /// Custom options for [`EmailField`]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct EmailFieldOptions {
-    /// The maximum length of the field. used to set the `maxlength` attribute
+    /// The maximum length of the field used to set the `maxlength` attribute
     /// in the HTML input element.
     pub max_length: Option<u32>,
-    /// The minimum length of the field. used to set the `minlength` attribute
+    /// The minimum length of the field used to set the `minlength` attribute
     /// in the HTML input element.
     pub min_length: Option<u32>,
 }

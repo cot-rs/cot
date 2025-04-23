@@ -8,11 +8,11 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
-#[cfg(feature = "db")]
+#[cfg(feature = "mysql")]
 use cot::db::impl_mysql::MySqlValueRef;
-#[cfg(feature = "db")]
+#[cfg(feature = "postgres")]
 use cot::db::impl_postgres::PostgresValueRef;
-#[cfg(feature = "db")]
+#[cfg(feature = "sqlite")]
 use cot::db::impl_sqlite::SqliteValueRef;
 use email_address::EmailAddress;
 

@@ -118,6 +118,13 @@ pub enum FormFieldValidationError {
         /// The maximum length of the field.
         max_length: u32,
     },
+
+    /// The field value is too short.
+    #[error("This is below the minimum length of {min_length}.")]
+    MinimumLengthNotMet {
+        /// The minimum length of the field.
+        min_length: u32,
+    },
     /// The field value is required to be true.
     #[error("This field must be checked.")]
     BooleanRequiredToBeTrue,
@@ -142,6 +149,13 @@ impl FormFieldValidationError {
     #[must_use]
     pub fn maximum_length_exceeded(max_length: u32) -> Self {
         Self::MaximumLengthExceeded { max_length }
+    }
+
+    /// Creates a new `FormFieldValidationError` for a field value that is too
+    /// short.
+    #[must_use]
+    pub fn minimum_length_not_met(min_length: u32) -> Self {
+        FormFieldValidationError::MinimumLengthNotMet { min_length }
     }
 
     /// Creates a new `FormFieldValidationError` from a `String`.

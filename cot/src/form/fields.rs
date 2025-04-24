@@ -245,18 +245,23 @@ impl AsFormField for Email {
         let value = check_required(field)?;
         let opts = &field.custom_options;
 
-        if let Some(max_length) = opts.max_length {
-            if let Some(min_length) = opts.min_length {
-                if min_length > max_length {
-                    return Err(FormFieldValidationError::from_string(format!(
-                        "min_length ({min_length}) exceeds max_length ({max_length})"
-                    )));
-                }
+        if let (Some(min), Some(max)) = (opts.min_length, opts.max_length) {
+            if min > max {
+                return Err(FormFieldValidationError::from_string(format!(
+                    "min_length ({min}) exceeds max_length ({max})"
+                )));
             }
-            if value.len() > max_length as usize {
-                return Err(FormFieldValidationError::maximum_length_exceeded(
-                    max_length,
-                ));
+        }
+
+        if let Some(min) = opts.min_length {
+            if value.len() < min as usize {
+                return Err(FormFieldValidationError::minimum_length_not_met(min));
+            }
+        }
+
+        if let Some(max) = opts.max_length {
+            if value.len() > max as usize {
+                return Err(FormFieldValidationError::maximum_length_exceeded(max));
             }
         }
 
@@ -811,6 +816,29 @@ mod tests {
         assert!(matches!(
             result,
             Err(FormFieldValidationError::MaximumLengthExceeded { max_length: _ })
+        ));
+    }
+
+    #[test]
+    fn email_field_clean_below_min_length() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(5),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("cot"));
+        let result = Email::clean_value(&field);
+
+        assert!(matches!(
+            result,
+            Err(FormFieldValidationError::MinimumLengthNotMet { min_length: _ })
         ));
     }
 

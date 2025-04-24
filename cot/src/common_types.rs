@@ -241,10 +241,7 @@ impl Email {
     /// use cot::common_types::Email;
     ///
     /// let email = Email::from_str("user@example.com").unwrap();
-    /// assert_eq!(
-    ///     email.to_display("John Doe"),
-    ///     "\"John Doe\" <user@example.com>"
-    /// );
+    /// assert_eq!(email.to_display("John Doe"), "John Doe <user@example.com>");
     /// ```
     pub fn to_display(&self, display_name: &str) -> String {
         self.0.to_display(display_name)
@@ -296,8 +293,8 @@ impl Email {
     ///
     /// use cot::common_types::Email;
     ///
-    /// let email = Email::from_str("user@example.com").unwrap();
-    /// assert_eq!(email.display_part(), "user");
+    /// let email = Email::from_str("Name <name@example.org>").unwrap();
+    /// assert_eq!(email.display_part(), "Name".to_owned());
     /// ```
     pub fn display_part(&self) -> &str {
         self.0.display_part()

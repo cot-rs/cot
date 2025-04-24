@@ -207,6 +207,7 @@ impl Email {
     /// let email = Email::from_str("user@example.com").unwrap();
     /// assert_eq!(email.domain(), "example.com");
     /// ```
+    #[must_use]
     pub fn domain(&self) -> &str {
         self.0.domain()
     }
@@ -224,6 +225,7 @@ impl Email {
     /// let email = Email::from_str("user@example.com").unwrap();
     /// assert_eq!(email.to_uri(), "mailto:user@example.com");
     /// ```
+    #[must_use]
     pub fn to_uri(&self) -> String {
         self.0.to_uri()
     }
@@ -243,6 +245,7 @@ impl Email {
     /// let email = Email::from_str("user@example.com").unwrap();
     /// assert_eq!(email.to_display("John Doe"), "John Doe <user@example.com>");
     /// ```
+    #[must_use]
     pub fn to_display(&self, display_name: &str) -> String {
         self.0.to_display(display_name)
     }
@@ -259,6 +262,7 @@ impl Email {
     /// let email = Email::from_str("user@example.com").unwrap();
     /// assert_eq!(email.email(), "user@example.com");
     /// ```
+    #[must_use]
     pub fn email(&self) -> String {
         self.0.email()
     }
@@ -276,6 +280,7 @@ impl Email {
     /// let email = Email::from_str("user@example.com").unwrap();
     /// assert_eq!(email.local_part(), "user");
     /// ```
+    #[must_use]
     pub fn local_part(&self) -> &str {
         self.0.local_part()
     }
@@ -296,6 +301,7 @@ impl Email {
     /// let email = Email::from_str("Name <name@example.org>").unwrap();
     /// assert_eq!(email.display_part(), "Name".to_owned());
     /// ```
+    #[must_use]
     pub fn display_part(&self) -> &str {
         self.0.display_part()
     }

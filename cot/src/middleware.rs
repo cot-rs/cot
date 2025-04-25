@@ -23,9 +23,9 @@ use http_body_util::combinators::BoxBody;
 use std::task::{Context, Poll};
 use tower::Service;
 use tower_sessions::session::{Id, Record};
+use tower_sessions::{MemoryStore as TowerMemoryStore, SessionManagerLayer, SessionStore};
 
 use crate::config::{Expiry, SameSite};
-use tower_sessions::{MemoryStore, SessionManagerLayer, SessionStore};
 
 /// Middleware that converts a any [`http::Response`] generic type to a
 /// [`cot::response::Response`].
@@ -254,6 +254,8 @@ where
     })
 }
 
+pub type MemoryStore = TowerMemoryStore;
+
 #[derive(Debug, Clone)]
 pub struct SessionStoreWrapper(Arc<dyn SessionStore>);
 
@@ -283,9 +285,8 @@ pub struct SessionMiddleware {
 impl SessionMiddleware {
     /// Crates a new instance of [`SessionMiddleware`].
     #[must_use]
-    pub fn new() -> Self {
-        let store = MemoryStore::default();
-        let layer = SessionManagerLayer::new(SessionStoreWrapper(Arc::new(store)));
+    pub fn new(session_store: Arc<dyn SessionStore>) -> Self {
+        let layer = SessionManagerLayer::new(SessionStoreWrapper(session_store));
         Self { inner: layer }
     }
 
@@ -315,7 +316,7 @@ impl SessionMiddleware {
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let session_cfg = &context.config().middlewares.session;
-        let mut middleware = Self::new()
+        let mut middleware = Self::new(cfg.middlewares.session.session_store.clone())
             .secure(session_cfg.secure)
             .path(session_cfg.path.clone())
             .name(session_cfg.name.clone())
@@ -470,7 +471,8 @@ impl SessionMiddleware {
 
 impl Default for SessionMiddleware {
     fn default() -> Self {
-        Self::new()
+        let memory_store = Arc::new(MemoryStore::default());
+        Self::new(memory_store)
     }
 }
 

@@ -19,8 +19,8 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::Service;
-use tower_sessions::session::{Id, Record};
 use tower_sessions::SessionManagerLayer;
+use tower_sessions::session::{Id, Record};
 pub use tower_sessions::{MemoryStore, SessionStore};
 
 /// Middleware that converts a any [`http::Response`] generic type to a

@@ -311,7 +311,8 @@ impl SessionMiddleware {
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let cfg = context.config();
-        Self::new(cfg.middlewares.session.session_store.clone()).secure(cfg.middlewares.session.secure)
+        Self::new(cfg.middlewares.session.session_store.clone())
+            .secure(cfg.middlewares.session.secure)
     }
 
     /// Sets the secure flag for the session middleware.

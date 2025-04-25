@@ -15,10 +15,12 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
+use std::sync::Arc;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
+use tower_sessions::{MemoryStore, SessionStore};
 
 /// The configuration for a project.
 ///
@@ -517,10 +519,10 @@ impl LiveReloadMiddlewareConfigBuilder {
 ///
 /// let config = SessionMiddlewareConfig::builder().secure(false).build();
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[derive(Debug, Clone, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
-pub struct SessionMiddlewareConfig {
+pub struct SessionMiddlewareConfig{
     /// Whether the session middleware is secure.
     ///
     /// # Examples
@@ -531,9 +533,18 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
+
+    /// The session store to use. Defaults to an in-memory store.
+    ///
+    /// Skipped in serde because trait objects cannot be deserialized.
+    #[serde(skip)]
+    #[builder(
+        default = "Arc::new(MemoryStore::default())"
+    )]
+    pub session_store: Arc<dyn SessionStore>,
 }
 
-impl SessionMiddlewareConfig {
+impl SessionMiddlewareConfig{
     /// Create a new [`SessionMiddlewareConfigBuilder`] to build a
     /// [`SessionMiddlewareConfig`].
     ///
@@ -564,9 +575,27 @@ impl SessionMiddlewareConfigBuilder {
     pub fn build(&self) -> SessionMiddlewareConfig {
         SessionMiddlewareConfig {
             secure: self.secure.unwrap_or(true),
+            session_store: self
+                .session_store
+                .clone()
+                .unwrap_or_else(|| Arc::new(MemoryStore::default())),
         }
     }
 }
+
+impl Default for SessionMiddlewareConfig{
+    fn default() -> Self {
+        SessionMiddlewareConfig::builder().build()
+    }
+}
+
+impl PartialEq<Self> for SessionMiddlewareConfig {
+    fn eq(&self, other: &Self) -> bool {
+        self.secure == other.secure
+    }
+}
+
+impl Eq for SessionMiddlewareConfig {}
 
 /// A secret key.
 ///

@@ -22,8 +22,8 @@ use http_body_util::combinators::BoxBody;
 
 use std::task::{Context, Poll};
 use tower::Service;
-use tower_sessions::session::{Id, Record};
 use tower_sessions::SessionManagerLayer;
+use tower_sessions::session::{Id, Record};
 pub use tower_sessions::{MemoryStore, SessionStore};
 
 use crate::config::{Expiry, SameSite};

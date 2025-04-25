@@ -22,6 +22,7 @@ use chrono::{DateTime, FixedOffset};
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
+
 use subtle::ConstantTimeEq;
 use time::{OffsetDateTime, UtcOffset};
 use tower_sessions::{MemoryStore, SessionStore};
@@ -1063,13 +1064,11 @@ pub struct SessionMiddlewareConfig {
     ///
     /// Skipped in serde because trait objects cannot be deserialized.
     #[serde(skip)]
-    #[builder(
-        default = "Arc::new(MemoryStore::default())"
-    )]
+    #[builder(default = "Arc::new(MemoryStore::default())")]
     pub session_store: Arc<dyn SessionStore>,
 }
 
-impl SessionMiddlewareConfig{
+impl SessionMiddlewareConfig {
     /// Create a new [`SessionMiddlewareConfigBuilder`] to build a
     /// [`SessionMiddlewareConfig`].
     ///
@@ -1115,7 +1114,7 @@ impl SessionMiddlewareConfigBuilder {
     }
 }
 
-impl Default for SessionMiddlewareConfig{
+impl Default for SessionMiddlewareConfig {
     fn default() -> Self {
         SessionMiddlewareConfig::builder().build()
     }

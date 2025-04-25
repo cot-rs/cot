@@ -316,7 +316,7 @@ impl SessionMiddleware {
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let session_cfg = &context.config().middlewares.session;
-        let mut middleware = Self::new(cfg.middlewares.session.session_store.clone())
+        let mut middleware = Self::new(session_cfg.session_store.clone())
             .secure(session_cfg.secure)
             .path(session_cfg.path.clone())
             .name(session_cfg.name.clone())

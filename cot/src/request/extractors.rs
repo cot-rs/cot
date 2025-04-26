@@ -60,6 +60,7 @@ use cot::request::{PathParams, Request};
 use http::request::Parts;
 use serde::de::DeserializeOwned;
 
+use crate::Method;
 use crate::auth::Auth;
 use crate::form::{Form, FormResult};
 use crate::request::RequestExt;
@@ -407,6 +408,12 @@ impl FromRequestParts for RequestDb {
 }
 
 // extractor impls for existing types
+impl FromRequestParts for Method {
+    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+        Ok(parts.method.clone())
+    }
+}
+
 impl FromRequestParts for Session {
     async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
         Ok(Session::from_extensions(&parts.extensions).clone())
@@ -603,6 +610,15 @@ mod tests {
         let urls: Urls = request.extract_parts().await.unwrap();
 
         assert!(reverse!(urls, "test_route").is_ok());
+    }
+
+    #[cot::test]
+    async fn method_extraction() {
+        let mut request = TestRequestBuilder::get("/test/").build();
+
+        let method: Method = request.extract_parts().await.unwrap();
+
+        assert_eq!(method, Method::GET);
     }
 
     #[cfg(feature = "db")]

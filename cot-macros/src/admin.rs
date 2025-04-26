@@ -73,7 +73,7 @@ impl AdminModelDeriveBuilder {
         }
     }
 
-    #[expect(clippy::too_many_lines)] // it's mostly the AdminModel impl
+    #[expect(clippy::too_many_lines)] // it's mainly the AdminModel impl
     fn build_admin_model_impl(&self) -> TokenStream {
         let crate_ident = cot_ident();
 
@@ -172,6 +172,7 @@ impl AdminModelDeriveBuilder {
                 {
                     use #crate_ident::form::Form;
                     use #crate_ident::request::RequestExt;
+                    use #crate_ident::db::Model;
 
                     let form_result = <Self as #crate_ident::form::Form>::from_request(request).await?;
                     match form_result {

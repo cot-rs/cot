@@ -12,6 +12,7 @@
 pub use askama;
 pub use async_trait::async_trait;
 pub use bytes::Bytes;
+pub use cot_macros::ModelHelper;
 pub use tokio;
 
 // used in the CLI

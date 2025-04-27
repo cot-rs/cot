@@ -764,15 +764,15 @@ pub trait ErrorPageHandler: Send + Sync {
 struct DefaultNotFoundHandler;
 impl ErrorPageHandler for DefaultNotFoundHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Html::new(include_str!("../templates/404.html")).with_status(StatusCode::NOT_FOUND))
+        Html::new(include_str!("../templates/404.html")).with_status(StatusCode::NOT_FOUND)
     }
 }
 
 struct DefaultServerErrorHandler;
 impl ErrorPageHandler for DefaultServerErrorHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Html::new(include_str!("../templates/500.html"))
-            .with_status(StatusCode::INTERNAL_SERVER_ERROR))
+        Html::new(include_str!("../templates/500.html"))
+            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 

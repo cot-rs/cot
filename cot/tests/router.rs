@@ -8,14 +8,14 @@ use cot::router::{Route, Router};
 use cot::test::Client;
 use cot::{App, AppBuilder, Body, Project, StatusCode};
 
-async fn index(_request: Request) -> cot::Result<Response> {
-    Ok(Html::new("Hello world!").into_response())
+async fn index(_request: Request) -> Html {
+    Html::new("Hello world!")
 }
 
-async fn parameterized(request: Request) -> cot::Result<Response> {
+async fn parameterized(request: Request) -> Html {
     let name = request.path_params().get("name").unwrap().to_owned();
 
-    Ok(Html::new(name).into_response())
+    Html::new(name)
 }
 
 #[cot::test]

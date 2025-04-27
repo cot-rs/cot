@@ -113,7 +113,7 @@ async fn login(urls: Urls, auth: Auth, mut request: Request) -> crate::Result<Re
         urls: &urls,
         form: login_form_context,
     };
-    Ok(Html::new(template.render()?).into_response())
+    Html::new(template.render()?).into_response()
 }
 
 async fn authenticate(auth: &Auth, login_form: LoginForm) -> cot::Result<bool> {
@@ -221,7 +221,7 @@ async fn view_model(
         total_pages,
     };
 
-    Ok(Html::new(template.render()?).into_response())
+    Html::new(template.render()?).into_response()
 }
 
 async fn create_model_instance(
@@ -288,7 +288,7 @@ async fn edit_model_instance_impl(
         is_edit: object_id.is_some(),
     };
 
-    Ok(Html::new(template.render()?).into_response())
+    Html::new(template.render()?).into_response()
 }
 
 async fn remove_model_instance(
@@ -325,7 +325,7 @@ async fn remove_model_instance(
             object: &*object,
         };
 
-        Ok(Html::new(template.render()?).into_response())
+        Html::new(template.render()?).into_response()
     }
 }
 

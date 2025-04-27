@@ -172,12 +172,10 @@ impl ResponseExt for Response {
     }
 }
 
-pub(crate) fn not_found_response(message: Option<String>) -> Response {
-    let mut response = Html::new("404 Not Found").with_status(StatusCode::NOT_FOUND);
-    response
-        .extensions_mut()
-        .insert(ErrorPageTrigger::NotFound { message });
-    response
+pub(crate) fn not_found_response(message: Option<String>) -> crate::Result<Response> {
+    Html::new("404 Not Found")
+        .with_status(StatusCode::NOT_FOUND)
+        .with_extension(ErrorPageTrigger::NotFound { message })
 }
 
 #[cfg(test)]

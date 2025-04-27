@@ -71,6 +71,17 @@ pub trait IntoResponse {
             resp
         })
     }
+
+    fn with_extension<T>(self, extension: T) -> cot::Result<Response>
+    where
+        T: Clone + Send + Sync + 'static,
+        Self: Sized,
+    {
+        self.into_response().map(|mut resp| {
+            resp.extensions_mut().insert(extension);
+            resp
+        })
+    }
 }
 macro_rules! impl_into_response_for_type_and_mime {
     ($ty:ty, $mime:expr) => {

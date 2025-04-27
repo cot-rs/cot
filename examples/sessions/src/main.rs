@@ -41,7 +41,7 @@ async fn hello(urls: Urls, session: Session) -> cot::Result<Response> {
 
     let template = IndexTemplate { name };
 
-    Ok(Html::new(template.render()?).into_response())
+    Html::new(template.render()?).into_response()
 }
 
 async fn name(urls: Urls, session: Session, mut request: Request) -> cot::Result<Response> {
@@ -54,7 +54,7 @@ async fn name(urls: Urls, session: Session, mut request: Request) -> cot::Result
 
     let template = NameTemplate { urls: &urls };
 
-    Ok(Html::new(template.render()?).into_response())
+    Html::new(template.render()?).into_response()
 }
 
 struct HelloApp;

@@ -139,7 +139,7 @@ impl Router {
             result.handler.handle(request).await
         } else {
             debug!("Not found: {}", request_path);
-            Ok(not_found_response(None))
+            not_found_response(None)
         }
     }
 
@@ -1039,7 +1039,7 @@ mod tests {
 
     impl RequestHandler for MockHandler {
         async fn handle(&self, _request: Request) -> Result<Response> {
-            Ok(Html::new("OK").into_response())
+            Html::new("OK").into_response()
         }
     }
 

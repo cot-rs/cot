@@ -11,8 +11,8 @@ use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
 #[cot::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
 async fn cot_project_router_sub_path() {
-    async fn hello(_request: Request) -> cot::Result<Response> {
-        Ok(Html::new("OK").into_response())
+    async fn hello(_request: Request) -> Html {
+        Html::new("OK")
     }
 
     struct App1;
@@ -62,8 +62,9 @@ async fn cot_project_router_sub_path() {
 #[cot::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
 async fn cot_router_reverse_local() {
-    async fn get_index(request: Request) -> cot::Result<Response> {
-        Ok(Html::new(reverse!(request, "index")?).into_response())
+    async fn get_index(request: Request) -> cot::Result<Html> {
+        let reversed = reverse!(request, "index")?;
+        Ok(Html::new(reversed))
     }
 
     struct App1;

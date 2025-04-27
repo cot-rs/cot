@@ -52,14 +52,14 @@ impl Project for HelloProject {
 struct CustomServerError;
 impl ErrorPageHandler for CustomServerError {
     fn handle(&self) -> cot::Result<Response> {
-        Ok(Html::new(include_str!("500.html")).with_status(StatusCode::INTERNAL_SERVER_ERROR))
+        Html::new(include_str!("500.html")).with_status(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 
 struct CustomNotFound;
 impl ErrorPageHandler for CustomNotFound {
     fn handle(&self) -> cot::Result<Response> {
-        Ok(Html::new(include_str!("404.html")).with_status(StatusCode::INTERNAL_SERVER_ERROR))
+        Html::new(include_str!("404.html")).with_status(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 

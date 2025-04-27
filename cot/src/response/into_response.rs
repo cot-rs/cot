@@ -24,10 +24,15 @@ use crate::html::Html;
 
 pub trait IntoResponse {
     /// Converts the implementing type into a `cot::Result<Response>`.
-    #[must_use]
+    ///
+    /// # Errors
+    /// Returns an error if the conversion fails.
     fn into_response(self) -> cot::Result<Response>;
 
     /// Modifies the response by appending the specified header.
+    ///
+    /// # Errors
+    /// Returns an error if the header name or value is invalid.
     fn with_header<K, V, KE, VE>(self, key: K, value: V) -> cot::Result<Response>
     where
         K: TryInto<http::HeaderName, Error = KE>,
@@ -50,6 +55,9 @@ pub trait IntoResponse {
     }
 
     /// Modifies the response by setting the `Content-Type` header.
+    ///
+    /// # Errors
+    /// Returns an error if the content type value is invalid.
     fn with_content_type<V, VE>(self, content_type: V) -> cot::Result<Response>
     where
         V: TryInto<http::HeaderValue, Error = VE>,
@@ -68,6 +76,9 @@ pub trait IntoResponse {
     }
 
     /// Modifies the response by setting the status code.
+    ///
+    /// # Errors
+    /// Returns an error if the `IntoResponse` conversion fails.
     fn with_status(self, status: StatusCode) -> cot::Result<Response>
     where
         Self: Sized,
@@ -79,6 +90,9 @@ pub trait IntoResponse {
     }
 
     /// Modifies the response by setting the body.
+    ///
+    /// # Errors
+    /// Returns an error if the `IntoResponse` conversion fails.
     fn with_body(self, body: impl Into<Body>) -> cot::Result<Response>
     where
         Self: Sized,
@@ -90,6 +104,9 @@ pub trait IntoResponse {
     }
 
     /// Modifies the response by inserting an extension.
+    ///
+    /// # Errors
+    /// Returns an error if the `IntoResponse` conversion fails.
     fn with_extension<T>(self, extension: T) -> cot::Result<Response>
     where
         T: Clone + Send + Sync + 'static,

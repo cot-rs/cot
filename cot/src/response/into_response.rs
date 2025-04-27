@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 use std::convert::Infallible;
+use std::fmt::Error;
 
 use bytes::{Bytes, BytesMut};
+use cot::error::ErrorRepr;
 use cot::headers::HTML_CONTENT_TYPE;
 use cot::response::{RESPONSE_BUILD_FAILURE, Response};
 use cot::{Body, StatusCode};
@@ -25,14 +27,20 @@ pub trait IntoResponse {
     #[must_use]
     fn into_response(self) -> cot::Result<Response>;
 
-    fn with_header<K, V>(self, key: K, value: V) -> cot::Result<Response>
+    fn with_header<K, V, KE, VE>(self, key: K, value: V) -> cot::Result<Response>
     where
-        K: Into<http::HeaderName>,
-        V: Into<http::HeaderValue>,
+        K: TryInto<http::HeaderName, Error = KE>,
+        KE: Into<http::Error>,
+        V: TryInto<http::HeaderValue, Error = VE>,
+        VE: Into<http::Error>,
         Self: Sized,
     {
-        let key = key.into();
-        let value = value.into();
+        let key = key
+            .try_into()
+            .map_err(|e| cot::error::ErrorRepr::from(e.into()))?;
+        let value = value
+            .try_into()
+            .map_err(|e| cot::error::ErrorRepr::from(e.into()))?;
 
         self.into_response().map(|mut resp| {
             resp.headers_mut().append(key, value);
@@ -40,14 +48,19 @@ pub trait IntoResponse {
         })
     }
 
-    fn with_content_type<V>(self, content_type: V) -> cot::Result<Response>
+    fn with_content_type<V, VE>(self, content_type: V) -> cot::Result<Response>
     where
-        V: Into<http::HeaderValue>,
+        V: TryInto<http::HeaderValue, Error = VE>,
+        VE: Into<http::Error>,
         Self: Sized,
     {
+        let content_type = content_type
+            .try_into()
+            .map_err(|e| cot::error::ErrorRepr::from(e.into()))?;
+
         self.into_response().map(|mut resp| {
             resp.headers_mut()
-                .insert(http::header::CONTENT_TYPE, content_type.into());
+                .insert(http::header::CONTENT_TYPE, content_type);
             resp
         })
     }
@@ -87,10 +100,7 @@ macro_rules! impl_into_response_for_type_and_mime {
     ($ty:ty, $mime:expr) => {
         impl IntoResponse for $ty {
             fn into_response(self) -> cot::Result<Response> {
-                Body::from(self).with_header(
-                    http::header::CONTENT_TYPE,
-                    http::HeaderValue::from_static($mime.as_ref()),
-                )
+                Body::from(self).with_header(http::header::CONTENT_TYPE, $mime.as_ref())
             }
         }
     };
@@ -221,9 +231,10 @@ impl IntoResponse for Html {
     /// let response = html.into_response();
     /// ```
     fn into_response(self) -> cot::Result<Response> {
-        self.as_str().to_owned().into_response().with_content_type(
-            http::header::HeaderValue::from_static(mime::TEXT_HTML_UTF_8.as_ref()),
-        )
+        self.as_str()
+            .to_owned()
+            .into_response()
+            .with_content_type(mime::TEXT_HTML_UTF_8.as_ref())
     }
 }
 

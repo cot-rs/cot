@@ -51,8 +51,8 @@ future_not_send = "warn"
 ahash = { version = "0.8.11", default-features = false }
 aide = { version = "0.14", default-features = false }
 anstyle = "1.0.10"
-anyhow = "1.0.97"
-askama = "0.13"
+anyhow = "1.0.98"
+askama = { version = "0.14", default-features = false }
 assert_cmd = "2"
 async-stream = "0.3"
 async-trait = "0.1"
@@ -90,7 +90,7 @@ insta-cmd = "0.6"
 mime_guess = { version = "2", default-features = false }
 mockall = "0.13"
 password-auth = { version = "1", default-features = false }
-petgraph = { version = "0.7", default-features = false }
+petgraph = { version = "0.8", default-features = false }
 pin-project-lite = "0.2"
 prettyplease = "0.2"
 proc-macro-crate = "3"

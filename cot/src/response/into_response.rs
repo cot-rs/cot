@@ -1,14 +1,11 @@
-use std::borrow::Cow;
 use std::convert::Infallible;
-use std::fmt::Error;
 
 use bytes::{Bytes, BytesMut};
-use cot::error::ErrorRepr;
-use cot::headers::HTML_CONTENT_TYPE;
-use cot::response::{RESPONSE_BUILD_FAILURE, Response};
+use cot::response::Response;
 use cot::{Body, StatusCode};
 use http;
 
+use crate::error::ErrorRepr;
 use crate::html::Html;
 
 /// Trait for generating responses.
@@ -21,7 +18,6 @@ use crate::html::Html;
 ///
 /// However, it might be necessary if you have a custom error type that you want
 /// to return from handlers.
-
 pub trait IntoResponse {
     /// Converts the implementing type into a `cot::Result<Response>`.
     ///
@@ -41,12 +37,8 @@ pub trait IntoResponse {
         VE: Into<http::Error>,
         Self: Sized,
     {
-        let key = key
-            .try_into()
-            .map_err(|e| cot::error::ErrorRepr::from(e.into()))?;
-        let value = value
-            .try_into()
-            .map_err(|e| cot::error::ErrorRepr::from(e.into()))?;
+        let key = key.try_into().map_err(|e| ErrorRepr::from(e.into()))?;
+        let value = value.try_into().map_err(|e| ErrorRepr::from(e.into()))?;
 
         self.into_response().map(|mut resp| {
             resp.headers_mut().append(key, value);
@@ -66,7 +58,7 @@ pub trait IntoResponse {
     {
         let content_type = content_type
             .try_into()
-            .map_err(|e| cot::error::ErrorRepr::from(e.into()))?;
+            .map_err(|e| ErrorRepr::from(e.into()))?;
 
         self.into_response().map(|mut resp| {
             resp.headers_mut()

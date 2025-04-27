@@ -53,7 +53,7 @@ use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{AppName, Request, RequestExt};
-use crate::response::{Response, ResponseExt};
+use crate::response::Response;
 use crate::router::{Route, Router, RouterService};
 use crate::{Body, Error, StatusCode, cli, error_page};
 

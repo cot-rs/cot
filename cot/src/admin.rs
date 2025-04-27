@@ -30,9 +30,9 @@ use crate::form::{
 };
 use crate::request::extractors::{FromRequestParts, Path, UrlQuery};
 use crate::request::{Request, RequestExt};
-use crate::response::{Response, ResponseExt};
+use crate::response::Response;
 use crate::router::{Router, Urls};
-use crate::{App, Body, Error, Method, RequestHandler, StatusCode, reverse_redirect, static_files};
+use crate::{App, Error, Method, RequestHandler, reverse_redirect, static_files};
 
 struct AdminAuthenticated<T, H: Send + Sync>(H, PhantomData<fn() -> T>);
 

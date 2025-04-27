@@ -12,7 +12,6 @@
 //! use cot::response::ResponseExt;
 //! ```
 
-use bytes::Bytes;
 use cot::html::Html;
 
 use crate::error_page::ErrorPageTrigger;
@@ -72,7 +71,7 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// let response = Response::new_html(StatusCode::OK, Body::fixed("Hello world!"));
     /// ```
     #[must_use]
-    #[deprecated(since = "0.3", note = "Use `Html::new` instead")]
+    #[deprecated(since = "0.3.0", note = "Use `Html::new` instead")]
     fn new_html(status: StatusCode, body: Body) -> Self;
 
     /// Create a new JSON response.

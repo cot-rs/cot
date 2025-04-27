@@ -23,10 +23,11 @@ use crate::html::Html;
 /// to return from handlers.
 
 pub trait IntoResponse {
-    /// Create a response.
+    /// Converts the implementing type into a `cot::Result<Response>`.
     #[must_use]
     fn into_response(self) -> cot::Result<Response>;
 
+    /// Modifies the response by appending the specified header.
     fn with_header<K, V, KE, VE>(self, key: K, value: V) -> cot::Result<Response>
     where
         K: TryInto<http::HeaderName, Error = KE>,
@@ -48,6 +49,7 @@ pub trait IntoResponse {
         })
     }
 
+    /// Modifies the response by setting the `Content-Type` header.
     fn with_content_type<V, VE>(self, content_type: V) -> cot::Result<Response>
     where
         V: TryInto<http::HeaderValue, Error = VE>,
@@ -65,6 +67,7 @@ pub trait IntoResponse {
         })
     }
 
+    /// Modifies the response by setting the status code.
     fn with_status(self, status: StatusCode) -> cot::Result<Response>
     where
         Self: Sized,
@@ -75,6 +78,7 @@ pub trait IntoResponse {
         })
     }
 
+    /// Modifies the response by setting the body.
     fn with_body(self, body: impl Into<Body>) -> cot::Result<Response>
     where
         Self: Sized,
@@ -85,6 +89,7 @@ pub trait IntoResponse {
         })
     }
 
+    /// Modifies the response by inserting an extension.
     fn with_extension<T>(self, extension: T) -> cot::Result<Response>
     where
         T: Clone + Send + Sync + 'static,

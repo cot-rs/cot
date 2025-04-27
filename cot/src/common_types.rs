@@ -363,11 +363,12 @@ impl TryFrom<String> for Email {
 
 /// Implements database value conversion for `Email`.
 ///
-/// This allows `Email` to be stored in the database as a text value.
+/// This allows a normalized `Email` to be stored in the database as a text
+/// value.
 #[cfg(feature = "db")]
 impl ToDbValue for Email {
     fn to_db_value(&self) -> DbValue {
-        self.0.clone().to_string().into()
+        self.0.clone().email().into()
     }
 }
 
@@ -469,6 +470,17 @@ mod tests {
             let email_str = email.as_str();
             let db_value_str = format!("{db_value:?}");
             assert!(db_value_str.contains(email_str));
+        }
+
+        #[test]
+        fn test_to_db_value_is_normalized() {
+            let with_display = Email::new("John Doe <user@example.com>").unwrap();
+            let bare = Email::new("user@example.com").unwrap();
+
+            let db1 = with_display.to_db_value();
+            let db2 = bare.to_db_value();
+
+            assert_eq!(db1, db2);
         }
     }
 }

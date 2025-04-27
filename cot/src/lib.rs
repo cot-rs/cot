@@ -66,6 +66,7 @@ pub mod admin;
 pub mod auth;
 mod body;
 pub mod cli;
+pub mod common_types;
 pub mod config;
 mod error_page;
 #[macro_use]

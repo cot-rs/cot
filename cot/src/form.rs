@@ -61,6 +61,7 @@ use crate::request::{Request, RequestExt};
 
 /// Error occurred while processing a form.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum FormError {
     /// An error occurred while processing the request, before validating the
     /// form data.
@@ -107,6 +108,7 @@ impl<T: Form> FormResult<T> {
 
 /// An error that can occur when validating a form field.
 #[derive(Debug, Error, PartialEq, Eq)]
+#[non_exhaustive]
 #[error("{message}")]
 pub enum FormFieldValidationError {
     /// The field is required.
@@ -117,6 +119,13 @@ pub enum FormFieldValidationError {
     MaximumLengthExceeded {
         /// The maximum length of the field.
         max_length: u32,
+    },
+
+    /// The field value is too short.
+    #[error("This is below the minimum length of {min_length}.")]
+    MinimumLengthNotMet {
+        /// The minimum length of the field.
+        min_length: u32,
     },
     /// The field value is required to be true.
     #[error("This field must be checked.")]
@@ -144,6 +153,13 @@ impl FormFieldValidationError {
         Self::MaximumLengthExceeded { max_length }
     }
 
+    /// Creates a new `FormFieldValidationError` for a field value that is too
+    /// short.
+    #[must_use]
+    pub fn minimum_length_not_met(min_length: u32) -> Self {
+        FormFieldValidationError::MinimumLengthNotMet { min_length }
+    }
+
     /// Creates a new `FormFieldValidationError` from a `String`.
     #[must_use]
     pub const fn from_string(message: String) -> Self {
@@ -154,6 +170,12 @@ impl FormFieldValidationError {
     #[must_use]
     pub const fn from_static(message: &'static str) -> Self {
         Self::Custom(Cow::Borrowed(message))
+    }
+}
+
+impl From<email_address::Error> for FormFieldValidationError {
+    fn from(error: email_address::Error) -> Self {
+        FormFieldValidationError::from_string(error.to_string())
     }
 }
 

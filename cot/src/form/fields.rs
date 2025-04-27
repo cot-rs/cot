@@ -9,7 +9,8 @@ use askama::filters::HtmlSafe;
 #[cfg(feature = "db")]
 use cot::db::Auto;
 
-use crate::auth::{Password, PasswordHash};
+use crate::auth::PasswordHash;
+use crate::common_types::{Email, Password};
 #[cfg(feature = "db")]
 use crate::db::LimitedString;
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
@@ -198,6 +199,81 @@ impl AsFormField for PasswordHash {
         String::new()
     }
 }
+
+impl_form_field!(EmailField, EmailFieldOptions, "an email");
+
+/// Custom options for [`EmailField`]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct EmailFieldOptions {
+    /// The maximum length of the field used to set the `maxlength` attribute
+    /// in the HTML input element.
+    pub max_length: Option<u32>,
+    /// The minimum length of the field used to set the `minlength` attribute
+    /// in the HTML input element.
+    pub min_length: Option<u32>,
+}
+
+impl Display for EmailField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag = HtmlTag::input("email");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+        if let Some(max_length) = self.custom_options.max_length {
+            tag.attr("maxlength", &max_length.to_string());
+        }
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", &min_length.to_string());
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl AsFormField for Email {
+    type Type = EmailField;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized,
+    {
+        let value = check_required(field)?;
+        let opts = &field.custom_options;
+
+        if let (Some(min), Some(max)) = (opts.min_length, opts.max_length) {
+            if min > max {
+                return Err(FormFieldValidationError::from_string(format!(
+                    "min_length ({min}) exceeds max_length ({max})"
+                )));
+            }
+        }
+
+        if let Some(min) = opts.min_length {
+            if value.len() < min as usize {
+                return Err(FormFieldValidationError::minimum_length_not_met(min));
+            }
+        }
+
+        if let Some(max) = opts.max_length {
+            if value.len() > max as usize {
+                return Err(FormFieldValidationError::maximum_length_exceeded(max));
+            }
+        }
+
+        Ok(value.parse()?)
+    }
+
+    fn to_field_value(&self) -> String {
+        self.as_str().to_owned()
+    }
+}
+
+impl HtmlSafe for EmailField {}
 
 impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer);
 
@@ -551,6 +627,29 @@ mod tests {
     }
 
     #[test]
+    fn email_field_render() {
+        let field = EmailField::with_options(
+            FormFieldOptions {
+                id: "test_id".to_owned(),
+                name: "test_name".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        let html = field.to_string();
+        assert!(html.contains("type=\"email\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("minlength=\"10\""));
+        assert!(html.contains("maxlength=\"50\""));
+        assert!(html.contains("name=\"test_name\""));
+        assert!(html.contains("id=\"test_id\""));
+    }
+
+    #[test]
     fn integer_field_render() {
         let field = IntegerField::<i32>::with_options(
             FormFieldOptions {
@@ -655,6 +754,116 @@ mod tests {
         field.set_value(Cow::Borrowed("password"));
         let value = Password::clean_value(&field).unwrap();
         assert_eq!(value.as_str(), "password");
+    }
+
+    #[test]
+    fn email_field_clean_valid() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("user@example.com"));
+        let email = Email::clean_value(&field).unwrap();
+
+        assert_eq!(email.as_str(), "user@example.com");
+    }
+
+    #[test]
+    fn email_field_clean_invalid_format() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("invalid-email"));
+        let result = Email::clean_value(&field);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn email_field_clean_exceeds_max_length() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(5),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("averylongemail@example.com"));
+        let result = Email::clean_value(&field);
+
+        assert!(matches!(
+            result,
+            Err(FormFieldValidationError::MaximumLengthExceeded { max_length: _ })
+        ));
+    }
+
+    #[test]
+    fn email_field_clean_below_min_length() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(5),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("cot"));
+        let result = Email::clean_value(&field);
+
+        assert!(matches!(
+            result,
+            Err(FormFieldValidationError::MinimumLengthNotMet { min_length: _ })
+        ));
+    }
+
+    #[test]
+    fn email_field_clean_invalid_length_options() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(50),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("user@example.com"));
+        let result = Email::clean_value(&field);
+
+        assert!(result.is_err());
+        if let Err(err) = result {
+            let msg = err.to_string();
+            assert!(msg.contains("min_length") && msg.contains("exceeds max_length"));
+        }
     }
 
     #[test]

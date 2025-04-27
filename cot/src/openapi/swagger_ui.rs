@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use cot::headers::HTML_CONTENT_TYPE;
 use cot::html::Html;
 use cot::request::Request;
 use cot::response::IntoResponse;
@@ -97,7 +98,8 @@ impl App for SwaggerUi {
         let swagger_ui = Arc::new(self.inner.clone());
         let swagger_handler = async move || {
             let swagger = swagger_ui.serve().map_err(cot::Error::custom)?;
-            Html::new("").with_body(Body::fixed(swagger))
+            Body::fixed(swagger)
+                .with_content_type(http::header::HeaderValue::from_static(HTML_CONTENT_TYPE))
         };
 
         let mut urls = vec![Route::with_handler("/", swagger_handler)];

@@ -477,7 +477,7 @@ impl HtmlSafe for BoolField {}
 /// Implementation of `AsFormField` for `bool`.
 ///
 /// This implementation converts the string values "true", "on", and "1" to
-/// `true`, and "false", "  off", and "0" to `false`. It returns an error if the
+/// `true`, and "false", "off", and "0" to `false`. It returns an error if the
 /// value is not one of these strings. If the field is required to be `true` by
 /// the field's options, it will return an error if the value is `false`.
 impl AsFormField for bool {

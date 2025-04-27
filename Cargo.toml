@@ -86,7 +86,7 @@ http-body-util = "0.1"
 indexmap = "2"
 insta = { version = "1", features = ["filters"] }
 insta-cmd = "0.6"
-mime = "0.3.17"
+mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 mockall = "0.13"
 password-auth = { version = "1", default-features = false }

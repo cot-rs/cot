@@ -4,7 +4,6 @@ use std::pin::Pin;
 
 use tower::util::BoxCloneSyncService;
 
-use crate::error::ErrorRepr;
 use crate::request::Request;
 use crate::request::extractors::{FromRequest, FromRequestParts};
 use crate::response::{IntoResponse, Response, not_found_response};
@@ -51,17 +50,7 @@ pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
             &self,
             request: Request,
         ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + '_>> {
-            Box::pin(async move {
-                let response = self.0.handle(request).await;
-
-                match response {
-                    Ok(response) => Ok(response),
-                    Err(error) => match error.inner {
-                        ErrorRepr::NotFound { message } => Ok(not_found_response(message)),
-                        _ => Err(error),
-                    },
-                }
-            })
+            Box::pin(self.0.handle(request))
         }
     }
 

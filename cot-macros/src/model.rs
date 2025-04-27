@@ -45,10 +45,11 @@ pub(super) fn impl_model_for_struct(
         syn::Data::Struct(data) => &mut data.fields,
         _ => panic!("Only structs are supported"),
     };
-    let fields = remove_helper_field_attributes(fields);
+    let fields = get_fields_punctuated(fields);
 
     quote!(
         #(#attrs)*
+        #[derive(::cot::__private::ModelHelper)]
         #vis struct #ident {
             #fields
         }
@@ -56,14 +57,9 @@ pub(super) fn impl_model_for_struct(
     )
 }
 
-fn remove_helper_field_attributes(fields: &mut syn::Fields) -> &Punctuated<syn::Field, Token![,]> {
+fn get_fields_punctuated(fields: &mut syn::Fields) -> &Punctuated<syn::Field, Token![,]> {
     match fields {
-        syn::Fields::Named(fields) => {
-            for field in &mut fields.named {
-                field.attrs.retain(|a| !a.path().is_ident("model"));
-            }
-            &fields.named
-        }
+        syn::Fields::Named(fields) => &fields.named,
         _ => panic!("Only named fields are supported"),
     }
 }

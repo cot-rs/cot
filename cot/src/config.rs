@@ -294,6 +294,7 @@ impl ProjectConfigBuilder {
 /// let config = AuthBackendConfig::Database;
 /// ```
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AuthBackendConfig {
     /// No authentication backend.

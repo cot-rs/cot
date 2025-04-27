@@ -760,7 +760,7 @@ where
         match response {
             Ok(response) => Ok(response),
             Err(error) => match error.inner {
-                ErrorRepr::NotFound { message } => Ok(not_found_response(message)),
+                ErrorRepr::NotFound { message } => not_found_response(message),
                 _ => Err(error),
             },
         }

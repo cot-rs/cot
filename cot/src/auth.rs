@@ -34,6 +34,7 @@ use crate::session::Session;
 
 /// An error that occurs during authentication.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum AuthError {
     /// The password hash that is passed to [`PasswordHash::new`] is invalid.
     #[error("Password hash is invalid")]

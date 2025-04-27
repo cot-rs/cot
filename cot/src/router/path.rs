@@ -266,6 +266,7 @@ macro_rules! reverse_param_map {
 
 /// An error that occurs when reversing a path with missing parameters.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ReverseError {
     /// A parameter is missing for the reverse operation.
     #[error("Missing parameter for reverse: `{0}`")]

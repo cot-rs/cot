@@ -61,6 +61,7 @@ use crate::request::{Request, RequestExt};
 
 /// Error occurred while processing a form.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum FormError {
     /// An error occurred while processing the request, before validating the
     /// form data.
@@ -107,6 +108,7 @@ impl<T: Form> FormResult<T> {
 
 /// An error that can occur when validating a form field.
 #[derive(Debug, Error, PartialEq, Eq)]
+#[non_exhaustive]
 #[error("{message}")]
 pub enum FormFieldValidationError {
     /// The field is required.

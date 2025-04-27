@@ -543,17 +543,7 @@ macro_rules! impl_as_openapi_operation {
     };
 }
 
-impl_as_openapi_operation!();
-impl_as_openapi_operation!(P1);
-impl_as_openapi_operation!(P1, P2);
-impl_as_openapi_operation!(P1, P2, P3);
-impl_as_openapi_operation!(P1, P2, P3, P4);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6, P7);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6, P7, P8);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6, P7, P8, P9);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
+handle_all_parameters!(impl_as_openapi_operation);
 
 /// A trait that can be implemented for types that should be taken into
 /// account when generating OpenAPI paths.

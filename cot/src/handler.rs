@@ -74,11 +74,11 @@ macro_rules! impl_request_handler {
         where
             Func: FnOnce($($ty,)*) -> Fut + Clone + Send + Sync + 'static,
             $($ty: FromRequestParts + Send,)*
-            Fut: Future<Output = Result<R>> + Send,
+            Fut: Future<Output = R> + Send,
             R: IntoResponse,
         {
             #[allow(non_snake_case)]
-            async fn handle(&self, request: Request) -> Result<Response> {
+            async fn handle(&self, request: Request) -> cot::Result<Response> {
                 #[allow(unused_variables, unused_mut)] // for the case where there are no params
                 let (mut parts, _body) = request.into_parts();
 
@@ -86,10 +86,7 @@ macro_rules! impl_request_handler {
                     let $ty = $ty::from_request_parts(&mut parts).await?;
                 )*
 
-                match self.clone()($($ty,)*).await {
-                    Ok(response) => Ok(response.into_response()),
-                    Err(error) => Err(error),
-                }
+                self.clone()($($ty,)*).await.into_response()
             }
         }
     };
@@ -97,16 +94,17 @@ macro_rules! impl_request_handler {
 
 macro_rules! impl_request_handler_from_request {
     ($($ty_lhs:ident,)* ($ty_from_request:ident) $(,$ty_rhs:ident)*) => {
-        impl<T, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for T
+        impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for Func
         where
-            T: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> R + Clone + Send + Sync + 'static,
+            Func: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> Fut + Clone + Send + Sync + 'static,
             $($ty_lhs: FromRequestParts + Send,)*
             $ty_from_request: FromRequest + Send,
             $($ty_rhs: FromRequestParts + Send,)*
-            R: for<'a> Future<Output = Result<Response>> + Send,
+            Fut: Future<Output = R> + Send,
+            R: IntoResponse,
         {
             #[expect(non_snake_case)]
-            async fn handle(&self, request: Request) -> Result<Response> {
+            async fn handle(&self, request: Request) -> cot::Result<Response> {
                 #[allow(unused_mut)] // for the case where there are no FromRequestParts params
                 let (mut parts, body) = request.into_parts();
 
@@ -120,10 +118,7 @@ macro_rules! impl_request_handler_from_request {
                 let request = Request::from_parts(parts, body);
                 let $ty_from_request = $ty_from_request::from_request(request).await?;
 
-                match self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await {
-                    Ok(response) => Ok(response.into_response()),
-                    Err(error) => Err(error),
-                }
+                self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await.into_response()
             }
         }
     };

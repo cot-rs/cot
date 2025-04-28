@@ -6,10 +6,10 @@ use cot::html::Html;
 use cot::middleware::SessionMiddleware;
 use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::request::Request;
-use cot::response::{IntoResponse, Response, ResponseExt};
+use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router, Urls};
 use cot::session::Session;
-use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, reverse_redirect};
+use cot::{App, AppBuilder, BoxedHandler, Project, reverse_redirect};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

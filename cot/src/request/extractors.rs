@@ -439,7 +439,6 @@ mod tests {
 
     use super::*;
     use crate::request::extractors::{FromRequest, Json, Path, UrlQuery};
-    use crate::response::{Response, ResponseExt};
     use crate::router::{Route, Router, Urls};
     use crate::test::TestRequestBuilder;
     use crate::{Body, reverse};

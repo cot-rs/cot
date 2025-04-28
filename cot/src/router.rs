@@ -1030,10 +1030,10 @@ mod tests {
     use cot::response::IntoResponse;
 
     use super::*;
+    use crate::StatusCode;
     use crate::request::Request;
-    use crate::response::{Response, ResponseExt};
+    use crate::response::Response;
     use crate::test::TestRequestBuilder;
-    use crate::{Body, StatusCode};
 
     struct MockHandler;
 

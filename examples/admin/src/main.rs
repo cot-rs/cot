@@ -17,10 +17,9 @@ use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::request::extractors::RequestDb;
-use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Body, BoxedHandler, Project, ProjectContext, StatusCode};
+use cot::{App, AppBuilder, BoxedHandler, Project, ProjectContext};
 
 #[derive(Debug, Clone, Form, AdminModel)]
 #[model]

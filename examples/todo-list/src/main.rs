@@ -10,10 +10,10 @@ use cot::form::Form;
 use cot::html::Html;
 use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::request::extractors::{Path, RequestDb, RequestForm};
-use cot::response::{Response, ResponseExt};
+use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, reverse_redirect};
+use cot::{App, AppBuilder, BoxedHandler, Project, reverse_redirect};
 
 #[derive(Debug, Clone)]
 #[model]

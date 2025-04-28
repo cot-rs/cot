@@ -3,10 +3,9 @@ use cot::config::ProjectConfig;
 use cot::html::Html;
 use cot::project::RegisterAppsContext;
 use cot::request::{Request, RequestExt};
-use cot::response::{IntoResponse, Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::test::Client;
-use cot::{App, AppBuilder, Body, Project, StatusCode};
+use cot::{App, AppBuilder, Project, StatusCode};
 
 async fn index(_request: Request) -> Html {
     Html::new("Hello world!")

@@ -2,9 +2,9 @@ use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::html::Html;
 use cot::project::{ErrorPageHandler, RegisterAppsContext};
-use cot::response::{IntoResponse, Response, ResponseExt};
+use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router};
-use cot::{App, AppBuilder, Body, Project, StatusCode};
+use cot::{App, AppBuilder, Project, StatusCode};
 
 async fn return_hello() -> cot::Result<Response> {
     panic!()

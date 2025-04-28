@@ -113,7 +113,6 @@ macro_rules! impl_request_handler_from_request {
     };
 }
 
-#[rustfmt::skip]
 macro_rules! handle_all_parameters {
     ($name:ident) => {
         $name!();
@@ -130,7 +129,6 @@ macro_rules! handle_all_parameters {
     };
 }
 
-#[rustfmt::skip]
 macro_rules! handle_all_parameters_from_request {
     ($name:ident) => {
         $name!((PX));

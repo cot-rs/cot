@@ -254,11 +254,9 @@ macro_rules! body_from_impl {
 }
 
 body_from_impl!(&'static [u8]);
-// body_from_impl!(std::borrow::Cow<'static, [u8]>);
 body_from_impl!(Vec<u8>);
 
 body_from_impl!(&'static str);
-// body_from_impl!(std::borrow::Cow<'static, str>);
 body_from_impl!(String);
 
 body_from_impl!(Bytes);

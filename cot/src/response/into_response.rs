@@ -1,11 +1,9 @@
-use std::convert::Infallible;
-
 use bytes::{Bytes, BytesMut};
+use cot::headers::{APPLICATION_OCTET_STREAM, HTML_CONTENT_TYPE, TEXT_PLAIN_UTF_8};
 use cot::response::Response;
 use cot::{Body, StatusCode};
 use http;
 
-use crate::error::ErrorRepr;
 use crate::html::Html;
 
 /// Trait for generating responses.
@@ -29,92 +27,176 @@ pub trait IntoResponse {
     ///
     /// # Errors
     /// Returns an error if the header name or value is invalid.
-    fn with_header<K, V, KE, VE>(self, key: K, value: V) -> cot::Result<Response>
+    fn with_header<K, V>(self, key: K, value: V) -> WithHeader<Self>
     where
-        K: TryInto<http::HeaderName, Error = KE>,
-        KE: Into<http::Error>,
-        V: TryInto<http::HeaderValue, Error = VE>,
-        VE: Into<http::Error>,
+        K: TryInto<http::HeaderName>,
+        V: TryInto<http::HeaderValue>,
         Self: Sized,
     {
-        let key = key.try_into().map_err(|e| ErrorRepr::from(e.into()))?;
-        let value = value.try_into().map_err(|e| ErrorRepr::from(e.into()))?;
+        let key = key.try_into().ok();
+        let value = value.try_into().ok();
 
-        self.into_response().map(|mut resp| {
-            resp.headers_mut().append(key, value);
-            resp
-        })
+        WithHeader {
+            inner: self,
+            header: key.zip(value),
+        }
     }
 
     /// Modifies the response by setting the `Content-Type` header.
     ///
     /// # Errors
     /// Returns an error if the content type value is invalid.
-    fn with_content_type<V, VE>(self, content_type: V) -> cot::Result<Response>
+    fn with_content_type<V>(self, content_type: V) -> WithContentType<Self>
     where
-        V: TryInto<http::HeaderValue, Error = VE>,
-        VE: Into<http::Error>,
+        V: TryInto<http::HeaderValue>,
         Self: Sized,
     {
-        let content_type = content_type
-            .try_into()
-            .map_err(|e| ErrorRepr::from(e.into()))?;
-
-        self.into_response().map(|mut resp| {
-            resp.headers_mut()
-                .insert(http::header::CONTENT_TYPE, content_type);
-            resp
-        })
+        WithContentType {
+            inner: self,
+            content_type: content_type.try_into().ok(),
+        }
     }
 
     /// Modifies the response by setting the status code.
     ///
     /// # Errors
     /// Returns an error if the `IntoResponse` conversion fails.
-    fn with_status(self, status: StatusCode) -> cot::Result<Response>
+    fn with_status(self, status: StatusCode) -> WithStatus<Self>
     where
         Self: Sized,
     {
-        self.into_response().map(|mut resp| {
-            *resp.status_mut() = status;
-            resp
-        })
+        WithStatus {
+            inner: self,
+            status,
+        }
     }
 
     /// Modifies the response by setting the body.
     ///
     /// # Errors
     /// Returns an error if the `IntoResponse` conversion fails.
-    fn with_body(self, body: impl Into<Body>) -> cot::Result<Response>
+    fn with_body(self, body: impl Into<Body>) -> WithBody<Self>
     where
         Self: Sized,
     {
-        self.into_response().map(|mut resp| {
-            *resp.body_mut() = body.into();
-            resp
-        })
+        WithBody {
+            inner: self,
+            body: body.into(),
+        }
     }
 
     /// Modifies the response by inserting an extension.
     ///
     /// # Errors
     /// Returns an error if the `IntoResponse` conversion fails.
-    fn with_extension<T>(self, extension: T) -> cot::Result<Response>
+    fn with_extension<T>(self, extension: T) -> WithExtension<Self, T>
     where
         T: Clone + Send + Sync + 'static,
         Self: Sized,
     {
-        self.into_response().map(|mut resp| {
-            resp.extensions_mut().insert(extension);
+        WithExtension {
+            inner: self,
+            extension,
+        }
+    }
+}
+
+/// Returned by [`with_header`](IntoResponse::with_header) method.
+#[derive(Debug)]
+pub struct WithHeader<T> {
+    inner: T,
+    header: Option<(http::HeaderName, http::HeaderValue)>,
+}
+
+impl<T: IntoResponse> IntoResponse for WithHeader<T> {
+    fn into_response(self) -> cot::Result<Response> {
+        self.inner.into_response().map(|mut resp| {
+            if let Some((key, value)) = &self.header {
+                resp.headers_mut().append(key, value.clone());
+            }
             resp
         })
     }
 }
+
+/// Returned by [`with_content_type`](IntoResponse::with_content_type) method.
+#[derive(Debug)]
+pub struct WithContentType<T> {
+    inner: T,
+    content_type: Option<http::HeaderValue>,
+}
+
+impl<T: IntoResponse> IntoResponse for WithContentType<T> {
+    fn into_response(self) -> cot::Result<Response> {
+        self.inner.into_response().map(|mut resp| {
+            if let Some(content_type) = self.content_type {
+                resp.headers_mut()
+                    .insert(http::header::CONTENT_TYPE, content_type);
+            }
+            resp
+        })
+    }
+}
+
+/// Returned by [`with_status`](IntoResponse::with_status) method.
+#[derive(Debug)]
+pub struct WithStatus<T> {
+    inner: T,
+    status: StatusCode,
+}
+
+impl<T: IntoResponse> IntoResponse for WithStatus<T> {
+    fn into_response(self) -> cot::Result<Response> {
+        self.inner.into_response().map(|mut resp| {
+            *resp.status_mut() = self.status;
+            resp
+        })
+    }
+}
+
+/// Returned by [`with_body`](IntoResponse::with_body) method.
+#[derive(Debug)]
+pub struct WithBody<T> {
+    inner: T,
+    body: Body,
+}
+
+impl<T: IntoResponse> IntoResponse for WithBody<T> {
+    fn into_response(self) -> cot::Result<Response> {
+        self.inner.into_response().map(|mut resp| {
+            *resp.body_mut() = self.body.into();
+            resp
+        })
+    }
+}
+
+/// Returned by [`with_extension`](IntoResponse::with_extension) method.
+#[derive(Debug)]
+pub struct WithExtension<T, D: Clone + Send + Sync + 'static> {
+    inner: T,
+    extension: D,
+}
+
+impl<T, D> IntoResponse for WithExtension<T, D>
+where
+    T: IntoResponse,
+    D: Clone + Send + Sync + 'static,
+{
+    fn into_response(self) -> cot::Result<Response> {
+        self.inner.into_response().map(|mut resp| {
+            resp.extensions_mut().insert(self.extension);
+            resp
+        })
+    }
+}
+
 macro_rules! impl_into_response_for_type_and_mime {
     ($ty:ty, $mime:expr) => {
         impl IntoResponse for $ty {
             fn into_response(self) -> cot::Result<Response> {
-                Body::from(self).with_header(http::header::CONTENT_TYPE, $mime.as_ref())
+                Body::from(self)
+                    .with_header(http::header::CONTENT_TYPE, $mime)
+                    .into_response()
             }
         }
     };
@@ -125,12 +207,6 @@ macro_rules! impl_into_response_for_type_and_mime {
 impl IntoResponse for () {
     fn into_response(self) -> cot::Result<Response> {
         Body::empty().into_response()
-    }
-}
-
-impl IntoResponse for Infallible {
-    fn into_response(self) -> cot::Result<Response> {
-        match self {}
     }
 }
 
@@ -155,8 +231,8 @@ impl IntoResponse for Response {
 
 // Text implementations
 
-impl_into_response_for_type_and_mime!(&'static str, mime::TEXT_PLAIN_UTF_8);
-impl_into_response_for_type_and_mime!(String, mime::TEXT_PLAIN_UTF_8);
+impl_into_response_for_type_and_mime!(&'static str, TEXT_PLAIN_UTF_8);
+impl_into_response_for_type_and_mime!(String, TEXT_PLAIN_UTF_8);
 
 impl IntoResponse for Box<str> {
     fn into_response(self) -> cot::Result<Response> {
@@ -166,9 +242,9 @@ impl IntoResponse for Box<str> {
 
 // Bytes implementations
 
-impl_into_response_for_type_and_mime!(&'static [u8], mime::APPLICATION_OCTET_STREAM);
-impl_into_response_for_type_and_mime!(Vec<u8>, mime::APPLICATION_OCTET_STREAM);
-impl_into_response_for_type_and_mime!(Bytes, mime::APPLICATION_OCTET_STREAM);
+impl_into_response_for_type_and_mime!(&'static [u8], APPLICATION_OCTET_STREAM);
+impl_into_response_for_type_and_mime!(Vec<u8>, APPLICATION_OCTET_STREAM);
+impl_into_response_for_type_and_mime!(Bytes, APPLICATION_OCTET_STREAM);
 
 impl<const N: usize> IntoResponse for &'static [u8; N] {
     fn into_response(self) -> cot::Result<Response> {
@@ -198,7 +274,7 @@ impl IntoResponse for BytesMut {
 
 impl IntoResponse for StatusCode {
     fn into_response(self) -> cot::Result<Response> {
-        ().into_response().with_status(self)
+        ().into_response().with_status(self).into_response()
     }
 }
 
@@ -248,7 +324,8 @@ impl IntoResponse for Html {
         self.as_str()
             .to_owned()
             .into_response()
-            .with_content_type(mime::TEXT_HTML_UTF_8.as_ref())
+            .with_content_type(HTML_CONTENT_TYPE)
+            .into_response()
     }
 }
 
@@ -268,6 +345,7 @@ mod tests {
     use http::{self, HeaderMap, HeaderValue};
 
     use super::*;
+    use crate::error::ErrorRepr;
     use crate::html::Html;
 
     #[tokio::test]
@@ -573,7 +651,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_header() {
-        let response = "test".with_header("X-Custom", "HeaderValue").unwrap();
+        let response = "test"
+            .with_header("X-Custom", "HeaderValue")
+            .into_response()
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers().get("X-Custom").unwrap(), "HeaderValue");
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "test");
@@ -581,7 +662,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_content_type() {
-        let response = "test".with_content_type("application/json").unwrap();
+        let response = "test"
+            .with_content_type("application/json")
+            .into_response()
+            .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -593,7 +677,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_status() {
-        let response = "test".with_status(StatusCode::CREATED).unwrap();
+        let response = "test"
+            .with_status(StatusCode::CREATED)
+            .into_response()
+            .unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(
@@ -605,7 +692,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_body() {
-        let response = StatusCode::ACCEPTED.with_body("new body").unwrap();
+        let response = StatusCode::ACCEPTED
+            .with_body("new body")
+            .into_response()
+            .unwrap();
 
         assert_eq!(response.status(), StatusCode::ACCEPTED);
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "new body");
@@ -616,7 +706,10 @@ mod tests {
         #[derive(Clone, Debug, PartialEq)]
         struct MyExt(String);
 
-        let response = "test".with_extension(MyExt("data".to_string())).unwrap();
+        let response = "test"
+            .with_extension(MyExt("data".to_string()))
+            .into_response()
+            .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(

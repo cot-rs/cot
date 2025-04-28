@@ -6,15 +6,14 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use cot::headers::HTML_CONTENT_TYPE;
+use cot::html::Html;
 use cot::request::Request;
-use cot::response::IntoResponse;
 use swagger_ui_redist::SwaggerUiStaticFile;
 
 use crate::request::RequestExt;
 use crate::response::{Response, ResponseExt};
 use crate::router::{Route, Router};
-use crate::{App, Body, StatusCode};
+use crate::{App, StatusCode};
 
 /// A wrapper around the Swagger UI functionality.
 ///

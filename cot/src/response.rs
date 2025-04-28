@@ -22,7 +22,9 @@ use crate::{Body, StatusCode};
 
 mod into_response;
 
-pub use into_response::IntoResponse;
+pub use into_response::{
+    IntoResponse, WithBody, WithContentType, WithExtension, WithHeader, WithStatus,
+};
 
 const RESPONSE_BUILD_FAILURE: &str = "Failed to build response";
 
@@ -175,6 +177,7 @@ pub(crate) fn not_found_response(message: Option<String>) -> crate::Result<Respo
     Html::new("404 Not Found")
         .with_status(StatusCode::NOT_FOUND)
         .with_extension(ErrorPageTrigger::NotFound { message })
+        .into_response()
 }
 
 #[cfg(test)]

@@ -164,7 +164,7 @@ pub struct WithBody<T> {
 impl<T: IntoResponse> IntoResponse for WithBody<T> {
     fn into_response(self) -> cot::Result<Response> {
         self.inner.into_response().map(|mut resp| {
-            *resp.body_mut() = self.body.into();
+            *resp.body_mut() = self.body;
             resp
         })
     }

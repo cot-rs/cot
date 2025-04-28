@@ -190,6 +190,7 @@ mod tests {
     #[test]
     fn response_new_html() {
         let body = Body::fixed("<html></html>");
+        #[allow(deprecated)]
         let response = Response::new_html(StatusCode::OK, body);
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(

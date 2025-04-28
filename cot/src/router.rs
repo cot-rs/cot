@@ -1025,7 +1025,6 @@ macro_rules! reverse_redirect {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
     use cot::html::Html;
     use cot::response::IntoResponse;
 

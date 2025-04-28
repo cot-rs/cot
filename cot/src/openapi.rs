@@ -869,6 +869,7 @@ impl ApiOperationPart for crate::Result<Response> {
 #[cfg(test)]
 mod tests {
     use aide::openapi::{Operation, Parameter};
+    use cot::html::Html;
     use schemars::SchemaGenerator;
     use schemars::schema::Schema;
     use serde::{Deserialize, Serialize};
@@ -876,8 +877,6 @@ mod tests {
     use super::*;
     use crate::openapi::AsApiOperation;
     use crate::request::extractors::{Json, Path, UrlQuery};
-    use crate::response::{Response, ResponseExt};
-    use crate::{Body, StatusCode};
 
     #[derive(Deserialize, Serialize, schemars::JsonSchema)]
     struct TestRequest {
@@ -900,8 +899,8 @@ mod tests {
         field2: i32,
     }
 
-    async fn test_handler() -> cot::Result<Response> {
-        Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+    async fn test_handler() -> Html {
+        Html::new("test")
     }
 
     #[test]

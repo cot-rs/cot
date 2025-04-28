@@ -67,7 +67,7 @@ macro_rules! impl_request_handler {
             R: IntoResponse,
         {
             #[allow(non_snake_case)]
-            async fn handle(&self, request: Request) -> cot::Result<Response> {
+            async fn handle(&self, request: Request) -> Result<Response> {
                 #[allow(unused_variables, unused_mut)] // for the case where there are no params
                 let (mut parts, _body) = request.into_parts();
 
@@ -93,7 +93,7 @@ macro_rules! impl_request_handler_from_request {
             R: IntoResponse,
         {
             #[expect(non_snake_case)]
-            async fn handle(&self, request: Request) -> cot::Result<Response> {
+            async fn handle(&self, request: Request) -> Result<Response> {
                 #[allow(unused_mut)] // for the case where there are no FromRequestParts params
                 let (mut parts, body) = request.into_parts();
 

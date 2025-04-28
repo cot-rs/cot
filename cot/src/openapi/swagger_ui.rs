@@ -97,7 +97,7 @@ impl App for SwaggerUi {
         let swagger_ui = Arc::new(self.inner.clone());
         let swagger_handler = async move || {
             let swagger = swagger_ui.serve().map_err(cot::Error::custom)?;
-            Body::fixed(swagger).with_content_type(HTML_CONTENT_TYPE)
+            Ok::<_, cot::Error>(Html::new(swagger))
         };
 
         let mut urls = vec![Route::with_handler("/", swagger_handler)];

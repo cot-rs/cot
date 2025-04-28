@@ -7,7 +7,7 @@ use cot::router::{Route, Router};
 use cot::test::Client;
 use cot::{App, AppBuilder, Project, StatusCode};
 
-async fn index(_request: Request) -> Html {
+async fn index() -> Html {
     Html::new("Hello world!")
 }
 

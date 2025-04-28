@@ -4,8 +4,8 @@ use cot::project::RegisterAppsContext;
 use cot::router::{Route, Router};
 use cot::{App, AppBuilder, Project};
 
-async fn return_hello() -> cot::Result<&'static str> {
-    Ok("Hello Cot!")
+async fn return_hello() -> &'static str {
+    "Hello Cot!"
 }
 
 struct HelloApp;

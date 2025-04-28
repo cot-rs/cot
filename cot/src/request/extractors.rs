@@ -595,8 +595,8 @@ mod tests {
 
     #[cot::test]
     async fn urls_extraction() {
-        async fn handler() -> cot::Result<Html> {
-            Ok(Html::new(""))
+        async fn handler() -> Html {
+            Html::new("")
         }
 
         let router = Router::with_urls([Route::with_handler_and_name(

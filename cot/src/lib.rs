@@ -69,7 +69,8 @@ pub mod cli;
 pub mod common_types;
 pub mod config;
 mod error_page;
-mod handler;
+#[macro_use]
+pub(crate) mod handler;
 pub mod html;
 pub mod middleware;
 #[cfg(feature = "openapi")]

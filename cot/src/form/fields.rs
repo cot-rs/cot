@@ -32,8 +32,14 @@ macro_rules! impl_form_field {
             fn with_options(
                 options: FormFieldOptions,
                 custom_options: Self::CustomOptions,
-            ) -> Self {
-                Self {
+            ) -> Self
+            where Self: Sized
+            {
+              custom_options.validate_options()
+              .unwrap_or_else(|err| {
+                panic!("Could not initialize {}: {}", stringify!($field_options_type_name), err)
+    });
+              Self {
                     options,
                     custom_options,
                     value: None,
@@ -53,6 +59,12 @@ macro_rules! impl_form_field {
             }
         }
     };
+}
+
+pub trait ValidateOptions {
+    fn validate_options(&self) -> Result<(), FormFieldValidationError> {
+        Ok(())
+    }
 }
 
 impl_form_field!(StringField, StringFieldOptions, "a string");
@@ -83,6 +95,8 @@ impl Display for StringField {
         write!(f, "{}", tag.render())
     }
 }
+
+impl ValidateOptions for StringFieldOptions {}
 
 impl HtmlSafe for StringField {}
 
@@ -153,6 +167,7 @@ impl Display for PasswordField {
     }
 }
 
+impl ValidateOptions for PasswordFieldOptions {}
 impl HtmlSafe for PasswordField {}
 
 impl AsFormField for Password {
@@ -273,6 +288,20 @@ impl AsFormField for Email {
     }
 }
 
+impl ValidateOptions for EmailFieldOptions {
+    fn validate_options(&self) -> Result<(), FormFieldValidationError> {
+        if let (Some(min), Some(max)) = (self.min_length, self.max_length) {
+            if min > max {
+                return Err(FormFieldValidationError::from_string(format!(
+                    "min_length ({}) exceeds max_length ({})",
+                    min, max
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl HtmlSafe for EmailField {}
 
 impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer);
@@ -318,6 +347,8 @@ impl<T: Integer> Display for IntegerField<T> {
         write!(f, "{}", tag.render())
     }
 }
+
+impl<T: Integer> ValidateOptions for IntegerFieldOptions<T> {}
 
 impl<T: Integer> HtmlSafe for IntegerField<T> {}
 
@@ -472,6 +503,7 @@ impl Display for BoolField {
     }
 }
 
+impl ValidateOptions for BoolFieldOptions {}
 impl HtmlSafe for BoolField {}
 
 /// Implementation of `AsFormField` for `bool`.

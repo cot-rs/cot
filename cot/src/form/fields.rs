@@ -932,4 +932,24 @@ mod tests {
         let value = bool::clean_value(&field).unwrap();
         assert!(value);
     }
+
+    #[test]
+    #[should_panic(
+        expected = "Could not initialize EmailFieldOptions: min_length (50) exceeds max_length (10)"
+    )]
+    fn email_field_validate_options() {
+        let bad_opts = EmailFieldOptions {
+            min_length: Some(50),
+            max_length: Some(10),
+        };
+
+        let _ = EmailField::with_options(
+            FormFieldOptions {
+                id: "foo".into(),
+                name: "foo".into(),
+                required: true,
+            },
+            bad_opts,
+        );
+    }
 }

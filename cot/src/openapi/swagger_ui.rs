@@ -5,9 +5,9 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use bytes::Bytes;
 use crate::html::Html;
 use crate::request::Request;
+use bytes::Bytes;
 use swagger_ui_redist::SwaggerUiStaticFile;
 
 use crate::request::RequestExt;

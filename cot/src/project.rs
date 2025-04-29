@@ -25,11 +25,11 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::html::Html;
+use crate::response::IntoResponse;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
 use bytes::Bytes;
-use crate::html::Html;
-use crate::response::IntoResponse;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use http::request::Parts;

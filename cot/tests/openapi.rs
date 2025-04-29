@@ -1,11 +1,12 @@
 use aide::openapi::{Parameter, PathItem, ReferenceOr};
+use cot::html::Html;
 use cot::openapi::{AsApiRoute, NoApi, RouteContext};
 use cot::request::extractors::{Json, Path, UrlQuery};
-use cot::response::{Response, ResponseExt};
+use cot::response::{IntoResponse, Response, ResponseExt};
 use cot::router::method::openapi::{ApiMethodRouter, api_get, api_post};
 use cot::router::{Route, Router};
 use cot::test::TestRequestBuilder;
-use cot::{Body, RequestHandler, StatusCode};
+use cot::{RequestHandler, StatusCode};
 use schemars::SchemaGenerator;
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +23,7 @@ struct TestResponse {
 }
 
 async fn test_handler() -> cot::Result<Response> {
-    Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+    Html::new("test").into_response()
 }
 
 async fn test_json_handler(Json(req): Json<TestRequest>) -> cot::Result<Response> {
@@ -35,17 +36,11 @@ async fn test_json_handler(Json(req): Json<TestRequest>) -> cot::Result<Response
 }
 
 async fn test_path_handler(Path(id): Path<i32>) -> cot::Result<Response> {
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(format!("ID: {id}")),
-    ))
+    Html::new(format!("ID: {id}")).into_response()
 }
 
 async fn test_query_handler(UrlQuery(query): UrlQuery<TestRequest>) -> cot::Result<Response> {
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(format!("Query: {}, {}", query.field1, query.field2)),
-    ))
+    Html::new(format!("Query: {}, {}", query.field1, query.field2)).into_response()
 }
 
 #[cot::test]
@@ -195,10 +190,7 @@ async fn no_api_in_params() {
         NoApi(Path(id)): NoApi<Path<i32>>,
         NoApi(Json(req)): NoApi<Json<TestRequest>>,
     ) -> cot::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::OK,
-            Body::fixed(format!("Got: {id}, {}, {}", req.field1, req.field2)),
-        ))
+        Html::new(format!("Got: {id}, {}, {}", req.field1, req.field2)).into_response()
     }
 
     let router = Router::with_urls([Route::with_api_handler(

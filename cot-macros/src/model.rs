@@ -122,7 +122,7 @@ impl ModelBuilder {
     fn push_field(&mut self, field: &Field) {
         let orm_ident = orm_ident();
 
-        let name = &field.field_name;
+        let name = &field.name;
         let ty = &field.ty;
         let index = self.fields_as_columns.len();
         let column_name = &field.column_name;
@@ -163,7 +163,7 @@ impl ModelBuilder {
         let table_name = &self.table_name;
         let fields_struct_name = &self.fields_struct_name;
         let fields_as_columns = &self.fields_as_columns;
-        let pk_field_name = &self.pk_field.field_name;
+        let pk_field_name = &self.pk_field.name;
         let pk_column_name = &self.pk_field.column_name;
         let pk_type = &self.pk_field.ty;
         let fields_as_from_db = &self.fields_as_from_db;

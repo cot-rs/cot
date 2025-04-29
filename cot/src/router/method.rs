@@ -438,7 +438,7 @@ async fn default_fallback() -> cot::Result<Response> {
 
 #[cfg(test)]
 mod tests {
-    use cot::html::Html;
+    use crate::html::Html;
 
     use super::*;
     use crate::StatusCode;

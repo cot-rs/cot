@@ -111,8 +111,8 @@ pub struct WithHeader<T> {
 impl<T: IntoResponse> IntoResponse for WithHeader<T> {
     fn into_response(self) -> cot::Result<Response> {
         self.inner.into_response().map(|mut resp| {
-            if let Some((key, value)) = &self.header {
-                resp.headers_mut().append(key, value.clone());
+            if let Some((key, value)) = self.header {
+                resp.headers_mut().append(key, value);
             }
             resp
         })

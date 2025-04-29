@@ -1025,8 +1025,8 @@ macro_rules! reverse_redirect {
 
 #[cfg(test)]
 mod tests {
-    use cot::html::Html;
-    use cot::response::IntoResponse;
+    use crate::html::Html;
+    use crate::response::IntoResponse;
 
     use super::*;
     use crate::StatusCode;

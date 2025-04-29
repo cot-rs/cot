@@ -6,8 +6,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use cot::html::Html;
-use cot::request::Request;
+use crate::html::Html;
+use crate::request::Request;
 use swagger_ui_redist::SwaggerUiStaticFile;
 
 use crate::request::RequestExt;
@@ -96,7 +96,7 @@ impl App for SwaggerUi {
         let swagger_ui = Arc::new(self.inner.clone());
         let swagger_handler = async move || {
             let swagger = swagger_ui.serve().map_err(cot::Error::custom)?;
-            Ok::<_, cot::Error>(Html::new(swagger))
+            Ok::<_, crate::Error>(Html::new(swagger))
         };
 
         let mut urls = vec![Route::with_handler("/", swagger_handler)];

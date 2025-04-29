@@ -529,7 +529,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use cot::html::Html;
+    use crate::html::Html;
 
     use super::*;
     use crate::request::extractors::{Json, Path};

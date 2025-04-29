@@ -434,7 +434,7 @@ impl FromRequestParts for Auth {
 
 #[cfg(test)]
 mod tests {
-    use cot::html::Html;
+    use crate::html::Html;
     use serde::Deserialize;
 
     use super::*;

@@ -12,7 +12,7 @@
 //! use cot::response::ResponseExt;
 //! ```
 
-use cot::html::Html;
+use crate::html::Html;
 
 use crate::error_page::ErrorPageTrigger;
 use crate::headers::HTML_CONTENT_TYPE;

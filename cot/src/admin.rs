@@ -9,8 +9,8 @@ use std::marker::PhantomData;
 use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
-use cot::html::Html;
-use cot::response::IntoResponse;
+use crate::html::Html;
+use crate::response::IntoResponse;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.

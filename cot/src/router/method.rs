@@ -440,14 +440,11 @@ async fn default_fallback() -> cot::Result<Response> {
 mod tests {
     use super::*;
     use crate::StatusCode;
-    use crate::response::{Response, ResponseExt};
+    use crate::html::Html;
     use crate::test::TestRequestBuilder;
 
-    async fn test_handler(method: Method) -> cot::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::OK,
-            Body::fixed(method.as_str().to_owned()),
-        ))
+    async fn test_handler(method: Method) -> Html {
+        Html::new(method.as_str())
     }
 
     #[test]

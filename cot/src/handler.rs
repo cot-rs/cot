@@ -6,7 +6,7 @@ use tower::util::BoxCloneSyncService;
 
 use crate::request::Request;
 use crate::request::extractors::{FromRequest, FromRequestParts};
-use crate::response::Response;
+use crate::response::{IntoResponse, Response};
 use crate::{Error, Result};
 
 /// A function that takes a request and returns a response.
@@ -59,11 +59,12 @@ pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
 
 macro_rules! impl_request_handler {
     ($($ty:ident),*) => {
-        impl<T, $($ty,)* R> RequestHandler<($($ty,)*)> for T
+        impl<Func, $($ty,)* Fut, R> RequestHandler<($($ty,)*)> for Func
         where
-            T: FnOnce($($ty,)*) -> R + Clone + Send + Sync + 'static,
+            Func: FnOnce($($ty,)*) -> Fut + Clone + Send + Sync + 'static,
             $($ty: FromRequestParts + Send,)*
-            R: for<'a> Future<Output = Result<Response>> + Send,
+            Fut: Future<Output = R> + Send,
+            R: IntoResponse,
         {
             #[allow(non_snake_case)]
             async fn handle(&self, request: Request) -> Result<Response> {
@@ -74,7 +75,7 @@ macro_rules! impl_request_handler {
                     let $ty = $ty::from_request_parts(&mut parts).await?;
                 )*
 
-                self.clone()($($ty,)*).await
+                self.clone()($($ty,)*).await.into_response()
             }
         }
     };
@@ -82,13 +83,14 @@ macro_rules! impl_request_handler {
 
 macro_rules! impl_request_handler_from_request {
     ($($ty_lhs:ident,)* ($ty_from_request:ident) $(,$ty_rhs:ident)*) => {
-        impl<T, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for T
+        impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for Func
         where
-            T: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> R + Clone + Send + Sync + 'static,
+            Func: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> Fut + Clone + Send + Sync + 'static,
             $($ty_lhs: FromRequestParts + Send,)*
             $ty_from_request: FromRequest + Send,
             $($ty_rhs: FromRequestParts + Send,)*
-            R: for<'a> Future<Output = Result<Response>> + Send,
+            Fut: Future<Output = R> + Send,
+            R: IntoResponse,
         {
             #[expect(non_snake_case)]
             async fn handle(&self, request: Request) -> Result<Response> {
@@ -105,79 +107,99 @@ macro_rules! impl_request_handler_from_request {
                 let request = Request::from_parts(parts, body);
                 let $ty_from_request = $ty_from_request::from_request(request).await?;
 
-                self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await
+                self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await.into_response()
             }
         }
     };
 }
 
-impl_request_handler!();
-impl_request_handler!(P1);
-impl_request_handler!(P1, P2);
-impl_request_handler!(P1, P2, P3);
-impl_request_handler!(P1, P2, P3, P4);
-impl_request_handler!(P1, P2, P3, P4, P5);
-impl_request_handler!(P1, P2, P3, P4, P5, P6);
-impl_request_handler!(P1, P2, P3, P4, P5, P6, P7);
-impl_request_handler!(P1, P2, P3, P4, P5, P6, P7, P8);
-impl_request_handler!(P1, P2, P3, P4, P5, P6, P7, P8, P9);
-impl_request_handler!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
+macro_rules! handle_all_parameters {
+    ($name:ident) => {
+        $name!();
+        $name!(P1);
+        $name!(P1, P2);
+        $name!(P1, P2, P3);
+        $name!(P1, P2, P3, P4);
+        $name!(P1, P2, P3, P4, P5);
+        $name!(P1, P2, P3, P4, P5, P6);
+        $name!(P1, P2, P3, P4, P5, P6, P7);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
+    };
+}
 
-impl_request_handler_from_request!((P1));
-impl_request_handler_from_request!((P1), P2);
-impl_request_handler_from_request!(P1, (P2));
-impl_request_handler_from_request!((P1), P2, P3);
-impl_request_handler_from_request!(P1, (P2), P3);
-impl_request_handler_from_request!(P1, P2, (P3));
-impl_request_handler_from_request!((P1), P2, P3, P4);
-impl_request_handler_from_request!(P1, (P2), P3, P4);
-impl_request_handler_from_request!(P1, P2, (P3), P4);
-impl_request_handler_from_request!(P1, P2, P3, (P4));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6, P7);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6, P7);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6, P7);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6, P7);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6, P7);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6), P7);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, (P7));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6, P7, P8);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6, P7, P8);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6, P7, P8);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6, P7, P8);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6, P7, P8);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6), P7, P8);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, (P7), P8);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, (P8));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6, P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6), P7, P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, (P7), P8, P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, (P8), P9);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, P8, (P9));
-impl_request_handler_from_request!((P1), P2, P3, P4, P5, P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, (P2), P3, P4, P5, P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, (P3), P4, P5, P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, (P4), P5, P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, (P5), P6, P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, (P6), P7, P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, (P7), P8, P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, (P8), P9, P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, P8, (P9), P10);
-impl_request_handler_from_request!(P1, P2, P3, P4, P5, P6, P7, P8, P9, (P10));
+macro_rules! handle_all_parameters_from_request {
+    ($name:ident) => {
+        $name!((PX));
+
+        $name!((PX), P2);
+        $name!(P1, (PX));
+
+        $name!((PX), P2, P3);
+        $name!(P1, (PX), P3);
+        $name!(P1, P2, (PX));
+
+        $name!((PX), P2, P3, P4);
+        $name!(P1, (PX), P3, P4);
+        $name!(P1, P2, (PX), P4);
+        $name!(P1, P2, P3, (PX));
+
+        $name!((PX), P2, P3, P4, P5);
+        $name!(P1, (PX), P3, P4, P5);
+        $name!(P1, P2, (PX), P4, P5);
+        $name!(P1, P2, P3, (PX), P5);
+        $name!(P1, P2, P3, P4, (PX));
+
+        $name!((PX), P2, P3, P4, P5, P6);
+        $name!(P1, (PX), P3, P4, P5, P6);
+        $name!(P1, P2, (PX), P4, P5, P6);
+        $name!(P1, P2, P3, (PX), P5, P6);
+        $name!(P1, P2, P3, P4, (PX), P6);
+        $name!(P1, P2, P3, P4, P5, (PX));
+
+        $name!((PX), P2, P3, P4, P5, P6, P7);
+        $name!(P1, (PX), P3, P4, P5, P6, P7);
+        $name!(P1, P2, (PX), P4, P5, P6, P7);
+        $name!(P1, P2, P3, (PX), P5, P6, P7);
+        $name!(P1, P2, P3, P4, (PX), P6, P7);
+        $name!(P1, P2, P3, P4, P5, (PX), P7);
+        $name!(P1, P2, P3, P4, P5, P6, (PX));
+
+        $name!((PX), P2, P3, P4, P5, P6, P7, P8);
+        $name!(P1, (PX), P3, P4, P5, P6, P7, P8);
+        $name!(P1, P2, (PX), P4, P5, P6, P7, P8);
+        $name!(P1, P2, P3, (PX), P5, P6, P7, P8);
+        $name!(P1, P2, P3, P4, (PX), P6, P7, P8);
+        $name!(P1, P2, P3, P4, P5, (PX), P7, P8);
+        $name!(P1, P2, P3, P4, P5, P6, (PX), P8);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (PX));
+
+        $name!((PX), P2, P3, P4, P5, P6, P7, P8, P9);
+        $name!(P1, (PX), P3, P4, P5, P6, P7, P8, P9);
+        $name!(P1, P2, (PX), P4, P5, P6, P7, P8, P9);
+        $name!(P1, P2, P3, (PX), P5, P6, P7, P8, P9);
+        $name!(P1, P2, P3, P4, (PX), P6, P7, P8, P9);
+        $name!(P1, P2, P3, P4, P5, (PX), P7, P8, P9);
+        $name!(P1, P2, P3, P4, P5, P6, (PX), P8, P9);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (PX), P9);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, (PX));
+
+        $name!((PX), P2, P3, P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, (PX), P3, P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, (PX), P4, P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, (PX), P5, P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, (PX), P6, P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, (PX), P7, P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, (PX), P8, P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, P7, (PX), P9, P10);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, (PX), P10);
+        $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9, (P10));
+    };
+}
+
+handle_all_parameters!(impl_request_handler);
+handle_all_parameters_from_request!(impl_request_handler_from_request);
 
 /// A wrapper around a handler that's used in
 /// [`Bootstrapper`](cot::Bootstrapper).

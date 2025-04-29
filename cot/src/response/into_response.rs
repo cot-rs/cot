@@ -1,5 +1,5 @@
 use bytes::{Bytes, BytesMut};
-use cot::headers::{APPLICATION_OCTET_STREAM, HTML_CONTENT_TYPE, TEXT_PLAIN_UTF_8};
+use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use cot::response::Response;
 use cot::{Body, StatusCode};
 use http;
@@ -231,8 +231,8 @@ impl IntoResponse for Response {
 
 // Text implementations
 
-impl_into_response_for_type_and_mime!(&'static str, TEXT_PLAIN_UTF_8);
-impl_into_response_for_type_and_mime!(String, TEXT_PLAIN_UTF_8);
+impl_into_response_for_type_and_mime!(&'static str, PLAIN_TEXT_CONTENT_TYPE);
+impl_into_response_for_type_and_mime!(String, PLAIN_TEXT_CONTENT_TYPE);
 
 impl IntoResponse for Box<str> {
     fn into_response(self) -> cot::Result<Response> {
@@ -242,9 +242,9 @@ impl IntoResponse for Box<str> {
 
 // Bytes implementations
 
-impl_into_response_for_type_and_mime!(&'static [u8], APPLICATION_OCTET_STREAM);
-impl_into_response_for_type_and_mime!(Vec<u8>, APPLICATION_OCTET_STREAM);
-impl_into_response_for_type_and_mime!(Bytes, APPLICATION_OCTET_STREAM);
+impl_into_response_for_type_and_mime!(&'static [u8], OCTET_STREAM_CONTENT_TYPE);
+impl_into_response_for_type_and_mime!(Vec<u8>, OCTET_STREAM_CONTENT_TYPE);
+impl_into_response_for_type_and_mime!(Bytes, OCTET_STREAM_CONTENT_TYPE);
 
 impl<const N: usize> IntoResponse for &'static [u8; N] {
     fn into_response(self) -> cot::Result<Response> {

@@ -80,13 +80,14 @@ pub mod response;
 pub mod router;
 pub mod session;
 pub mod static_files;
+#[cfg(feature = "test")]
 pub mod test;
 pub(crate) mod utils;
 
 #[cfg(feature = "openapi")]
 pub use aide;
 pub use body::Body;
-pub use cot_macros::{main, test};
+pub use cot_macros::{e2e_test, main, test};
 pub use error::Error;
 #[cfg(feature = "openapi")]
 pub use schemars;

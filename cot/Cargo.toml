@@ -27,8 +27,8 @@ clap.workspace = true
 cot_macros.workspace = true
 derive_builder.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
-fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 email_address.workspace = true
+fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 form_urlencoded.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
@@ -65,6 +65,7 @@ url = { workspace = true, features = ["serde"], optional = true }
 [dev-dependencies]
 async-stream.workspace = true
 fake.workspace = true
+fantoccini.workspace = true
 futures.workspace = true
 mockall.workspace = true
 tempfile.workspace = true
@@ -90,7 +91,7 @@ ignored = [
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
-full = ["default", "fake", "live-reload"]
+full = ["default", "fake", "live-reload", "test"]
 fake = ["dep:fake"]
 db = ["dep:url", "dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
 sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
@@ -100,3 +101,4 @@ json = ["dep:serde_json"]
 openapi = ["json", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
+test = []

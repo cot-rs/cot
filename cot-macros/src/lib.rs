@@ -15,7 +15,7 @@ use syn::{ItemFn, parse_macro_input};
 use crate::admin::impl_admin_model_for_struct;
 use crate::dbtest::fn_to_dbtest;
 use crate::form::impl_form_for_struct;
-use crate::main_fn::{fn_to_cot_main, fn_to_cot_test};
+use crate::main_fn::{fn_to_cot_e2e_test, fn_to_cot_main, fn_to_cot_test};
 use crate::model::impl_model_for_struct;
 use crate::query::{Query, query_to_tokens};
 
@@ -205,6 +205,30 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn test(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);
     fn_to_cot_test(&fn_input).into()
+}
+
+/// An attribute macro that defines an `async` test function for a Cot-powered
+/// app.
+///
+/// This is pretty much an equivalent to `#[tokio::test]` provided so that you
+/// don't have to declare `tokio` as a dependency in your tests.
+///
+/// # Examples
+///
+/// ```no_run
+/// use cot::test::TestDatabase;
+///
+/// #[cot::test]
+/// async fn test_db() {
+///     let db = TestDatabase::new_sqlite().await.unwrap();
+///     // do something with the database
+///     db.cleanup().await.unwrap();
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn e2e_test(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let fn_input = parse_macro_input!(input as ItemFn);
+    fn_to_cot_e2e_test(&fn_input).into()
 }
 
 pub(crate) fn cot_ident() -> proc_macro2::TokenStream {

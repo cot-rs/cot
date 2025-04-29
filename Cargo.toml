@@ -73,6 +73,7 @@ derive_builder = "0.20"
 derive_more = "2"
 email_address = "0.2.9"
 fake = "4"
+fantoccini = "0.21"
 form_urlencoded = "1"
 futures = { version = "0.3", default-features = false }
 futures-core = { version = "0.3", default-features = false }

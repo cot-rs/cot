@@ -43,6 +43,14 @@ We are also using [`pre-commit`](https://pre-commit.com/) hooks to handle
 formatting and linting. See the `pre-commit` website for installation
 instructions. This handles formatting of all the files in the repository.
 
+### Tests that use database, cache, or other external resources
+
+TODO
+
+#### End-to-end tests
+
+TODO
+
 ### Snapshot tests
 
 Cot uses snapshot testing for the CLI to ensure that the output of commands

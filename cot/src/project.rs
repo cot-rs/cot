@@ -1733,6 +1733,15 @@ pub async fn run_at(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
 ) -> cot::Result<()> {
+    run_at_with_shutdown(bootstrapper, listener, shutdown_signal()).await
+}
+
+#[expect(clippy::future_not_send)]
+pub async fn run_at_with_shutdown(
+    bootstrapper: Bootstrapper<Initialized>,
+    listener: tokio::net::TcpListener,
+    shutdown_signal: impl Future<Output = ()> + Send + 'static,
+) -> cot::Result<()> {
     let not_found_handler: Arc<dyn ErrorPageHandler> =
         bootstrapper.project().not_found_handler().into();
     let server_error_handler: Arc<dyn ErrorPageHandler> =
@@ -1821,7 +1830,7 @@ pub async fn run_at(
         std::panic::set_hook(Box::new(new_hook));
     }
     axum::serve(listener, handler.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal)
         .await
         .map_err(|e| ErrorRepr::StartServer { source: e })?;
     if register_panic_hook {

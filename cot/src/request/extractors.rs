@@ -434,10 +434,10 @@ impl FromRequestParts for Auth {
 
 #[cfg(test)]
 mod tests {
-    use crate::html::Html;
     use serde::Deserialize;
 
     use super::*;
+    use crate::html::Html;
     use crate::request::extractors::{FromRequest, Json, Path, UrlQuery};
     use crate::router::{Route, Router, Urls};
     use crate::test::TestRequestBuilder;

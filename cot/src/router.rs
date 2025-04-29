@@ -1025,13 +1025,11 @@ macro_rules! reverse_redirect {
 
 #[cfg(test)]
 mod tests {
-    use crate::html::Html;
-    use crate::response::IntoResponse;
-
     use super::*;
     use crate::StatusCode;
+    use crate::html::Html;
     use crate::request::Request;
-    use crate::response::Response;
+    use crate::response::{IntoResponse, Response};
     use crate::test::TestRequestBuilder;
 
     struct MockHandler;

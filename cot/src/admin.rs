@@ -6,8 +6,6 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
-use crate::html::Html;
-use crate::response::IntoResponse;
 use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -28,9 +26,10 @@ use crate::common_types::Password;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
+use crate::html::Html;
 use crate::request::extractors::{FromRequestParts, Path, UrlQuery};
 use crate::request::{Request, RequestExt};
-use crate::response::Response;
+use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
 use crate::{App, Error, Method, RequestHandler, reverse_redirect, static_files};
 

@@ -5,12 +5,11 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use crate::html::Html;
-use crate::request::Request;
 use bytes::Bytes;
 use swagger_ui_redist::SwaggerUiStaticFile;
 
-use crate::request::RequestExt;
+use crate::html::Html;
+use crate::request::{Request, RequestExt};
 use crate::response::{Response, ResponseExt};
 use crate::router::{Route, Router};
 use crate::{App, StatusCode};

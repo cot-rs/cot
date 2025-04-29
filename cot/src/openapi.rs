@@ -868,13 +868,13 @@ impl ApiOperationPart for crate::Result<Response> {
 
 #[cfg(test)]
 mod tests {
-    use crate::html::Html;
     use aide::openapi::{Operation, Parameter};
     use schemars::SchemaGenerator;
     use schemars::schema::Schema;
     use serde::{Deserialize, Serialize};
 
     use super::*;
+    use crate::html::Html;
     use crate::openapi::AsApiOperation;
     use crate::request::extractors::{Json, Path, UrlQuery};
 

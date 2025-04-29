@@ -529,9 +529,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::html::Html;
-
     use super::*;
+    use crate::html::Html;
     use crate::request::extractors::{Json, Path};
     use crate::response::{IntoResponse, Response};
     use crate::test::TestRequestBuilder;

@@ -12,12 +12,11 @@
 //! use cot::response::ResponseExt;
 //! ```
 
-use crate::html::Html;
-
 use crate::error_page::ErrorPageTrigger;
 use crate::headers::HTML_CONTENT_TYPE;
 #[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
+use crate::html::Html;
 use crate::{Body, StatusCode};
 
 mod into_response;

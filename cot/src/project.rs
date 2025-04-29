@@ -25,8 +25,6 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::html::Html;
-use crate::response::IntoResponse;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
 use bytes::Bytes;
@@ -51,9 +49,10 @@ use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error::ErrorRepr;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
+use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{AppName, Request, RequestExt};
-use crate::response::Response;
+use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::{Body, Error, StatusCode, cli, error_page};
 

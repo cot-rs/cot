@@ -602,7 +602,7 @@ fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldValidationEr
     }
 }
 
-impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float + Debug);
+impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float);
 
 /// Custom options for a `FloatField`.
 #[derive(Debug, Copy, Clone)]
@@ -624,7 +624,7 @@ impl<T: Float> Default for FloatFieldOptions<T> {
     }
 }
 
-impl<T: Float + Debug> Display for FloatField<T> {
+impl<T: Float> Display for FloatField<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag: HtmlTag = HtmlTag::input("number");
         tag.attr("name", self.name());
@@ -634,12 +634,10 @@ impl<T: Float + Debug> Display for FloatField<T> {
         }
 
         if let Some(min) = &self.custom_options.min {
-            let min = format!("{:?}", min);
-            tag.attr("min", &min);
+            tag.attr("min", &min.to_string());
         }
         if let Some(max) = &self.custom_options.max {
-            let max = format!("{:?}", max);
-            tag.attr("max", &max);
+            tag.attr("max", &max.to_string());
         }
         if let Some(value) = &self.value {
             tag.attr("value", value);
@@ -649,7 +647,7 @@ impl<T: Float + Debug> Display for FloatField<T> {
     }
 }
 
-impl<T: Float + Debug> HtmlSafe for FloatField<T> {}
+impl<T: Float> HtmlSafe for FloatField<T> {}
 
 /// A trait for types that can be represented as a float.
 ///
@@ -829,16 +827,16 @@ mod tests {
                 required: true,
             },
             FloatFieldOptions {
-                min: Some(1.0),
-                max: Some(10.0),
+                min: Some(1.5),
+                max: Some(10.7),
             },
         );
         let html = field.to_string();
         println!("html: {}", html);
         assert!(html.contains("type=\"number\""));
         assert!(html.contains("required"));
-        assert!(html.contains("min=\"1.0\""));
-        assert!(html.contains("max=\"10.0\""));
+        assert!(html.contains("min=\"1.5\""));
+        assert!(html.contains("max=\"10.7\""));
     }
     #[test]
     fn bool_field_render() {

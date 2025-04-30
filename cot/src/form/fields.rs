@@ -396,9 +396,27 @@ macro_rules! impl_integer_as_form_field {
             fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
                 let value = check_required(field)?;
 
-                value
+                let parsed: $type = value
                     .parse()
-                    .map_err(|_| FormFieldValidationError::invalid_value(value))
+                    .map_err(|_| FormFieldValidationError::invalid_value(value))?;
+
+                if let Some(min) = field.custom_options.min {
+                    if parsed < min {
+                        return Err(FormFieldValidationError::from_string(format!(
+                            "This is below the minimum value of {min}"
+                        )));
+                    }
+                }
+
+                if let Some(max) = field.custom_options.max {
+                    if parsed > max {
+                        return Err(FormFieldValidationError::from_string(format!(
+                            "This exceeds the maximum value of {max}"
+                        )));
+                    }
+                }
+
+                Ok(parsed)
             }
 
             fn to_field_value(&self) -> String {
@@ -687,6 +705,23 @@ macro_rules! impl_float_as_form_field {
                         "Cannot have NaN or inf as form input values",
                     ));
                 }
+
+                if let Some(min) = field.custom_options.min {
+                    if parsed < min {
+                        return Err(FormFieldValidationError::from_string(format!(
+                            "This is below the minimum value of {min}"
+                        )));
+                    }
+                }
+
+                if let Some(max) = field.custom_options.max {
+                    if parsed > max {
+                        return Err(FormFieldValidationError::from_string(format!(
+                            "This exceeds the maximum value of {max}"
+                        )));
+                    }
+                }
+
                 Ok(parsed)
             }
 

@@ -832,7 +832,6 @@ mod tests {
             },
         );
         let html = field.to_string();
-        println!("html: {}", html);
         assert!(html.contains("type=\"number\""));
         assert!(html.contains("required"));
         assert!(html.contains("min=\"1.5\""));
@@ -1085,7 +1084,7 @@ mod tests {
         );
         field.set_value(Cow::Borrowed("5.0"));
         let value = f32::clean_value(&field).unwrap();
-        assert_eq!(value, 5.0);
+        assert_eq!(value, 5.0f32);
     }
     #[test]
     fn float_field_clean_value_nan_and_inf() {

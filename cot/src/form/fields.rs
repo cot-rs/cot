@@ -1112,6 +1112,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn float_field_clean_value() {
         let mut field = FloatField::<f32>::with_options(
             FormFieldOptions {

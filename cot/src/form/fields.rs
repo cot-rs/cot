@@ -584,6 +584,122 @@ fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldValidationEr
     }
 }
 
+impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float + Debug);
+
+/// Custom options for a `FloatField`.
+#[derive(Debug, Copy, Clone)]
+pub struct FloatFieldOptions<T> {
+    /// The minimum value of the field. Used to set the `min` attribute in the
+    /// HTML input element.
+    pub min: Option<T>,
+    /// The maximum value of the field. Used to set the `max` attribute in the
+    /// HTML input element.
+    pub max: Option<T>,
+}
+
+impl<T: Float> Default for FloatFieldOptions<T> {
+    fn default() -> Self {
+        Self {
+            min: T::MIN,
+            max: T::MAX,
+        }
+    }
+}
+
+impl<T: Float + Debug> Display for FloatField<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag: HtmlTag = HtmlTag::input("number");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+
+        if let Some(min) = &self.custom_options.min {
+            let min = format!("{:?}", min);
+            tag.attr("min", &min);
+        }
+        if let Some(max) = &self.custom_options.max {
+            let max = format!("{:?}", max);
+            tag.attr("max", &max);
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl<T: Float + Debug> HtmlSafe for FloatField<T> {}
+
+/// A trait for types that can be represented as a float.
+///
+/// This trait is implemented for `f32` and `f64`.
+pub trait Float: Sized + ToString {
+    /// The minimum value of the type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::fields::Float;
+    ///
+    /// assert_eq!(<f32 as Float>::MIN, Some(f32::MIN));
+    /// ```
+    const MIN: Option<Self>;
+    /// The maximum value of the type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::fields::Float;
+    ///
+    /// assert_eq!(<f32 as Float>::MAX, Some(f32::MAX));
+    /// ```
+    const MAX: Option<Self>;
+}
+
+macro_rules! impl_float {
+    ($type:ty) => {
+        impl Float for $type {
+            const MIN: Option<Self> = Some(Self::MIN);
+            const MAX: Option<Self> = Some(Self::MAX);
+        }
+    };
+}
+
+impl_float!(f32);
+impl_float!(f64);
+
+macro_rules! impl_float_as_form_field {
+    ($type:ty) => {
+        impl AsFormField for $type {
+            type Type = FloatField<$type>;
+
+            fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
+                let value = check_required(field)?;
+                let parsed: $type = value
+                    .parse()
+                    .map_err(|_| FormFieldValidationError::invalid_value(value))?;
+
+                if parsed.is_nan() || parsed.is_infinite() {
+                    return Err(FormFieldValidationError::from_static(
+                        "Cannot have NaN or inf as form input values",
+                    ));
+                }
+                Ok(parsed)
+            }
+
+            fn to_field_value(&self) -> String {
+                self.to_string()
+            }
+        }
+    };
+}
+
+impl_float_as_form_field!(f32);
+impl_float_as_form_field!(f64);
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -669,6 +785,26 @@ mod tests {
         assert!(html.contains("max=\"10\""));
     }
 
+    #[test]
+    fn float_field_render() {
+        let field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.0),
+                max: Some(10.0),
+            },
+        );
+        let html = field.to_string();
+        println!("html: {}", html);
+        assert!(html.contains("type=\"number\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"1.0\""));
+        assert!(html.contains("max=\"10.0\""));
+    }
     #[test]
     fn bool_field_render() {
         let field = BoolField::with_options(
@@ -899,5 +1035,67 @@ mod tests {
         field.set_value(Cow::Borrowed("true"));
         let value = bool::clean_value(&field).unwrap();
         assert!(value);
+    }
+
+    #[test]
+    fn float_field_clean_value() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.0),
+                max: Some(10.0),
+            },
+        );
+        field.set_value(Cow::Borrowed("5.0"));
+        let value = f32::clean_value(&field).unwrap();
+        assert_eq!(value, 5.0);
+    }
+    #[test]
+    fn float_field_clean_value_nan_and_inf() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.0),
+                max: Some(10.0),
+            },
+        );
+        let bad_inputs = ["NaN", "inf"];
+
+        for &bad_input in &bad_inputs {
+            field.set_value(Cow::Borrowed(bad_input));
+            let value = f32::clean_value(&field);
+            assert_eq!(
+                value,
+                Err(FormFieldValidationError::from_static(
+                    "Cannot have NaN or inf as form input values"
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn float_field_clean_required() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.0),
+                max: Some(10.0),
+            },
+        );
+        field.set_value(Cow::Borrowed(""));
+        let value = f32::clean_value(&field);
+        assert_eq!(value, Err(FormFieldValidationError::Required));
     }
 }

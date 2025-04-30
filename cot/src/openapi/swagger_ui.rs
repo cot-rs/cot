@@ -6,13 +6,13 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use cot::request::Request;
 use swagger_ui_redist::SwaggerUiStaticFile;
 
-use crate::request::RequestExt;
+use crate::html::Html;
+use crate::request::{Request, RequestExt};
 use crate::response::{Response, ResponseExt};
 use crate::router::{Route, Router};
-use crate::{App, Body, StatusCode};
+use crate::{App, StatusCode};
 
 /// A wrapper around the Swagger UI functionality.
 ///
@@ -94,10 +94,8 @@ impl App for SwaggerUi {
     fn router(&self) -> Router {
         let swagger_ui = Arc::new(self.inner.clone());
         let swagger_handler = async move || {
-            Ok(Response::new_html(
-                StatusCode::OK,
-                Body::fixed(swagger_ui.serve().map_err(cot::Error::custom)?),
-            ))
+            let swagger = swagger_ui.serve().map_err(cot::Error::custom)?;
+            Ok::<_, crate::Error>(Html::new(swagger))
         };
 
         let mut urls = vec![Route::with_handler("/", swagger_handler)];

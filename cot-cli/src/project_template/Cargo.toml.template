@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-askama = "0.13"
+askama = "0.14"
 cot = { {{ cot_source }}, features = ["full"] }

@@ -45,10 +45,11 @@ pub(super) fn impl_model_for_struct(
         syn::Data::Struct(data) => &mut data.fields,
         _ => panic!("Only structs are supported"),
     };
-    let fields = remove_helper_field_attributes(fields);
+    let fields = get_fields_punctuated(fields);
 
     quote!(
         #(#attrs)*
+        #[derive(::cot::__private::ModelHelper)]
         #vis struct #ident {
             #fields
         }
@@ -56,14 +57,9 @@ pub(super) fn impl_model_for_struct(
     )
 }
 
-fn remove_helper_field_attributes(fields: &mut syn::Fields) -> &Punctuated<syn::Field, Token![,]> {
+fn get_fields_punctuated(fields: &mut syn::Fields) -> &Punctuated<syn::Field, Token![,]> {
     match fields {
-        syn::Fields::Named(fields) => {
-            for field in &mut fields.named {
-                field.attrs.retain(|a| !a.path().is_ident("model"));
-            }
-            &fields.named
-        }
+        syn::Fields::Named(fields) => &fields.named,
         _ => panic!("Only named fields are supported"),
     }
 }
@@ -126,7 +122,7 @@ impl ModelBuilder {
     fn push_field(&mut self, field: &Field) {
         let orm_ident = orm_ident();
 
-        let name = &field.field_name;
+        let name = &field.name;
         let ty = &field.ty;
         let index = self.fields_as_columns.len();
         let column_name = &field.column_name;
@@ -167,7 +163,7 @@ impl ModelBuilder {
         let table_name = &self.table_name;
         let fields_struct_name = &self.fields_struct_name;
         let fields_as_columns = &self.fields_as_columns;
-        let pk_field_name = &self.pk_field.field_name;
+        let pk_field_name = &self.pk_field.name;
         let pk_column_name = &self.pk_field.column_name;
         let pk_type = &self.pk_field.ty;
         let fields_as_from_db = &self.fields_as_from_db;

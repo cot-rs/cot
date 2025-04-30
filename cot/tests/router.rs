@@ -1,23 +1,20 @@
 use bytes::Bytes;
 use cot::config::ProjectConfig;
+use cot::html::Html;
 use cot::project::RegisterAppsContext;
 use cot::request::{Request, RequestExt};
-use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::test::Client;
-use cot::{App, AppBuilder, Body, Project, StatusCode};
+use cot::{App, AppBuilder, Project, StatusCode};
 
-async fn index(_request: Request) -> cot::Result<Response> {
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed("Hello world!"),
-    ))
+async fn index() -> Html {
+    Html::new("Hello world!")
 }
 
-async fn parameterized(request: Request) -> cot::Result<Response> {
+async fn parameterized(request: Request) -> Html {
     let name = request.path_params().get("name").unwrap().to_owned();
 
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(name)))
+    Html::new(name)
 }
 
 #[cot::test]

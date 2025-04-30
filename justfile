@@ -25,7 +25,7 @@ update-template-lockfile:
     echo $tmpdir
     cargo run --bin cot -- new --cot-path "$(pwd)/cot" $proj_dir
     cargo update --manifest-path "$proj_dir/Cargo.toml"
-    sed -i 's/$proj_name/\{\{ project_name \}\}/' $cargo_lock_path
+    sed -i "s/$proj_name/\{\{ project_name \}\}/" $cargo_lock_path
     cp $cargo_lock_path cot-cli/src/project_template/Cargo.lock.template
     rm -rf $tmpdir
 

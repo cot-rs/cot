@@ -20,9 +20,10 @@ use thiserror::Error;
 use crate::App;
 use crate::admin::{AdminModelManager, DefaultAdminModelManager};
 use crate::auth::{
-    AuthBackend, AuthError, Password, PasswordHash, PasswordVerificationResult, Result,
-    SessionAuthHash, User, UserId,
+    AuthBackend, AuthError, PasswordHash, PasswordVerificationResult, Result, SessionAuthHash,
+    User, UserId,
 };
+use crate::common_types::Password;
 use crate::config::SecretKey;
 use crate::db::migrations::SyncDynMigration;
 use crate::db::{Database, DatabaseBackend, LimitedString, Model, model, query};

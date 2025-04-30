@@ -543,17 +543,7 @@ macro_rules! impl_as_openapi_operation {
     };
 }
 
-impl_as_openapi_operation!();
-impl_as_openapi_operation!(P1);
-impl_as_openapi_operation!(P1, P2);
-impl_as_openapi_operation!(P1, P2, P3);
-impl_as_openapi_operation!(P1, P2, P3, P4);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6, P7);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6, P7, P8);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6, P7, P8, P9);
-impl_as_openapi_operation!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
+handle_all_parameters!(impl_as_openapi_operation);
 
 /// A trait that can be implemented for types that should be taken into
 /// account when generating OpenAPI paths.
@@ -884,10 +874,9 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     use super::*;
+    use crate::html::Html;
     use crate::openapi::AsApiOperation;
     use crate::request::extractors::{Json, Path, UrlQuery};
-    use crate::response::{Response, ResponseExt};
-    use crate::{Body, StatusCode};
 
     #[derive(Deserialize, Serialize, schemars::JsonSchema)]
     struct TestRequest {
@@ -910,8 +899,8 @@ mod tests {
         field2: i32,
     }
 
-    async fn test_handler() -> cot::Result<Response> {
-        Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+    async fn test_handler() -> Html {
+        Html::new("test")
     }
 
     #[test]

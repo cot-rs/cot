@@ -243,6 +243,24 @@ impl http_body::Body for Body {
     }
 }
 
+macro_rules! body_from_impl {
+    ($ty:ty) => {
+        impl From<$ty> for Body {
+            fn from(buf: $ty) -> Self {
+                Self::new(BodyInner::Fixed(Bytes::from(buf)))
+            }
+        }
+    };
+}
+
+body_from_impl!(&'static [u8]);
+body_from_impl!(Vec<u8>);
+
+body_from_impl!(&'static str);
+body_from_impl!(String);
+
+body_from_impl!(Bytes);
+
 #[cfg(test)]
 mod tests {
     use std::pin::Pin;

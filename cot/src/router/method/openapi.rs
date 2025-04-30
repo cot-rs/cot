@@ -530,16 +530,14 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::html::Html;
     use crate::request::extractors::{Json, Path};
-    use crate::response::{Response, ResponseExt};
+    use crate::response::{IntoResponse, Response};
     use crate::test::TestRequestBuilder;
-    use crate::{Body, Method, StatusCode};
+    use crate::{Method, StatusCode};
 
     async fn test_handler(method: Method) -> cot::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::OK,
-            Body::fixed(method.as_str().to_owned()),
-        ))
+        Html::new(method.as_str()).into_response()
     }
 
     #[test]
@@ -690,7 +688,7 @@ mod tests {
         Path(_): Path<i32>,
         Json(_): Json<String>,
     ) -> cot::Result<Response> {
-        Ok(Response::new_html(StatusCode::OK, Body::empty()))
+        Html::new("").into_response()
     }
 
     #[test]

@@ -1730,6 +1730,7 @@ impl<const LIMIT: u32> fake::Dummy<fake::Faker> for LimitedString<LIMIT> {
 /// }
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum ColumnType {
     /// A boolean column type.
     Boolean,

@@ -139,7 +139,7 @@ impl Router {
             result.handler.handle(request).await
         } else {
             debug!("Not found: {}", request_path);
-            Ok(not_found_response(None))
+            not_found_response(None)
         }
     }
 
@@ -760,7 +760,7 @@ where
         match response {
             Ok(response) => Ok(response),
             Err(error) => match error.inner {
-                ErrorRepr::NotFound { message } => Ok(not_found_response(message)),
+                ErrorRepr::NotFound { message } => not_found_response(message),
                 _ => Err(error),
             },
         }
@@ -1025,22 +1025,18 @@ macro_rules! reverse_redirect {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
-
     use super::*;
+    use crate::StatusCode;
+    use crate::html::Html;
     use crate::request::Request;
-    use crate::response::{Response, ResponseExt};
+    use crate::response::{IntoResponse, Response};
     use crate::test::TestRequestBuilder;
-    use crate::{Body, StatusCode};
 
     struct MockHandler;
 
     impl RequestHandler for MockHandler {
         async fn handle(&self, _request: Request) -> Result<Response> {
-            Ok(Response::new_html(
-                StatusCode::OK,
-                Body::fixed(Bytes::from("OK")),
-            ))
+            Html::new("OK").into_response()
         }
     }
 

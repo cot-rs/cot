@@ -121,7 +121,7 @@ fn create_models_foreign_key_cycle() {
 
     let (table_name, field) = unwrap_add_field(&migration.operations[2]);
     assert_eq!(table_name, "cot__parent");
-    assert_eq!(field.field_name, "child");
+    assert_eq!(field.name, "child");
 }
 
 #[test]

@@ -49,9 +49,10 @@ use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error::ErrorRepr;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
+use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{AppName, Request, RequestExt};
-use crate::response::{Response, ResponseExt};
+use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::{Body, Error, StatusCode, cli, error_page};
 
@@ -762,20 +763,18 @@ pub trait ErrorPageHandler: Send + Sync {
 struct DefaultNotFoundHandler;
 impl ErrorPageHandler for DefaultNotFoundHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::NOT_FOUND,
-            Body::fixed(include_str!("../templates/404.html")),
-        ))
+        Html::new(include_str!("../templates/404.html"))
+            .with_status(StatusCode::NOT_FOUND)
+            .into_response()
     }
 }
 
 struct DefaultServerErrorHandler;
 impl ErrorPageHandler for DefaultServerErrorHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Body::fixed(include_str!("../templates/500.html")),
-        ))
+        Html::new(include_str!("../templates/500.html"))
+            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
+            .into_response()
     }
 }
 

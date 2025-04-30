@@ -1,15 +1,11 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::project::RegisterAppsContext;
-use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
-use cot::{App, AppBuilder, Body, Project, StatusCode};
+use cot::{App, AppBuilder, Project};
 
-async fn return_hello() -> cot::Result<Response> {
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed("<h1>Hello Cot!</h1>".as_bytes().to_vec()),
-    ))
+async fn return_hello() -> &'static str {
+    "Hello Cot!"
 }
 
 struct HelloApp;

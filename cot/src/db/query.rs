@@ -277,6 +277,7 @@ impl<T: Model> Query<T> {
 /// );
 /// ```
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum Expr {
     /// An expression containing a reference to a column.
     ///

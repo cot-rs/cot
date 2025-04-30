@@ -114,6 +114,20 @@ pub fn model(args: TokenStream, input: TokenStream) -> TokenStream {
     token_stream.into()
 }
 
+// Simple derive macro that doesn't do anything useful but defines the `model`
+// helper attribute.
+//
+// It's used internally by the `model` macro to avoid having to remove the
+// `#[model]` attributes from the struct fields. Typically, the Rust compiler
+// complains when there are unused attributes, so we define this macro to avoid
+// that. This way, we don't have to remove the `#[model]` attributes from the
+// struct fields, while other derive macros (such as `AdminModel`) can still use
+// them.
+#[proc_macro_derive(ModelHelper, attributes(model))]
+pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
+    TokenStream::new()
+}
+
 #[proc_macro]
 pub fn query(input: TokenStream) -> TokenStream {
     let query_input = parse_macro_input!(input as Query);

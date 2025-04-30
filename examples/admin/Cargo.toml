@@ -7,5 +7,5 @@ edition = "2024"
 
 [dependencies]
 async-trait = "0.1"
-askama = "0.13"
+askama = "0.14"
 cot = { path = "../../cot", features = ["live-reload"] }

@@ -70,6 +70,7 @@ pub fn handle_cli_manpages(
         .context("unable to generate manpages in output directory")
 }
 
+#[expect(clippy::unnecessary_wraps)] // return Result<()> for consistency
 pub fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> anyhow::Result<()> {
     generate_completions(shell, &mut std::io::stdout());
 

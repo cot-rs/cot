@@ -61,7 +61,53 @@ macro_rules! impl_form_field {
     };
 }
 
+/// A trait for validating form field options.
+///
+/// This trait is used to validate the custom options for form fields when they
+/// are created. It ensures that the options provided are valid before a form
+/// field is constructed.
+///
+/// Implementing this trait allows for custom validation logic to be applied to
+/// field options.
+///
+/// # Examples
+///
+/// ```
+/// use cot::form::fields::ValidateOptions;
+/// use cot::form::{FormFieldOptions, FormFieldValidationError};
+///
+/// struct MyFieldOptions {
+///     min: Option<u32>,
+///     max: Option<u32>,
+/// }
+///
+/// impl ValidateOptions for MyFieldOptions {
+///     fn validate_options(&self) -> Result<(), FormFieldValidationError> {
+///         if let (Some(min), Some(max)) = (self.min, self.max) {
+///             if min > max {
+///                 return Err(FormFieldValidationError::from_string(format!(
+///                     "min ({min}) cannot be greater than max ({max})"
+///                 )));
+///             }
+///         }
+///         Ok(())
+///     }
+/// }
+/// ```
 pub trait ValidateOptions {
+    /// Validates the form field options when a field is created.
+    ///
+    /// This method is used to check that the provided options are valid and
+    /// consistent before a form field is constructed. The validation is
+    /// performed when `FormField::with_options` is called.
+    ///
+    /// The default implementation performs no validation and always returns
+    /// `Ok(())`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the options are invalid or inconsistent with each
+    /// other.
     fn validate_options(&self) -> Result<(), FormFieldValidationError> {
         Ok(())
     }
@@ -293,8 +339,7 @@ impl ValidateOptions for EmailFieldOptions {
         if let (Some(min), Some(max)) = (self.min_length, self.max_length) {
             if min > max {
                 return Err(FormFieldValidationError::from_string(format!(
-                    "min_length ({}) exceeds max_length ({})",
-                    min, max
+                    "min_length ({min}) exceeds max_length ({max})"
                 )));
             }
         }

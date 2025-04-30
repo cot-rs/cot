@@ -402,17 +402,17 @@ macro_rules! impl_integer_as_form_field {
 
                 if let Some(min) = field.custom_options.min {
                     if parsed < min {
-                        return Err(FormFieldValidationError::from_string(format!(
-                            "This is below the minimum value of {min}"
-                        )));
+                        return Err(FormFieldValidationError::minimum_value_not_met(
+                            min.to_string(),
+                        ));
                     }
                 }
 
                 if let Some(max) = field.custom_options.max {
                     if parsed > max {
-                        return Err(FormFieldValidationError::from_string(format!(
-                            "This exceeds the maximum value of {max}"
-                        )));
+                        return Err(FormFieldValidationError::maximum_value_exceeded(
+                            max.to_string(),
+                        ));
                     }
                 }
 
@@ -706,17 +706,17 @@ macro_rules! impl_float_as_form_field {
 
                 if let Some(min) = field.custom_options.min {
                     if parsed < min {
-                        return Err(FormFieldValidationError::from_string(format!(
-                            "This is below the minimum value of {min}"
-                        )));
+                        return Err(FormFieldValidationError::minimum_value_not_met(
+                            min.to_string(),
+                        ));
                     }
                 }
 
                 if let Some(max) = field.custom_options.max {
                     if parsed > max {
-                        return Err(FormFieldValidationError::from_string(format!(
-                            "This exceeds the maximum value of {max}"
-                        )));
+                        return Err(FormFieldValidationError::maximum_value_exceeded(
+                            max.to_string(),
+                        ));
                     }
                 }
 
@@ -1053,6 +1053,48 @@ mod tests {
     }
 
     #[test]
+    fn integer_field_clean_value_below_min_value() {
+        let mut field = IntegerField::<i32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            IntegerFieldOptions {
+                min: Some(10),
+                max: Some(50),
+            },
+        );
+        field.set_value(Cow::Borrowed("5"));
+        let value = i32::clean_value(&field);
+        assert!(matches!(
+            value,
+            Err(FormFieldValidationError::MinimumValueNotMet { min_value: _ })
+        ));
+    }
+
+    #[test]
+    fn integer_field_clean_value_above_max_value() {
+        let mut field = IntegerField::<i32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            IntegerFieldOptions {
+                min: Some(10),
+                max: Some(50),
+            },
+        );
+        field.set_value(Cow::Borrowed("100"));
+        let value = i32::clean_value(&field);
+        assert!(matches!(
+            value,
+            Err(FormFieldValidationError::MaximumValueExceeded { max_value: _ })
+        ));
+    }
+
+    #[test]
     fn bool_field_clean_value() {
         let mut field = BoolField::with_options(
             FormFieldOptions {
@@ -1086,6 +1128,49 @@ mod tests {
         let value = f32::clean_value(&field).unwrap();
         assert_eq!(value, 5.0f32);
     }
+
+    #[test]
+    fn float_field_clean_value_min_value_not_met() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(5.0),
+                max: Some(10.0),
+            },
+        );
+        field.set_value(Cow::Borrowed("2.0"));
+        let value = f32::clean_value(&field);
+        assert!(matches!(
+            value,
+            Err(FormFieldValidationError::MinimumValueNotMet { min_value: _ })
+        ));
+    }
+
+    #[test]
+    fn float_field_clean_value_max_value_exceeded() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(5.0),
+                max: Some(10.0),
+            },
+        );
+        field.set_value(Cow::Borrowed("20.0"));
+        let value = f32::clean_value(&field);
+        assert!(matches!(
+            value,
+            Err(FormFieldValidationError::MaximumValueExceeded { max_value: _ })
+        ));
+    }
+
     #[test]
     fn float_field_clean_value_nan_and_inf() {
         let mut field = FloatField::<f32>::with_options(

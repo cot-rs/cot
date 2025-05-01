@@ -264,6 +264,27 @@ fn normalize_datetimes(data: &mut Vec<AllFieldsModel>) {
     }
 }
 
+macro_rules! run_migrations {
+    ( $db:ident, $( $operations:ident ),* ) => {
+        struct TestMigration;
+
+        impl cot::db::migrations::Migration for TestMigration {
+            const APP_NAME: &'static str = "cot";
+            const DEPENDENCIES: &'static [cot::db::migrations::MigrationDependency] = &[];
+            const MIGRATION_NAME: &'static str = "test_migration";
+            const OPERATIONS: &'static [Operation] = &[ $($operations),* ];
+        }
+
+        cot::db::migrations::MigrationEngine::new(
+            cot::db::migrations::wrap_migrations(&[&TestMigration])
+        )
+            .unwrap()
+            .run(&**$db)
+            .await
+            .unwrap();
+    };
+}
+
 #[cot_macros::dbtest]
 async fn foreign_keys(db: &mut TestDatabase) {
     #[derive(Debug, Clone, PartialEq)]
@@ -312,8 +333,7 @@ async fn foreign_keys(db: &mut TestDatabase) {
         ])
         .build();
 
-    CREATE_ARTIST.forwards(db).await.unwrap();
-    CREATE_TRACK.forwards(db).await.unwrap();
+    run_migrations!(db, CREATE_ARTIST, CREATE_TRACK);
 
     let mut artist = Artist {
         id: Auto::auto(),
@@ -395,8 +415,7 @@ async fn foreign_keys_option(db: &mut TestDatabase) {
         ])
         .build();
 
-    CREATE_PARENT.forwards(db).await.unwrap();
-    CREATE_CHILD.forwards(db).await.unwrap();
+    run_migrations!(db, CREATE_PARENT, CREATE_CHILD);
 
     // Test child with `None` parent
     let mut child = Child {
@@ -479,8 +498,7 @@ async fn foreign_keys_cascade(db: &mut TestDatabase) {
         ])
         .build();
 
-    CREATE_PARENT.forwards(db).await.unwrap();
-    CREATE_CHILD.forwards(db).await.unwrap();
+    run_migrations!(db, CREATE_PARENT, CREATE_CHILD);
 
     // with parent
     let mut parent = Parent { id: Auto::auto() };

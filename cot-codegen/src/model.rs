@@ -1,5 +1,6 @@
 use darling::{FromDeriveInput, FromField, FromMeta};
 use heck::ToSnakeCase;
+use quote::ToTokens;
 use syn::spanned::Spanned;
 
 #[cfg(feature = "symbol-resolver")]
@@ -50,12 +51,32 @@ impl ModelOpts {
     ///
     /// Panics if the [`ModelOpts`] was not parsed from a struct.
     #[must_use]
-    pub fn fields(&self) -> Vec<&FieldOpts> {
-        self.data
+    pub fn fields(&self) -> Vec<FieldOpts> {
+        let model_name = self.ident.to_string();
+        let mut fields: Vec<FieldOpts> = self
+            .data
             .as_ref()
             .take_struct()
             .expect("Only structs are supported")
             .fields
+            .iter()
+            .map(|f| (*f).clone())
+            .collect();
+
+        for field in fields.iter_mut() {
+            let ty = {
+                let ty_str = field.ty.to_token_stream().to_string();
+                if ty_str.contains("< Self >") {
+                    let replaced =
+                        ty_str.replace("< Self >", format!("< {} >", model_name).as_str());
+                    syn::parse_str(&replaced).unwrap_or_else(|_| field.ty.clone())
+                } else {
+                    field.ty.clone()
+                }
+            };
+            field.ty = ty;
+        }
+        fields
     }
 
     /// Convert the model options into a model.
@@ -70,9 +91,10 @@ impl ModelOpts {
         #[cfg(feature = "symbol-resolver")] symbol_resolver: &SymbolResolver,
     ) -> Result<Model, syn::Error> {
         #[cfg(feature = "symbol-resolver")]
-        let as_field = |field: &&FieldOpts| field.as_field(symbol_resolver);
+        let as_field = |field: &FieldOpts| field.as_field(symbol_resolver);
+
         #[cfg(not(feature = "symbol-resolver"))]
-        let as_field = |field: &&FieldOpts| field.as_field();
+        let as_field = |field: &FieldOpts| field.as_field();
 
         let fields = self
             .fields()
@@ -224,11 +246,15 @@ impl FieldOpts {
                 .transpose()?,
         );
         let is_primary_key = self.primary_key.is_present();
+        let mut ty = self.ty.clone();
+
+        #[cfg(feature = "symbol-resolver")]
+        symbol_resolver.resolve(&mut ty);
 
         Ok(Field {
             name: name.clone(),
             column_name,
-            ty: self.ty.clone(),
+            ty,
             #[cfg(feature = "symbol-resolver")]
             auto_value,
             primary_key: is_primary_key,

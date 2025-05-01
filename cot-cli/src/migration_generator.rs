@@ -898,7 +898,7 @@ pub struct ModelInSource {
 impl ModelInSource {
     fn from_item(
         app_name: &str,
-        item: syn::ItemStruct,
+        mut item: syn::ItemStruct,
         args: &ModelArgs,
         symbol_resolver: &SymbolResolver,
     ) -> anyhow::Result<Self> {
@@ -907,6 +907,22 @@ impl ModelInSource {
             .map_err(|e| anyhow::anyhow!("cannot parse model: {}", e))?;
         let mut model = opts.as_model(args, symbol_resolver)?;
         model.table_name = format!("{}__{}", app_name.to_snake_case(), model.table_name);
+
+        let model_name = model.name.to_string();
+        for field in &mut item.fields {
+            let mut ty = {
+                let ty_str = field.ty.to_token_stream().to_string();
+                if ty_str.contains("< Self >") {
+                    let replaced =
+                        ty_str.replace("< Self >", format!("< {} >", model_name).as_str());
+                    syn::parse_str(&replaced).unwrap_or_else(|_| field.ty.clone())
+                } else {
+                    field.ty.clone()
+                }
+            };
+            symbol_resolver.resolve(&mut ty);
+            field.ty = ty;
+        }
 
         Ok(Self {
             model_item: item,

@@ -106,7 +106,7 @@ impl ModelOpts {
                 qself: None,
                 path: syn::Path::from(self.ident.clone()),
             });
-            symbol_resolver.resolve(&mut ty);
+            symbol_resolver.resolve(&mut ty, Some(&original_name));
             ty
         };
 
@@ -156,7 +156,8 @@ impl FieldOpts {
     #[cfg(feature = "symbol-resolver")]
     fn find_type(&self, type_to_find: &str, symbol_resolver: &SymbolResolver) -> Option<syn::Type> {
         let mut ty = self.ty.clone();
-        symbol_resolver.resolve(&mut ty);
+        let self_reference = self.ident.as_ref().map(ToString::to_string);
+        symbol_resolver.resolve(&mut ty, self_reference.as_ref());
         Self::find_type_resolved(&ty, type_to_find)
     }
 

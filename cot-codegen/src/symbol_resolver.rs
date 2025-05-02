@@ -56,23 +56,29 @@ impl SymbolResolver {
 
     pub fn resolve_struct(&self, item: &mut syn::ItemStruct) {
         for field in &mut item.fields {
-            self.resolve(&mut field.ty);
+            self.resolve(&mut field.ty, Some(&item.ident.to_string()));
         }
     }
 
-    pub fn resolve(&self, ty: &mut syn::Type) {
+    pub fn resolve(&self, ty: &mut syn::Type, self_reference: Option<&String>) {
         if let syn::Type::Path(path) = ty {
-            self.resolve_type_path(path);
+            self.resolve_type_path(path, self_reference);
         }
     }
 
     /// Checks the provided `TypePath` and resolves the full type path, if
     /// available.
-    fn resolve_type_path(&self, path: &mut syn::TypePath) {
+    fn resolve_type_path(&self, path: &mut syn::TypePath, self_reference: Option<&String>) {
         let first_segment = path.path.segments.first();
 
         if let Some(first_segment) = first_segment {
-            if let Some(symbol) = self.symbols.get(&first_segment.ident.to_string()) {
+            let mut ident = first_segment.ident.to_string();
+            if ident == "Self" {
+                if let Some(self_reference) = self_reference {
+                    ident.clone_from(self_reference);
+                }
+            }
+            if let Some(symbol) = self.symbols.get(&ident) {
                 let mut new_segments: Vec<_> = symbol
                     .full_path_parts()
                     .map(|s| syn::PathSegment {
@@ -92,25 +98,33 @@ impl SymbolResolver {
             }
 
             for segment in &mut path.path.segments {
-                self.resolve_path_arguments(&mut segment.arguments);
+                self.resolve_path_arguments(&mut segment.arguments, self_reference);
             }
         }
     }
 
-    fn resolve_path_arguments(&self, arguments: &mut syn::PathArguments) {
+    fn resolve_path_arguments(
+        &self,
+        arguments: &mut syn::PathArguments,
+        self_reference: Option<&String>,
+    ) {
         if let syn::PathArguments::AngleBracketed(args) = arguments {
             for arg in &mut args.args {
-                self.resolve_generic_argument(arg);
+                self.resolve_generic_argument(arg, self_reference);
             }
         }
     }
 
-    fn resolve_generic_argument(&self, arg: &mut syn::GenericArgument) {
+    fn resolve_generic_argument(
+        &self,
+        arg: &mut syn::GenericArgument,
+        self_reference: Option<&String>,
+    ) {
         if let syn::GenericArgument::Type(syn::Type::Path(path)) = arg {
             if let Some(new_arg) = self.try_resolve_generic_const(path) {
                 *arg = new_arg;
             } else {
-                self.resolve_type_path(path);
+                self.resolve_type_path(path, self_reference);
             }
         }
     }
@@ -422,21 +436,21 @@ const MY_CONSTANT: u8 = 42;
         ]);
 
         let path = &mut parse_quote!(MyType);
-        resolver.resolve_type_path(path);
+        resolver.resolve_type_path(path, None);
         assert_eq!(
             quote!(crate::models::MyType).to_string(),
             path.into_token_stream().to_string()
         );
 
         let path = &mut parse_quote!(HashMap<String, u8>);
-        resolver.resolve_type_path(path);
+        resolver.resolve_type_path(path, None);
         assert_eq!(
             quote!(std::collections::HashMap<String, u8>).to_string(),
             path.into_token_stream().to_string()
         );
 
         let path = &mut parse_quote!(Option<MyType>);
-        resolver.resolve_type_path(path);
+        resolver.resolve_type_path(path, None);
         assert_eq!(
             quote!(Option<crate::models::MyType>).to_string(),
             path.into_token_stream().to_string()
@@ -471,6 +485,27 @@ const MY_CONSTANT: u8 = 42;
                 field_2: std::collections::HashMap<String, crate::models::MyType>,
                 field_3: Option<String>,
                 field_4: cot::db::LimitedString<{ crate::constants::MY_CONSTANT }>,
+            }
+        };
+        assert_eq!(actual.into_token_stream().to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn import_resolver_resolve_struct_with_self() {
+        let resolver = SymbolResolver::new(vec![
+            VisibleSymbol::new_use("ForeignKey", "cot::db::ForeignKey"),
+            VisibleSymbol::new_use("MyModel", "crate::MyModel"),
+        ]);
+
+        let mut actual = parse_quote! {
+            struct MyModel {
+                foreign_key: ForeignKey<Self>,
+            }
+        };
+        resolver.resolve_struct(&mut actual);
+        let expected = quote! {
+            struct MyModel {
+                foreign_key: cot::db::ForeignKey<crate::MyModel>,
             }
         };
         assert_eq!(actual.into_token_stream().to_string(), expected.to_string());

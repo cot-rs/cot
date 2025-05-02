@@ -494,7 +494,7 @@ const MY_CONSTANT: u8 = 42;
     fn import_resolver_resolve_struct_with_self() {
         let resolver = SymbolResolver::new(vec![
             VisibleSymbol::new_use("ForeignKey", "cot::db::ForeignKey"),
-            VisibleSymbol::new_use("MyModel", "crate::MyModel"),
+            VisibleSymbol::new("MyModel", "crate::MyModel", VisibleSymbolKind::Struct),
         ]);
 
         let mut actual = parse_quote! {

@@ -1,9 +1,13 @@
 use std::collections::HashMap;
+#[cfg(feature = "symbol-resolver")]
 use std::fmt::Display;
 use std::iter::FromIterator;
+#[cfg(feature = "symbol-resolver")]
 use std::path::Path;
 
+#[cfg(feature = "symbol-resolver")]
 use syn::UseTree;
+#[cfg(feature = "symbol-resolver")]
 use tracing::warn;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +29,7 @@ impl SymbolResolver {
         }
     }
 
+    #[cfg(feature = "symbol-resolver")]
     #[must_use]
     pub fn from_file(file: &syn::File, module_path: &Path) -> Self {
         let imports = Self::get_imports(file, &ModulePath::from_fs_path(module_path));
@@ -33,6 +38,7 @@ impl SymbolResolver {
 
     /// Return the list of top-level `use` statements, structs, and constants as
     /// a list of [`VisibleSymbol`]s from the file.
+    #[cfg(feature = "symbol-resolver")]
     fn get_imports(file: &syn::File, module_path: &ModulePath) -> Vec<VisibleSymbol> {
         let mut imports = Vec::new();
 
@@ -198,14 +204,17 @@ impl VisibleSymbol {
         self.full_path.split("::")
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn new_use(alias: &str, full_path: &str) -> Self {
         Self::new(alias, full_path, VisibleSymbolKind::Use)
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn from_item_use(item: &syn::ItemUse, module_path: &ModulePath) -> Vec<Self> {
         Self::from_tree(&item.tree, module_path)
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn from_item_struct(item: &syn::ItemStruct, module_path: &ModulePath) -> Self {
         let ident = item.ident.to_string();
         let full_path = Self::module_path(module_path, &ident);
@@ -217,6 +226,7 @@ impl VisibleSymbol {
         }
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn from_item_const(item: &syn::ItemConst, module_path: &ModulePath) -> Self {
         let ident = item.ident.to_string();
         let full_path = Self::module_path(module_path, &ident);
@@ -228,10 +238,12 @@ impl VisibleSymbol {
         }
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn module_path(module_path: &ModulePath, ident: &str) -> String {
         format!("{module_path}::{ident}")
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn from_tree(tree: &UseTree, current_module: &ModulePath) -> Vec<Self> {
         match tree {
             UseTree::Path(path) => {
@@ -282,11 +294,13 @@ impl VisibleSymbol {
     }
 }
 
+#[cfg(feature = "symbol-resolver")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModulePath {
     parts: Vec<String>,
 }
 
+#[cfg(feature = "symbol-resolver")]
 impl ModulePath {
     #[must_use]
     pub fn from_fs_path(path: &Path) -> Self {
@@ -333,6 +347,7 @@ impl ModulePath {
     }
 }
 
+#[cfg(feature = "symbol-resolver")]
 impl Display for ModulePath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.parts.join("::"))

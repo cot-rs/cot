@@ -2,7 +2,6 @@ use darling::{FromDeriveInput, FromField, FromMeta};
 use heck::ToSnakeCase;
 use syn::spanned::Spanned;
 
-#[cfg(feature = "symbol-resolver")]
 use crate::symbol_resolver::SymbolResolver;
 
 #[expect(clippy::module_name_repetitions)]
@@ -67,12 +66,10 @@ impl ModelOpts {
     pub fn as_model(
         &self,
         args: &ModelArgs,
-        #[cfg(feature = "symbol-resolver")] symbol_resolver: &SymbolResolver,
+        symbol_resolver: &SymbolResolver,
     ) -> Result<Model, syn::Error> {
-        #[cfg(feature = "symbol-resolver")]
-        let as_field = |field: &&FieldOpts| field.as_field(symbol_resolver);
-        #[cfg(not(feature = "symbol-resolver"))]
-        let as_field = |field: &&FieldOpts| field.as_field();
+        let self_reference = self.ident.to_string();
+        let as_field = |field: &&FieldOpts| field.as_field(symbol_resolver, Some(&self_reference));
 
         let fields = self
             .fields()
@@ -100,7 +97,6 @@ impl ModelOpts {
 
         let primary_key_field = self.get_primary_key_field(&fields)?;
 
-        #[cfg(feature = "symbol-resolver")]
         let ty = {
             let mut ty = syn::Type::Path(syn::TypePath {
                 qself: None,
@@ -114,7 +110,6 @@ impl ModelOpts {
             name: self.ident.clone(),
             vis: self.vis.clone(),
             original_name,
-            #[cfg(feature = "symbol-resolver")]
             resolved_ty: ty,
             model_type: args.model_type,
             table_name,
@@ -153,15 +148,12 @@ pub struct FieldOpts {
 }
 
 impl FieldOpts {
-    #[cfg(feature = "symbol-resolver")]
     fn find_type(&self, type_to_find: &str, symbol_resolver: &SymbolResolver) -> Option<syn::Type> {
         let mut ty = self.ty.clone();
-        let self_reference = self.ident.as_ref().map(ToString::to_string);
-        symbol_resolver.resolve(&mut ty, self_reference.as_ref());
+        symbol_resolver.resolve(&mut ty, None);
         Self::find_type_resolved(&ty, type_to_find)
     }
 
-    #[cfg(feature = "symbol-resolver")]
     fn find_type_resolved(ty: &syn::Type, type_to_find: &str) -> Option<syn::Type> {
         if let syn::Type::Path(type_path) = ty {
             let name = type_path
@@ -188,7 +180,6 @@ impl FieldOpts {
         None
     }
 
-    #[cfg(feature = "symbol-resolver")]
     fn find_type_in_generics(
         arg: &syn::AngleBracketedGenericArguments,
         type_to_find: &str,
@@ -208,16 +199,14 @@ impl FieldOpts {
     ///
     /// Panics if the field does not have an identifier (i.e. it is a tuple
     /// struct).
-    // we use `?` if the `symbol-resolver` feature is enabled
-    #[cfg_attr(not(feature = "symbol-resolver"), expect(clippy::unnecessary_wraps))]
     pub fn as_field(
         &self,
-        #[cfg(feature = "symbol-resolver")] symbol_resolver: &SymbolResolver,
+        symbol_resolver: &SymbolResolver,
+        self_reference: Option<&String>,
     ) -> Result<Field, syn::Error> {
         let name = self.ident.as_ref().unwrap();
         let column_name = name.to_string();
 
-        #[cfg(feature = "symbol-resolver")]
         let (auto_value, foreign_key) = (
             self.find_type("cot::db::Auto", symbol_resolver).is_some(),
             self.find_type("cot::db::ForeignKey", symbol_resolver)
@@ -225,15 +214,14 @@ impl FieldOpts {
                 .transpose()?,
         );
         let is_primary_key = self.primary_key.is_present();
-
+        let mut resolved_ty = self.ty.clone();
+        symbol_resolver.resolve(&mut resolved_ty, self_reference);
         Ok(Field {
             name: name.clone(),
             column_name,
-            ty: self.ty.clone(),
-            #[cfg(feature = "symbol-resolver")]
+            ty: resolved_ty,
             auto_value,
             primary_key: is_primary_key,
-            #[cfg(feature = "symbol-resolver")]
             foreign_key,
             unique: self.unique.is_present(),
         })
@@ -245,10 +233,8 @@ pub struct Model {
     pub name: syn::Ident,
     pub vis: syn::Visibility,
     pub original_name: String,
-    /// The type of the model resolved by symbol resolver.
-    #[cfg(feature = "symbol-resolver")]
     pub resolved_ty: syn::Type,
-    #[expect(clippy::struct_field_names)] // `type` is not an allowed identifier in Rust
+    #[expect(clippy::struct_field_names)]
     pub model_type: ModelType,
     pub table_name: String,
     pub pk_field: Field,
@@ -268,12 +254,10 @@ pub struct Field {
     pub column_name: String,
     pub ty: syn::Type,
     /// Whether the field is an auto field (e.g. `id`).
-    #[cfg(feature = "symbol-resolver")]
     pub auto_value: bool,
     pub primary_key: bool,
     /// [`Some`] if this field is a foreign key; [`None`] if this field is
     /// determined not to be a foreign key.
-    #[cfg(feature = "symbol-resolver")]
     pub foreign_key: Option<ForeignKeySpec>,
     pub unique: bool,
 }
@@ -330,8 +314,7 @@ mod tests {
     use syn::parse_quote;
 
     use super::*;
-    #[cfg(feature = "symbol-resolver")]
-    use crate::symbol_resolver::{VisibleSymbol, VisibleSymbolKind};
+    use crate::symbol_resolver::{SymbolResolver, VisibleSymbol, VisibleSymbolKind};
 
     #[test]
     fn model_args_default() {
@@ -361,7 +344,6 @@ mod tests {
         assert_eq!(fields[1].ident.as_ref().unwrap().to_string(), "name");
     }
 
-    #[cfg(feature = "symbol-resolver")]
     #[test]
     fn model_opts_as_model() {
         let input: syn::DeriveInput = parse_quote! {
@@ -380,7 +362,6 @@ mod tests {
         assert_eq!(model.field_count(), 2);
     }
 
-    #[cfg(feature = "symbol-resolver")]
     #[test]
     fn model_opts_as_model_migration() {
         let input: syn::DeriveInput = parse_quote! {
@@ -401,7 +382,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "symbol-resolver")]
     #[test]
     fn model_opts_as_model_pk_attr() {
         let input: syn::DeriveInput = parse_quote! {
@@ -418,7 +398,6 @@ mod tests {
         assert!(model.fields[0].primary_key);
     }
 
-    #[cfg(feature = "symbol-resolver")]
     #[test]
     fn model_opts_as_model_no_pk() {
         let input: syn::DeriveInput = parse_quote! {
@@ -439,7 +418,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "symbol-resolver")]
     #[test]
     fn model_opts_as_model_multiple_pks() {
         let input: syn::DeriveInput = parse_quote! {
@@ -463,7 +441,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "symbol-resolver")]
     #[test]
     fn field_opts_as_field() {
         let input: syn::Field = parse_quote! {
@@ -471,14 +448,15 @@ mod tests {
             name: String
         };
         let field_opts = FieldOpts::from_field(&input).unwrap();
-        let field = field_opts.as_field(&SymbolResolver::new(vec![])).unwrap();
+        let field = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"TestModel".to_string()))
+            .unwrap();
         assert_eq!(field.name.to_string(), "name");
         assert_eq!(field.column_name, "name");
         assert_eq!(field.ty, parse_quote!(String));
         assert!(field.unique);
     }
 
-    #[cfg(feature = "symbol-resolver")]
     #[test]
     fn find_type_resolved() {
         let input: syn::Type =
@@ -489,7 +467,6 @@ mod tests {
         assert!(FieldOpts::find_type_resolved(&input, "OtherType").is_none());
     }
 
-    #[cfg(feature = "symbol-resolver")]
     #[test]
     fn find_type() {
         let symbols = vec![VisibleSymbol::new(

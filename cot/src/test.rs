@@ -2,10 +2,15 @@
 
 use std::any::Any;
 use std::future::poll_fn;
+use std::marker::PhantomData;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use cot::project::run_at_with_shutdown;
 use derive_more::Debug;
+use tokio::net::TcpListener;
+use tokio::sync::oneshot;
 use tower::Service;
 use tower_sessions::MemoryStore;
 
@@ -1231,6 +1236,237 @@ impl DynMigration for TestMigration {
 
     fn operations(&self) -> &[Operation] {
         &self.operations
+    }
+}
+
+/// A utility for running entire projects in end-to-end tests.
+///
+/// This is useful for testing the full stack of a project, including the
+/// database, the router, the auth, etc. The server is running in the same
+/// process as the test by running a background async task.
+///
+///  This can be used to test the entire project by sending real requests to the
+/// server, possibly using libraries such as
+/// - [`reqwest`](https://docs.rs/reqwest/latest/reqwest/) for HTTP requests
+/// - [`thirtyfour`](https://docs.rs/thirtyfour/latest/thirtyfour/) or [`fantoccini`](https://docs.rs/fantoccini/latest/fantoccini/)
+///   for browser automation
+///
+/// Note that you need to use [`cot::e2e_test`] to run this, not
+/// [`mod@cot::test`]. Remember to call [`TestServerRunning::close`] when you're
+/// done with the tests, as the server will not be stopped automatically.
+///
+/// # Examples
+///
+/// ```
+/// use cot::test::TestServer;
+///
+/// struct TestProject;
+/// impl cot::Project for TestProject {}
+///
+/// #[cot::e2e_test] // note this uses "e2e_test"!
+/// async fn test_server() -> cot::Result<()> {
+///     let server = TestServer::new(TestProject).start().await;
+///
+///     let url = server.url();
+///     // ...use the server URL to send requests to the server
+///
+///     server.close().await;
+///     Ok(())
+/// }
+/// ```
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TestServer<T> {
+    project: T,
+}
+
+impl<T: Project + 'static> TestServer<T> {
+    /// Create a new test server.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServer;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServer::new(TestProject).start().await;
+    ///
+    ///     let url = server.url();
+    ///     // ...use the server URL to send requests to the server
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[must_use]
+    pub fn new(project: T) -> Self {
+        Self { project }
+    }
+
+    /// Start the test server.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it fails to bind to a port.
+    ///
+    /// This function will panic if the server could not be started.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServer;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServer::new(TestProject).start().await;
+    ///
+    ///     let url = server.url();
+    ///     // ...use the server URL to send requests to the server
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn start(self) -> TestServerRunning<T> {
+        TestServerRunning::start(self.project).await
+    }
+}
+
+/// A running test server.
+///
+/// This is returned by [`TestServer::start`] and can be used to access the
+/// server's URL and close the server.
+///
+/// # Examples
+///
+/// ```
+/// use cot::test::TestServer;
+///
+/// struct TestProject;
+/// impl cot::Project for TestProject {}
+///
+/// #[cot::e2e_test] // note this uses "e2e_test"!
+/// async fn test_server() -> cot::Result<()> {
+///     let server = TestServer::new(TestProject).start().await;
+///
+///     let url = server.url();
+///     // ...use the server URL to send requests to the server
+///
+///     server.close().await;
+///     Ok(())
+/// }
+/// ```
+#[must_use = "TestServerRunning must be used to close the server"]
+#[derive(Debug)]
+pub struct TestServerRunning<T> {
+    address: SocketAddr,
+    channel_send: oneshot::Sender<()>,
+    server_handle: tokio::task::JoinHandle<()>,
+    project: PhantomData<fn() -> T>,
+}
+
+impl<T: Project + 'static> TestServerRunning<T> {
+    async fn start(project: T) -> Self {
+        let tcp_listener = TcpListener::bind("0.0.0.0:0")
+            .await
+            .expect("Failed to bind to a port");
+        let address = tcp_listener
+            .local_addr()
+            .expect("Failed to get the listening address");
+
+        let (send, recv) = oneshot::channel::<()>();
+
+        let server_handle = tokio::task::spawn_local(async move {
+            let bootstrapper = Bootstrapper::new(project)
+                .with_config_name("test")
+                .expect("Failed to get the \"test\" config")
+                .boot()
+                .await
+                .expect("Failed to boot the project");
+            run_at_with_shutdown(bootstrapper, tcp_listener, async move {
+                recv.await.expect("Failed to receive a shutdown signal");
+            })
+            .await
+            .expect("Failed to run the server");
+        });
+
+        Self {
+            address,
+            channel_send: send,
+            server_handle,
+            project: PhantomData,
+        }
+    }
+
+    /// Get the server's URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServer;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServer::new(TestProject).start().await;
+    ///
+    ///     let url = server.url();
+    ///     // ...use the server URL to send requests to the server
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[must_use]
+    pub fn url(&self) -> String {
+        if let Ok(host) = std::env::var("COT_TEST_SERVER_HOST") {
+            format!("http://{}:{}", host, self.address.port())
+        } else {
+            format!("http://{}", self.address)
+        }
+    }
+
+    /// Stop the server.
+    ///
+    /// Note that this is not automatically called when the `TestServer` is
+    /// dropped; you need to call this function explicitly.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if an error occurs while sending the shutdown
+    /// signal or if the server task panics.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServer;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServer::new(TestProject).start().await;
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn close(self) {
+        self.channel_send
+            .send(())
+            .expect("Failed to send a shutdown signal");
+        self.server_handle
+            .await
+            .expect("Failed to join the server task");
     }
 }
 

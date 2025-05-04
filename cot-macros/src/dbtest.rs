@@ -28,7 +28,7 @@ pub(super) fn fn_to_dbtest(test_function_decl: ItemFn) -> syn::Result<TokenStrea
             #test_function_decl
         }
 
-        #[ignore]
+        #[ignore = "Tests that use PostgreSQL are ignored by default"]
         #[::tokio::test]
         async fn #postgres_ident() {
             let mut database = cot::test::TestDatabase::new_postgres(stringify!(#test_fn))
@@ -42,7 +42,7 @@ pub(super) fn fn_to_dbtest(test_function_decl: ItemFn) -> syn::Result<TokenStrea
             #test_function_decl
         }
 
-        #[ignore]
+        #[ignore = "Tests that use MySQL are ignored by default"]
         #[::tokio::test]
         async fn #mysql_ident() {
             let mut database = cot::test::TestDatabase::new_mysql(stringify!(#test_fn))

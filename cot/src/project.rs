@@ -49,9 +49,10 @@ use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error::ErrorRepr;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
+use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{AppName, Request, RequestExt};
-use crate::response::{Response, ResponseExt};
+use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::{Body, Error, StatusCode, cli, error_page};
 
@@ -762,20 +763,18 @@ pub trait ErrorPageHandler: Send + Sync {
 struct DefaultNotFoundHandler;
 impl ErrorPageHandler for DefaultNotFoundHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::NOT_FOUND,
-            Body::fixed(include_str!("../templates/404.html")),
-        ))
+        Html::new(include_str!("../templates/404.html"))
+            .with_status(StatusCode::NOT_FOUND)
+            .into_response()
     }
 }
 
 struct DefaultServerErrorHandler;
 impl ErrorPageHandler for DefaultServerErrorHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Body::fixed(include_str!("../templates/500.html")),
-        ))
+        Html::new(include_str!("../templates/500.html"))
+            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
+            .into_response()
     }
 }
 
@@ -1721,7 +1720,7 @@ pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> 
 ///
 /// If you need more control over the server listening socket, such as modifying
 /// the underlying buffer sizes, you can create a [`tokio::net::TcpListener`]
-/// and pass it to this function. Otherwise, [`run`] function will be more
+/// and pass it to this function. Otherwise, the [`run`] function will be more
 /// convenient.
 ///
 /// # Errors
@@ -1736,6 +1735,20 @@ pub async fn run_at(
     run_at_with_shutdown(bootstrapper, listener, shutdown_signal()).await
 }
 
+/// Runs the Cot project on the given listener.
+///
+/// This function takes a Cot project and a [`tokio::net::TcpListener`] and
+/// runs the project on the given listener, similarly to the [`run_at`]
+/// function. In addition to that, it takes a shutdown signal that can be used
+/// to gracefully shut down the server in a response to a signal or other event.
+///
+/// If you don't need to customize shutdown signal handling, you should instead
+/// use the [`run`] or [`run_at`] functions, as they are more convenient.
+///
+/// # Errors
+///
+/// This function returns an error if the server fails to start.
+// Send not needed; Bootstrapper/CLI is run async in a single thread
 #[expect(clippy::future_not_send)]
 pub async fn run_at_with_shutdown(
     bootstrapper: Bootstrapper<Initialized>,

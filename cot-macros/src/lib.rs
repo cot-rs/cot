@@ -142,39 +142,6 @@ pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// An attribute macro that defines an entry point to a Cot-powered app.
-///
-/// This macro is meant to wrap a function returning a structure implementing
-/// [`CotProject`]. It should just initialize a [`CotProject`] and return it,
-/// while the macro takes care of initializing an async runtime, creating a CLI
-/// and running the app.
-///
-/// # Examples
-///
-/// ```no_run
-/// use cot::project::RegisterAppsContext;
-/// use cot::{App, AppBuilder, Project};
-///
-/// struct HelloApp;
-///
-/// impl App for HelloApp {
-///     fn name(&self) -> &'static str {
-///         env!("CARGO_PKG_NAME")
-///     }
-/// }
-///
-/// struct HelloProject;
-/// impl Project for HelloProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
-///         apps.register_with_views(HelloApp, "");
-///     }
-/// }
-///
-/// #[cot::main]
-/// fn main() -> impl Project {
-///     HelloProject
-/// }
-/// ```
 #[proc_macro_attribute]
 pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);
@@ -207,24 +174,6 @@ pub fn test(_args: TokenStream, input: TokenStream) -> TokenStream {
     fn_to_cot_test(&fn_input).into()
 }
 
-/// An attribute macro that defines an `async` test function for a Cot-powered
-/// app.
-///
-/// This is pretty much an equivalent to `#[tokio::test]` provided so that you
-/// don't have to declare `tokio` as a dependency in your tests.
-///
-/// # Examples
-///
-/// ```no_run
-/// use cot::test::TestDatabase;
-///
-/// #[cot::test]
-/// async fn test_db() {
-///     let db = TestDatabase::new_sqlite().await.unwrap();
-///     // do something with the database
-///     db.cleanup().await.unwrap();
-/// }
-/// ```
 #[proc_macro_attribute]
 pub fn e2e_test(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);

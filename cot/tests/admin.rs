@@ -1,5 +1,4 @@
-use std::marker::PhantomData;
-use std::net::SocketAddr;
+use std::error::Error;
 
 use async_trait::async_trait;
 use cot::admin::AdminApp;
@@ -9,14 +8,16 @@ use cot::config::{
     AuthBackendConfig, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
 };
 use cot::middleware::{AuthMiddleware, SessionMiddleware};
-use cot::project::{MiddlewareContext, RegisterAppsContext, run_at_with_shutdown};
+use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Bootstrapper, BoxedHandler, Project, ProjectContext};
-use fantoccini::{ClientBuilder, Locator};
-use tokio::net::TcpListener;
-use tokio::sync::oneshot;
+use cot::test::{TestServer, TestServerRunning};
+use cot::{App, AppBuilder, BoxedHandler, Project, ProjectContext};
+use fantoccini::{Client, ClientBuilder, Locator};
 
 struct HelloApp;
+
+const DEFAULT_USERNAME: &str = "admin";
+const DEFAULT_PASSWORD: &str = "admin";
 
 #[async_trait]
 impl App for HelloApp {
@@ -25,8 +26,7 @@ impl App for HelloApp {
     }
 
     async fn init(&self, context: &mut ProjectContext) -> cot::Result<()> {
-        DatabaseUser::create_user(context.database(), "admin", "admin").await?;
-
+        DatabaseUser::create_user(context.database(), DEFAULT_USERNAME, DEFAULT_PASSWORD).await?;
         Ok(())
     }
 }
@@ -54,7 +54,7 @@ impl Project for AdminProject {
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register(DatabaseUserApp::new());
         apps.register_with_views(AdminApp::new(), "/admin");
-        apps.register_with_views(HelloApp, "");
+        apps.register(HelloApp);
     }
 
     fn middlewares(
@@ -72,19 +72,13 @@ impl Project for AdminProject {
 
 #[ignore = "This test requires a Webdriver to be running"]
 #[cot::e2e_test]
-async fn admin_e2e_login() -> Result<(), Box<dyn std::error::Error>> {
+async fn admin_e2e_login() -> Result<(), Box<dyn Error>> {
     let server = TestServer::new(AdminProject).start().await;
 
     let driver = ClientBuilder::native()
         .connect("http://localhost:4444")
         .await?;
-    driver.goto(&format!("{}/admin/", server.url())).await?;
-    let username_form = driver.find(Locator::Id("username")).await?;
-    username_form.send_keys("admin").await?;
-    let password_form = driver.find(Locator::Id("password")).await?;
-    password_form.send_keys("admin").await?;
-    let submit_button = driver.find(Locator::Css("button[type=submit]")).await?;
-    submit_button.click().await?;
+    login(&server, &driver).await?;
 
     let welcome_message = driver
         .find(Locator::XPath(
@@ -95,74 +89,68 @@ async fn admin_e2e_login() -> Result<(), Box<dyn std::error::Error>> {
 
     driver.close().await?;
     server.close().await;
-
     Ok(())
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct TestServer<T> {
-    project: T,
+#[ignore = "This test requires a Webdriver to be running"]
+#[cot::e2e_test]
+async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
+    const NEW_PASSWORD: &str = "test";
+
+    let server = TestServer::new(AdminProject).start().await;
+
+    let driver = ClientBuilder::native()
+        .connect("http://localhost:4444")
+        .await?;
+    login(&server, &driver).await?;
+
+    let database_user_link = driver.find(Locator::LinkText("DatabaseUser")).await?;
+    database_user_link.click().await?;
+    let admin_user_link = driver.find(Locator::LinkText(DEFAULT_USERNAME)).await?;
+    admin_user_link.click().await?;
+    let password_form = driver.find(Locator::Id("password")).await?;
+    password_form.send_keys(NEW_PASSWORD).await?;
+    let submit_button = driver.find(Locator::Css("button[type=submit]")).await?;
+    submit_button.click().await?;
+
+    // Check the user was logged out
+    assert!(
+        driver
+            .current_url()
+            .await?
+            .as_str()
+            .ends_with("/admin/login/")
+    );
+
+    // Log in with the new password
+    login_with(&server, &driver, DEFAULT_USERNAME, NEW_PASSWORD).await?;
+
+    driver.close().await?;
+    server.close().await;
+    Ok(())
 }
 
-impl<T: Project + 'static> TestServer<T> {
-    pub fn new(project: T) -> Self {
-        Self { project }
-    }
-
-    async fn start(self) -> TestServerRunning<T> {
-        TestServerRunning::start(self.project).await
-    }
+async fn login(
+    server: &TestServerRunning<AdminProject>,
+    driver: &Client,
+) -> Result<(), Box<dyn Error>> {
+    login_with(server, driver, DEFAULT_USERNAME, DEFAULT_PASSWORD).await
 }
 
-#[must_use = "TestServerRunning must be used to close the server"]
-#[derive(Debug)]
-pub struct TestServerRunning<T> {
-    address: SocketAddr,
-    channel_send: oneshot::Sender<()>,
-    server_handle: tokio::task::JoinHandle<()>,
-    project: PhantomData<fn() -> T>,
-}
+async fn login_with(
+    server: &TestServerRunning<AdminProject>,
+    driver: &Client,
+    username: &str,
+    password: &str,
+) -> Result<(), Box<dyn Error>> {
+    driver.goto(&format!("{}/admin/", server.url())).await?;
 
-impl<T: Project + 'static> TestServerRunning<T> {
-    async fn start(project: T) -> Self {
-        let tcp_listener = TcpListener::bind("0.0.0.0:0").await.unwrap();
-        let address = tcp_listener.local_addr().unwrap();
+    let username_form = driver.find(Locator::Id("username")).await?;
+    username_form.send_keys(username).await?;
+    let password_form = driver.find(Locator::Id("password")).await?;
+    password_form.send_keys(password).await?;
+    let submit_button = driver.find(Locator::Css("button[type=submit]")).await?;
+    submit_button.click().await?;
 
-        let (send, recv) = oneshot::channel::<()>();
-
-        let server_handle = tokio::task::spawn_local(async move {
-            let bootstrapper = Bootstrapper::new(project)
-                .with_config_name("test")
-                .unwrap()
-                .boot()
-                .await
-                .unwrap();
-            run_at_with_shutdown(bootstrapper, tcp_listener, async move {
-                recv.await.unwrap();
-            })
-            .await
-            .unwrap();
-        });
-
-        Self {
-            address,
-            channel_send: send,
-            server_handle,
-            project: PhantomData,
-        }
-    }
-
-    #[must_use]
-    pub fn url(&self) -> String {
-        if let Ok(host) = std::env::var("COT_TEST_SERVER_HOST") {
-            format!("http://{}:{}", host, self.address.port())
-        } else {
-            format!("http://{}", self.address)
-        }
-    }
-
-    pub async fn close(self) {
-        self.channel_send.send(()).unwrap();
-        self.server_handle.await.unwrap();
-    }
+    Ok(())
 }

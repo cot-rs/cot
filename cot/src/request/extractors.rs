@@ -437,8 +437,8 @@ mod tests {
     use serde::Deserialize;
 
     use super::*;
+    use crate::html::Html;
     use crate::request::extractors::{FromRequest, Json, Path, UrlQuery};
-    use crate::response::{Response, ResponseExt};
     use crate::router::{Route, Router, Urls};
     use crate::test::TestRequestBuilder;
     use crate::{Body, reverse};
@@ -595,8 +595,8 @@ mod tests {
 
     #[cot::test]
     async fn urls_extraction() {
-        async fn handler() -> cot::Result<Response> {
-            Ok(Response::new_html(cot::StatusCode::OK, Body::empty()))
+        async fn handler() -> Html {
+            Html::new("")
         }
 
         let router = Router::with_urls([Route::with_handler_and_name(

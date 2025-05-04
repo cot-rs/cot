@@ -1,9 +1,10 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
+use cot::html::Html;
 use cot::project::{ErrorPageHandler, RegisterAppsContext};
-use cot::response::{Response, ResponseExt};
+use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router};
-use cot::{App, AppBuilder, Body, Project, StatusCode};
+use cot::{App, AppBuilder, Project, StatusCode};
 
 async fn return_hello() -> cot::Result<Response> {
     panic!()
@@ -51,20 +52,18 @@ impl Project for HelloProject {
 struct CustomServerError;
 impl ErrorPageHandler for CustomServerError {
     fn handle(&self) -> cot::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Body::fixed(include_str!("500.html")),
-        ))
+        Html::new(include_str!("500.html"))
+            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
+            .into_response()
     }
 }
 
 struct CustomNotFound;
 impl ErrorPageHandler for CustomNotFound {
     fn handle(&self) -> cot::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::NOT_FOUND,
-            Body::fixed(include_str!("404.html")),
-        ))
+        Html::new(include_str!("404.html"))
+            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
+            .into_response()
     }
 }
 

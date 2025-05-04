@@ -134,7 +134,7 @@ impl ModelOpts {
         }
         if pks.len() > 1 {
             return Err(syn::Error::new(
-                pks[1].field_name.span(),
+                pks[1].name.span(),
                 "composite primary keys are not supported; only one primary key field is allowed",
             ));
         }
@@ -207,6 +207,8 @@ impl FieldOpts {
     ///
     /// Panics if the field does not have an identifier (i.e. it is a tuple
     /// struct).
+    // we use `?` if the `symbol-resolver` feature is enabled
+    #[cfg_attr(not(feature = "symbol-resolver"), expect(clippy::unnecessary_wraps))]
     pub fn as_field(
         &self,
         #[cfg(feature = "symbol-resolver")] symbol_resolver: &SymbolResolver,
@@ -224,7 +226,7 @@ impl FieldOpts {
         let is_primary_key = self.primary_key.is_present();
 
         Ok(Field {
-            field_name: name.clone(),
+            name: name.clone(),
             column_name,
             ty: self.ty.clone(),
             #[cfg(feature = "symbol-resolver")]
@@ -245,6 +247,7 @@ pub struct Model {
     /// The type of the model resolved by symbol resolver.
     #[cfg(feature = "symbol-resolver")]
     pub resolved_ty: syn::Type,
+    #[expect(clippy::struct_field_names)] // `type` is not an allowed identifier in Rust
     pub model_type: ModelType,
     pub table_name: String,
     pub pk_field: Field,
@@ -260,7 +263,7 @@ impl Model {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Field {
-    pub field_name: syn::Ident,
+    pub name: syn::Ident,
     pub column_name: String,
     pub ty: syn::Type,
     /// Whether the field is an auto field (e.g. `id`).
@@ -468,7 +471,7 @@ mod tests {
         };
         let field_opts = FieldOpts::from_field(&input).unwrap();
         let field = field_opts.as_field(&SymbolResolver::new(vec![])).unwrap();
-        assert_eq!(field.field_name.to_string(), "name");
+        assert_eq!(field.name.to_string(), "name");
         assert_eq!(field.column_name, "name");
         assert_eq!(field.ty, parse_quote!(String));
         assert!(field.unique);

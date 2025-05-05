@@ -4,6 +4,8 @@
 //! are used to add functionality to the request/response cycle, such as
 //! session management, adding security headers, and more.
 
+use std::fmt::Debug;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
@@ -12,12 +14,15 @@ use futures_util::TryFutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::BoxBody;
 use tower::Service;
-use tower_sessions::{MemoryStore, SessionManagerLayer};
+use tower_sessions::SessionManagerLayer;
+use tower_sessions::service::PlaintextCookie;
+pub use tower_sessions::{MemoryStore, SessionStore};
 
 use crate::error::ErrorRepr;
 use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
+use crate::session::store::{SessionStoreWrapper, ToSessionStore};
 use crate::{Body, Error};
 
 /// Middleware that converts a any [`http::Response`] generic type to a
@@ -247,21 +252,22 @@ where
     })
 }
 
+pub type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;
+
 /// A middleware that provides session management.
 ///
 /// By default, it uses an in-memory store for session data.
 #[derive(Debug, Clone)]
 pub struct SessionMiddleware {
-    inner: SessionManagerLayer<MemoryStore>,
+    inner: DynamicSessionStore,
 }
 
 impl SessionMiddleware {
     /// Crates a new instance of [`SessionMiddleware`].
     #[must_use]
-    pub fn new() -> Self {
-        let store = MemoryStore::default();
-        let layer = SessionManagerLayer::new(store);
-        Self { inner: layer }
+    pub fn new(store: Arc<dyn SessionStore + Send + Sync>) -> Self {
+        let layer = SessionManagerLayer::new(SessionStoreWrapper::new(store));
+        SessionMiddleware { inner: layer }
     }
 
     /// Creates a new instance of [`SessionMiddleware`] from the application
@@ -289,7 +295,17 @@ impl SessionMiddleware {
     /// ```
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
-        Self::new().secure(context.config().middlewares.session.secure)
+        let cfg = context.config();
+        let boxed_store = cfg
+            .middlewares
+            .session
+            .store
+            .store_type
+            .clone()
+            .to_session_store()
+            .expect("session store not supported");
+        let arc_store: Arc<dyn SessionStore + Send + Sync> = Arc::from(boxed_store);
+        SessionMiddleware::new(arc_store).secure(cfg.middlewares.session.secure)
     }
 
     /// Sets the secure flag for the session middleware.
@@ -303,20 +319,20 @@ impl SessionMiddleware {
     /// ```
     #[must_use]
     pub fn secure(self, secure: bool) -> Self {
-        Self {
-            inner: self.inner.with_secure(secure),
-        }
+        let layer = self.inner.with_secure(secure);
+        SessionMiddleware { inner: layer }
     }
 }
 
 impl Default for SessionMiddleware {
     fn default() -> Self {
-        Self::new()
+        let memory_store = Arc::new(MemoryStore::default());
+        Self::new(memory_store)
     }
 }
 
 impl<S> tower::Layer<S> for SessionMiddleware {
-    type Service = <SessionManagerLayer<MemoryStore> as tower::Layer<
+    type Service = <DynamicSessionStore as tower::Layer<
         <SessionWrapperLayer as tower::Layer<S>>::Service,
     >>::Service;
 

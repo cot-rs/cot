@@ -1,9 +1,13 @@
 use std::collections::HashMap;
+#[cfg(feature = "symbol-resolver")]
 use std::fmt::Display;
 use std::iter::FromIterator;
+#[cfg(feature = "symbol-resolver")]
 use std::path::Path;
 
+#[cfg(feature = "symbol-resolver")]
 use syn::UseTree;
+#[cfg(feature = "symbol-resolver")]
 use tracing::warn;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +29,7 @@ impl SymbolResolver {
         }
     }
 
+    #[cfg(feature = "symbol-resolver")]
     #[must_use]
     pub fn from_file(file: &syn::File, module_path: &Path) -> Self {
         let imports = Self::get_imports(file, &ModulePath::from_fs_path(module_path));
@@ -33,6 +38,7 @@ impl SymbolResolver {
 
     /// Return the list of top-level `use` statements, structs, and constants as
     /// a list of [`VisibleSymbol`]s from the file.
+    #[cfg(feature = "symbol-resolver")]
     fn get_imports(file: &syn::File, module_path: &ModulePath) -> Vec<VisibleSymbol> {
         let mut imports = Vec::new();
 
@@ -56,23 +62,29 @@ impl SymbolResolver {
 
     pub fn resolve_struct(&self, item: &mut syn::ItemStruct) {
         for field in &mut item.fields {
-            self.resolve(&mut field.ty);
+            self.resolve(&mut field.ty, Some(&item.ident.to_string()));
         }
     }
 
-    pub fn resolve(&self, ty: &mut syn::Type) {
+    pub fn resolve(&self, ty: &mut syn::Type, self_reference: Option<&String>) {
         if let syn::Type::Path(path) = ty {
-            self.resolve_type_path(path);
+            self.resolve_type_path(path, self_reference);
         }
     }
 
     /// Checks the provided `TypePath` and resolves the full type path, if
     /// available.
-    fn resolve_type_path(&self, path: &mut syn::TypePath) {
+    fn resolve_type_path(&self, path: &mut syn::TypePath, self_reference: Option<&String>) {
         let first_segment = path.path.segments.first();
 
         if let Some(first_segment) = first_segment {
-            if let Some(symbol) = self.symbols.get(&first_segment.ident.to_string()) {
+            let mut ident = first_segment.ident.to_string();
+            if ident == "Self" {
+                if let Some(self_reference) = self_reference {
+                    ident.clone_from(self_reference);
+                }
+            }
+            if let Some(symbol) = self.symbols.get(&ident) {
                 let mut new_segments: Vec<_> = symbol
                     .full_path_parts()
                     .map(|s| syn::PathSegment {
@@ -92,25 +104,33 @@ impl SymbolResolver {
             }
 
             for segment in &mut path.path.segments {
-                self.resolve_path_arguments(&mut segment.arguments);
+                self.resolve_path_arguments(&mut segment.arguments, self_reference);
             }
         }
     }
 
-    fn resolve_path_arguments(&self, arguments: &mut syn::PathArguments) {
+    fn resolve_path_arguments(
+        &self,
+        arguments: &mut syn::PathArguments,
+        self_reference: Option<&String>,
+    ) {
         if let syn::PathArguments::AngleBracketed(args) = arguments {
             for arg in &mut args.args {
-                self.resolve_generic_argument(arg);
+                self.resolve_generic_argument(arg, self_reference);
             }
         }
     }
 
-    fn resolve_generic_argument(&self, arg: &mut syn::GenericArgument) {
+    fn resolve_generic_argument(
+        &self,
+        arg: &mut syn::GenericArgument,
+        self_reference: Option<&String>,
+    ) {
         if let syn::GenericArgument::Type(syn::Type::Path(path)) = arg {
             if let Some(new_arg) = self.try_resolve_generic_const(path) {
                 *arg = new_arg;
             } else {
-                self.resolve_type_path(path);
+                self.resolve_type_path(path, self_reference);
             }
         }
     }
@@ -184,14 +204,17 @@ impl VisibleSymbol {
         self.full_path.split("::")
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn new_use(alias: &str, full_path: &str) -> Self {
         Self::new(alias, full_path, VisibleSymbolKind::Use)
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn from_item_use(item: &syn::ItemUse, module_path: &ModulePath) -> Vec<Self> {
         Self::from_tree(&item.tree, module_path)
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn from_item_struct(item: &syn::ItemStruct, module_path: &ModulePath) -> Self {
         let ident = item.ident.to_string();
         let full_path = Self::module_path(module_path, &ident);
@@ -203,6 +226,7 @@ impl VisibleSymbol {
         }
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn from_item_const(item: &syn::ItemConst, module_path: &ModulePath) -> Self {
         let ident = item.ident.to_string();
         let full_path = Self::module_path(module_path, &ident);
@@ -214,10 +238,12 @@ impl VisibleSymbol {
         }
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn module_path(module_path: &ModulePath, ident: &str) -> String {
         format!("{module_path}::{ident}")
     }
 
+    #[cfg(feature = "symbol-resolver")]
     fn from_tree(tree: &UseTree, current_module: &ModulePath) -> Vec<Self> {
         match tree {
             UseTree::Path(path) => {
@@ -268,11 +294,13 @@ impl VisibleSymbol {
     }
 }
 
+#[cfg(feature = "symbol-resolver")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModulePath {
     parts: Vec<String>,
 }
 
+#[cfg(feature = "symbol-resolver")]
 impl ModulePath {
     #[must_use]
     pub fn from_fs_path(path: &Path) -> Self {
@@ -319,6 +347,7 @@ impl ModulePath {
     }
 }
 
+#[cfg(feature = "symbol-resolver")]
 impl Display for ModulePath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.parts.join("::"))
@@ -422,21 +451,21 @@ const MY_CONSTANT: u8 = 42;
         ]);
 
         let path = &mut parse_quote!(MyType);
-        resolver.resolve_type_path(path);
+        resolver.resolve_type_path(path, None);
         assert_eq!(
             quote!(crate::models::MyType).to_string(),
             path.into_token_stream().to_string()
         );
 
         let path = &mut parse_quote!(HashMap<String, u8>);
-        resolver.resolve_type_path(path);
+        resolver.resolve_type_path(path, None);
         assert_eq!(
             quote!(std::collections::HashMap<String, u8>).to_string(),
             path.into_token_stream().to_string()
         );
 
         let path = &mut parse_quote!(Option<MyType>);
-        resolver.resolve_type_path(path);
+        resolver.resolve_type_path(path, None);
         assert_eq!(
             quote!(Option<crate::models::MyType>).to_string(),
             path.into_token_stream().to_string()
@@ -471,6 +500,27 @@ const MY_CONSTANT: u8 = 42;
                 field_2: std::collections::HashMap<String, crate::models::MyType>,
                 field_3: Option<String>,
                 field_4: cot::db::LimitedString<{ crate::constants::MY_CONSTANT }>,
+            }
+        };
+        assert_eq!(actual.into_token_stream().to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn import_resolver_resolve_struct_with_self() {
+        let resolver = SymbolResolver::new(vec![
+            VisibleSymbol::new_use("ForeignKey", "cot::db::ForeignKey"),
+            VisibleSymbol::new("MyModel", "crate::MyModel", VisibleSymbolKind::Struct),
+        ]);
+
+        let mut actual = parse_quote! {
+            struct MyModel {
+                foreign_key: ForeignKey<Self>,
+            }
+        };
+        resolver.resolve_struct(&mut actual);
+        let expected = quote! {
+            struct MyModel {
+                foreign_key: cot::db::ForeignKey<crate::MyModel>,
             }
         };
         assert_eq!(actual.into_token_stream().to_string(), expected.to_string());

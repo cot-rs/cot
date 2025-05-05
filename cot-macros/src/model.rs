@@ -1,4 +1,5 @@
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
+use cot_codegen::symbol_resolver::{SymbolResolver, VisibleSymbol, VisibleSymbolKind};
 use darling::FromMeta;
 use darling::ast::NestedMeta;
 use heck::ToSnakeCase;
@@ -27,8 +28,12 @@ pub(super) fn impl_model_for_struct(
             return err.write_errors();
         }
     };
-
-    let model = match opts.as_model(&args) {
+    let symbol_resplver = SymbolResolver::new(vec![VisibleSymbol::new(
+        &opts.ident.to_string(),
+        &opts.ident.to_string(),
+        VisibleSymbolKind::Struct,
+    )]);
+    let model = match opts.as_model(&args, &symbol_resplver) {
         Ok(val) => val,
         Err(err) => {
             return err.to_compile_error();

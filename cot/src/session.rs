@@ -41,7 +41,6 @@
 //! # Ok(())
 //! # }
 //! ```
-mod migrations;
 mod models;
 pub mod store;
 

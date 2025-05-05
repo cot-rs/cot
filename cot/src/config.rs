@@ -18,6 +18,10 @@
 use std::time::Duration;
 
 use std::sync::Arc;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
@@ -26,6 +30,10 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use time::{OffsetDateTime, UtcOffset};
 use tower_sessions::{MemoryStore, SessionStore};
+use tower_sessions::{SessionStore, session_store};
+
+use crate::session::store::ToSessionStore;
+use crate::session::store::memory::MemoryStore;
 
 /// The configuration for a project.
 ///
@@ -753,6 +761,51 @@ impl LiveReloadMiddlewareConfigBuilder {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum SessionStoreTypeConfig {
+    #[default]
+    Memory,
+    #[cfg(feature = "db")]
+    Database,
+}
+
+impl ToSessionStore for SessionStoreTypeConfig {
+    #[must_use]
+    fn to_session_store(self) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error> {
+        match self {
+            Self::Memory => Ok(Box::new(MemoryStore::new())),
+            _ => Err(session_store::Error::Backend(
+                "Session store type is not supported.".to_string(),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct SessionStoreConfig {
+    #[serde(flatten)]
+    pub store_type: SessionStoreTypeConfig,
+}
+
+impl SessionStoreConfig {
+    #[must_use]
+    pub fn builder() -> SessionStoreConfigBuilder {
+        SessionStoreConfigBuilder::default()
+    }
+}
+
+impl SessionStoreConfigBuilder {
+    #[must_use]
+    pub fn build(&self) -> SessionStoreConfig {
+        SessionStoreConfig {
+            store_type: self.store_type.clone().unwrap_or_default(),
+        }
+    }
+}
+
 /// The [`SameSite`] attribute of a cookie determines how strictly browsers send
 /// cookies on cross-site requests. When not explicitly configured, it defaults
 /// to `Strict`, which provides the most restrictive security posture.
@@ -880,7 +933,7 @@ impl From<Expiry> for tower_sessions::Expiry {
 ///
 /// let config = SessionMiddlewareConfig::builder().secure(false).build();
 /// ```
-#[derive(Debug, Clone, Builder, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct SessionMiddlewareConfig {
@@ -1060,12 +1113,7 @@ pub struct SessionMiddlewareConfig {
     #[serde(with = "crate::serializers::session_expiry_time")]
     pub expiry: Expiry,
 
-    /// The session store to use. Defaults to an in-memory store.
-    ///
-    /// Skipped in serde because trait objects cannot be deserialized.
-    #[serde(skip)]
-    #[builder(default = "Arc::new(MemoryStore::default())")]
-    pub session_store: Arc<dyn SessionStore>,
+    pub store: SessionStoreConfig,
 }
 
 impl SessionMiddlewareConfig {
@@ -1106,27 +1154,10 @@ impl SessionMiddlewareConfigBuilder {
             path: self.path.clone().unwrap_or(String::from("/")),
             always_save: self.always_save.unwrap_or(false),
             expiry: self.expiry.unwrap_or_default(),
-            session_store: self
-                .session_store
-                .clone()
-                .unwrap_or_else(|| Arc::new(MemoryStore::default())),
+            store: self.store.clone().unwrap_or_default(),
         }
     }
 }
-
-impl Default for SessionMiddlewareConfig {
-    fn default() -> Self {
-        SessionMiddlewareConfig::builder().build()
-    }
-}
-
-impl PartialEq<Self> for SessionMiddlewareConfig {
-    fn eq(&self, other: &Self) -> bool {
-        self.secure == other.secure
-    }
-}
-
-impl Eq for SessionMiddlewareConfig {}
 
 /// A secret key.
 ///

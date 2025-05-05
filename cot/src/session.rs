@@ -41,6 +41,9 @@
 //! # Ok(())
 //! # }
 //! ```
+mod migrations;
+mod models;
+pub mod store;
 
 use std::ops::{Deref, DerefMut};
 

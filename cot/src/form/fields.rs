@@ -32,8 +32,14 @@ macro_rules! impl_form_field {
             fn with_options(
                 options: FormFieldOptions,
                 custom_options: Self::CustomOptions,
-            ) -> Self {
-                Self {
+            ) -> Self
+            where Self: Sized
+            {
+              custom_options.validate_options()
+              .unwrap_or_else(|err| {
+                panic!("Could not initialize {}: {}", stringify!($field_options_type_name), err)
+    });
+              Self {
                     options,
                     custom_options,
                     value: None,
@@ -53,6 +59,58 @@ macro_rules! impl_form_field {
             }
         }
     };
+}
+
+/// A trait for validating form field options.
+///
+/// This trait is used to validate the custom options for form fields when they
+/// are created. It ensures that the options provided are valid before a form
+/// field is constructed.
+///
+/// Implementing this trait allows for custom validation logic to be applied to
+/// field options.
+///
+/// # Examples
+///
+/// ```
+/// use cot::form::fields::ValidateOptions;
+/// use cot::form::{FormFieldOptions, FormFieldValidationError};
+///
+/// struct MyFieldOptions {
+///     min: Option<u32>,
+///     max: Option<u32>,
+/// }
+///
+/// impl ValidateOptions for MyFieldOptions {
+///     fn validate_options(&self) -> Result<(), FormFieldValidationError> {
+///         if let (Some(min), Some(max)) = (self.min, self.max) {
+///             if min > max {
+///                 return Err(FormFieldValidationError::from_string(format!(
+///                     "min ({min}) cannot be greater than max ({max})"
+///                 )));
+///             }
+///         }
+///         Ok(())
+///     }
+/// }
+/// ```
+pub trait ValidateOptions {
+    /// Validates the form field options when a field is created.
+    ///
+    /// This method is used to check that the provided options are valid and
+    /// consistent before a form field is constructed. The validation is
+    /// performed when `FormField::with_options` is called.
+    ///
+    /// The default implementation performs no validation and always returns
+    /// `Ok(())`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the options are invalid or inconsistent with each
+    /// other.
+    fn validate_options(&self) -> Result<(), FormFieldValidationError> {
+        Ok(())
+    }
 }
 
 impl_form_field!(StringField, StringFieldOptions, "a string");
@@ -83,6 +141,8 @@ impl Display for StringField {
         write!(f, "{}", tag.render())
     }
 }
+
+impl ValidateOptions for StringFieldOptions {}
 
 impl HtmlSafe for StringField {}
 
@@ -153,6 +213,7 @@ impl Display for PasswordField {
     }
 }
 
+impl ValidateOptions for PasswordFieldOptions {}
 impl HtmlSafe for PasswordField {}
 
 impl AsFormField for Password {
@@ -273,6 +334,19 @@ impl AsFormField for Email {
     }
 }
 
+impl ValidateOptions for EmailFieldOptions {
+    fn validate_options(&self) -> Result<(), FormFieldValidationError> {
+        if let (Some(min), Some(max)) = (self.min_length, self.max_length) {
+            if min > max {
+                return Err(FormFieldValidationError::from_string(format!(
+                    "min_length ({min}) exceeds max_length ({max})"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl HtmlSafe for EmailField {}
 
 impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer);
@@ -318,6 +392,8 @@ impl<T: Integer> Display for IntegerField<T> {
         write!(f, "{}", tag.render())
     }
 }
+
+impl<T: Integer> ValidateOptions for IntegerFieldOptions<T> {}
 
 impl<T: Integer> HtmlSafe for IntegerField<T> {}
 
@@ -472,6 +548,7 @@ impl Display for BoolField {
     }
 }
 
+impl ValidateOptions for BoolFieldOptions {}
 impl HtmlSafe for BoolField {}
 
 /// Implementation of `AsFormField` for `bool`.
@@ -843,30 +920,6 @@ mod tests {
     }
 
     #[test]
-    fn email_field_clean_invalid_length_options() {
-        let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(50),
-                max_length: Some(10),
-            },
-        );
-
-        field.set_value(Cow::Borrowed("user@example.com"));
-        let result = Email::clean_value(&field);
-
-        assert!(result.is_err());
-        if let Err(err) = result {
-            let msg = err.to_string();
-            assert!(msg.contains("min_length") && msg.contains("exceeds max_length"));
-        }
-    }
-
-    #[test]
     fn integer_field_clean_value() {
         let mut field = IntegerField::<i32>::with_options(
             FormFieldOptions {
@@ -899,5 +952,25 @@ mod tests {
         field.set_value(Cow::Borrowed("true"));
         let value = bool::clean_value(&field).unwrap();
         assert!(value);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Could not initialize EmailFieldOptions: min_length (50) exceeds max_length (10)"
+    )]
+    fn email_field_validate_options() {
+        let bad_opts = EmailFieldOptions {
+            min_length: Some(50),
+            max_length: Some(10),
+        };
+
+        let _ = EmailField::with_options(
+            FormFieldOptions {
+                id: "foo".into(),
+                name: "foo".into(),
+                required: true,
+            },
+            bad_opts,
+        );
     }
 }

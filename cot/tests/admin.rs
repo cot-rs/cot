@@ -74,10 +74,8 @@ impl Project for AdminProject {
 #[cot::e2e_test]
 async fn admin_e2e_login() -> Result<(), Box<dyn Error>> {
     let server = TestServer::new(AdminProject).start().await;
+    let driver = create_webdriver().await?;
 
-    let driver = ClientBuilder::native()
-        .connect("http://localhost:4444")
-        .await?;
     login(&server, &driver).await?;
 
     let welcome_message = driver
@@ -98,10 +96,8 @@ async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
     const NEW_PASSWORD: &str = "test";
 
     let server = TestServer::new(AdminProject).start().await;
+    let driver = create_webdriver().await?;
 
-    let driver = ClientBuilder::native()
-        .connect("http://localhost:4444")
-        .await?;
     login(&server, &driver).await?;
 
     let database_user_link = driver.find(Locator::LinkText("DatabaseUser")).await?;
@@ -153,4 +149,10 @@ async fn login_with(
     submit_button.click().await?;
 
     Ok(())
+}
+
+async fn create_webdriver() -> Result<Client, Box<dyn Error>> {
+    Ok(ClientBuilder::native()
+        .connect("http://localhost:4444")
+        .await?)
 }

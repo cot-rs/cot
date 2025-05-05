@@ -32,9 +32,5 @@ services:
   webdriver:
     image: docker.io/selenium/standalone-firefox:4.31.0-20250414
     container_name: cot-webdriver
-    ports:
-      - "4444:4444"
-      - "7900:7900"
     shm_size: 2gb
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    network_mode: host

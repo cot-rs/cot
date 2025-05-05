@@ -3,7 +3,7 @@
 use std::any::Any;
 use std::future::poll_fn;
 use std::marker::PhantomData;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -1376,9 +1376,10 @@ impl<T: Project + 'static> TestServerRunning<T> {
         let tcp_listener = TcpListener::bind("0.0.0.0:0")
             .await
             .expect("Failed to bind to a port");
-        let address = tcp_listener
+        let mut address = tcp_listener
             .local_addr()
             .expect("Failed to get the listening address");
+        address.set_ip(IpAddr::V4(Ipv4Addr::LOCALHOST));
 
         let (send, recv) = oneshot::channel::<()>();
 
@@ -1404,7 +1405,44 @@ impl<T: Project + 'static> TestServerRunning<T> {
         }
     }
 
+    /// Get the server's address.
+    ///
+    /// You can use this to get the port that the server is running on. It's,
+    /// however, typically more convenient to use [`Self::url`] to get
+    /// the server's URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServer;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServer::new(TestProject).start().await;
+    ///
+    ///     let address = server.address();
+    ///     // ...use the server address to send requests to the server
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[must_use]
+    pub fn address(&self) -> SocketAddr {
+        self.address
+    }
+
     /// Get the server's URL.
+    ///
+    /// This is the URL of the server that can be used to send requests to the
+    /// server. Note that this will typically return the local address of the
+    /// server (127.0.0.1) and not the public address of the machine. This might
+    /// be a problem if you are making requests from a different machine or a
+    /// Docker container. If you need to override the host returned by this
+    /// function, you can set the `COT_TEST_SERVER_HOST` environment variable.
     ///
     /// # Examples
     ///

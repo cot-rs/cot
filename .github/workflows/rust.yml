@@ -14,8 +14,6 @@ env:
   CI: true
   SCCACHE_GHA_ENABLED: true
   RUSTC_WRAPPER: sccache
-  # Required for the end-to-end tests to work with the Webdriver running in a Docker container
-  COT_TEST_SERVER_HOST: host.docker.internal
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.

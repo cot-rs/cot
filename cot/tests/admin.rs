@@ -122,7 +122,7 @@ async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
     login(&server, &driver).await?;
     let error_alert = driver.find(Locator::Css("div.form-errors")).await?;
     assert!(error_alert.is_displayed().await?);
-    let error_message = error_alert.text().await?.to_owned();
+    let error_message = error_alert.text().await?.clone();
     assert!(
         error_message.contains("Invalid username or password"),
         "Error message not found, actual message: {error_message}"

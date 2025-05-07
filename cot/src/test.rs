@@ -1252,8 +1252,8 @@ impl DynMigration for TestMigration {
 ///   for browser automation
 ///
 /// Note that you need to use [`cot::e2e_test`] to run this, not
-/// [`mod@cot::test`]. Remember to call [`TestServerRunning::close`] when you're
-/// done with the tests, as the server will not be stopped automatically.
+/// [`macro@cot::test`]. Remember to call [`TestServerRunning::close`] when
+/// you're done with the tests, as the server will not be stopped automatically.
 ///
 /// # Examples
 ///

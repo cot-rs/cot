@@ -14,10 +14,10 @@ use cot::test::{TestServer, TestServerRunning};
 use cot::{App, AppBuilder, BoxedHandler, Project, ProjectContext};
 use fantoccini::{Client, ClientBuilder, Locator};
 
-struct HelloApp;
-
 const DEFAULT_USERNAME: &str = "admin";
 const DEFAULT_PASSWORD: &str = "admin";
+
+struct HelloApp;
 
 #[async_trait]
 impl App for HelloApp {
@@ -116,6 +116,16 @@ async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
             .await?
             .as_str()
             .ends_with("/admin/login/")
+    );
+
+    // Try to log in with the old password
+    login(&server, &driver).await?;
+    let error_alert = driver.find(Locator::Css("div.form-errors")).await?;
+    assert!(error_alert.is_displayed().await?);
+    let error_message = error_alert.text().await?.to_owned();
+    assert!(
+        error_message.contains("Invalid username or password"),
+        "Error message not found, actual message: {error_message}"
     );
 
     // Log in with the new password

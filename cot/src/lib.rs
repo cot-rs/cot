@@ -72,6 +72,7 @@ mod error_page;
 #[macro_use]
 pub(crate) mod handler;
 pub mod html;
+mod humantime;
 pub mod middleware;
 #[cfg(feature = "openapi")]
 pub mod openapi;

@@ -53,12 +53,14 @@
 //! ```
 
 use std::future::Future;
+use std::sync::Arc;
 
 use cot::Error;
 use cot::error::ErrorRepr;
 use cot::request::{PathParams, Request};
 use http::request::Parts;
 use serde::de::DeserializeOwned;
+use thiserror::Error;
 
 use crate::Method;
 use crate::auth::Auth;
@@ -375,22 +377,21 @@ impl<F: Form> FromRequest for RequestForm<F> {
 /// # Example
 ///
 /// ```
+/// use cot::html::Html;
+/// use cot::request::Request;
 /// use cot::request::extractors::RequestDb;
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
-/// use cot::test::{TestDatabase, TestRequestBuilder};
-/// use cot::{Body, RequestHandler};
 ///
-/// async fn my_handler(RequestDb(db): RequestDb) -> cot::Result<Response> {
+/// async fn my_handler(RequestDb(db): RequestDb) -> Html {
 ///     // ... do something with the database
-///     # db.close().await?;
-///     # Ok(Response::new_html(cot::StatusCode::OK, Body::empty()))
+///     # db.close().await.unwrap();
+///     # Html::new("")
 /// }
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
-/// # let request = TestRequestBuilder::get("/")
-/// #     .database(TestDatabase::new_sqlite().await?.database())
+/// # use cot::RequestHandler;
+/// # let request = cot::test::TestRequestBuilder::get("/")
+/// #     .database(cot::test::TestDatabase::new_sqlite().await?.database())
 /// #     .build();
 /// # my_handler.handle(request).await?;
 /// # Ok(())
@@ -398,12 +399,119 @@ impl<F: Form> FromRequest for RequestForm<F> {
 /// ```
 #[cfg(feature = "db")]
 #[derive(Debug)]
-pub struct RequestDb(pub std::sync::Arc<crate::db::Database>);
+pub struct RequestDb(pub Arc<crate::db::Database>);
 
 #[cfg(feature = "db")]
 impl FromRequestParts for RequestDb {
     async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
         Ok(Self(parts.db().clone()))
+    }
+}
+
+/// An extractor that allows you to access static files metadata (e.g., their
+/// URLs).
+///
+/// # Examples
+///
+/// ```
+/// use cot::html::Html;
+/// use cot::request::Request;
+/// use cot::request::extractors::StaticFiles;
+/// use cot::test::TestRequestBuilder;
+///
+/// async fn my_handler(static_files: StaticFiles) -> cot::Result<Html> {
+///     let url = static_files.url_for("css/main.css")?;
+///
+///     Ok(Html::new(format!(
+///         "<html><head><link rel=\"stylesheet\" href=\"{url}\"></head></html>"
+///     )))
+/// }
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// # use cot::RequestHandler;
+/// # let request = TestRequestBuilder::get("/")
+/// #     .static_file("css/main.css", "body { color: red; }")
+/// #     .build();
+/// # my_handler.handle(request).await?;
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaticFiles {
+    inner: Arc<crate::static_files::StaticFiles>,
+}
+
+impl StaticFiles {
+    /// Gets the URL for a static file.
+    ///
+    /// This method returns the URL that can be used to access the static file.
+    /// The URL is constructed based on the static files configuration, which
+    /// may include a URL prefix or be suffixed by a content hash.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`StaticFilesGetError::NotFound`] error if the file doesn't
+    /// exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::html::Html;
+    /// use cot::request::extractors::StaticFiles;
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// async fn my_handler(static_files: StaticFiles) -> cot::Result<Html> {
+    ///     let url = static_files.url_for("css/main.css")?;
+    ///
+    ///     Ok(Html::new(format!(
+    ///         "<html><head><link rel=\"stylesheet\" href=\"{url}\"></head></html>"
+    ///     )))
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// # use cot::RequestHandler;
+    /// # let request = TestRequestBuilder::get("/")
+    /// #     .static_file("css/main.css", "body { color: red; }")
+    /// #     .build();
+    /// # my_handler.handle(request).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn url_for(&self, path: &str) -> Result<&str, StaticFilesGetError> {
+        self.inner
+            .path_for(path)
+            .ok_or_else(|| StaticFilesGetError::NotFound {
+                path: path.to_owned(),
+            })
+    }
+}
+
+/// Errors that can occur when trying to get a static file.
+///
+/// This enum represents errors that can occur when attempting to
+/// access a static file through the [`StaticFiles`] extractor.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
+#[non_exhaustive]
+pub enum StaticFilesGetError {
+    /// The requested static file was not found.
+    #[error("static file `{path}` not found")]
+    NotFound {
+        /// The path of the static file that was not found.
+        path: String,
+    },
+}
+
+impl FromRequestParts for StaticFiles {
+    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+        Ok(StaticFiles {
+            inner: parts
+                .extensions
+                .get::<Arc<crate::static_files::StaticFiles>>()
+                .cloned()
+                .expect("StaticFilesMiddleware not enabled for the route/project"),
+        })
     }
 }
 
@@ -425,7 +533,7 @@ impl FromRequestParts for Auth {
         let auth = parts
             .extensions
             .get::<Auth>()
-            .expect("Auth extension missing. Did you forget to add the AuthMiddleware?")
+            .expect("AuthMiddleware not enabled for the route/project")
             .clone();
 
         Ok(auth)

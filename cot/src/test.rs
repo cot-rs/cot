@@ -30,6 +30,7 @@ use crate::request::Request;
 use crate::response::Response;
 use crate::router::Router;
 use crate::session::Session;
+use crate::static_files::{StaticFile, StaticFiles};
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
 
 /// A test client for making requests to a Cot project.
@@ -209,6 +210,7 @@ pub struct TestRequestBuilder {
     form_data: Option<Vec<(String, String)>>,
     #[cfg(feature = "json")]
     json_data: Option<String>,
+    static_files: Vec<StaticFile>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -261,6 +263,7 @@ impl Default for TestRequestBuilder {
             form_data: None,
             #[cfg(feature = "json")]
             json_data: None,
+            static_files: Vec::new(),
         }
     }
 }
@@ -670,6 +673,30 @@ impl TestRequestBuilder {
         self
     }
 
+    /// Add a static file to the request builder.
+    ///
+    /// This allows you to add static files that will be available in the
+    /// request through the
+    /// [`StaticFiles`](crate::request::extractors::StaticFiles) extractor.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// let request = TestRequestBuilder::get("/")
+    ///     .static_file("css/style.css", "body { color: red; }")
+    ///     .build();
+    /// ```
+    pub fn static_file<Path, Content>(&mut self, path: Path, content: Content) -> &mut Self
+    where
+        Path: Into<String>,
+        Content: Into<bytes::Bytes>,
+    {
+        self.static_files.push(StaticFile::new(path, content));
+        self
+    }
+
     /// Build the request.
     ///
     /// # Examples
@@ -758,6 +785,15 @@ impl TestRequestBuilder {
                 http::header::CONTENT_TYPE,
                 http::HeaderValue::from_static("application/json"),
             );
+        }
+
+        if !self.static_files.is_empty() {
+            let config = self.config.clone().unwrap_or_default();
+            let mut static_files = StaticFiles::new(&config.static_files);
+            for file in std::mem::take(&mut self.static_files) {
+                static_files.add_file(file);
+            }
+            request.extensions_mut().insert(Arc::new(static_files));
         }
 
         request

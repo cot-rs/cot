@@ -27,7 +27,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
-use bytes::Bytes;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use http::request::Parts;
@@ -54,6 +53,7 @@ use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCo
 use crate::request::{AppName, Request, RequestExt};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
+use crate::static_files::StaticFile;
 use crate::{Body, Error, StatusCode, cli, error_page};
 
 /// A building block for a Cot project.
@@ -151,7 +151,7 @@ pub trait App: Send + Sync {
 
     /// Returns a list of static files that the app serves. By default, it
     /// returns an empty list.
-    fn static_files(&self) -> Vec<(String, Bytes)> {
+    fn static_files(&self) -> Vec<StaticFile> {
         vec![]
     }
 }

@@ -8,7 +8,7 @@ use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
-use cot::static_files::StaticFilesMiddleware;
+use cot::static_files::{StaticFile, StaticFilesMiddleware};
 use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, static_files};
 
 #[derive(Debug, Template)]
@@ -37,7 +37,7 @@ impl App for {{ app_name }} {
         Router::with_urls([Route::with_handler_and_name("/", index, "index")])
     }
 
-    fn static_files(&self) -> Vec<(String, Bytes)> {
+    fn static_files(&self) -> Vec<StaticFile> {
         static_files!("css/main.css")
     }
 }

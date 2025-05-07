@@ -92,8 +92,8 @@ pub use body::Body;
 /// Cot-powered app.
 ///
 /// This is primarily useful for use with the
-/// [`TestServer`](cot::test::TestServer) struct, which allows you to run a
-/// full-fledged Cot server in a test environment.
+/// [`TestServerBuilder`](cot::test::TestServerBuilder) struct, which allows you
+/// to run a full-fledged Cot server in a test environment.
 ///
 /// Internally, this is equivalent to `#[tokio::test]` with the test body
 /// wrapped in a [`tokio::task::LocalSet`] to allow for running non-`Send` async
@@ -102,14 +102,14 @@ pub use body::Body;
 /// # Examples
 ///
 /// ```
-/// use cot::test::TestServer;
+/// use cot::test::TestServerBuilder;
 ///
 /// struct TestProject;
 /// impl cot::Project for TestProject {}
 ///
 /// #[cot::e2e_test]
 /// async fn test_server() -> cot::Result<()> {
-///     let server = TestServer::new(TestProject).start().await;
+///     let server = TestServerBuilder::new(TestProject).start().await;
 ///
 ///     server.close().await;
 ///     Ok(())

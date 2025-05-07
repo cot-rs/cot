@@ -1252,20 +1252,20 @@ impl DynMigration for TestMigration {
 ///   for browser automation
 ///
 /// Note that you need to use [`cot::e2e_test`] to run this, not
-/// [`macro@cot::test`]. Remember to call [`TestServerRunning::close`] when
+/// [`macro@cot::test`]. Remember to call [`TestServer::close`] when
 /// you're done with the tests, as the server will not be stopped automatically.
 ///
 /// # Examples
 ///
 /// ```
-/// use cot::test::TestServer;
+/// use cot::test::TestServerBuilder;
 ///
 /// struct TestProject;
 /// impl cot::Project for TestProject {}
 ///
 /// #[cot::e2e_test] // note this uses "e2e_test"!
 /// async fn test_server() -> cot::Result<()> {
-///     let server = TestServer::new(TestProject).start().await;
+///     let server = TestServerBuilder::new(TestProject).start().await;
 ///
 ///     let url = server.url();
 ///     // ...use the server URL to send requests to the server
@@ -1275,24 +1275,24 @@ impl DynMigration for TestMigration {
 /// }
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct TestServer<T> {
+pub struct TestServerBuilder<T> {
     project: T,
 }
 
-impl<T: Project + 'static> TestServer<T> {
+impl<T: Project + 'static> TestServerBuilder<T> {
     /// Create a new test server.
     ///
     /// # Examples
     ///
     /// ```
-    /// use cot::test::TestServer;
+    /// use cot::test::TestServerBuilder;
     ///
     /// struct TestProject;
     /// impl cot::Project for TestProject {}
     ///
     /// #[cot::e2e_test] // note this uses "e2e_test"!
     /// async fn test_server() -> cot::Result<()> {
-    ///     let server = TestServer::new(TestProject).start().await;
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
     ///
     ///     let url = server.url();
     ///     // ...use the server URL to send requests to the server
@@ -1317,14 +1317,14 @@ impl<T: Project + 'static> TestServer<T> {
     /// # Examples
     ///
     /// ```
-    /// use cot::test::TestServer;
+    /// use cot::test::TestServerBuilder;
     ///
     /// struct TestProject;
     /// impl cot::Project for TestProject {}
     ///
     /// #[cot::e2e_test] // note this uses "e2e_test"!
     /// async fn test_server() -> cot::Result<()> {
-    ///     let server = TestServer::new(TestProject).start().await;
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
     ///
     ///     let url = server.url();
     ///     // ...use the server URL to send requests to the server
@@ -1333,27 +1333,27 @@ impl<T: Project + 'static> TestServer<T> {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn start(self) -> TestServerRunning<T> {
-        TestServerRunning::start(self.project).await
+    pub async fn start(self) -> TestServer<T> {
+        TestServer::start(self.project).await
     }
 }
 
 /// A running test server.
 ///
-/// This is returned by [`TestServer::start`] and can be used to access the
-/// server's URL and close the server.
+/// This is returned by [`TestServerBuilder::start`] and can be used to access
+/// the server's URL and close the server.
 ///
 /// # Examples
 ///
 /// ```
-/// use cot::test::TestServer;
+/// use cot::test::TestServerBuilder;
 ///
 /// struct TestProject;
 /// impl cot::Project for TestProject {}
 ///
 /// #[cot::e2e_test] // note this uses "e2e_test"!
 /// async fn test_server() -> cot::Result<()> {
-///     let server = TestServer::new(TestProject).start().await;
+///     let server = TestServerBuilder::new(TestProject).start().await;
 ///
 ///     let url = server.url();
 ///     // ...use the server URL to send requests to the server
@@ -1362,16 +1362,16 @@ impl<T: Project + 'static> TestServer<T> {
 ///     Ok(())
 /// }
 /// ```
-#[must_use = "TestServerRunning must be used to close the server"]
+#[must_use = "TestServer must be used to close the server"]
 #[derive(Debug)]
-pub struct TestServerRunning<T> {
+pub struct TestServer<T> {
     address: SocketAddr,
     channel_send: oneshot::Sender<()>,
     server_handle: tokio::task::JoinHandle<()>,
     project: PhantomData<fn() -> T>,
 }
 
-impl<T: Project + 'static> TestServerRunning<T> {
+impl<T: Project + 'static> TestServer<T> {
     async fn start(project: T) -> Self {
         let tcp_listener = TcpListener::bind("0.0.0.0:0")
             .await
@@ -1414,14 +1414,14 @@ impl<T: Project + 'static> TestServerRunning<T> {
     /// # Examples
     ///
     /// ```
-    /// use cot::test::TestServer;
+    /// use cot::test::TestServerBuilder;
     ///
     /// struct TestProject;
     /// impl cot::Project for TestProject {}
     ///
     /// #[cot::e2e_test] // note this uses "e2e_test"!
     /// async fn test_server() -> cot::Result<()> {
-    ///     let server = TestServer::new(TestProject).start().await;
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
     ///
     ///     let address = server.address();
     ///     // ...use the server address to send requests to the server
@@ -1447,14 +1447,14 @@ impl<T: Project + 'static> TestServerRunning<T> {
     /// # Examples
     ///
     /// ```
-    /// use cot::test::TestServer;
+    /// use cot::test::TestServerBuilder;
     ///
     /// struct TestProject;
     /// impl cot::Project for TestProject {}
     ///
     /// #[cot::e2e_test] // note this uses "e2e_test"!
     /// async fn test_server() -> cot::Result<()> {
-    ///     let server = TestServer::new(TestProject).start().await;
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
     ///
     ///     let url = server.url();
     ///     // ...use the server URL to send requests to the server
@@ -1485,14 +1485,14 @@ impl<T: Project + 'static> TestServerRunning<T> {
     /// # Examples
     ///
     /// ```
-    /// use cot::test::TestServer;
+    /// use cot::test::TestServerBuilder;
     ///
     /// struct TestProject;
     /// impl cot::Project for TestProject {}
     ///
     /// #[cot::e2e_test] // note this uses "e2e_test"!
     /// async fn test_server() -> cot::Result<()> {
-    ///     let server = TestServer::new(TestProject).start().await;
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
     ///
     ///     server.close().await;
     ///     Ok(())

@@ -10,7 +10,7 @@ use cot::config::{
 use cot::middleware::{AuthMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext};
 use cot::static_files::StaticFilesMiddleware;
-use cot::test::{TestServer, TestServerRunning};
+use cot::test::{TestServer, TestServerBuilder};
 use cot::{App, AppBuilder, BoxedHandler, Project, ProjectContext};
 use fantoccini::{Client, ClientBuilder, Locator};
 
@@ -73,7 +73,7 @@ impl Project for AdminProject {
 #[ignore = "This test requires a Webdriver to be running"]
 #[cot::e2e_test]
 async fn admin_e2e_login() -> Result<(), Box<dyn Error>> {
-    let server = TestServer::new(AdminProject).start().await;
+    let server = TestServerBuilder::new(AdminProject).start().await;
     let driver = create_webdriver().await?;
 
     login(&server, &driver).await?;
@@ -95,7 +95,7 @@ async fn admin_e2e_login() -> Result<(), Box<dyn Error>> {
 async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
     const NEW_PASSWORD: &str = "test";
 
-    let server = TestServer::new(AdminProject).start().await;
+    let server = TestServerBuilder::new(AdminProject).start().await;
     let driver = create_webdriver().await?;
 
     login(&server, &driver).await?;
@@ -136,15 +136,12 @@ async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn login(
-    server: &TestServerRunning<AdminProject>,
-    driver: &Client,
-) -> Result<(), Box<dyn Error>> {
+async fn login(server: &TestServer<AdminProject>, driver: &Client) -> Result<(), Box<dyn Error>> {
     login_with(server, driver, DEFAULT_USERNAME, DEFAULT_PASSWORD).await
 }
 
 async fn login_with(
-    server: &TestServerRunning<AdminProject>,
+    server: &TestServer<AdminProject>,
     driver: &Client,
     username: &str,
     password: &str,

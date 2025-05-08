@@ -15,10 +15,14 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
+use std::time::Duration;
+
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
+
+use crate::email;
 
 /// The configuration for a project.
 ///
@@ -179,6 +183,24 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub middlewares: MiddlewareConfig,
+    /// Configuration related to the email backend.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{EmailBackendConfig, ProjectConfig};
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [email_backend]
+    /// type = "none"
+    /// "#,
+    /// )?;
+    ///
+    /// assert_eq!(config.email_backend, EmailBackendConfig::default());
+    /// # Ok::<(), cot::Error>(())
+    /// ```
+    pub email_backend: EmailBackendConfig,
 }
 
 const fn default_debug() -> bool {
@@ -280,6 +302,7 @@ impl ProjectConfigBuilder {
             #[cfg(feature = "db")]
             database: self.database.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
+            email_backend: self.email_backend.clone().unwrap_or_default(),
         }
     }
 }
@@ -567,7 +590,104 @@ impl SessionMiddlewareConfigBuilder {
         }
     }
 }
+/// The type of email backend to use.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EmailBackendType {
+    /// No email backend.
+    #[default]
+    None,
+    /// SMTP email backend.
+    Smtp,
+}
+/// The configuration for the SMTP backend.
+///
+/// This is used as part of the [`EmailBackendConfig`] enum.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::EmailBackendConfig;
+///
+/// let config = EmailBackendConfig::builder().build();
+/// ```
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct EmailBackendConfig {
+    /// The type of email backend to use.
+    /// Defaults to `None`.
+    #[builder(setter(into, strip_option), default)]
+    pub backend_type: EmailBackendType,
+    /// The SMTP server host address.
+    /// Defaults to "localhost".
+    #[builder(setter(into, strip_option), default)]
+    pub smtp_mode: email::SmtpTransportMode,
+    /// The SMTP server port.
+    /// Overwrites the default standard port when specified.
+    #[builder(setter(into, strip_option), default)]
+    pub port: Option<u16>,
+    /// The username for SMTP authentication.
+    #[builder(setter(into, strip_option), default)]
+    pub username: Option<String>,
+    /// The password for SMTP authentication.
+    #[builder(setter(into, strip_option), default)]
+    pub password: Option<String>,
+    /// The timeout duration for the SMTP connection.
+    #[builder(setter(into, strip_option), default)]
+    pub timeout: Option<Duration>,
+}
 
+impl EmailBackendConfig {
+    /// Create a new [`EmailBackendConfigBuilder`] to build a
+    /// [`EmailBackendConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailBackendConfig;
+    ///
+    /// let config = EmailBackendConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> EmailBackendConfigBuilder {
+        EmailBackendConfigBuilder::default()
+    }
+}
+impl EmailBackendConfigBuilder {
+    /// Builds the email configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailBackendConfig;
+    ///
+    /// let config = EmailBackendConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> EmailBackendConfig {
+        match self.backend_type.clone().unwrap_or(EmailBackendType::None) {
+            EmailBackendType::Smtp => EmailBackendConfig {
+                backend_type: EmailBackendType::Smtp,
+                smtp_mode: self
+                    .smtp_mode
+                    .clone()
+                    .unwrap_or(email::SmtpTransportMode::Localhost),
+                port: self.port.unwrap_or_default(),
+                username: self.username.clone().unwrap_or_default(),
+                password: self.password.clone().unwrap_or_default(),
+                timeout: self.timeout.unwrap_or_default(),
+            },
+            EmailBackendType::None => EmailBackendConfig {
+                backend_type: EmailBackendType::None,
+                smtp_mode: email::SmtpTransportMode::Localhost,
+                port: None,
+                username: None,
+                password: None,
+                timeout: None,
+            },
+        }
+    }
+}
 /// A secret key.
 ///
 /// This is a wrapper over a byte array, which is used to store a cryptographic
@@ -776,6 +896,8 @@ mod tests {
             live_reload.enabled = true
             [middlewares.session]
             secure = false
+            [email_backend]
+            type = "none"
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
@@ -789,6 +911,7 @@ mod tests {
         assert_eq!(config.auth_backend, AuthBackendConfig::None);
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
+        assert_eq!(config.email_backend.backend_type, EmailBackendType::None);
     }
 
     #[test]

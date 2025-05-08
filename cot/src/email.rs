@@ -1,48 +1,37 @@
 //! Email sending functionality using SMTP and other backends
 //!
 //! #Examples
-//! To send an email using the `EmailBackend`, you need to create an instance of `SmtpConfig`
+//! To send an email using the `EmailBackend`, you need to create an instance of
+//! `SmtpConfig`
 //! ```
-//! use cot::email::{EmailBackend, SmtpConfig, SmtpEmailBackend};
-//! use lettre::message::{Message, SinglePart, MultiPart};
-//! use lettre::message::header;
-//!fn test_send_email_localhsot() {
-//!     let parts = MultiPart::related()
-//!         .singlepart(
-//!             SinglePart::builder()
-//!                 .header(header::ContentType::TEXT_PLAIN)
-//!                 .body("This is a test email sent from Rust.".to_string()),
-//!         )
-//!         .singlepart(
-//!             SinglePart::builder()
-//!                 .header(header::ContentType::TEXT_HTML)
-//!                 .body("This is a test email sent from Rust as HTML.".to_string()),
-//!         );
+//! use cot::email::{EmailBackend, EmailMessage, SmtpConfig, SmtpEmailBackend};
+//! fn test_send_email_localhsot() {
 //!     // Create a test email
-//!     let email = Message::builder()
-//!         .subject("Test Email".to_string())
-//!         .from("<from@cotexample.com>".parse().unwrap())
-//!         .to("<to@cotexample.com>".parse().unwrap())
-//!         .cc("<cc@cotexample.com>".parse().unwrap())
-//!         .bcc("<bcc@cotexample.com>".parse().unwrap())
-//!         .reply_to("<replyto@cotexample.com>".parse().unwrap())
-//!         .multipart(parts)
-//!         .unwrap();
-//!     // Get the port it's running on
-//!     let port = 1025; //Mailhog default smtp port
+//!     let email = EmailMessage {
+//!         subject: "Test Email".to_string(),
+//!         from: String::from("<from@cotexample.com>").into(),
+//!         to: vec!["<to@cotexample.com>".to_string()],
+//!         body: "This is a test email sent from Rust.".to_string(),
+//!         alternative_html: Some(
+//!             "<p>This is a test email sent from Rust as HTML.</p>".to_string(),
+//!         ),
+//!         ..Default::default()
+//!     };
 //!     let config = SmtpConfig::default();
 //!     // Create a new email backend
 //!     let mut backend = SmtpEmailBackend::new(config);
 //!     let _ = backend.send_message(&email);
 //! }
 //! ```
-//!
-use lettre::{
-    SmtpTransport, Transport, message::Message, transport::smtp::authentication::Credentials,
-};
+use std::time::Duration;
+
+use derive_builder::Builder;
+use lettre::message::{Mailbox, Message, MultiPart};
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::{SmtpTransport, Transport};
 #[cfg(test)]
 use mockall::{automock, predicate::*};
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
 
 /// Represents errors that can occur when sending an email.
 #[derive(Debug, thiserror::Error)]
@@ -64,8 +53,10 @@ pub enum EmailError {
 type Result<T> = std::result::Result<T, EmailError>;
 
 /// Represents the mode of SMTP transport to initialize the backend with.
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SmtpTransportMode {
+    /// No SMTP transport.
+    None,
     /// Use the default SMTP transport for localhost.
     #[default]
     Localhost,
@@ -101,16 +92,44 @@ pub enum TransportState {
     /// Use an unencrypted SMTP connection to the specified host.
     Initialized,
 }
+/// Represents an email address with an optional name.
+#[derive(Debug, Clone, Default)]
+pub struct EmailAddress {
+    /// The email address.
+    pub address: String,
+    /// The optional name associated with the email address.
+    pub name: Option<String>,
+}
+/// Holds the contents of the email prior to converting to
+/// a lettre Message.
+#[derive(Debug, Clone, Default)]
+pub struct EmailMessage {
+    /// The subject of the email.
+    pub subject: String,
+    /// The body of the email.
+    pub body: String,
+    /// The email address of the sender.
+    pub from: EmailAddress,
+    /// The list of recipient email addresses.
+    pub to: Vec<String>,
+    /// The list of CC (carbon copy) recipient email addresses.
+    pub cc: Option<Vec<String>>,
+    /// The list of BCC (blind carbon copy) recipient email addresses.
+    pub bcc: Option<Vec<String>>,
+    /// The list of reply-to email addresses.
+    pub reply_to: Option<Vec<String>>,
+    /// The alternative parts of the email (e.g., plain text and HTML versions).
+    pub alternative_html: Option<String>, // (content, mimetype)
+}
 
 /// Configuration for SMTP email backend
-#[derive(Debug, Clone)]
+#[derive(Debug, Builder, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SmtpConfig {
     /// The SMTP server host address.
     /// Defaults to "localhost".
     pub mode: SmtpTransportMode,
     /// The SMTP server port.
-    /// Defaults to None, which means the default port for the transport will be used.
-    /// For example, 587 for STARTTLS or 25 for unencrypted.
+    /// Overwrites the default standard port when specified.
     pub port: Option<u16>,
     /// The username for SMTP authentication.
     pub username: Option<String>,
@@ -121,7 +140,8 @@ pub struct SmtpConfig {
 }
 
 /// SMTP Backend for sending emails
-#[allow(missing_debug_implementations)]
+//#[allow(missing_debug_implementations)]
+#[derive(Debug)]
 pub struct SmtpEmailBackend {
     /// The SMTP configuration.
     config: SmtpConfig,
@@ -133,17 +153,21 @@ pub struct SmtpEmailBackend {
     debug: bool,
     transport_state: TransportState,
 }
-
+impl std::fmt::Debug for dyn EmailTransport + 'static {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EmailTransport").finish()
+    }
+}
 /// Default implementation for `SmtpConfig`.
 /// This provides default values for the SMTP configuration fields.
 /// The default mode is `Localhost`, with no port, username, or password.
 /// The default timeout is set to 60 seconds.
-///     This allows for easy creation of a default SMTP configuration
-///    without needing to specify all the fields explicitly.
+/// This allows for easy creation of a default SMTP configuration
+/// without needing to specify all the fields explicitly.
 impl Default for SmtpConfig {
     fn default() -> Self {
         Self {
-            mode: SmtpTransportMode::Localhost,
+            mode: SmtpTransportMode::None,
             port: None,
             username: None,
             password: None,
@@ -162,12 +186,13 @@ impl SmtpConfig {
         }
     }
     fn validate(&self) -> Result<&Self> {
-        // Check if username and password are both provided both must be Some or both None
+        // Check if username and password are both provided both must be Some or both
+        // None
         if self.username.is_some() && self.password.is_none()
             || self.username.is_none() && self.password.is_some()
         {
             return Err(EmailError::ConfigurationError(
-                "Proper credentials require both Username and Password is required".to_string(),
+                "Both username and password must be provided for SMTP authentication".to_string(),
             ));
         }
         let host = match &self.mode {
@@ -175,13 +200,47 @@ impl SmtpConfig {
             SmtpTransportMode::Relay(host_relay) => host_relay,
             SmtpTransportMode::StartTlsRelay(host_tls) => host_tls,
             SmtpTransportMode::Localhost => &"localhost".to_string(),
+            SmtpTransportMode::None => &String::new(),
         };
-        if host.is_empty() {
+        if host.is_empty() && self.mode != SmtpTransportMode::None {
             return Err(EmailError::ConfigurationError(
                 "Host cannot be empty or blank".to_string(),
             ));
         }
         Ok(self)
+    }
+}
+/// Convert ``AddressError`` to ``EmailError`` using ``From`` trait
+impl From<lettre::address::AddressError> for EmailError {
+    fn from(error: lettre::address::AddressError) -> Self {
+        EmailError::MessageError(format!("Invalid email address: {error}"))
+    }
+}
+/// Convert ``EmailAddress`` to ``Mailbox`` using ``TryFrom`` trait
+impl TryFrom<&EmailAddress> for Mailbox {
+    type Error = EmailError;
+
+    fn try_from(email: &EmailAddress) -> Result<Self> {
+        if email.address.is_empty() {
+            return Err(EmailError::ConfigurationError(
+                "Email address cannot be empty".to_string(),
+            ));
+        }
+
+        if email.name.is_none() {
+            Ok(format!("<{}>", email.address).parse()?)
+        } else {
+            Ok(format!("\"{}\" <{}>", email.name.as_ref().unwrap(), email.address).parse()?)
+        }
+    }
+}
+/// Convert ``String`` to ``EmailAddress`` using ``From`` trait
+impl From<String> for EmailAddress {
+    fn from(address: String) -> Self {
+        Self {
+            address,
+            name: None,
+        }
     }
 }
 /// Convert ``SmtpConfig`` to Credentials using ``TryFrom`` trait
@@ -200,6 +259,55 @@ impl TryFrom<&SmtpConfig> for Credentials {
         }
     }
 }
+/// Convert ``EmailMessage`` to ``Message`` using ``TryFrom`` trait
+impl TryFrom<&EmailMessage> for Message {
+    type Error = EmailError;
+
+    fn try_from(email: &EmailMessage) -> Result<Self> {
+        // Create a simple email for testing
+        let mut builder = Message::builder()
+            .subject(email.subject.clone())
+            .from(Mailbox::try_from(&email.from)?);
+
+        // Add recipients
+        for to in &email.to {
+            builder = builder.to(to.parse()?);
+        }
+        if let Some(cc) = &email.cc {
+            for c in cc {
+                builder = builder.cc(c.parse()?);
+            }
+        }
+
+        // Add BCC recipients if present
+        if let Some(bcc) = &email.bcc {
+            for bc in bcc {
+                builder = builder.cc(bc.parse()?);
+            }
+        }
+
+        // Add reply-to if present
+        if let Some(reply_to) = &email.reply_to {
+            for r in reply_to {
+                builder = builder.reply_to(r.parse()?);
+            }
+        }
+        if email.alternative_html.is_some() {
+            builder
+                .multipart(MultiPart::alternative_plain_html(
+                    String::from(email.body.clone()),
+                    String::from(email.alternative_html.clone().unwrap()),
+                ))
+                .map_err(|e| {
+                    EmailError::MessageError(format!("Failed to create email message: {e}"))
+                })
+        } else {
+            builder
+                .body(email.body.clone())
+                .map_err(|e| EmailError::MessageError(format!("Failed email body:{e}")))
+        }
+    }
+}
 /// Trait for sending emails using SMTP transport
 /// This trait provides methods for testing connection,
 /// sending a single email, and building the transport.
@@ -209,20 +317,21 @@ impl TryFrom<&SmtpConfig> for Credentials {
 /// It can be used in applications that need to send emails
 /// using SMTP protocol.
 /// #Errors
-/// - `EmailError::ConnectionError` if there is an issue with the SMTP connection.
-/// - `EmailError::SendError` if there is an issue with sending the email.
-/// - `EmailError::ConfigurationError` if the SMTP configuration is invalid.
-///
+/// `EmailError::ConnectionError` if there is an issue with the SMTP connection.
+/// `EmailError::SendError` if there is an issue with sending the email.
+/// `EmailError::ConfigurationError` if the SMTP configuration is invalid.
 #[cfg_attr(test, automock)]
-pub trait EmailTransport {
+pub trait EmailTransport: Send +Sync {
     /// Test the connection to the SMTP server.
     /// # Errors
-    /// - Returns `Ok(true)` if the connection is successful, otherwise `EmailError::ConnectionError`.
+    /// Returns Ok(true) if the connection is successful, otherwise
+    /// ``EmailError::ConnectionError``.
     fn test_connection(&self) -> Result<bool>;
 
     /// Send an email message.
     /// # Errors
-    /// - Returns `Ok(true)` if the connection is successful, otherwise `EmailError::ConnectionError or SendError`.
+    /// Returns Ok(true) if the connection is successful, otherwise
+    /// ``EmailError::ConnectionError or SendError``.
     fn send_email(&self, email: &Message) -> Result<()>;
 }
 
@@ -234,7 +343,6 @@ impl EmailTransport for SmtpTransport {
     fn send_email(&self, email: &Message) -> Result<()> {
         // Call the actual Transport::send method
         match self.send(email) {
-            //.map_err(|e| EmailError::SendError(e.to_string()))
             Ok(_) => Ok(()),
             Err(e) => Err(EmailError::SendError(e.to_string())),
         }
@@ -242,65 +350,69 @@ impl EmailTransport for SmtpTransport {
 }
 
 /// Trait representing an email backend for sending emails.
-pub trait EmailBackend {
-    /// Creates a new instance of the email backend with the given configuration.
+pub trait EmailBackend: Send + Sync + 'static {
+    /// Creates a new instance of the email backend with the given
+    /// configuration.
     ///
     /// # Arguments
     ///
     /// * `config` - The SMTP configuration to use.
     fn new(config: SmtpConfig) -> Self;
 
-    /// Initialize the backend for any specialization for any backend such as `FileTransport` ``SmtpTransport``
+    /// Initialize the backend for any specialization for any backend such as
+    /// `FileTransport` ``SmtpTransport``
     ///
     /// # Errors
     ///
-    /// - `EmailError::ConfigurationError`:
-    ///   - If the SMTP configuration is invalid (e.g., missing required fields like username and password).
-    ///   - If the host is empty or blank in the configuration.
-    ///   - If the credentials cannot be created from the configuration.
+    /// `EmailError::ConfigurationError`:
+    /// If the SMTP configuration is invalid (e.g., missing required fields like
+    /// username and password).
+    /// If the host is empty or blank in the configuration.
+    /// If the credentials cannot be created from the configuration.
     ///
-    /// - `EmailError::ConnectionError`:
-    ///   - If the transport cannot be created for the specified mode (e.g., invalid host or unsupported configuration).
-    ///   - If the transport fails to connect to the SMTP server.
-    ///
+    /// `EmailError::ConnectionError`:
+    /// If the transport cannot be created for the specified mode (e.g.,
+    /// invalid host or unsupported configuration).
+    /// If the transport fails to connect to the SMTP server.
     fn init(&mut self) -> Result<()>;
 
     /// Open a connection to the SMTP server.
     ///
     /// # Errors
     ///
-    /// This function will return an `EmailError` if there is an issue with resolving the SMTP host,
+    /// This function will return an `EmailError` if there is an issue with
+    /// resolving the SMTP host,
     /// creating the TLS parameters, or connecting to the SMTP server.
     fn open(&mut self) -> Result<&Self>;
     /// Close the connection to the SMTP server.
     ///
     /// # Errors
     ///
-    /// This function will return an `EmailError` if there is an issue with closing the SMTP connection.
+    /// This function will return an `EmailError` if there is an issue with
+    /// closing the SMTP connection.
     ///
     /// # Errors
     ///
-    /// This function will return an `EmailError` if there is an issue with closing the SMTP connection.
+    /// This function will return an `EmailError` if there is an issue with
+    /// closing the SMTP connection.
     fn close(&mut self) -> Result<()>;
 
     /// Send a single email message
     ///
     /// # Errors
     ///
-    /// This function will return an `EmailError` if there is an issue with opening the SMTP connection,
+    /// This function will return an `EmailError` if there is an issue with
+    /// opening the SMTP connection,
     /// building the email message, or sending the email.
-    fn send_message(&mut self, message: &Message) -> Result<()>;
+    fn send_message(&mut self, message: &EmailMessage) -> Result<()>;
 
     /// Send multiple email messages
     ///
     /// # Errors
     ///
-    /// This function will return an `EmailError` if there is an issue with sending any of the emails.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an `EmailError` if there is an issue with sending any of the emails.
-    fn send_messages(&mut self, emails: &[Message]) -> Result<usize> {
+    /// This function will return an `EmailError` if there is an issue with
+    /// sending any of the emails.
+    fn send_messages(&mut self, emails: &[EmailMessage]) -> Result<usize> {
         let mut sent_count = 0;
 
         for email in emails {
@@ -331,21 +443,23 @@ impl EmailBackend for SmtpEmailBackend {
 
     /// Safely initializes the SMTP transport based on the configured mode.
     ///
-    /// This function validates the SMTP configuration and creates the appropriate
-    /// transport based on the mode (e.g., Localhost, Unencrypted, Relay, or ``StartTlsRelay``).
+    /// This function validates the SMTP configuration and creates the
+    /// appropriate transport based on the mode (e.g., Localhost,
+    /// Unencrypted, Relay, or ``StartTlsRelay``).
     /// It also sets the timeout, port, and credentials if provided.
     ///
     /// # Errors
     ///
-    /// - `EmailError::ConfigurationError`:
-    ///   - If the SMTP configuration is invalid (e.g., missing required fields like username and password).
-    ///   - If the host is empty or blank in the configuration.
-    ///   - If the credentials cannot be created from the configuration.
+    /// `EmailError::ConfigurationError`:
+    ///  If the SMTP configuration is invalid (e.g., missing required fields
+    ///  like username and password).
+    ///  If the host is empty or blank in the configuration.
+    ///  If the credentials cannot be created from the configuration.
     ///
-    /// - `EmailError::ConnectionError`:
-    ///   - If the transport cannot be created for the specified mode (e.g., invalid host or unsupported configuration).
-    ///   - If the transport fails to connect to the SMTP server.
-    ///
+    /// `EmailError::ConnectionError`:
+    ///  If the transport cannot be created for the specified mode (e.g.,
+    ///  invalid host or unsupported configuration).
+    ///  If the transport fails to connect to the SMTP server.
     fn init(&mut self) -> Result<()> {
         if self.transport_state == TransportState::Initialized {
             return Ok(());
@@ -356,6 +470,11 @@ impl EmailBackend for SmtpEmailBackend {
             ))
         })?;
         let mut transport_builder = match &self.config.mode {
+            SmtpTransportMode::None => {
+                return Err(EmailError::ConfigurationError(
+                    "SMTP transport mode is not specified".to_string(),
+                ));
+            }
             SmtpTransportMode::Localhost => SmtpTransport::relay("localhost").map_err(|e| {
                 EmailError::ConnectionError(format!(
                     "Failed to create SMTP localhost transport,error: {e}"
@@ -412,15 +531,16 @@ impl EmailBackend for SmtpEmailBackend {
     ///
     /// This function can return the following errors:
     ///
-    /// - `EmailError::ConfigurationError`:
-    ///   - If the SMTP configuration is invalid (e.g., missing required fields like username and password).
-    ///   - If the host is empty or blank in the configuration.
-    ///   - If the credentials cannot be created from the configuration.
+    /// `EmailError::ConfigurationError`:
+    ///  If the SMTP configuration is invalid (e.g., missing required fields
+    ///  like username and password).
+    ///  If the host is empty or blank in the configuration.
+    ///  If the credentials cannot be created from the configuration.
     ///
-    /// - `EmailError::ConnectionError`:
-    ///   - If the transport cannot be created for the specified mode (e.g., invalid host or unsupported configuration).
-    ///   - If the transport fails to connect to the SMTP server.
-    ///
+    /// `EmailError::ConnectionError`:
+    ///   If the transport cannot be created for the specified mode (e.g.,
+    ///   invalid host or unsupported configuration).
+    ///   If the transport fails to connect to the SMTP server.
     fn open(&mut self) -> Result<&Self> {
         // Test if self.transport is None or if the connection is not working
         if self.transport.is_some() && self.transport.as_ref().unwrap().test_connection().is_ok() {
@@ -441,7 +561,13 @@ impl EmailBackend for SmtpEmailBackend {
     ///
     /// # Errors
     ///
-    /// This function will return an `EmailError` if there is an issue with closing the SMTP connection.
+    /// This function will return an `EmailError` if there is an issue with
+    /// closing the SMTP connection.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `EmailError` if there is an issue with
+    /// closing the SMTP connection.
     fn close(&mut self) -> Result<()> {
         self.transport = None;
         self.transport_state = TransportState::Uninitialized;
@@ -452,28 +578,29 @@ impl EmailBackend for SmtpEmailBackend {
     ///
     /// # Errors
     ///
-    /// This function will return an `EmailError` if there is an issue with opening the SMTP connection,
+    /// This function will return an `EmailError` if there is an issue with
+    /// opening the SMTP connection,
     /// building the email message, or sending the email.
-    fn send_message(&mut self, email: &Message) -> Result<()> {
+    fn send_message(&mut self, email: &EmailMessage) -> Result<()> {
         self.open()?;
         if self.debug {
             println!("Dump email: {email:#?}");
         }
-
         // Send the email
         self.transport
             .as_ref()
             .ok_or(EmailError::ConnectionError(
                 "SMTP transport is not initialized".to_string(),
             ))?
-            .send_email(email)
+            .send_email(&email.try_into()?)
             .map_err(|e| EmailError::SendError(e.to_string()))?;
 
         Ok(())
     }
 }
 impl SmtpEmailBackend {
-    /// Creates a new instance of `SmtpEmailBackend` from the given configuration and transport.
+    /// Creates a new instance of `SmtpEmailBackend` from the given
+    /// configuration and transport.
     ///
     /// # Arguments
     ///
@@ -495,16 +622,13 @@ impl SmtpEmailBackend {
 }
 #[cfg(test)]
 mod tests {
-    //use std::io::Cursor;
     use super::*;
-    use lettre::message::SinglePart;
-    use lettre::message::{MultiPart, header};
 
     #[test]
     fn test_config_defaults_values() {
         let config = SmtpConfig::default();
 
-        assert_eq!(config.mode, SmtpTransportMode::Localhost);
+        assert_eq!(config.mode, SmtpTransportMode::None);
         assert_eq!(config.port, None);
         assert_eq!(config.username, None);
         assert_eq!(config.password, None);
@@ -645,16 +769,56 @@ mod tests {
             .returning(|_| Ok(()));
 
         // Create a simple email for testing
-        let email = Message::builder()
-            .subject("Test Email")
-            .from("<from@cotexample.com>".parse().unwrap())
-            .to("<to@cotexample.com>".parse().unwrap())
-            .singlepart(
-                SinglePart::builder()
-                    .header(header::ContentType::TEXT_PLAIN)
-                    .body("This is a test email sent from Rust.".to_string()),
-            )
-            .unwrap();
+        let email = EmailMessage {
+            subject: "Test Email".to_string(),
+            from: EmailAddress {
+                address: "from@cotexample.com".to_string(),
+                name: None,
+            },
+            to: vec!["to@cotexample.com".to_string()],
+            body: "This is a test email sent from Rust.".to_string(),
+            ..Default::default()
+        };
+        // Create SmtpConfig (the actual config doesn't matter as we're using a mock)
+        let config = SmtpConfig::default();
+
+        // Create the backend with our mock transport
+        let mut backend = SmtpEmailBackend::from_config(config, Box::new(mock_transport));
+
+        // Try to send the email - this should succeed
+        let result = backend.send_message(&email);
+
+        // Verify that the email was sent successfully
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_send_email_send_ok() {
+        // Create a mock transport
+        let mut mock_transport = MockEmailTransport::new();
+
+        // Set expectations - test_connection succeeds but send_email fails
+        mock_transport
+            .expect_test_connection()
+            .times(1)
+            .returning(|| Ok(true));
+
+        mock_transport
+            .expect_send_email()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        // Create a simple email for testing
+        let email = EmailMessage {
+            subject: "Test Email".to_string(),
+            from: EmailAddress {
+                address: "from@cotexample.com".to_string(),
+                name: None,
+            },
+            to: vec!["to@cotexample.com".to_string()],
+            body: "This is a test email #1.".to_string(),
+            ..Default::default()
+        };
 
         // Create SmtpConfig (the actual config doesn't matter as we're using a mock)
         let config = SmtpConfig::default();
@@ -664,13 +828,14 @@ mod tests {
 
         // Send the email - this should succeed with our mock
         let result = backend.send_message(&email);
+        eprintln!("Result: {:?}", result);
 
         // Assert that the email was sent successfully
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_backend_clode() {
+    fn test_backend_close() {
         // Create a mock transport
         let mock_transport = MockEmailTransport::new();
         let config = SmtpConfig::default();
@@ -697,16 +862,16 @@ mod tests {
             .returning(|_| Err(EmailError::SendError("Mock send failure".to_string())));
 
         // Create a simple email for testing
-        let email = Message::builder()
-            .subject("Test Email")
-            .from("<from@cotexample.com>".parse().unwrap())
-            .to("<to@cotexample.com>".parse().unwrap())
-            .singlepart(
-                SinglePart::builder()
-                    .header(header::ContentType::TEXT_PLAIN)
-                    .body("This is a test email sent from Rust.".to_string()),
-            )
-            .unwrap();
+        let email = EmailMessage {
+            subject: "Test Email".to_string(),
+            from: String::from("from@cotexample.com").into(),
+            to: vec!["to@cotexample.com".to_string()],
+            cc: Some(vec!["cc@cotexample.com".to_string()]),
+            bcc: Some(vec!["bcc@cotexample.com".to_string()]),
+            reply_to: Some(vec!["anonymous@cotexample.com".to_string()]),
+            body: "This is a test email sent from Rust.".to_string(),
+            alternative_html: Some("This is a test email sent from Rust as HTML.".to_string()),
+        };
 
         // Create the backend with our mock transport
         let config = SmtpConfig {
@@ -716,11 +881,11 @@ mod tests {
             ..Default::default()
         };
 
-        //let mut backend = SmtpEmailBackend::build(config, mock_transport).unwrap();
         let mut backend = SmtpEmailBackend::from_config(config, Box::new(mock_transport));
 
         // Try to send the email - this should fail
         let result = backend.send_message(&email);
+        eprintln!("Result: {:?}", result);
 
         // Verify that we got a send error
         assert!(matches!(result, Err(EmailError::SendError(_))));
@@ -731,7 +896,8 @@ mod tests {
         // Create a mock transport
         let mut mock_transport = MockEmailTransport::new();
 
-        // Set expectations - test_connection succeeds and send_email succeeds for both emails
+        // Set expectations - test_connection succeeds and send_email succeeds for both
+        // emails
         mock_transport
             .expect_test_connection()
             .times(1..)
@@ -744,26 +910,20 @@ mod tests {
 
         // Create test emails
         let emails = vec![
-            Message::builder()
-                .subject("Test Email 1")
-                .from("<from@cotexample.com>".parse().unwrap())
-                .to("<to1@cotexample.com>".parse().unwrap())
-                .singlepart(
-                    SinglePart::builder()
-                        .header(header::ContentType::TEXT_PLAIN)
-                        .body("This is test email 1.".to_string()),
-                )
-                .unwrap(),
-            Message::builder()
-                .subject("Test Email 2")
-                .from("<from@cotexample.com>".parse().unwrap())
-                .to("<to2@cotexample.com>".parse().unwrap())
-                .singlepart(
-                    SinglePart::builder()
-                        .header(header::ContentType::TEXT_PLAIN)
-                        .body("This is test email 2.".to_string()),
-                )
-                .unwrap(),
+            EmailMessage {
+                subject: "Test Email".to_string(),
+                from: String::from("from@cotexample.com").into(),
+                to: vec!["to@cotexample.com".to_string()],
+                body: "This is a test email #1.".to_string(),
+                ..Default::default()
+            },
+            EmailMessage {
+                subject: "Test Email".to_string(),
+                from: String::from("from@cotexample.com").into(),
+                to: vec!["to@cotexample.com".to_string()],
+                body: "This is a test email #2.".to_string(),
+                ..Default::default()
+            },
         ];
 
         // Create the backend with our mock transport
@@ -778,32 +938,24 @@ mod tests {
         assert_eq!(result.unwrap(), 2);
     }
 
-    // An integration test to send an email to localhost using the default configuration.
-    // Dependent on the mail server running on localhost, this test may fail/hang if the server is not available.
+    // An integration test to send an email to localhost using the default
+    // configuration. Dependent on the mail server running on localhost, this
+    // test may fail/hang if the server is not available.
     #[test]
     #[ignore]
     fn test_send_email_localhost() {
-        let parts = MultiPart::related()
-            .singlepart(
-                SinglePart::builder()
-                    .header(header::ContentType::TEXT_PLAIN)
-                    .body("This is a test email sent from Rust.".to_string()),
-            )
-            .singlepart(
-                SinglePart::builder()
-                    .header(header::ContentType::TEXT_HTML)
-                    .body("This is a test email sent from Rust as HTML.".to_string()),
-            );
         // Create a test email
-        let email = Message::builder()
-            .subject("Test Email".to_string())
-            .from("<from@cotexample.com>".parse().unwrap())
-            .to("<to@cotexample.com>".parse().unwrap())
-            .cc("<cc@cotexample.com>".parse().unwrap())
-            .bcc("<bcc@cotexample.com>".parse().unwrap())
-            .reply_to("<replyto@cotexample.com>".parse().unwrap())
-            .multipart(parts)
-            .unwrap();
+        let email = EmailMessage {
+            subject: "Test Email".to_string(),
+            from: String::from("from@cotexample.com").into(),
+            to: vec!["to@cotexample.com".to_string()],
+            cc: Some(vec!["cc@cotexample.com".to_string()]),
+            bcc: Some(vec!["bcc@cotexample.com".to_string()]),
+            reply_to: Some(vec!["anonymous@cotexample.com".to_string()]),
+            body: "This is a test email sent from Rust.".to_string(),
+            alternative_html: Some("This is a test email sent from Rust as HTML.".to_string()),
+        };
+
         // Get the port it's running on
         let port = 1025; //Mailhog default smtp port
         let config = SmtpConfig {
@@ -851,21 +1003,21 @@ mod tests {
                     "Mock connection failure".to_string(),
                 ))
             });
-        //Mock the from_config method to return a transport
+        // Mock the from_config method to return a transport
         // Create config and backend
         let config = SmtpConfig::default();
         let mut backend = SmtpEmailBackend::from_config(config, Box::new(mock_transport));
         // Open should fail due to connection error
         let result = backend.open();
-        assert!(result.is_ok());
-        assert!(backend.transport_state == TransportState::Initialized);
+        assert!(result.is_err());
+        assert!(backend.transport_state == TransportState::Uninitialized);
     }
 
     #[test]
     fn test_init_only_username_connection() {
         // Create a mock transport that will fail connection test
         let mock_transport = MockEmailTransport::new();
-        //Mock the from_config method to return a transport
+        // Mock the from_config method to return a transport
         // Create config and backend
         let config = SmtpConfig {
             mode: SmtpTransportMode::Unencrypted("localhost".to_string()),
@@ -899,7 +1051,7 @@ mod tests {
     fn test_init_with_relay_credentials() {
         // Create a mock transport that will fail connection test
         let mock_transport = MockEmailTransport::new();
-        //Mock the from_config method to return a transport
+        // Mock the from_config method to return a transport
         // Create config and backend
         let config = SmtpConfig {
             mode: SmtpTransportMode::Relay("localhost".to_string()),
@@ -920,7 +1072,7 @@ mod tests {
     fn test_init_with_tlsrelay_credentials() {
         // Create a mock transport that will fail connection test
         let mock_transport = MockEmailTransport::new();
-        //Mock the from_config method to return a transport
+        // Mock the from_config method to return a transport
         // Create config and backend
         let config = SmtpConfig {
             mode: SmtpTransportMode::StartTlsRelay("junkyhost".to_string()),

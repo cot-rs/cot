@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.2.2...cot-cli-v0.3.0) - 2025-05-09
+
+### <!-- 1 -->New features
+
+- [**breaking**] append app name to table name ([#257](https://github.com/cot-rs/cot/pull/257))
+
+### <!-- 3 -->Other
+
+- *(clippy)* allow API breaking clippy lints ([#305](https://github.com/cot-rs/cot/pull/305))
+- *(deps)* [**breaking**] bump deps (upgrade to askama 0.14) ([#293](https://github.com/cot-rs/cot/pull/293))
+- [**breaking**] migrate from rinja to askama ([#265](https://github.com/cot-rs/cot/pull/265))
+
 ## [0.2.2](https://github.com/cot-rs/cot/compare/cot-cli-v0.2.1...cot-cli-v0.2.2) - 2025-04-03
 
 ### <!-- 3 -->Other

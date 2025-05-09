@@ -27,15 +27,18 @@ clap.workspace = true
 cot_macros.workspace = true
 derive_builder.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
+digest.workspace = true
 email_address.workspace = true
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 form_urlencoded.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
+hex.workspace = true
 hmac.workspace = true
 http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
+humantime.workspace = true
 indexmap.workspace = true
 mime_guess.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }

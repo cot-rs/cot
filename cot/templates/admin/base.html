@@ -1,4 +1,4 @@
-{%- let urls = urls -%}
+{%- let urls = ctx.urls -%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="NONE,NOARCHIVE">
     <title>{% block title %}{% endblock %} | Cot Admin</title>
-    <link rel="stylesheet" href="/static/admin/admin.css">
+    <link rel="stylesheet" href="{{ ctx.static_files.url_for("admin/admin.css")? }}">
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <header id="header">

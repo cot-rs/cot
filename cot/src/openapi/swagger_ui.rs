@@ -12,6 +12,7 @@ use crate::html::Html;
 use crate::request::{Request, RequestExt};
 use crate::response::{Response, ResponseExt};
 use crate::router::{Route, Router};
+use crate::static_files::StaticFile;
 use crate::{App, StatusCode};
 
 /// A wrapper around the Swagger UI functionality.
@@ -105,13 +106,13 @@ impl App for SwaggerUi {
         Router::with_urls(urls)
     }
 
-    fn static_files(&self) -> Vec<(String, Bytes)> {
+    fn static_files(&self) -> Vec<StaticFile> {
         swagger_ui_redist::SwaggerUi::static_files()
             .iter()
             .map(|(static_file_id, data)| {
                 let path = Self::static_file_path(*static_file_id);
                 let bytes = Bytes::from_static(data);
-                (path, bytes)
+                StaticFile::new(path, bytes)
             })
             .collect()
     }

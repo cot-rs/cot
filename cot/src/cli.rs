@@ -406,7 +406,6 @@ use crate::static_files::StaticFiles;
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
     use clap::Command;
     use cot::test::serial_guard;
     use tempfile::tempdir;
@@ -415,6 +414,7 @@ mod tests {
     use super::*;
     use crate::config::ProjectConfig;
     use crate::project::RegisterAppsContext;
+    use crate::static_files::StaticFile;
     use crate::{App, AppBuilder};
 
     #[test]
@@ -492,8 +492,8 @@ mod tests {
                 "test_app"
             }
 
-            fn static_files(&self) -> Vec<(String, Bytes)> {
-                vec![("test.txt".to_owned(), Bytes::from_static(b"test"))]
+            fn static_files(&self) -> Vec<StaticFile> {
+                vec![StaticFile::new("test.txt", "test")]
             }
         }
 

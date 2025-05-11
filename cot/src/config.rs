@@ -548,7 +548,7 @@ pub struct StaticFilesConfig {
     /// );
     /// # Ok::<(), cot::Error>(())
     /// ```
-    #[serde(with = "crate::humantime")]
+    #[serde(with = "crate::serializers::humantime")]
     #[builder(setter(strip_option), default)]
     pub cache_timeout: Option<Duration>,
 }
@@ -574,25 +574,27 @@ pub enum StaticFilesPathRewriteMode {
 }
 
 impl StaticFilesConfigBuilder {
-    /// Builds the database configuration.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if the database URL is not set.
+    /// Builds the static files configuration.
     ///
     /// # Examples
     ///
     /// ```
-    /// use cot::config::DatabaseConfig;
+    /// use std::time::Duration;
     ///
-    /// let config = DatabaseConfig::builder().url("sqlite::memory:").build();
+    /// use cot::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
+    ///
+    /// let config = StaticFilesConfig::builder()
+    ///     .url("/assets/")
+    ///     .rewrite(StaticFilesPathRewriteMode::QueryParam)
+    ///     .cache_timeout(Duration::from_secs(3600))
+    ///     .build();
     /// ```
     #[must_use]
     pub fn build(&self) -> StaticFilesConfig {
         StaticFilesConfig {
             url: self.url.clone().unwrap_or("/static/".to_string()),
             rewrite: self.rewrite.clone().unwrap_or_default(),
-            cache_timeout: self.cache_timeout.unwrap_or_default(), // TODO fix???
+            cache_timeout: self.cache_timeout.unwrap_or_default(),
         }
     }
 }

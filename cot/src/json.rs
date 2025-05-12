@@ -1,3 +1,8 @@
+//! JSON rendering utilities.
+//!
+//! This module provides structures and methods for creating and rendering JSON
+//! content.
+
 /// A type that represents JSON content.
 ///
 /// Note that this is just a newtype wrapper around data and does not

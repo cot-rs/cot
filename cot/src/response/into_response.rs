@@ -1,7 +1,7 @@
 use bytes::{Bytes, BytesMut};
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use cot::json::Json;
-use cot::response::{RESPONSE_BUILD_FAILURE, Response};
+use cot::response::Response;
 use cot::{Body, Error, StatusCode};
 use http;
 use serde::Serialize;
@@ -397,7 +397,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_result_ok_into_response() {
-        let res: Result<&'static str, cot::Error> = Ok("hello");
+        let res: Result<&'static str, Error> = Ok("hello");
 
         let response = res.into_response().unwrap();
 
@@ -411,10 +411,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_result_err_into_response() {
-        let err = cot::Error::new(ErrorRepr::NotFound {
+        let err = Error::new(ErrorRepr::NotFound {
             message: Some("test".to_string()),
         });
-        let res: Result<&'static str, cot::Error> = Err(err);
+        let res: Result<&'static str, Error> = Err(err);
 
         let error_result = res.into_response();
 

@@ -58,14 +58,12 @@ use std::sync::Arc;
 use cot::Error;
 use cot::error::ErrorRepr;
 use cot::request::{PathParams, Request};
-use futures_util::TryFutureExt;
 use http::request::Parts;
 use serde::de::DeserializeOwned;
 
 use crate::Method;
 use crate::auth::Auth;
 use crate::form::{Form, FormResult};
-use crate::html::Html;
 use crate::json::Json;
 use crate::request::RequestExt;
 use crate::router::Urls;

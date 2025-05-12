@@ -8,12 +8,12 @@ use std::sync::Arc;
 use bytes::Bytes;
 use swagger_ui_redist::SwaggerUiStaticFile;
 
+use crate::App;
 use crate::html::Html;
+use crate::json::Json;
 use crate::request::{Request, RequestExt};
-use crate::response::{Response, ResponseExt};
 use crate::router::{Route, Router};
 use crate::static_files::StaticFile;
-use crate::{App, StatusCode};
 
 /// A wrapper around the Swagger UI functionality.
 ///
@@ -38,13 +38,13 @@ pub struct SwaggerUi {
     serve_openapi: bool,
 }
 
-async fn openapi_json(request: Request) -> cot::Result<Response> {
+async fn openapi_json(request: Request) -> Json<aide::openapi::OpenApi> {
     let openapi = aide::openapi::OpenApi {
         paths: Some(request.router().as_api()),
         ..Default::default()
     };
 
-    Response::new_json(StatusCode::OK, &openapi)
+    Json(openapi)
 }
 
 impl Default for SwaggerUi {

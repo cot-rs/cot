@@ -14,8 +14,6 @@
 
 use crate::error_page::ErrorPageTrigger;
 use crate::headers::HTML_CONTENT_TYPE;
-#[cfg(feature = "json")]
-use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
 use crate::{Body, StatusCode};
 
@@ -173,7 +171,7 @@ pub(crate) fn not_found_response(message: Option<String>) -> crate::Result<Respo
 mod tests {
     use super::*;
     use crate::body::BodyInner;
-    use crate::headers::HTML_CONTENT_TYPE;
+    use crate::headers::{HTML_CONTENT_TYPE, JSON_CONTENT_TYPE};
     use crate::response::{Response, ResponseExt};
 
     #[test]
@@ -199,7 +197,7 @@ mod tests {
         let data = MyData {
             hello: String::from("world"),
         };
-        let response = Response::new_json(StatusCode::OK, &data).unwrap();
+        let response = Json(data).into_response().unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             response.headers().get(http::header::CONTENT_TYPE).unwrap(),

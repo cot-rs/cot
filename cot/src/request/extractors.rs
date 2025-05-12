@@ -64,6 +64,7 @@ use serde::de::DeserializeOwned;
 use crate::Method;
 use crate::auth::Auth;
 use crate::form::{Form, FormResult};
+#[cfg(feature = "json")]
 use crate::json::Json;
 use crate::request::RequestExt;
 use crate::router::Urls;

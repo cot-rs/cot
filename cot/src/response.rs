@@ -23,6 +23,7 @@ pub use into_response::{
     IntoResponse, WithBody, WithContentType, WithExtension, WithHeader, WithStatus,
 };
 
+#[cfg(feature = "json")]
 use crate::json::Json;
 
 const RESPONSE_BUILD_FAILURE: &str = "Failed to build response";

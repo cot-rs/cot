@@ -756,4 +756,54 @@ mod tests {
         );
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "test");
     }
+
+    #[cfg(feature = "json")]
+    #[tokio::test]
+    async fn test_json_struct_into_response() {
+        use serde::Serialize;
+
+        #[derive(Serialize, PartialEq, Debug)]
+        struct TestData {
+            name: String,
+            value: i32,
+        }
+
+        let data = TestData {
+            name: "test".to_string(),
+            value: 123,
+        };
+        let json = Json(data);
+        let response = json.into_response().unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            JSON_CONTENT_TYPE
+        );
+
+        let body_bytes = response.into_body().into_bytes().await.unwrap();
+        let expected_json = r#"{"name":"test","value":123}"#;
+
+        assert_eq!(body_bytes, expected_json.as_bytes());
+    }
+
+    #[cfg(feature = "json")]
+    #[tokio::test]
+    async fn test_json_hashmap_into_response() {
+        use std::collections::HashMap;
+
+        let data = HashMap::from([("key", "value")]);
+        let json = Json(data);
+        let response = json.into_response().unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            JSON_CONTENT_TYPE
+        );
+
+        let body_bytes = response.into_body().into_bytes().await.unwrap();
+        let expected_json = r#"{"key":"value"}"#;
+        assert_eq!(body_bytes, expected_json.as_bytes());
+    }
 }

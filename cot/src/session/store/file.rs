@@ -46,9 +46,9 @@ impl FileStore {
     pub fn new(dir_path: impl Into<Cow<'static, Path>>) -> Result<Self, FileStoreError> {
         let dir: PathBuf = dir_path.into().into();
         fs::create_dir_all(&dir).map_err(FileStoreError::IoError)?;
-        let canonicalized = dir.canonicalize().map_err(FileStoreError::IoError)?;
+        let canonical = dir.canonicalize().map_err(FileStoreError::IoError)?;
         Ok(Self {
-            dir_path: canonicalized.into(),
+            dir_path: canonical.into(),
         })
     }
 }

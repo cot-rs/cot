@@ -1,11 +1,12 @@
 use async_trait::async_trait;
-use cot::config::CacheUrl;
-use cot::session::store::redis::RedisStoreError::PoolConnectionError;
 use deadpool_redis::{Config, ConfigError, CreatePoolError, Pool as RedisPool, Runtime};
 use redis::{AsyncCommands, Commands, Connection, ExistenceCheck, SetExpiry, SetOptions};
 use thiserror::Error;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
+
+use crate::config::CacheUrl;
+use crate::session::store::redis::RedisStoreError::PoolConnectionError;
 
 #[derive(Debug, Error)]
 #[non_exhaustive]

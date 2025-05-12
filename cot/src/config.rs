@@ -36,10 +36,13 @@ use tower_sessions::{MemoryStore, SessionStore};
 use tower_sessions::{SessionStore, session_store};
 
 use crate::ProjectContext;
+use crate::db::Database;
 use crate::project::WithDatabase;
 use crate::session::store::ToSessionStore;
+use crate::session::store::db::DbStore;
 use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
+use crate::session::store::redis::RedisStore;
 
 /// The configuration for a project.
 ///

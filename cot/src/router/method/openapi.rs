@@ -46,7 +46,7 @@ use crate::router::method::InnerMethodRouter;
 /// # Examples
 ///
 /// ```
-/// use cot::request::extractors::Json;
+/// use cot::json::Json;
 /// use cot::response::{Response, ResponseExt};
 /// use cot::router::method::openapi::api_post;
 /// use cot::router::{Route, Router};
@@ -531,7 +531,8 @@ where
 mod tests {
     use super::*;
     use crate::html::Html;
-    use crate::request::extractors::{Json, Path};
+    use crate::json::Json;
+    use crate::request::extractors::Path;
     use crate::response::{IntoResponse, Response};
     use crate::test::TestRequestBuilder;
     use crate::{Method, StatusCode};

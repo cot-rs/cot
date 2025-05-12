@@ -58,13 +58,15 @@ use std::sync::Arc;
 use cot::Error;
 use cot::error::ErrorRepr;
 use cot::request::{PathParams, Request};
+use futures_util::TryFutureExt;
 use http::request::Parts;
 use serde::de::DeserializeOwned;
-use thiserror::Error;
 
 use crate::Method;
 use crate::auth::Auth;
 use crate::form::{Form, FormResult};
+use crate::html::Html;
+use crate::json::Json;
 use crate::request::RequestExt;
 use crate::router::Urls;
 use crate::session::Session;
@@ -258,7 +260,7 @@ where
 ///
 /// ```
 /// use cot::RequestHandler;
-/// use cot::request::extractors::Json;
+/// use cot::json::Json;
 /// use cot::request::{Request, RequestExt};
 /// use cot::response::{Response, ResponseExt};
 /// use cot::test::TestRequestBuilder;
@@ -293,10 +295,6 @@ where
 /// # Ok(())
 /// # }
 /// ```
-#[cfg(feature = "json")]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Json<D>(pub D);
-
 #[cfg(feature = "json")]
 impl<D: DeserializeOwned> FromRequest for Json<D> {
     async fn from_request(mut request: Request) -> cot::Result<Self> {
@@ -492,7 +490,7 @@ impl StaticFiles {
 ///
 /// This enum represents errors that can occur when attempting to
 /// access a static file through the [`StaticFiles`] extractor.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, thiserror::Error)]
 #[non_exhaustive]
 pub enum StaticFilesGetError {
     /// The requested static file was not found.

@@ -1,8 +1,8 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
+use cot::json::Json;
 use cot::openapi::swagger_ui::SwaggerUi;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
-use cot::request::extractors::Json;
 use cot::response::{Response, ResponseExt};
 use cot::router::method::openapi::api_post;
 use cot::router::{Route, Router};

@@ -1,9 +1,13 @@
 use bytes::{Bytes, BytesMut};
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
-use cot::response::Response;
-use cot::{Body, StatusCode};
+use cot::json::Json;
+use cot::response::{RESPONSE_BUILD_FAILURE, Response};
+use cot::{Body, Error, StatusCode};
 use http;
+use serde::Serialize;
 
+use crate::error::ErrorRepr;
+use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
 
 /// Trait for generating responses.
@@ -213,7 +217,7 @@ impl IntoResponse for () {
 impl<R, E> IntoResponse for Result<R, E>
 where
     R: IntoResponse,
-    E: Into<cot::Error>,
+    E: Into<Error>,
 {
     fn into_response(self) -> cot::Result<Response> {
         match self {
@@ -308,7 +312,7 @@ impl IntoResponse for Html {
     /// Create a new HTML response.
     ///
     /// This creates a new [`Response`] object with a content type of
-    /// `text/html; charset=utf-8` and given status code and body.
+    /// `text/html; charset=utf-8` and given body.
     ///
     /// # Examples
     ///
@@ -326,6 +330,40 @@ impl IntoResponse for Html {
             .into_response()
             .with_content_type(HTML_CONTENT_TYPE)
             .into_response()
+    }
+}
+
+#[cfg(feature = "json")]
+impl<D: Serialize> IntoResponse for Json<D> {
+    /// Create a new JSON response.
+    ///
+    /// This creates a new [`Response`] object with a content type of
+    /// `application/json` and given body.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    ///
+    /// use cot::json::Json;
+    /// use cot::response::IntoResponse;
+    ///
+    /// let data = HashMap::from([("hello", "world")]);
+    /// let json = Json(data);
+    ///
+    /// let response = json.into_response();
+    /// ```
+    fn into_response(self) -> cot::Result<Response> {
+        // a "reasonable default" for a JSON response size
+        const DEFAULT_JSON_SIZE: usize = 128;
+
+        let mut buf = Vec::with_capacity(DEFAULT_JSON_SIZE);
+        let mut serializer = serde_json::Serializer::new(&mut buf);
+        serde_path_to_error::serialize(&self.0, &mut serializer)
+            .map_err(|error| Error::new(ErrorRepr::Json(error)))?;
+        let data = String::from_utf8(buf).expect("JSON serialization always returns valid UTF-8");
+
+        data.with_content_type(JSON_CONTENT_TYPE).into_response()
     }
 }
 

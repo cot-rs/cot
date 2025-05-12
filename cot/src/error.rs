@@ -242,6 +242,9 @@ pub(crate) enum ErrorRepr {
     /// An error occurred while getting a URL for a static files.
     #[error("Could not get URL for a static file: {0}")]
     StaticFilesGetError(#[from] crate::request::extractors::StaticFilesGetError),
+    /// An error occurred due to invalid data encoding.
+    #[error("The data was not encoded with UTF-8")]
+    InvalidEncoding,
 }
 
 #[cfg(test)]

@@ -124,10 +124,9 @@ use schemars::{JsonSchema, SchemaGenerator};
 use crate::auth::Auth;
 use crate::form::Form;
 use crate::handler::BoxRequestHandler;
+use crate::json::Json;
 use crate::request::Request;
-use crate::request::extractors::{
-    FromRequest, FromRequestParts, Json, Path, RequestForm, UrlQuery,
-};
+use crate::request::extractors::{FromRequest, FromRequestParts, Path, RequestForm, UrlQuery};
 use crate::response::Response;
 use crate::router::Urls;
 use crate::session::Session;
@@ -875,8 +874,9 @@ mod tests {
 
     use super::*;
     use crate::html::Html;
+    use crate::json::Json;
     use crate::openapi::AsApiOperation;
-    use crate::request::extractors::{Json, Path, UrlQuery};
+    use crate::request::extractors::{Path, UrlQuery};
 
     #[derive(Deserialize, Serialize, schemars::JsonSchema)]
     struct TestRequest {

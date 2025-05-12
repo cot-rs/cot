@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use cot::ProjectContext;
-use cot::db::Database;
 use cot::middleware::SessionStore;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::session_store;

@@ -7,11 +7,11 @@ pub mod db;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use cot::ProjectContext;
-use cot::middleware::SessionStore;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::session_store;
 
+use crate::ProjectContext;
+use crate::middleware::SessionStore;
 use crate::project::WithDatabase;
 
 pub trait ToSessionStore {

@@ -1,25 +1,24 @@
 mod migrations;
 
 use askama::Template;
-use cot::bytes::Bytes;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
+use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
-use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
-use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, static_files};
+use cot::{App, AppBuilder, BoxedHandler, Project, static_files};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {}
 
-async fn index() -> cot::Result<Response> {
+async fn index() -> cot::Result<Html> {
     let index_template = IndexTemplate {};
     let rendered = index_template.render()?;
 
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(rendered)))
+    Ok(Html::new(rendered))
 }
 
 struct {{ app_name }};

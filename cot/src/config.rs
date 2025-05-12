@@ -797,16 +797,19 @@ impl ToSessionStore for SessionStoreTypeConfig {
                 Ok(Box::new(file_store))
             }
             Self::Cache { ref uri } => match CacheType::from(uri.clone()) {
-                CacheType::Redis => Ok(Box::new(RedisStore::new(uri, "session", 3600)?)),
+                CacheType::Redis => Ok(Box::new(RedisStore::new(uri, 3600)?)),
                 CacheType::Unknown => Err(session_store::Error::Backend(format!(
                     "Unsupported cache URI scheme: {}",
                     uri.0.scheme()
                 ))),
             },
-            Self::Database => Ok(Box::new(DbStore::new(
-                context.database().clone(),
-                "session",
-            ))),
+            Self::Database => {
+                unimplemented!();
+                Ok(Box::new(DbStore::new(
+                    context.database().clone(),
+                    "session",
+                )))
+            }
         }
     }
 }

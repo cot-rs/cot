@@ -13,17 +13,25 @@ use tower_sessions::{SessionStore, session_store};
 #[non_exhaustive]
 pub enum FileStoreError {
     #[error(transparent)]
-    Io(#[from] io::Error),
+    IoError(#[from] io::Error),
     /// Failed to serialize the record to JSON.
     #[error("JSON serialization error: {0}")]
-    Serialize(#[from] serde_json::Error),
+    SerializeError(serde_json::Error),
+    /// Failed to deserialize the record to JSON.
+    #[error("JSON serialization error: {0}")]
+    DeserializeError(serde_json::Error),
 }
 
 impl From<FileStoreError> for session_store::Error {
     fn from(error: FileStoreError) -> session_store::Error {
         match error {
-            FileStoreError::Io(inner) => session_store::Error::Backend(inner.to_string()),
-            FileStoreError::Serialize(inner) => session_store::Error::Backend(inner.to_string()),
+            FileStoreError::IoError(inner) => session_store::Error::Backend(inner.to_string()),
+            FileStoreError::SerializeError(inner) => {
+                session_store::Error::Encode(inner.to_string())
+            }
+            FileStoreError::DeserializeError(inner) => {
+                session_store::Error::Decode(inner.to_string())
+            }
         }
     }
 }
@@ -37,8 +45,8 @@ impl FileStore {
     #[must_use]
     pub fn new(dir_path: impl Into<Cow<'static, Path>>) -> Result<Self, FileStoreError> {
         let dir: PathBuf = dir_path.into().into();
-        fs::create_dir_all(&dir).map_err(FileStoreError::Io)?;
-        let canonicalized = dir.canonicalize().map_err(FileStoreError::Io)?;
+        fs::create_dir_all(&dir).map_err(FileStoreError::IoError)?;
+        let canonicalized = dir.canonicalize().map_err(FileStoreError::IoError)?;
         Ok(Self {
             dir_path: canonicalized.into(),
         })
@@ -50,7 +58,7 @@ impl SessionStore for FileStore {
     async fn create(&self, record: &mut Record) -> session_store::Result<()> {
         tokio::fs::create_dir_all(&self.dir_path)
             .await
-            .map_err(|err| FileStoreError::Io(err))?;
+            .map_err(FileStoreError::IoError)?;
 
         loop {
             let file_path = self.dir_path.join(record.id.to_string());
@@ -60,15 +68,14 @@ impl SessionStore for FileStore {
                 .open(&file_path)
             {
                 Ok(mut file) => {
-                    serde_json::to_writer(file, &record)
-                        .map_err(|err| FileStoreError::Serialize(err))?;
+                    serde_json::to_writer(file, &record).map_err(FileStoreError::SerializeError)?;
                     break;
                 }
                 Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
                     record.id = Id::default();
                     continue;
                 }
-                Err(err) => return Err(FileStoreError::Io(err))?,
+                Err(err) => return Err(FileStoreError::IoError(err))?,
             }
         }
 
@@ -82,15 +89,14 @@ impl SessionStore for FileStore {
             .open(self.dir_path.join(record.id.to_string()))
         {
             Ok(mut file) => {
-                serde_json::to_writer(file, &record)
-                    .map_err(|err| FileStoreError::Serialize(err))?;
+                serde_json::to_writer(file, &record).map_err(FileStoreError::SerializeError)?;
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // create the file if it does not exist.
                 let mut record = record.clone();
                 self.create(&mut record).await?;
             }
-            Err(err) => Err(FileStoreError::Io(err))?,
+            Err(err) => Err(FileStoreError::IoError(err))?,
         }
 
         Ok(())
@@ -104,8 +110,8 @@ impl SessionStore for FileStore {
         let file = OpenOptions::new()
             .read(true)
             .open(path)
-            .map_err(|err| FileStoreError::Io(err))?;
-        let out = serde_json::from_reader(file).map_err(|err| FileStoreError::Serialize(err))?;
+            .map_err(|err| FileStoreError::IoError(err))?;
+        let out = serde_json::from_reader(file).map_err(FileStoreError::SerializeError)?;
 
         Ok(out)
     }
@@ -116,9 +122,7 @@ impl SessionStore for FileStore {
             Ok(_) => {}
             Err(e) => {
                 if e.kind() != io::ErrorKind::NotFound {
-                    return Err(session_store::Error::Backend(
-                        "Failed to Delete".to_string(),
-                    ));
+                    return Err(FileStoreError::IoError(e))?;
                 }
             }
         }

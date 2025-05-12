@@ -5,6 +5,7 @@ use cot::{Body, Error, StatusCode};
 use http;
 
 use crate::error::ErrorRepr;
+#[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
 
@@ -174,7 +175,7 @@ impl<T: IntoResponse> IntoResponse for WithBody<T> {
 
 /// Returned by [`with_extension`](IntoResponse::with_extension) method.
 #[derive(Debug)]
-pub struct WithExtension<T, D: Clone + Send + Sync + 'static> {
+pub struct WithExtension<T, D> {
     inner: T,
     extension: D,
 }

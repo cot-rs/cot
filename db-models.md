@@ -30,7 +30,7 @@ There's some very useful stuff going on here, so let's break it down:
 After putting this structure in your project, you can use it to interact with the database. Before you do that though, it's necessary to create the table in the database that corresponds to this model. Cot CLI has got you covered and can automatically create migrations for you – just run the following command:
 
 ```bash
-cot migrations make
+cot migration make
 ```
 
 This will create a new file in your `migrations` directory in the crate's src directory. We will come back to the contents of this file later in this guide, but for now, let's focus on how to use the model to interact with the database.

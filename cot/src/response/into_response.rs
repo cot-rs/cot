@@ -1,10 +1,8 @@
 use bytes::{Bytes, BytesMut};
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
-use cot::json::Json;
 use cot::response::Response;
 use cot::{Body, Error, StatusCode};
 use http;
-use serde::Serialize;
 
 use crate::error::ErrorRepr;
 use crate::headers::JSON_CONTENT_TYPE;
@@ -334,7 +332,7 @@ impl IntoResponse for Html {
 }
 
 #[cfg(feature = "json")]
-impl<D: Serialize> IntoResponse for Json<D> {
+impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {
     /// Create a new JSON response.
     ///
     /// This creates a new [`Response`] object with a content type of
@@ -772,7 +770,7 @@ mod tests {
             name: "test".to_string(),
             value: 123,
         };
-        let json = Json(data);
+        let json = cot::json::Json(data);
         let response = json.into_response().unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -793,7 +791,7 @@ mod tests {
         use std::collections::HashMap;
 
         let data = HashMap::from([("key", "value")]);
-        let json = Json(data);
+        let json = cot::json::Json(data);
         let response = json.into_response().unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);

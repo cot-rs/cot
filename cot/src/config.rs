@@ -23,6 +23,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
+use cot::db::Database;
+use cot::session::store::db::DbStore;
+use cot::session::store::redis::RedisStore;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
@@ -32,7 +35,10 @@ use time::{OffsetDateTime, UtcOffset};
 use tower_sessions::{MemoryStore, SessionStore};
 use tower_sessions::{SessionStore, session_store};
 
+use crate::ProjectContext;
+use crate::project::WithDatabase;
 use crate::session::store::ToSessionStore;
+use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
 
 /// The configuration for a project.
@@ -768,16 +774,39 @@ pub enum SessionStoreTypeConfig {
     Memory,
     #[cfg(feature = "db")]
     Database,
+
+    File {
+        path: PathBuf,
+    },
+    Cache {
+        uri: CacheUrl,
+    },
 }
 
 impl ToSessionStore for SessionStoreTypeConfig {
     #[must_use]
-    fn to_session_store(self) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error> {
+    fn to_session_store(
+        self,
+        context: &ProjectContext<WithDatabase>,
+    ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error> {
         match self {
             Self::Memory => Ok(Box::new(MemoryStore::new())),
-            _ => Err(session_store::Error::Backend(
-                "Session store type is not supported.".to_string(),
-            )),
+            Self::File { path } => {
+                let file_store =
+                    FileStore::new(path).unwrap_or_else(|e| panic!("{}", e.to_string()));
+                Ok(Box::new(file_store))
+            }
+            Self::Cache { ref uri } => match CacheType::from(uri.clone()) {
+                CacheType::Redis => Ok(Box::new(RedisStore::new(uri, "session", 3600)?)),
+                CacheType::Unknown => Err(session_store::Error::Backend(format!(
+                    "Unsupported cache URI scheme: {}",
+                    uri.0.scheme()
+                ))),
+            },
+            Self::Database => Ok(Box::new(DbStore::new(
+                context.database().clone(),
+                "session",
+            ))),
         }
     }
 }
@@ -1348,6 +1377,52 @@ impl Debug for DatabaseUrl {
         f.debug_tuple("DatabaseUrl")
             .field(&new_url.as_str())
             .finish()
+    }
+}
+
+pub enum CacheType {
+    Redis,
+    // File,
+    Unknown,
+}
+
+impl From<&str> for CacheType {
+    fn from(value: &str) -> Self {
+        match value {
+            // "file" => Self::File,
+            "redis" => Self::Redis,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+#[derive(Debug)]
+pub struct CacheUrl(url::Url);
+
+impl CacheUrl {
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl From<String> for CacheUrl {
+    fn from(url: String) -> Self {
+        Self(url::Url::parse(&url).expect("invalid URL"))
+    }
+}
+
+impl From<&str> for CacheUrl {
+    fn from(url: &str) -> Self {
+        Self(url::Url::parse(url).expect("invalid URL"))
+    }
+}
+
+impl From<CacheUrl> for CacheType {
+    fn from(url: CacheUrl) -> Self {
+        url.0.scheme().into()
     }
 }
 

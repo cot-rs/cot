@@ -1,15 +1,26 @@
+pub mod file;
 pub mod memory;
+pub mod redis;
+
+pub mod db;
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use cot::ProjectContext;
+use cot::db::Database;
 use cot::middleware::SessionStore;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::session_store;
 
+use crate::project::WithDatabase;
+
 pub trait ToSessionStore {
     #[must_use]
-    fn to_session_store(self) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error>;
+    fn to_session_store(
+        self,
+        context: &ProjectContext<WithDatabase>,
+    ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error>;
 }
 
 #[derive(Debug, Clone)]

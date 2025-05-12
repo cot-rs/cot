@@ -303,8 +303,18 @@ impl SessionMiddleware {
     /// ```
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
+        let cfg = context.config();
+        let boxed_store = cfg
+            .middlewares
+            .session
+            .store
+            .store_type
+            .clone()
+            .to_session_store(&context)
+            .expect("session store not supported");
+        let arc_store: Arc<dyn SessionStore + Send + Sync> = Arc::from(boxed_store);
         let session_cfg = &context.config().middlewares.session;
-        let mut middleware = Self::new(session_cfg.session_store.clone())
+        let mut middleware = Self::new(arc_store)
             .secure(session_cfg.secure)
             .path(session_cfg.path.clone())
             .name(session_cfg.name.clone())

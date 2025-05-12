@@ -43,6 +43,41 @@ We are also using [`pre-commit`](https://pre-commit.com/) hooks to handle
 formatting and linting. See the `pre-commit` website for installation
 instructions. This handles formatting of all the files in the repository.
 
+### Tests that use database, cache, or other external resources
+
+Some tests use a database, cache, or other external resources. All these tests
+are marked with `#[ignore]`, so they are not run by default.
+
+If you want to run the full test suite, it's necessary to run these external
+dependencies. For convenience, Cot provides a
+[Docker compose file](./compose.yml) in the root of the repository that
+contains all the dependencies needed to run the tests. You can run it with:
+
+```sh
+docker compose up -d
+```
+
+Then, the tests can be run with:
+
+```sh
+cargo test --all-features --include-ignored
+```
+
+#### End-to-end tests
+
+End-to-end tests require a running webdriver server. By default, a Selenium
+Grid server is used (included in the `compose.yml` file). You can access the
+UI to see the tests running (for example, to debug them) at
+`http://localhost:7900/?autoconnect=1&resize=scale&password=secret`.
+
+Alternatively, instead of using Selenium Grid, you can run the tests with
+a local webdriver server. To do this, you need to install and run the
+Webdriver implementation of your choice, such as
+[geckodriver](https://github.com/mozilla/geckodriver/releases) or
+[chromedriver](https://developer.chrome.com/docs/chromedriver/downloads).
+After running the webdriver server, you will see the tests running in a
+local browser window.
+
 ### Snapshot tests
 
 Cot uses snapshot testing for the CLI to ensure that the output of commands

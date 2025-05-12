@@ -13,8 +13,22 @@ use crate::{Error, Result};
 ///
 /// This is the main building block of a Cot app. You shouldn't
 /// usually need to implement this directly, as it is already
-/// implemented for closures and functions that take a [`Request`]
-/// and return a [`Result<Response>`].
+/// implemented for closures and functions that take some
+/// number of [extractors](crate::request::extractors) as parameters
+/// and return some type that [can be converted into a
+/// response](IntoResponse).
+///
+/// # Details
+///
+/// Cot provides an implementation of `RequestHandler` for functions
+/// and closures that:
+/// * are marked `async`
+/// * take at most 10 parameters, all of which implement [`FromRequestParts`],
+///   except for at most one that implements [`FromRequest`]
+/// * return a type that implements [`IntoResponse`]
+/// * is `Clone + Send + 'static` (important if it's a closure)
+/// * return a future that is `Send` (i.e., doesn't hold any non-Send references
+///   across await points)
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid request handler",
     label = "not a valid request handler",

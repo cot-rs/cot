@@ -27,7 +27,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
-use bytes::Bytes;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use http::request::Parts;
@@ -54,6 +53,7 @@ use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCo
 use crate::request::{AppName, Request, RequestExt};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
+use crate::static_files::StaticFile;
 use crate::{Body, Error, StatusCode, cli, error_page};
 
 /// A building block for a Cot project.
@@ -151,7 +151,7 @@ pub trait App: Send + Sync {
 
     /// Returns a list of static files that the app serves. By default, it
     /// returns an empty list.
-    fn static_files(&self) -> Vec<(String, Bytes)> {
+    fn static_files(&self) -> Vec<StaticFile> {
         vec![]
     }
 }
@@ -1720,7 +1720,7 @@ pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> 
 ///
 /// If you need more control over the server listening socket, such as modifying
 /// the underlying buffer sizes, you can create a [`tokio::net::TcpListener`]
-/// and pass it to this function. Otherwise, [`run`] function will be more
+/// and pass it to this function. Otherwise, the [`run`] function will be more
 /// convenient.
 ///
 /// # Errors
@@ -1731,6 +1731,29 @@ pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> 
 pub async fn run_at(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
+) -> cot::Result<()> {
+    run_at_with_shutdown(bootstrapper, listener, shutdown_signal()).await
+}
+
+/// Runs the Cot project on the given listener.
+///
+/// This function takes a Cot project and a [`tokio::net::TcpListener`] and
+/// runs the project on the given listener, similarly to the [`run_at`]
+/// function. In addition to that, it takes a shutdown signal that can be used
+/// to gracefully shut down the server in a response to a signal or other event.
+///
+/// If you don't need to customize shutdown signal handling, you should instead
+/// use the [`run`] or [`run_at`] functions, as they are more convenient.
+///
+/// # Errors
+///
+/// This function returns an error if the server fails to start.
+// Send not needed; Bootstrapper/CLI is run async in a single thread
+#[expect(clippy::future_not_send)]
+pub async fn run_at_with_shutdown(
+    bootstrapper: Bootstrapper<Initialized>,
+    listener: tokio::net::TcpListener,
+    shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> cot::Result<()> {
     let not_found_handler: Arc<dyn ErrorPageHandler> =
         bootstrapper.project().not_found_handler().into();
@@ -1820,7 +1843,7 @@ pub async fn run_at(
         std::panic::set_hook(Box::new(new_hook));
     }
     axum::serve(listener, handler.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal)
         .await
         .map_err(|e| ErrorRepr::StartServer { source: e })?;
     if register_panic_hook {

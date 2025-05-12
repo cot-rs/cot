@@ -1,6 +1,7 @@
 mod migrations;
 
 use std::fmt::{Display, Formatter};
+use std::time::Duration;
 
 use askama::Template;
 use async_trait::async_trait;
@@ -9,6 +10,7 @@ use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
 use cot::config::{
     AuthBackendConfig, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
+    StaticFilesConfig, StaticFilesPathRewriteMode,
 };
 use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model};
@@ -103,6 +105,12 @@ impl Project for AdminProject {
             .middlewares(
                 MiddlewareConfig::builder()
                     .session(SessionMiddlewareConfig::builder().secure(false).build())
+                    .build(),
+            )
+            .static_files(
+                StaticFilesConfig::builder()
+                    .rewrite(StaticFilesPathRewriteMode::QueryParam)
+                    .cache_timeout(Duration::from_secs(300))
                     .build(),
             )
             .build())

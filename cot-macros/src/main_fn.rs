@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::ItemFn;
+use syn::{ItemFn, parse_quote};
 
 use crate::cot_ident;
 
@@ -41,10 +41,27 @@ pub(super) fn fn_to_cot_main(main_function_decl: ItemFn) -> syn::Result<TokenStr
 }
 
 pub(super) fn fn_to_cot_test(test_function_decl: &ItemFn) -> TokenStream {
-    let result = quote! {
-        #[cot::__private::tokio::test(crate = "cot::__private::tokio")]
-        #test_function_decl
-    };
+    let crate_name = cot_ident();
+    let tokio_path = quote! { #crate_name::__private::tokio }.to_string();
 
-    result
+    quote! {
+        #[#crate_name::__private::tokio::test(crate = #tokio_path)]
+        #test_function_decl
+    }
+}
+
+pub(super) fn fn_to_cot_e2e_test(test_function_decl: &ItemFn) -> TokenStream {
+    let crate_name = cot_ident();
+
+    let block = test_function_decl.block.clone();
+    let mut new_test_fn = test_function_decl.clone();
+
+    new_test_fn.block = parse_quote! {{
+        #crate_name::__private::tokio::task::LocalSet::new()
+            .run_until(async move {
+                #block
+            }).await
+    }};
+
+    fn_to_cot_test(&new_test_fn)
 }

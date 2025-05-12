@@ -2,10 +2,15 @@
 
 use std::any::Any;
 use std::future::poll_fn;
+use std::marker::PhantomData;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use cot::project::run_at_with_shutdown;
 use derive_more::Debug;
+use tokio::net::TcpListener;
+use tokio::sync::oneshot;
 use tower::Service;
 use tower_sessions::MemoryStore;
 
@@ -25,6 +30,7 @@ use crate::request::Request;
 use crate::response::Response;
 use crate::router::Router;
 use crate::session::Session;
+use crate::static_files::{StaticFile, StaticFiles};
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
 
 /// A test client for making requests to a Cot project.
@@ -204,6 +210,7 @@ pub struct TestRequestBuilder {
     form_data: Option<Vec<(String, String)>>,
     #[cfg(feature = "json")]
     json_data: Option<String>,
+    static_files: Vec<StaticFile>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -256,6 +263,7 @@ impl Default for TestRequestBuilder {
             form_data: None,
             #[cfg(feature = "json")]
             json_data: None,
+            static_files: Vec::new(),
         }
     }
 }
@@ -665,6 +673,30 @@ impl TestRequestBuilder {
         self
     }
 
+    /// Add a static file to the request builder.
+    ///
+    /// This allows you to add static files that will be available in the
+    /// request through the
+    /// [`StaticFiles`](crate::request::extractors::StaticFiles) extractor.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// let request = TestRequestBuilder::get("/")
+    ///     .static_file("css/style.css", "body { color: red; }")
+    ///     .build();
+    /// ```
+    pub fn static_file<Path, Content>(&mut self, path: Path, content: Content) -> &mut Self
+    where
+        Path: Into<String>,
+        Content: Into<bytes::Bytes>,
+    {
+        self.static_files.push(StaticFile::new(path, content));
+        self
+    }
+
     /// Build the request.
     ///
     /// # Examples
@@ -753,6 +785,15 @@ impl TestRequestBuilder {
                 http::header::CONTENT_TYPE,
                 http::HeaderValue::from_static("application/json"),
             );
+        }
+
+        if !self.static_files.is_empty() {
+            let config = self.config.clone().unwrap_or_default();
+            let mut static_files = StaticFiles::new(&config.static_files);
+            for file in std::mem::take(&mut self.static_files) {
+                static_files.add_file(file);
+            }
+            request.extensions_mut().insert(Arc::new(static_files));
         }
 
         request
@@ -1231,6 +1272,275 @@ impl DynMigration for TestMigration {
 
     fn operations(&self) -> &[Operation] {
         &self.operations
+    }
+}
+
+/// A utility for running entire projects in end-to-end tests.
+///
+/// This is useful for testing the full stack of a project, including the
+/// database, the router, the auth, etc. The server is running in the same
+/// process as the test by running a background async task.
+///
+///  This can be used to test the entire project by sending real requests to the
+/// server, possibly using libraries such as
+/// - [`reqwest`](https://docs.rs/reqwest/latest/reqwest/) for HTTP requests
+/// - [`thirtyfour`](https://docs.rs/thirtyfour/latest/thirtyfour/) or [`fantoccini`](https://docs.rs/fantoccini/latest/fantoccini/)
+///   for browser automation
+///
+/// Note that you need to use [`cot::e2e_test`] to run this, not
+/// [`macro@cot::test`]. Remember to call [`TestServer::close`] when
+/// you're done with the tests, as the server will not be stopped automatically.
+///
+/// # Examples
+///
+/// ```
+/// use cot::test::TestServerBuilder;
+///
+/// struct TestProject;
+/// impl cot::Project for TestProject {}
+///
+/// #[cot::e2e_test] // note this uses "e2e_test"!
+/// async fn test_server() -> cot::Result<()> {
+///     let server = TestServerBuilder::new(TestProject).start().await;
+///
+///     let url = server.url();
+///     // ...use the server URL to send requests to the server
+///
+///     server.close().await;
+///     Ok(())
+/// }
+/// ```
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TestServerBuilder<T> {
+    project: T,
+}
+
+impl<T: Project + 'static> TestServerBuilder<T> {
+    /// Create a new test server.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServerBuilder;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
+    ///
+    ///     let url = server.url();
+    ///     // ...use the server URL to send requests to the server
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[must_use]
+    pub fn new(project: T) -> Self {
+        Self { project }
+    }
+
+    /// Start the test server.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it fails to bind to a port.
+    ///
+    /// This function will panic if the server could not be started.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServerBuilder;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
+    ///
+    ///     let url = server.url();
+    ///     // ...use the server URL to send requests to the server
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn start(self) -> TestServer<T> {
+        TestServer::start(self.project).await
+    }
+}
+
+/// A running test server.
+///
+/// This is returned by [`TestServerBuilder::start`] and can be used to access
+/// the server's URL and close the server.
+///
+/// # Examples
+///
+/// ```
+/// use cot::test::TestServerBuilder;
+///
+/// struct TestProject;
+/// impl cot::Project for TestProject {}
+///
+/// #[cot::e2e_test] // note this uses "e2e_test"!
+/// async fn test_server() -> cot::Result<()> {
+///     let server = TestServerBuilder::new(TestProject).start().await;
+///
+///     let url = server.url();
+///     // ...use the server URL to send requests to the server
+///
+///     server.close().await;
+///     Ok(())
+/// }
+/// ```
+#[must_use = "TestServer must be used to close the server"]
+#[derive(Debug)]
+pub struct TestServer<T> {
+    address: SocketAddr,
+    channel_send: oneshot::Sender<()>,
+    server_handle: tokio::task::JoinHandle<()>,
+    project: PhantomData<fn() -> T>,
+}
+
+impl<T: Project + 'static> TestServer<T> {
+    async fn start(project: T) -> Self {
+        let tcp_listener = TcpListener::bind("0.0.0.0:0")
+            .await
+            .expect("Failed to bind to a port");
+        let mut address = tcp_listener
+            .local_addr()
+            .expect("Failed to get the listening address");
+        address.set_ip(IpAddr::V4(Ipv4Addr::LOCALHOST));
+
+        let (send, recv) = oneshot::channel::<()>();
+
+        let server_handle = tokio::task::spawn_local(async move {
+            let bootstrapper = Bootstrapper::new(project)
+                .with_config_name("test")
+                .expect("Failed to get the \"test\" config")
+                .boot()
+                .await
+                .expect("Failed to boot the project");
+            run_at_with_shutdown(bootstrapper, tcp_listener, async move {
+                recv.await.expect("Failed to receive a shutdown signal");
+            })
+            .await
+            .expect("Failed to run the server");
+        });
+
+        Self {
+            address,
+            channel_send: send,
+            server_handle,
+            project: PhantomData,
+        }
+    }
+
+    /// Get the server's address.
+    ///
+    /// You can use this to get the port that the server is running on. It's,
+    /// however, typically more convenient to use [`Self::url`] to get
+    /// the server's URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServerBuilder;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
+    ///
+    ///     let address = server.address();
+    ///     // ...use the server address to send requests to the server
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[must_use]
+    pub fn address(&self) -> SocketAddr {
+        self.address
+    }
+
+    /// Get the server's URL.
+    ///
+    /// This is the URL of the server that can be used to send requests to the
+    /// server. Note that this will typically return the local address of the
+    /// server (127.0.0.1) and not the public address of the machine. This might
+    /// be a problem if you are making requests from a different machine or a
+    /// Docker container. If you need to override the host returned by this
+    /// function, you can set the `COT_TEST_SERVER_HOST` environment variable.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServerBuilder;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
+    ///
+    ///     let url = server.url();
+    ///     // ...use the server URL to send requests to the server
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[must_use]
+    pub fn url(&self) -> String {
+        if let Ok(host) = std::env::var("COT_TEST_SERVER_HOST") {
+            format!("http://{}:{}", host, self.address.port())
+        } else {
+            format!("http://{}", self.address)
+        }
+    }
+
+    /// Stop the server.
+    ///
+    /// Note that this is not automatically called when the `TestServer` is
+    /// dropped; you need to call this function explicitly.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if an error occurs while sending the shutdown
+    /// signal or if the server task panics.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestServerBuilder;
+    ///
+    /// struct TestProject;
+    /// impl cot::Project for TestProject {}
+    ///
+    /// #[cot::e2e_test] // note this uses "e2e_test"!
+    /// async fn test_server() -> cot::Result<()> {
+    ///     let server = TestServerBuilder::new(TestProject).start().await;
+    ///
+    ///     server.close().await;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn close(self) {
+        self.channel_send
+            .send(())
+            .expect("Failed to send a shutdown signal");
+        self.server_handle
+            .await
+            .expect("Failed to join the server task");
     }
 }
 

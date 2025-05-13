@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/cot-rs/cot/compare/cot-v0.2.2...cot-v0.3.0) - 2025-05-13
+
+### <!-- 1 -->New features
+
+- implement `AsFormField` for floating point types ([#307](https://github.com/cot-rs/cot/pull/307))
+- extractor & IntoResponse for Html and Json ([#321](https://github.com/cot-rs/cot/pull/321))
+- *(static-files)* [**breaking**] refactor, add config and content hashing ([#317](https://github.com/cot-rs/cot/pull/317))
+- [**breaking**] implement and handle `IntoResponse` ([#256](https://github.com/cot-rs/cot/pull/256))
+- add form support for Email field ([#286](https://github.com/cot-rs/cot/pull/286))
+- generate OpenAPI specs automatically ([#287](https://github.com/cot-rs/cot/pull/287))
+- allow FnOnce for RequestHandlers ([#283](https://github.com/cot-rs/cot/pull/283))
+- use SCSS ([#278](https://github.com/cot-rs/cot/pull/278))
+- [**breaking**] append app name to table name ([#257](https://github.com/cot-rs/cot/pull/257))
+
+### <!-- 2 -->Fixes
+
+- migration engine only running the first operation in a migration ([#310](https://github.com/cot-rs/cot/pull/310))
+- *(docs)* invalid whitespace in a doc ([#303](https://github.com/cot-rs/cot/pull/303))
+- allow `#[model]` to be put before `#[derive(AdminModel)]` ([#295](https://github.com/cot-rs/cot/pull/295))
+- build when minimal dependency versions are used ([#288](https://github.com/cot-rs/cot/pull/288))
+- actually use SessionMiddleware config ([#279](https://github.com/cot-rs/cot/pull/279))
+
+### <!-- 3 -->Other
+
+- don't log backtraces ([#318](https://github.com/cot-rs/cot/pull/318))
+- [**breaking**] add `TestServer` utility and add some E2E tests ([#315](https://github.com/cot-rs/cot/pull/315))
+- *(docs)* improve `RequestHandler` docs ([#314](https://github.com/cot-rs/cot/pull/314))
+- [**breaking**] add `#[non_exhaustive]` to more enums ([#297](https://github.com/cot-rs/cot/pull/297))
+- *(deps)* [**breaking**] bump deps (upgrade to askama 0.14) ([#293](https://github.com/cot-rs/cot/pull/293))
+- allow trailing comma in static_files macro ([#291](https://github.com/cot-rs/cot/pull/291))
+- password comparison ([#285](https://github.com/cot-rs/cot/pull/285))
+- [**breaking**] migrate from rinja to askama ([#265](https://github.com/cot-rs/cot/pull/265))
+
 ## [0.2.2](https://github.com/cot-rs/cot/compare/cot-v0.2.1...cot-v0.2.2) - 2025-04-03
 
 ### <!-- 2 -->Fixes

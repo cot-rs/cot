@@ -14,8 +14,6 @@
 
 use crate::error_page::ErrorPageTrigger;
 use crate::headers::HTML_CONTENT_TYPE;
-#[cfg(feature = "json")]
-use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
 use crate::{Body, StatusCode};
 
@@ -24,6 +22,9 @@ mod into_response;
 pub use into_response::{
     IntoResponse, WithBody, WithContentType, WithExtension, WithHeader, WithStatus,
 };
+
+#[cfg(feature = "json")]
+use crate::json::Json;
 
 const RESPONSE_BUILD_FAILURE: &str = "Failed to build response";
 
@@ -105,6 +106,7 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// # Ok::<(), cot::Error>(())
     /// ```
     #[cfg(feature = "json")]
+    #[deprecated(since = "0.3.0", note = "Use `Json::into_response()` instead")]
     fn new_json<T: ?Sized + serde::Serialize>(status: StatusCode, data: &T) -> crate::Result<Self>;
 
     /// Create a new redirect response.
@@ -147,20 +149,7 @@ impl ResponseExt for Response {
 
     #[cfg(feature = "json")]
     fn new_json<T: ?Sized + serde::Serialize>(status: StatusCode, data: &T) -> crate::Result<Self> {
-        // a "reasonable default" for a JSON response size
-        const DEFAULT_JSON_SIZE: usize = 128;
-
-        let mut buf = Vec::with_capacity(DEFAULT_JSON_SIZE);
-        let mut serializer = serde_json::Serializer::new(&mut buf);
-        serde_path_to_error::serialize(data, &mut serializer)
-            .map_err(|error| crate::Error::new(crate::error::ErrorRepr::Json(error)))?;
-        let data = String::from_utf8(buf).expect("JSON serialization always returns valid UTF-8");
-
-        Ok(http::Response::builder()
-            .status(status)
-            .header(http::header::CONTENT_TYPE, JSON_CONTENT_TYPE)
-            .body(Body::fixed(data))
-            .expect(RESPONSE_BUILD_FAILURE))
+        Json(data).with_status(status).into_response()
     }
 
     fn new_redirect<T: Into<String>>(location: T) -> Self {
@@ -183,7 +172,7 @@ pub(crate) fn not_found_response(message: Option<String>) -> crate::Result<Respo
 mod tests {
     use super::*;
     use crate::body::BodyInner;
-    use crate::headers::HTML_CONTENT_TYPE;
+    use crate::headers::{HTML_CONTENT_TYPE, JSON_CONTENT_TYPE};
     use crate::response::{Response, ResponseExt};
 
     #[test]
@@ -209,7 +198,7 @@ mod tests {
         let data = MyData {
             hello: String::from("world"),
         };
-        let response = Response::new_json(StatusCode::OK, &data).unwrap();
+        let response = Json(data).into_response().unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             response.headers().get(http::header::CONTENT_TYPE).unwrap(),

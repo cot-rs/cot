@@ -1,9 +1,12 @@
 use bytes::{Bytes, BytesMut};
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use cot::response::Response;
-use cot::{Body, StatusCode};
+use cot::{Body, Error, StatusCode};
 use http;
 
+use crate::error::ErrorRepr;
+#[cfg(feature = "json")]
+use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
 
 /// Trait for generating responses.
@@ -172,7 +175,7 @@ impl<T: IntoResponse> IntoResponse for WithBody<T> {
 
 /// Returned by [`with_extension`](IntoResponse::with_extension) method.
 #[derive(Debug)]
-pub struct WithExtension<T, D: Clone + Send + Sync + 'static> {
+pub struct WithExtension<T, D> {
     inner: T,
     extension: D,
 }
@@ -213,7 +216,7 @@ impl IntoResponse for () {
 impl<R, E> IntoResponse for Result<R, E>
 where
     R: IntoResponse,
-    E: Into<cot::Error>,
+    E: Into<Error>,
 {
     fn into_response(self) -> cot::Result<Response> {
         match self {
@@ -308,7 +311,7 @@ impl IntoResponse for Html {
     /// Create a new HTML response.
     ///
     /// This creates a new [`Response`] object with a content type of
-    /// `text/html; charset=utf-8` and given status code and body.
+    /// `text/html; charset=utf-8` and given body.
     ///
     /// # Examples
     ///
@@ -326,6 +329,40 @@ impl IntoResponse for Html {
             .into_response()
             .with_content_type(HTML_CONTENT_TYPE)
             .into_response()
+    }
+}
+
+#[cfg(feature = "json")]
+impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {
+    /// Create a new JSON response.
+    ///
+    /// This creates a new [`Response`] object with a content type of
+    /// `application/json` and given body.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    ///
+    /// use cot::json::Json;
+    /// use cot::response::IntoResponse;
+    ///
+    /// let data = HashMap::from([("hello", "world")]);
+    /// let json = Json(data);
+    ///
+    /// let response = json.into_response();
+    /// ```
+    fn into_response(self) -> cot::Result<Response> {
+        // a "reasonable default" for a JSON response size
+        const DEFAULT_JSON_SIZE: usize = 128;
+
+        let mut buf = Vec::with_capacity(DEFAULT_JSON_SIZE);
+        let mut serializer = serde_json::Serializer::new(&mut buf);
+        serde_path_to_error::serialize(&self.0, &mut serializer)
+            .map_err(|error| Error::new(ErrorRepr::Json(error)))?;
+        let data = String::from_utf8(buf).expect("JSON serialization always returns valid UTF-8");
+
+        data.with_content_type(JSON_CONTENT_TYPE).into_response()
     }
 }
 
@@ -359,7 +396,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_result_ok_into_response() {
-        let res: Result<&'static str, cot::Error> = Ok("hello");
+        let res: Result<&'static str, Error> = Ok("hello");
 
         let response = res.into_response().unwrap();
 
@@ -373,10 +410,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_result_err_into_response() {
-        let err = cot::Error::new(ErrorRepr::NotFound {
+        let err = Error::new(ErrorRepr::NotFound {
             message: Some("test".to_string()),
         });
-        let res: Result<&'static str, cot::Error> = Err(err);
+        let res: Result<&'static str, Error> = Err(err);
 
         let error_result = res.into_response();
 
@@ -717,5 +754,55 @@ mod tests {
             Some(&MyExt("data".to_string()))
         );
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "test");
+    }
+
+    #[cfg(feature = "json")]
+    #[tokio::test]
+    async fn test_json_struct_into_response() {
+        use serde::Serialize;
+
+        #[derive(Serialize, PartialEq, Debug)]
+        struct TestData {
+            name: String,
+            value: i32,
+        }
+
+        let data = TestData {
+            name: "test".to_string(),
+            value: 123,
+        };
+        let json = cot::json::Json(data);
+        let response = json.into_response().unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            JSON_CONTENT_TYPE
+        );
+
+        let body_bytes = response.into_body().into_bytes().await.unwrap();
+        let expected_json = r#"{"name":"test","value":123}"#;
+
+        assert_eq!(body_bytes, expected_json.as_bytes());
+    }
+
+    #[cfg(feature = "json")]
+    #[tokio::test]
+    async fn test_json_hashmap_into_response() {
+        use std::collections::HashMap;
+
+        let data = HashMap::from([("key", "value")]);
+        let json = cot::json::Json(data);
+        let response = json.into_response().unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            JSON_CONTENT_TYPE
+        );
+
+        let body_bytes = response.into_body().into_bytes().await.unwrap();
+        let expected_json = r#"{"key":"value"}"#;
+        assert_eq!(body_bytes, expected_json.as_bytes());
     }
 }

@@ -72,6 +72,8 @@ mod error_page;
 #[macro_use]
 pub(crate) mod handler;
 pub mod html;
+#[cfg(feature = "json")]
+pub mod json;
 pub mod middleware;
 #[cfg(feature = "openapi")]
 pub mod openapi;

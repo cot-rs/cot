@@ -30,9 +30,9 @@
 //!
 //! ```
 //! use cot::config::ProjectConfig;
+//! use cot::json::Json;
 //! use cot::openapi::swagger_ui::SwaggerUi;
 //! use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
-//! use cot::request::extractors::Json;
 //! use cot::response::{Response, ResponseExt};
 //! use cot::router::method::openapi::api_post;
 //! use cot::router::{Route, Router};
@@ -51,13 +51,10 @@
 //!     result: i32,
 //! }
 //!
-//! async fn add(Json(add_request): Json<AddRequest>) -> cot::Result<Response> {
-//!     Response::new_json(
-//!         StatusCode::OK,
-//!         &AddResponse {
-//!             result: add_request.a + add_request.b,
-//!         },
-//!     )
+//! async fn add(Json(add_request): Json<AddRequest>) -> Json<AddResponse> {
+//!     Json(AddResponse {
+//!         result: add_request.a + add_request.b,
+//!     })
 //! }
 //!
 //! struct AddApp;
@@ -114,7 +111,7 @@ use std::pin::Pin;
 
 use aide::openapi::{
     MediaType, Operation, Parameter, ParameterData, ParameterSchemaOrContent, PathItem, PathStyle,
-    QueryStyle, ReferenceOr, RequestBody,
+    QueryStyle, ReferenceOr, RequestBody, StatusCode,
 };
 use http::request::Parts;
 use indexmap::IndexMap;
@@ -124,11 +121,10 @@ use schemars::{JsonSchema, SchemaGenerator};
 use crate::auth::Auth;
 use crate::form::Form;
 use crate::handler::BoxRequestHandler;
+use crate::json::Json;
 use crate::request::Request;
-use crate::request::extractors::{
-    FromRequest, FromRequestParts, Json, Path, RequestForm, UrlQuery,
-};
-use crate::response::Response;
+use crate::request::extractors::{FromRequest, FromRequestParts, Path, RequestForm, UrlQuery};
+use crate::response::{Response, WithExtension};
 use crate::router::Urls;
 use crate::session::Session;
 use crate::{Method, RequestHandler};
@@ -514,7 +510,7 @@ macro_rules! impl_as_openapi_operation {
             T: Fn($($ty,)*) -> R + Clone + Send + Sync + 'static,
             $($ty: ApiOperationPart,)*
             R: for<'a> Future<Output = Response> + Send,
-            Response: ApiOperationPart,
+            Response: ApiOperationResponse,
         {
             #[allow(non_snake_case)]
             fn as_api_operation(
@@ -531,11 +527,22 @@ macro_rules! impl_as_openapi_operation {
                         schema_generator
                     );
                 )*
-                Response::modify_api_operation(
+                let responses = Response::api_operation_responses(
                     &mut operation,
                     &route_context,
                     schema_generator
                 );
+                let operation_responses = operation.responses.get_or_insert_default();
+                for (response_code, response) in responses {
+                    if let Some(response_code) = response_code {
+                        operation_responses.responses.insert(
+                            response_code,
+                            ReferenceOr::Item(response),
+                        );
+                    } else {
+                        operation_responses.default = Some(ReferenceOr::Item(response));
+                    }
+                }
 
                 Some(operation)
             }
@@ -630,12 +637,114 @@ pub trait ApiOperationPart {
     ///     }
     /// }
     /// ```
-    #[allow(unused)]
+    #[expect(unused)]
     fn modify_api_operation(
         operation: &mut Operation,
         route_context: &RouteContext<'_>,
         schema_generator: &mut SchemaGenerator,
     ) {
+    }
+}
+
+/// A trait that generates OpenAPI response objects for handler return types.
+///
+/// This trait is implemented for types that can be returned from request
+/// handlers and need to be documented in the OpenAPI specification. It allows
+/// you to specify how a type should be represented in the OpenAPI
+/// documentation.
+///
+/// # Examples
+///
+/// ```
+/// use cot::aide::openapi::{MediaType, Operation, Response, StatusCode};
+/// use cot::openapi::{ApiOperationResponse, RouteContext};
+/// use indexmap::IndexMap;
+/// use schemars::SchemaGenerator;
+///
+/// // A custom response type
+/// struct MyResponse<T>(T);
+///
+/// impl<T: schemars::JsonSchema> ApiOperationResponse for MyResponse<T> {
+///     fn api_operation_responses(
+///         _operation: &mut Operation,
+///         _route_context: &RouteContext<'_>,
+///         schema_generator: &mut SchemaGenerator,
+///     ) -> Vec<(Option<StatusCode>, Response)> {
+///         vec![(
+///             Some(StatusCode::Code(201)),
+///             Response {
+///                 description: "Created".to_string(),
+///                 content: IndexMap::from([(
+///                     "application/json".to_string(),
+///                     MediaType {
+///                         schema: Some(aide::openapi::SchemaObject {
+///                             json_schema: T::json_schema(schema_generator),
+///                             external_docs: None,
+///                             example: None,
+///                         }),
+///                         ..Default::default()
+///                     },
+///                 )]),
+///                 ..Default::default()
+///             },
+///         )]
+///     }
+/// }
+/// ```
+pub trait ApiOperationResponse {
+    /// Returns a list of OpenAPI response objects for this type.
+    ///
+    /// This method is called by the framework when generating the OpenAPI
+    /// specification for a route. It should return a list of responses
+    /// that this type can produce, along with their status codes.
+    ///
+    /// The status code can be `None` to indicate a default response.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::aide::openapi::{MediaType, Operation, Response, StatusCode};
+    /// use cot::openapi::{ApiOperationResponse, RouteContext};
+    /// use indexmap::IndexMap;
+    /// use schemars::SchemaGenerator;
+    ///
+    /// // A custom response type that always returns 201 Created
+    /// struct CreatedResponse<T>(T);
+    ///
+    /// impl<T: schemars::JsonSchema> ApiOperationResponse for CreatedResponse<T> {
+    ///     fn api_operation_responses(
+    ///         _operation: &mut Operation,
+    ///         _route_context: &RouteContext<'_>,
+    ///         schema_generator: &mut SchemaGenerator,
+    ///     ) -> Vec<(Option<StatusCode>, Response)> {
+    ///         vec![(
+    ///             Some(StatusCode::Code(201)),
+    ///             Response {
+    ///                 description: "Created".to_string(),
+    ///                 content: IndexMap::from([(
+    ///                     "application/json".to_string(),
+    ///                     MediaType {
+    ///                         schema: Some(aide::openapi::SchemaObject {
+    ///                             json_schema: T::json_schema(schema_generator),
+    ///                             external_docs: None,
+    ///                             example: None,
+    ///                         }),
+    ///                         ..Default::default()
+    ///                     },
+    ///                 )]),
+    ///                 ..Default::default()
+    ///             },
+    ///         )]
+    ///     }
+    /// }
+    /// ```
+    #[expect(unused)]
+    fn api_operation_responses(
+        operation: &mut Operation,
+        route_context: &RouteContext<'_>,
+        schema_generator: &mut SchemaGenerator,
+    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
+        Vec::new()
     }
 }
 
@@ -852,17 +961,56 @@ fn param_with_name(
     }
 }
 
-impl ApiOperationPart for crate::Result<Response> {
-    fn modify_api_operation(
+impl<S: JsonSchema> ApiOperationResponse for Json<S> {
+    fn api_operation_responses(
+        _operation: &mut Operation,
+        _route_context: &RouteContext<'_>,
+        schema_generator: &mut SchemaGenerator,
+    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
+        vec![(
+            Some(StatusCode::Code(http::StatusCode::OK.as_u16())),
+            aide::openapi::Response {
+                description: "OK".to_string(),
+                content: IndexMap::from([(
+                    crate::headers::JSON_CONTENT_TYPE.to_string(),
+                    MediaType {
+                        schema: Some(aide::openapi::SchemaObject {
+                            json_schema: S::json_schema(schema_generator),
+                            external_docs: None,
+                            example: None,
+                        }),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            },
+        )]
+    }
+}
+
+impl<T: ApiOperationResponse, D> ApiOperationResponse for WithExtension<T, D> {
+    fn api_operation_responses(
         operation: &mut Operation,
+        route_context: &RouteContext<'_>,
+        schema_generator: &mut SchemaGenerator,
+    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
+        T::api_operation_responses(operation, route_context, schema_generator)
+    }
+}
+
+impl ApiOperationResponse for crate::Result<Response> {
+    fn api_operation_responses(
+        _operation: &mut Operation,
         _route_context: &RouteContext<'_>,
         _schema_generator: &mut SchemaGenerator,
-    ) {
-        let responses = operation.responses.get_or_insert_default();
-        responses.default = Some(ReferenceOr::Item(aide::openapi::Response {
-            description: "*&lt;unspecified&gt;*".to_string(),
-            ..Default::default()
-        }));
+    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
+        vec![(
+            None,
+            aide::openapi::Response {
+                description: "*&lt;unspecified&gt;*".to_string(),
+                ..Default::default()
+            },
+        )]
     }
 }
 
@@ -875,8 +1023,9 @@ mod tests {
 
     use super::*;
     use crate::html::Html;
+    use crate::json::Json;
     use crate::openapi::AsApiOperation;
-    use crate::request::extractors::{Json, Path, UrlQuery};
+    use crate::request::extractors::{Path, UrlQuery};
 
     #[derive(Deserialize, Serialize, schemars::JsonSchema)]
     struct TestRequest {
@@ -1138,7 +1287,7 @@ mod tests {
     }
 
     #[test]
-    fn test_api_operation_part_for_query() {
+    fn api_operation_part_for_query() {
         let mut operation = Operation::default();
         let route_context = RouteContext::new();
         let mut schema_generator = SchemaGenerator::default();
@@ -1169,5 +1318,79 @@ mod tests {
                 _ => panic!("Expected query parameter"),
             }
         }
+    }
+
+    #[test]
+    fn api_operation_response_for_json() {
+        let mut operation = Operation::default();
+        let route_context = RouteContext::new();
+        let mut schema_generator = SchemaGenerator::default();
+
+        let responses = Json::<TestRequest>::api_operation_responses(
+            &mut operation,
+            &route_context,
+            &mut schema_generator,
+        );
+
+        assert_eq!(responses.len(), 1);
+        let (status_code, response) = &responses[0];
+
+        assert_eq!(status_code, &Some(StatusCode::Code(200)));
+        assert_eq!(response.description, "OK");
+        assert!(response.content.contains_key("application/json"));
+
+        let content = response.content.get("application/json").unwrap();
+        assert!(content.schema.is_some());
+
+        let schema = &content.schema.as_ref().unwrap().json_schema;
+        if let Schema::Object(obj) = schema {
+            if let Some(object_schema) = &obj.object {
+                assert!(object_schema.properties.contains_key("field1"));
+                assert!(object_schema.properties.contains_key("field2"));
+                assert!(object_schema.properties.contains_key("optional_field"));
+            } else {
+                panic!("Expected object schema");
+            }
+        } else {
+            panic!("Expected schema object");
+        }
+    }
+
+    #[test]
+    fn api_operation_response_for_with_extension() {
+        let mut operation = Operation::default();
+        let route_context = RouteContext::new();
+        let mut schema_generator = SchemaGenerator::default();
+
+        // WithExtension should delegate to the wrapped type's implementation
+        let responses = WithExtension::<Json<TestRequest>, ()>::api_operation_responses(
+            &mut operation,
+            &route_context,
+            &mut schema_generator,
+        );
+
+        assert_eq!(responses.len(), 1);
+        let (status_code, _) = &responses[0];
+        assert_eq!(status_code, &Some(StatusCode::Code(200)));
+    }
+
+    #[test]
+    fn api_operation_response_for_result() {
+        let mut operation = Operation::default();
+        let route_context = RouteContext::new();
+        let mut schema_generator = SchemaGenerator::default();
+
+        let responses = <crate::Result<Response>>::api_operation_responses(
+            &mut operation,
+            &route_context,
+            &mut schema_generator,
+        );
+
+        assert_eq!(responses.len(), 1);
+        let (status_code, response) = &responses[0];
+
+        assert_eq!(status_code, &None); // Default response
+        assert_eq!(response.description, "*&lt;unspecified&gt;*");
+        assert!(response.content.is_empty());
     }
 }

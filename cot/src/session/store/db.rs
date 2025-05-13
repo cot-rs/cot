@@ -53,12 +53,10 @@ impl SessionStore for DbStore {
         //     session_key: key,
         //     session_data: data,
         // };
-        println!("did we get here?");
         let query = query!(SessionModel, $session_data ==key.clone())
             .get(&self.connection)
             .await
             .map_err(|err| session_store::Error::Backend(err.to_string()))?;
-        println!("Okay how about we get here?");
         if let Some(mut model) = query {
             model.session_data = data;
             model
@@ -66,7 +64,6 @@ impl SessionStore for DbStore {
                 .await
                 .map_err(|err| session_store::Error::Backend(err.to_string()))?;
         } else {
-            println!("error error error!");
             let mut model = SessionModel {
                 id: Auto::auto(),
                 session_key: key,
@@ -81,24 +78,20 @@ impl SessionStore for DbStore {
             // return Err(session_store::Error::Backend("Could not find key with
             // given data".to_string()));
         }
-        println!("wheeeeeww!");
         Ok(())
     }
 
     async fn load(&self, session_id: &Id) -> session_store::Result<Option<Record>> {
-        println!("load load load load");
         let key = self.generate_key(session_id.to_string());
         let query = query!(SessionModel, $session_data ==key)
             .get(&self.connection)
             .await
             .map_err(|err| session_store::Error::Backend(err.to_string()))?;
         if let Some(data) = query {
-            println!("data here??");
             let rec = serde_json::from_str::<Record>(&data.session_data)
                 .map_err(|err| session_store::Error::Backend(err.to_string()))?;
             Ok(Some(rec))
         } else {
-            println!("nothing here");
             Ok(None)
         }
     }

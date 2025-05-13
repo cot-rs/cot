@@ -15,11 +15,9 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
-use std::time::Duration;
-
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};

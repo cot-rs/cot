@@ -178,15 +178,19 @@ impl FormFieldValidationError {
     /// Creates a new `FormFieldValidatorError`for a field value below the
     /// permitted minimum value.
     #[must_use]
-    pub fn minimum_value_not_met(min_value: String) -> Self {
-        FormFieldValidationError::MinimumValueNotMet { min_value }
+    pub fn minimum_value_not_met<T: Display>(min_value: T) -> Self {
+        FormFieldValidationError::MinimumValueNotMet {
+            min_value: min_value.to_string(),
+        }
     }
 
     /// Creates a new `FormFieldValidationError` for a field value that exceeds
     /// the permitted maximum value
     #[must_use]
-    pub fn maximum_value_exceeded(max_value: String) -> Self {
-        FormFieldValidationError::MaximumValueExceeded { max_value }
+    pub fn maximum_value_exceeded<T: Display>(max_value: T) -> Self {
+        FormFieldValidationError::MaximumValueExceeded {
+            max_value: max_value.to_string(),
+        }
     }
 
     /// Creates a new `FormFieldValidationError` from a `String`.

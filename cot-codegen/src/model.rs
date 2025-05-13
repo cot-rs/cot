@@ -233,8 +233,9 @@ pub struct Model {
     pub name: syn::Ident,
     pub vis: syn::Visibility,
     pub original_name: String,
+    /// The type of the model resolved by symbol resolver.
     pub resolved_ty: syn::Type,
-    #[expect(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)] // `type` is not an allowed identifier in Rust
     pub model_type: ModelType,
     pub table_name: String,
     pub pk_field: Field,

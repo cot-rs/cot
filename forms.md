@@ -32,7 +32,8 @@ async fn contact(mut request: Request) -> cot::Result<Response> {
     if request.method() == Method::POST {
         match ContactForm::from_request(&mut request).await? {
             FormResult::Ok(form) => {
-                // Form is valid! Process the data
+                // Form is valid! Process the datause cot::html::Html;
+
                 println!("Message from {}: {}", form.name, form.message);
 
                 // Redirect after successful submission

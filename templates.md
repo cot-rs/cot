@@ -2,11 +2,11 @@
 title: Templates
 ---
 
-Cot does not require you to use any specific templating engine. However, it provides a convenient integration with a powerful engine called [Rinja](https://rinja.readthedocs.io/). Rinja is very similar to Jinja2, which itself was inspired by Django's template engine. It allows you to build complex templates easily while providing type safety to help catch errors at compile time.
+Cot does not require you to use any specific templating engine. However, it provides a convenient integration with a powerful engine called [Askama](https://askama.readthedocs.io/). Askama is very similar to Jinja2, which itself was inspired by Django's template engine. It allows you to build complex templates easily while providing type safety to help catch errors at compile time.
 
 ## Basic Syntax
 
-A Rinja template is simply a text file that includes both static text and dynamic content. The dynamic content is introduced using variables, tags, and filters. Below is a simple Rinja template:
+A Askama template is simply a text file that includes both static text and dynamic content. The dynamic content is introduced using variables, tags, and filters. Below is a simple Askama template:
 
 ```html.j2
 <ul>
@@ -36,13 +36,13 @@ To make variables like `items` available in the template, you need to define the
 
 ### Example
 
-Here is a simple demonstration of templating with Rinja in Cot:
+Here is a simple demonstration of templating with Askama in Cot:
 
 ```rust
 use cot::request::Request;
 use cot::response::{Response, ResponseExt};
 use cot::{Body, StatusCode};
-use rinja::Template;
+use askama::Template;
 
 struct Item {
     title: String,
@@ -70,9 +70,9 @@ async fn index() -> cot::Result<Response> {
 
 ## Template Inheritance
 
-A common approach when using templates is to employ *template inheritance*. This technique lets you define a base template for shared structure and layout, and then create child templates that only override the pieces that need to differ. Rinja supports this via two main concepts:
+A common approach when using templates is to employ *template inheritance*. This technique lets you define a base template for shared structure and layout, and then create child templates that only override the pieces that need to differ. Askama supports this via two main concepts:
 
-- **`{% extends %}`**: Tells Rinja which template the current file extends (the "parent" template). This tag must appear first in the file.
+- **`{% extends %}`**: Tells Askama which template the current file extends (the "parent" template). This tag must appear first in the file.
 - **`{% block %}`**: Defines a named section in the parent template that child templates can override. By default, the block includes whatever is in the parent, but child templates may completely replace it.
 
 ### Example
@@ -114,11 +114,11 @@ When you render `index.html`, it uses the overall structure from `base.html` but
 
 ## Including Templates
 
-Beyond inheritance, Rinja also supports *including* other templates. This is useful for reusing small, self-contained pieces of content across multiple pages. You can include a template with the `{% include %}` tag.
+Beyond inheritance, Askama also supports *including* other templates. This is useful for reusing small, self-contained pieces of content across multiple pages. You can include a template with the `{% include %}` tag.
 
 ### Defining Variables
 
-Any template included via `{% include %}` has access to the parent template's variables. Additionally, you can define new variables with the `{% let %}` tag. Rinja's variables behave like Rust variables: they are immutable by default, but you can shadow an existing variable with the same name.
+Any template included via `{% include %}` has access to the parent template's variables. Additionally, you can define new variables with the `{% let %}` tag. Askama's variables behave like Rust variables: they are immutable by default, but you can shadow an existing variable with the same name.
 
 ### Example
 
@@ -167,7 +167,7 @@ use cot::request::Request;
 use cot::response::{Response, ResponseExt};
 use cot::router::{Router, Route, Urls};
 use cot::{Body, StatusCode};
-use rinja::Template;
+use askama::Template;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -206,7 +206,7 @@ impl cot::App for CotTestApp {
 
 ## Control Flow and Logic
 
-Rinja offers several tags that let you control how the template renders and apply logic. Here are the most commonly used ones:
+Askama offers several tags that let you control how the template renders and apply logic. Here are the most commonly used ones:
 
 ### If
 
@@ -242,7 +242,7 @@ The `{% match %}` tag matches a value against a set of Rust patterns. Use `{% wh
 
 ### For
 
-The `{% for %}` tag allows you to iterate over a sequence of items. Inside the loop, Rinja provides helpful variables such as:
+The `{% for %}` tag allows you to iterate over a sequence of items. Inside the loop, Askama provides helpful variables such as:
 
 - `loop.index`: Current iteration (1-indexed).
 - `loop.index0`: Current iteration (0-indexed).
@@ -261,7 +261,7 @@ The `{% for %}` tag allows you to iterate over a sequence of items. Inside the l
 
 ## Whitespace Control
 
-By default, Rinja preserves all whitespace, which can sometimes cause unwanted gaps in your output when using loops or conditionals. To manage this, you can use the `-` modifier before or after a tag to trim surrounding whitespace.
+By default, Askama preserves all whitespace, which can sometimes cause unwanted gaps in your output when using loops or conditionals. To manage this, you can use the `-` modifier before or after a tag to trim surrounding whitespace.
 
 ### Example
 
@@ -277,7 +277,7 @@ This usage of `-` ensures that no extra whitespace or blank lines appear around 
 
 ## Comments
 
-You can include comments in your Rinja templates using `{# ... #}`. These comments are ignored in the rendered output and can be used to document logic or temporarily disable parts of your template. They also support whitespace control via `-`.
+You can include comments in your Askama templates using `{# ... #}`. These comments are ignored in the rendered output and can be used to document logic or temporarily disable parts of your template. They also support whitespace control via `-`.
 
 ### Example
 
@@ -292,7 +292,7 @@ which won’t appear in the output.
 
 ## Custom Renderable Types
 
-To display custom types in Rinja templates, the type must implement `Display`. This makes the type's `to_string()` output available in the template.
+To display custom types in Askama templates, the type must implement `Display`. This makes the type's `to_string()` output available in the template.
 
 ### Example
 
@@ -300,7 +300,7 @@ To display custom types in Rinja templates, the type must implement `Display`. T
 
 ```rust
 use std::fmt::Display;
-use rinja::Template;
+use askama::Template;
 
 struct Item {
     title: String,
@@ -329,17 +329,17 @@ When rendered, it will display the `title` from the `Item` struct.
 
 ### HTML Escaping
 
-By default, Rinja escapes all output to protect against XSS attacks. Special characters are replaced with their HTML entities. If you’re certain your data is safe and want to bypass escaping, you can implement the `HtmlSafe` marker trait.
+By default, Askama escapes all output to protect against XSS attacks. Special characters are replaced with their HTML entities. If you’re certain your data is safe and want to bypass escaping, you can implement the `HtmlSafe` marker trait.
 
 ```rust
-use rinja::filters::HtmlSafe;
+use askama::filters::HtmlSafe;
 
 impl HtmlSafe for Item {}
 ```
 
 Be very cautious when marking output as safe; you are responsible for ensuring that the content doesn’t introduce security risks.
 
-To simplify generating safe HTML in Rust, Cot provides the [`HtmlTag`](https://docs.rs/cot/0.1/cot/html/struct.HtmlTag.html) type. It automatically applies escaping where necessary.
+To simplify generating safe HTML in Rust, Cot provides the [`HtmlTag`](https://docs.rs/cot/0.3/cot/html/struct.HtmlTag.html) type. It automatically applies escaping where necessary.
 
 ```rust
 impl Display for Item {
@@ -354,4 +354,4 @@ impl Display for Item {
 
 ## Read More
 
-This chapter only covers the basics of Rinja. For more detailed information, advanced usage, and additional examples, check out the [Rinja documentation](https://rinja.readthedocs.io/).
+This chapter only covers the basics of Askama. For more detailed information, advanced usage, and additional examples, check out the [Askama documentation](https://askama.readthedocs.io/).

@@ -44,7 +44,7 @@ In order to write a model instance to the database, you can use the `save` metho
 ```rust
 use cot::request::extractors::RequestDb;
 
-async fn create_link(RequestDb(db): RequestDb) -> cot::Result<Response> {
+async fn create_link(RequestDb(db): RequestDb) -> cot::Result<Html> {
     let mut link = Link {
         id: Auto::default(),
         slug: LimitedString::new("slug").unwrap(),

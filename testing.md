@@ -18,7 +18,7 @@ By employing Cot's testing utilities, you'll be able to verify that each piece o
 
 ## General Overview
 
-Cot provides several built-in utilities located in the [`cot::test` module](https://docs.rs/cot/0.1/cot/test/index.html) to help you create and run tests for your application.
+Cot provides several built-in utilities located in the [`cot::test` module](https://docs.rs/cot/0.3/cot/test/index.html) to help you create and run tests for your application.
 
 Typical Rust projects keep their tests in:
 - A dedicated `tests/` directory (for integration tests).
@@ -168,6 +168,41 @@ test_db.cleanup().await?;
 - Form data is currently only supported with POST requests.
 - Custom migrations can be added using the `add_migrations` method on `TestDatabase`.
 
+## End-to-end testing
+
+Cot provides an end-to-end testing framework that allows you to test your entire application in a near-production environment. This is particularly useful for testing complex workflows that involve multiple components, such as user authentication, database interactions, external API calls, and your application's UI. By using the end-to-end testing framework you will be able to send real HTTP requests or use web automation tools to simulate user interactions with your application.
+
+The end-to-end testing framework consists of two parts: the `cot::e2e_test` macro and the `TestServerBuilder` struct. The `cot::e2e_test` macro allows you to define end-to-end tests that allow you to run your project in the background, while the `TestServerBuilder` struct allows you to create a test server that you can send your requests to. An example of how to use the `cot::e2e_test` macro and the `TestServerBuilder` struct is shown below in a simple test that checks if the server is running and returns the `Hello world!` response:
+
+```rust
+struct TestProject;
+impl cot::Project for TestProject {
+    // ...
+}
+
+#[cot::e2e_test]
+async fn test_e2e_server() -> Result<(), Box<dyn Error>> {
+    let server = TestServerBuilder::new(TestProject).start().await;
+    let url = server.url();
+
+    // Send HTTP requests to `url`
+    let body = reqwest::get(url).await?.text().await?;
+    assert_eq!(body, "Hello world!");
+
+    server.close().await;
+    Ok(())
+}
+```
+
+The test above uses [reqwest](https://docs.rs/reqwest/latest/reqwest/index.html), a popular HTTP client for Rust, to send a GET request to the test server.
+
+Cot's end-to-end test framework is also particularly useful when using web automation tools that test your web application using an actual web browser. Some popular crates for web automation in Rust include:
+
+* [fantoccini](https://docs.rs/fantoccini/latest/fantoccini/)
+* [thirtyfour](https://docs.rs/thirtyfour/latest/thirtyfour/)
+
+Please refer to the documentation of these crates for more information on how to use them.
+
 ---
 
 ## Summary
@@ -176,5 +211,6 @@ Cot's testing framework provides a robust and flexible approach to ensuring the 
 
 - **Unit tests** with `TestRequestBuilder` help you verify that individual components behave as expected.
 - **Integration tests** with `Client` let you test your entire application in a near-production environment, while `TestDatabase` give you confidence that your data layer is functioning correctly, whether you're using SQLite, PostgreSQL, or MySQL.
+- **End-to-end tests** TODO
 
 By integrating these testing tools into your workflow, you can deploy your Cot applications with greater confidence. Happy testing!

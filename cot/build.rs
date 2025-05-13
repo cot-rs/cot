@@ -25,7 +25,8 @@ fn build_css() {
 
         let css = grass::from_path(scss_path, &options).expect("failed to compile SCSS");
 
-        let css_path = PathBuf::from(css_file);
+        let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR should be set");
+        let css_path = PathBuf::from(out_dir).join(css_file);
         let css_dir = css_path
             .parent()
             .expect("failed to get CSS parent directory");

@@ -46,8 +46,8 @@ use crate::response::{Response, ResponseExt};
 /// // .
 /// // ├── Cargo.toml
 /// // └── static
-/// //     └── admin
-/// //         └── admin.css
+/// //     └── test
+/// //         └── test.txt
 ///
 /// impl App for ExampleApp {
 ///     fn name(&self) -> &str {
@@ -55,7 +55,7 @@ use crate::response::{Response, ResponseExt};
 ///     }
 ///
 ///     fn static_files(&self) -> Vec<StaticFile> {
-///         static_files!("admin/admin.css")
+///         static_files!("test/test.txt")
 ///     }
 /// }
 /// ```
@@ -191,8 +191,8 @@ impl From<&MiddlewareContext> for StaticFiles {
 /// // .
 /// // ├── Cargo.toml
 /// // └── static
-/// //     └── admin
-/// //         └── admin.css
+/// //     └── test
+/// //         └── test.txt
 ///
 /// impl App for ExampleApp {
 ///     fn name(&self) -> &str {
@@ -200,7 +200,7 @@ impl From<&MiddlewareContext> for StaticFiles {
 ///     }
 ///
 ///     fn static_files(&self) -> Vec<StaticFile> {
-///         static_files!("admin/admin.css")
+///         static_files!("test/test.txt")
 ///     }
 /// }
 /// ```
@@ -531,7 +531,7 @@ mod tests {
             }
 
             fn static_files(&self) -> Vec<StaticFile> {
-                static_files!("admin/admin.css")
+                static_files!("test/test.txt")
             }
         }
 
@@ -563,11 +563,11 @@ mod tests {
         let middleware = StaticFilesMiddleware::from_context(bootstrapper.context());
         let static_files = middleware.static_files;
 
-        let file = static_files.get_file("admin/admin.css").unwrap();
-        assert_eq!(file.mime_type, mime_guess::mime::TEXT_CSS);
+        let file = static_files.get_file("test/test.txt").unwrap();
+        assert_eq!(file.mime_type, mime_guess::mime::TEXT_PLAIN);
         assert_eq!(
             file.content,
-            Bytes::from_static(include_bytes!("../static/admin/admin.css"))
+            Bytes::from_static(include_bytes!("../static/test/test.txt"))
         );
 
         let file = static_files.get_file("app2/test.js").unwrap();
@@ -617,19 +617,19 @@ mod tests {
 
     #[test]
     fn static_files_macro() {
-        let static_files = static_files!("admin/admin.css");
+        let static_files = static_files!("test/test.txt");
 
         assert_eq!(static_files.len(), 1);
-        assert_eq!(static_files[0].path, "admin/admin.css");
+        assert_eq!(static_files[0].path, "test/test.txt");
         assert_eq!(
             static_files[0].content,
-            Bytes::from_static(include_bytes!("../static/admin/admin.css"))
+            Bytes::from_static(include_bytes!("../static/test/test.txt"))
         );
     }
 
     #[test]
     fn static_files_macro_trailing_comma() {
-        let static_files = static_files!("admin/admin.css",);
+        let static_files = static_files!("test/test.txt",);
 
         assert_eq!(static_files.len(), 1);
     }

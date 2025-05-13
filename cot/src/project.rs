@@ -1574,6 +1574,7 @@ impl ProjectContext<WithDatabase> {
 }
 
 impl ProjectContext<Initialized> {
+    #[cfg(feature = "test")]
     pub(crate) fn initialized(
         config: <Initialized as BootstrapPhase>::Config,
         apps: <Initialized as BootstrapPhase>::Apps,

@@ -32,6 +32,7 @@ use subtle::ConstantTimeEq;
 use time::{OffsetDateTime, UtcOffset};
 use tower_sessions::{MemoryStore, SessionStore};
 use tower_sessions::{SessionStore, session_store};
+use url::Url;
 
 use crate::ProjectContext;
 use crate::db::Database;
@@ -1366,17 +1367,7 @@ impl From<&str> for DatabaseUrl {
 #[cfg(feature = "db")]
 impl Debug for DatabaseUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut new_url = self.0.clone();
-        if !new_url.username().is_empty() {
-            new_url
-                .set_username("********")
-                .expect("set_username should succeed if username is present");
-        }
-        if new_url.password().is_some() {
-            new_url
-                .set_password(Some("********"))
-                .expect("set_password should succeed if password is present");
-        }
+        let mut new_url = conceal_url_details(&self.0);
 
         f.debug_tuple("DatabaseUrl")
             .field(&new_url.as_str())
@@ -1384,16 +1375,15 @@ impl Debug for DatabaseUrl {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CacheType {
     Redis,
-    // File,
     Unknown,
 }
 
 impl From<&str> for CacheType {
     fn from(value: &str) -> Self {
         match value {
-            // "file" => Self::File,
             "redis" => Self::Redis,
             _ => Self::Unknown,
         }
@@ -1428,6 +1418,29 @@ impl From<CacheUrl> for CacheType {
     fn from(url: CacheUrl) -> Self {
         url.0.scheme().into()
     }
+}
+
+impl Debug for CacheUrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let new_url = conceal_url_details(&self.0);
+
+        f.debug_tuple("CacheUrl").field(&new_url.as_str()).finish()
+    }
+}
+
+fn conceal_url_details(url: &Url) -> url::Url {
+    let mut new_url = url.clone();
+    if !new_url.username().is_empty() {
+        new_url
+            .set_username("********")
+            .expect("set_username should succeed if username is present");
+    }
+    if new_url.password().is_some() {
+        new_url
+            .set_password(Some("********"))
+            .expect("set_password should succeed if password is present");
+    };
+    new_url
 }
 
 #[cfg(test)]
@@ -1595,5 +1608,65 @@ mod tests {
             config.static_files.rewrite,
             StaticFilesPathRewriteMode::QueryParam
         );
+    }
+    #[test]
+    fn cache_type_from_str_redis() {
+        assert_eq!(CacheType::from("redis"), CacheType::Redis);
+        assert_eq!(CacheType::from("REDIS"), CacheType::Unknown); // case-sensitive
+    }
+
+    #[test]
+    fn cache_type_from_str_unknown() {
+        for s in &["", "foo", "redis://foo"] {
+            assert_eq!(CacheType::from(*s), CacheType::Unknown);
+        }
+    }
+
+    #[test]
+    fn cache_type_from_cacheurl() {
+        let url = CacheUrl::from("redis://localhost/");
+        assert_eq!(CacheType::from(url.clone()), CacheType::Redis);
+
+        let other = CacheUrl::from("http://example.com/");
+        assert_eq!(CacheType::from(other), CacheType::Unknown);
+    }
+
+    #[test]
+    fn cacheurl_from_str_and_string() {
+        let s = "http://example.com/foo";
+        let u1 = CacheUrl::from(s);
+        let u2 = CacheUrl::from(s.to_string());
+        assert_eq!(u1, u2);
+        assert_eq!(u1.as_str(), s);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid URL")]
+    fn cacheurl_from_invalid_str_panics() {
+        let _ = CacheUrl::from("not a url");
+    }
+
+    #[test]
+    fn cacheurl_as_str_roundtrip() {
+        let raw = "https://user:pass@host:1234/path?query#frag";
+        let cu = CacheUrl::from(raw);
+        assert_eq!(cu.as_str(), Url::parse(raw).unwrap().as_str());
+    }
+
+    #[test]
+    fn cacheurl_debug_masks_credentials() {
+        let raw = "https://user:secret@host:1234/path";
+        let cu = CacheUrl::from(raw);
+        let dbg = format!("{:?}", cu);
+        assert!(dbg.starts_with("CacheUrl(\"https://********:********@host:1234/path\")"));
+    }
+
+    #[test]
+    fn conceal_url_details_leaves_no_credentials() {
+        let raw = "ftp://alice:alicepwd@server/";
+        let parsed = Url::parse(raw).unwrap();
+        let concealed = super::conceal_url_details(&parsed);
+        assert_eq!(concealed.username(), "********");
+        assert_eq!(concealed.password(), Some("********"));
     }
 }

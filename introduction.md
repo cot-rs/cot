@@ -87,11 +87,11 @@ At the heart of any web application is the ability to handle requests and return
 When you open the `src/main.rs` file, you'll see the following example view that has been generated for you:
 
 ```rust
-async fn index() -> cot::Result<Response> {
+async fn index() -> cot::Result<Html> {
     let index_template = IndexTemplate {};
     let rendered = index_template.render()?;
 
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(rendered)))
+    Ok(Html::new(rendered))
 }
 ```
 
@@ -114,8 +114,8 @@ This is how you specify the URL the view will be available at – in this case, 
 You can add more views by adding more routes to the `Router` by simply defining more functions and registering them in the `router` method:
 
 ```rust
-async fn hello() -> cot::Result<Response> {
-    Ok(Response::new_html(StatusCode::OK, Body::fixed("Hello World!")))
+async fn hello() -> Html {
+    Html::new("Hello World!")
 }
 
 // inside `impl App`:
@@ -139,8 +139,8 @@ At the core of Cot's request handling are _extractors_, which allow you to extra
 ```rust
 use cot::request::extractors::Path;
 
-async fn hello_name(Path(name): Path<String>) -> cot::Result<Response> {
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(format!("Hello, {}!", name))))
+async fn hello_name(Path(name): Path<String>) -> cot::Result<Html> {
+    Ok(Html::new(format!("Hello, {}!", name)))
 }
 
 // inside `impl App`:
@@ -157,8 +157,8 @@ fn router(&self) -> Router {
 This works for multiple parameters, too—you just need to define a tuple of parameters in the handler function:
 
 ```rust
-async fn hello_name(Path((first_name, last_name)): Path<(String, String)>) -> cot::Result<Response> {
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(format!("Hello, {first_name} {last_name}!"))))
+async fn hello_name(Path((first_name, last_name)): Path<(String, String)>) -> cot::Result<Html> {
+    Ok(Html::new(format!("Hello, {first_name} {last_name}!")))
 }
 
 // inside `impl App`:
@@ -199,7 +199,7 @@ An app is a collection of views and other components that make up a part of your
 This defines the database migration list that will be applied when your server starts. You shouldn't normally need to modify this, and the migrations can be generated automatically using the Cot CLI – more on this in the chapter about database models.
 
 ```rust
-    fn static_files(&self) -> Vec<(String, Bytes)> {
+    fn static_files(&self) -> Vec<StaticFile> {
         static_files!("css/main.css")
     }
 }

@@ -835,8 +835,8 @@ mod tests {
             assert!(req.extensions().get::<Session>().is_some());
             Ok::<_, Error>(Response::new(Body::empty()))
         });
-
-        let mut svc = SessionMiddleware::new().layer(svc);
+        let store = Arc::new(MemoryStore::default());
+        let mut svc = SessionMiddleware::new(store).layer(svc);
 
         let request = TestRequestBuilder::get("/").build();
 
@@ -851,8 +851,8 @@ mod tests {
 
             Ok::<_, Error>(Response::new(Body::empty()))
         });
-
-        let mut svc = SessionMiddleware::new().domain("example.com").layer(svc);
+        let store = Arc::new(MemoryStore::default());
+        let mut svc = SessionMiddleware::new(store).domain("example.com").layer(svc);
 
         let request = TestRequestBuilder::get("/").build();
 
@@ -882,7 +882,8 @@ mod tests {
             Ok::<_, Error>(Response::new(Body::empty()))
         });
 
-        let mut svc = SessionMiddleware::new().secure(false).layer(svc);
+        let store = Arc::new(MemoryStore::default());
+        let mut svc = SessionMiddleware::new(store).secure(false).layer(svc);
 
         let request = TestRequestBuilder::get("/").build();
 

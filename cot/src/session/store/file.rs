@@ -129,3 +129,100 @@ impl SessionStore for FileStore {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+    use time::{Duration, OffsetDateTime};
+    use tower_sessions::session::{Id, Record};
+
+    use super::*;
+
+    fn make_store() -> FileStore {
+        let dir = tempdir().expect("failed to make tempdir");
+        FileStore::new(dir.into_path()).expect("failed to init FileStore")
+    }
+
+    fn make_record() -> Record {
+        Record {
+            id: Id::default(),
+            data: Default::default(),
+            expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_and_load() {
+        let store = make_store();
+        let mut rec = make_record();
+        store.create(&mut rec).await.expect("create failed");
+        let path = store.dir_path.join(rec.id.to_string());
+        assert!(path.is_file(), "session file wasn't created");
+
+        let loaded = store.load(&rec.id).await.unwrap();
+        assert_eq!(Some(rec.clone()), loaded);
+    }
+
+    #[tokio::test]
+    async fn test_save_overwrites() {
+        let store = make_store();
+        let mut rec = make_record();
+        store.create(&mut rec).await.unwrap();
+
+        let mut rec2 = rec.clone();
+        rec2.data.insert("foo".into(), "bar".into());
+        store.save(&rec2).await.expect("save failed");
+
+        let loaded = store.load(&rec.id).await.unwrap().unwrap();
+        assert_eq!(rec2.data, loaded.data);
+    }
+
+    #[tokio::test]
+    async fn test_save_creates_if_missing() {
+        let store = make_store();
+        let rec = make_record();
+        store.save(&rec).await.unwrap();
+
+        let path = store.dir_path.join(rec.id.to_string());
+        assert!(path.is_file());
+    }
+
+    #[tokio::test]
+    async fn test_delete() {
+        let store = make_store();
+        let mut rec = make_record();
+        store.create(&mut rec).await.unwrap();
+
+        store.delete(&rec.id).await.unwrap();
+        let path = store.dir_path.join(rec.id.to_string());
+        assert!(!path.exists());
+
+        store.delete(&rec.id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_id_collision() {
+        let store = make_store();
+        let expiry = OffsetDateTime::now_utc() + Duration::minutes(30);
+
+        let mut r1 = Record {
+            id: Id::default(),
+            data: Default::default(),
+            expiry_date: expiry,
+        };
+        store.create(&mut r1).await.unwrap();
+
+        let collision_path = store.dir_path.join(r1.id.to_string());
+        let mut r2 = Record {
+            id: r1.id,
+            data: Default::default(),
+            expiry_date: expiry,
+        };
+        store.create(&mut r2).await.unwrap();
+
+        assert_ne!(r1.id, r2.id, "ID collision not resolved");
+        let p1 = store.dir_path.join(r1.id.to_string());
+        let p2 = store.dir_path.join(r2.id.to_string());
+        assert!(p1.is_file() && p2.is_file());
+    }
+}

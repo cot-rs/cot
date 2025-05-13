@@ -1,13 +1,12 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
+use cot::json::Json;
 use cot::openapi::swagger_ui::SwaggerUi;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
-use cot::request::extractors::Json;
-use cot::response::{Response, ResponseExt};
 use cot::router::method::openapi::api_post;
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project, StatusCode};
+use cot::{App, AppBuilder, BoxedHandler, Project};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
@@ -21,12 +20,12 @@ struct AddResponse {
     result: i32,
 }
 
-async fn add(Json(add_request): Json<AddRequest>) -> cot::Result<Response> {
+async fn add(Json(add_request): Json<AddRequest>) -> Json<AddResponse> {
     let response = AddResponse {
         result: add_request.a + add_request.b,
     };
 
-    Response::new_json(StatusCode::OK, &response)
+    Json(response)
 }
 
 struct AddApp;

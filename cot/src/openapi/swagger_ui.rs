@@ -6,13 +6,14 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use cot::request::Request;
 use swagger_ui_redist::SwaggerUiStaticFile;
 
-use crate::request::RequestExt;
-use crate::response::{Response, ResponseExt};
+use crate::App;
+use crate::html::Html;
+use crate::json::Json;
+use crate::request::{Request, RequestExt};
 use crate::router::{Route, Router};
-use crate::{App, Body, StatusCode};
+use crate::static_files::StaticFile;
 
 /// A wrapper around the Swagger UI functionality.
 ///
@@ -37,13 +38,13 @@ pub struct SwaggerUi {
     serve_openapi: bool,
 }
 
-async fn openapi_json(request: Request) -> cot::Result<Response> {
+async fn openapi_json(request: Request) -> Json<aide::openapi::OpenApi> {
     let openapi = aide::openapi::OpenApi {
         paths: Some(request.router().as_api()),
         ..Default::default()
     };
 
-    Response::new_json(StatusCode::OK, &openapi)
+    Json(openapi)
 }
 
 impl Default for SwaggerUi {
@@ -94,10 +95,8 @@ impl App for SwaggerUi {
     fn router(&self) -> Router {
         let swagger_ui = Arc::new(self.inner.clone());
         let swagger_handler = async move || {
-            Ok(Response::new_html(
-                StatusCode::OK,
-                Body::fixed(swagger_ui.serve().map_err(cot::Error::custom)?),
-            ))
+            let swagger = swagger_ui.serve().map_err(cot::Error::custom)?;
+            Ok::<_, crate::Error>(Html::new(swagger))
         };
 
         let mut urls = vec![Route::with_handler("/", swagger_handler)];
@@ -107,13 +106,13 @@ impl App for SwaggerUi {
         Router::with_urls(urls)
     }
 
-    fn static_files(&self) -> Vec<(String, Bytes)> {
+    fn static_files(&self) -> Vec<StaticFile> {
         swagger_ui_redist::SwaggerUi::static_files()
             .iter()
             .map(|(static_file_id, data)| {
                 let path = Self::static_file_path(*static_file_id);
                 let bytes = Bytes::from_static(data);
-                (path, bytes)
+                StaticFile::new(path, bytes)
             })
             .collect()
     }

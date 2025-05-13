@@ -8,3 +8,7 @@ url = "sqlite://db.sqlite3?mode=rwc"
 
 [auth_backend]
 type = "database"
+
+[static_files]
+rewrite = "query_param"
+cache_timeout = "1year"

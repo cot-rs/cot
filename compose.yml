@@ -28,3 +28,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  webdriver:
+    image: docker.io/selenium/standalone-firefox:4.31.0-20250414
+    container_name: cot-webdriver
+    shm_size: 2gb
+    network_mode: host

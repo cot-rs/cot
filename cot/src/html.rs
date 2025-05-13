@@ -51,7 +51,7 @@ use derive_more::{Deref, Display, From};
 /// assert_eq!(html.as_str(), "<div>Hello</div>");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Deref, From, Display)]
-pub struct Html(String);
+pub struct Html(pub String);
 
 impl Html {
     /// Creates a new `Html` instance from a string.
@@ -81,6 +81,12 @@ impl Html {
     /// ```
     #[must_use]
     pub fn as_str(&self) -> &str {
+        self.as_ref()
+    }
+}
+
+impl AsRef<str> for Html {
+    fn as_ref(&self) -> &str {
         &self.0
     }
 }

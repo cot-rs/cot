@@ -693,7 +693,7 @@ impl MigrationOperationGenerator {
             StatusType::Adding,
             &format!(
                 "Field '{}' to Model '{}'",
-                &field.field_name, app_model.model.name
+                &field.name, app_model.model.name
             ),
         );
 
@@ -707,7 +707,7 @@ impl MigrationOperationGenerator {
             StatusType::Added,
             &format!(
                 "Field '{}' to Model '{}'",
-                &field.field_name, app_model.model.name
+                &field.name, app_model.model.name
             ),
         );
 
@@ -728,7 +728,7 @@ impl MigrationOperationGenerator {
             StatusType::Modifying,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
+                &migration_field.name, migration_model.model.name
             ),
         );
 
@@ -739,7 +739,7 @@ impl MigrationOperationGenerator {
             StatusType::Modified,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
+                &migration_field.name, migration_model.model.name
             ),
         );
     }
@@ -753,7 +753,7 @@ impl MigrationOperationGenerator {
             StatusType::Removing,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
+                &migration_field.name, migration_model.model.name
             ),
         );
 
@@ -767,7 +767,7 @@ impl MigrationOperationGenerator {
             StatusType::Removed,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
+                &migration_field.name, migration_model.model.name
             ),
         );
 
@@ -1474,7 +1474,7 @@ mod tests {
                 table_name: "table2".to_string(),
                 model_ty: parse_quote!(Table2),
                 field: Box::new(Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(i32),
                     auto_value: false,
@@ -1514,7 +1514,7 @@ mod tests {
                 table_name: "table1".to_string(),
                 model_ty: parse_quote!(Table1),
                 fields: vec![Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(ForeignKey<Table2>),
                     auto_value: false,
@@ -1529,7 +1529,7 @@ mod tests {
                 table_name: "table2".to_string(),
                 model_ty: parse_quote!(Table2),
                 fields: vec![Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(ForeignKey<Table1>),
                     auto_value: false,
@@ -1576,7 +1576,7 @@ mod tests {
             table_name: "table1".to_string(),
             model_ty: parse_quote!(Table1),
             fields: vec![Field {
-                field_name: format_ident!("field1"),
+                name: format_ident!("field1"),
                 column_name: "field1".to_string(),
                 ty: parse_quote!(ForeignKey<Table2>),
                 auto_value: false,
@@ -1631,7 +1631,7 @@ mod tests {
             table_name: "table1".to_string(),
             model_ty: parse_quote!(Table1),
             fields: vec![Field {
-                field_name: format_ident!("field1"),
+                name: format_ident!("field1"),
                 column_name: "field1".to_string(),
                 ty: parse_quote!(ForeignKey<Table2>),
                 auto_value: false,
@@ -1660,7 +1660,7 @@ mod tests {
                 table_name: "table1".to_string(),
                 model_ty: parse_quote!(Table1),
                 fields: vec![Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(ForeignKey<Table2>),
                     auto_value: false,
@@ -1675,7 +1675,7 @@ mod tests {
                 table_name: "table3".to_string(),
                 model_ty: parse_quote!(Table3),
                 fields: vec![Field {
-                    field_name: format_ident!("field2"),
+                    name: format_ident!("field2"),
                     column_name: "field2".to_string(),
                     ty: parse_quote!(ForeignKey<Table4>),
                     auto_value: false,
@@ -1715,7 +1715,7 @@ mod tests {
                 model_type: ModelType::default(),
                 table_name: "test_model".to_string(),
                 pk_field: Field {
-                    field_name: format_ident!("id"),
+                    name: format_ident!("id"),
                     column_name: "id".to_string(),
                     ty: parse_quote!(i32),
                     auto_value: true,
@@ -1724,7 +1724,7 @@ mod tests {
                     foreign_key: None,
                 },
                 fields: vec![Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(String),
                     auto_value: false,
@@ -1753,7 +1753,7 @@ mod tests {
                 model_type: ModelType::default(),
                 table_name: "test_model".to_string(),
                 pk_field: Field {
-                    field_name: format_ident!("id"),
+                    name: format_ident!("id"),
                     column_name: "id".to_string(),
                     ty: parse_quote!(i32),
                     auto_value: true,
@@ -1763,7 +1763,7 @@ mod tests {
                 },
                 fields: vec![
                     Field {
-                        field_name: format_ident!("field1"),
+                        name: format_ident!("field1"),
                         column_name: "field1".to_string(),
                         ty: parse_quote!(String),
                         auto_value: false,
@@ -1772,7 +1772,7 @@ mod tests {
                         foreign_key: None,
                     },
                     Field {
-                        field_name: format_ident!("field2"),
+                        name: format_ident!("field2"),
                         column_name: "field2".to_string(),
                         ty: parse_quote!(f32),
                         auto_value: false,
@@ -1789,7 +1789,7 @@ mod tests {
     fn make_add_field_operation() {
         let app_model = get_test_model();
         let field = Field {
-            field_name: format_ident!("new_field"),
+            name: format_ident!("new_field"),
             column_name: "new_field".to_string(),
             ty: parse_quote!(i32),
             auto_value: false,
@@ -1938,7 +1938,7 @@ mod tests {
             table_name: "test_table".to_string(),
             model_ty: parse_quote!(TestModel),
             field: Box::new(Field {
-                field_name: format_ident!("test_field"),
+                name: format_ident!("test_field"),
                 column_name: "test_field".to_string(),
                 ty: parse_quote!(String),
                 auto_value: false,

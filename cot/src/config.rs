@@ -15,6 +15,8 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
+use std::time::Duration;
+
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
@@ -161,6 +163,36 @@ pub struct ProjectConfig {
     /// ```
     #[cfg(feature = "db")]
     pub database: DatabaseConfig,
+    /// Configuration related to the static files.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::{AuthBackendConfig, DatabaseUrl, ProjectConfig, StaticFilesPathRewriteMode};
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [static_files]
+    /// url = "/assets/"
+    /// rewrite = "query_param"
+    /// cache_timeout = "1h"
+    /// "#,
+    /// )?;
+    ///
+    /// assert_eq!(config.static_files.url, "/assets/");
+    /// assert_eq!(
+    ///     config.static_files.rewrite,
+    ///     StaticFilesPathRewriteMode::QueryParam,
+    /// );
+    /// assert_eq!(
+    ///     config.static_files.cache_timeout,
+    ///     Some(Duration::from_secs(3600)),
+    /// );
+    /// # Ok::<(), cot::Error>(())
+    /// ```
+    pub static_files: StaticFilesConfig,
     /// Configuration related to the middlewares.
     ///
     /// # Examples
@@ -279,6 +311,7 @@ impl ProjectConfigBuilder {
             auth_backend: self.auth_backend.unwrap_or_default(),
             #[cfg(feature = "db")]
             database: self.database.clone().unwrap_or_default(),
+            static_files: self.static_files.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
         }
     }
@@ -380,6 +413,214 @@ impl DatabaseConfig {
     #[must_use]
     pub fn builder() -> DatabaseConfigBuilder {
         DatabaseConfigBuilder::default()
+    }
+}
+
+/// The configuration for serving static files.
+///
+/// This configuration controls how static files (like CSS, JavaScript, images,
+/// etc.) are served by the application. It allows you to customize the URL
+/// prefix, caching behavior, and URL rewriting strategy for static assets.
+///
+/// # Caching
+///
+/// When the `cache_timeout` is set, the [`Cache-Control`] header is set to
+/// `max-age=<cache_timeout>`. This allows browsers to cache the files for the
+/// specified duration, improving performance by reducing the number of requests
+/// to the server.
+///
+/// If not set, no caching headers will be sent, and **browsers will need to
+/// revalidate the files on each request**.
+///
+/// The recommended configuration (which is also the default in the project
+/// template) is to set the `cache_timeout` to 1 year and use the
+/// `QueryParam` rewrite mode. This way, the files are cached for a year, and
+/// the URL of the file is rewritten to include a query parameter that changes
+/// when the file is updated. This allows for long-lived caching of static
+/// files, while invalidating the cache when the file changes.
+///
+/// [`Cache-Control`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
+///
+/// # See also
+///
+/// - ["Love your cache" article on web.dev](https://web.dev/articles/love-your-cache#fingerprinted_urls)
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use cot::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
+///
+/// let config = StaticFilesConfig::builder()
+///     .url("/assets/")
+///     .rewrite(StaticFilesPathRewriteMode::QueryParam)
+///     .cache_timeout(Duration::from_secs(86400))
+///     .build();
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct StaticFilesConfig {
+    /// The URL prefix for the static files to be served at (which should
+    /// typically end with a slash). The default is `/static/`.
+    ///
+    /// This prefix is used to determine which requests should be handled by the
+    /// static files middleware. For example, if set to `/assets/`, then
+    /// requests to `/assets/style.css` will be served from the static files
+    /// directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::StaticFilesConfig;
+    ///
+    /// let config = StaticFilesConfig::builder().url("/assets/").build();
+    /// assert_eq!(config.url, "/assets/");
+    /// ```
+    #[builder(setter(into))]
+    pub url: String,
+
+    /// The URL rewriting mode for the static files. This is useful to allow
+    /// long-lived caching of static files, while still allowing to invalidate
+    /// the cache when the file changes.
+    ///
+    /// This affects the URL that is returned by
+    /// [`StaticFiles::url_for`](crate::request::extractors::StaticFiles::url_for)
+    /// and the actual URL that is used to serve the static files.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
+    ///
+    /// let config = StaticFilesConfig::builder()
+    ///     .rewrite(StaticFilesPathRewriteMode::QueryParam)
+    ///     .build();
+    /// assert_eq!(config.rewrite, StaticFilesPathRewriteMode::QueryParam);
+    /// ```
+    pub rewrite: StaticFilesPathRewriteMode,
+
+    /// The duration for which static files should be cached by browsers.
+    ///
+    /// When set, this value is used to set the `Cache-Control` header for
+    /// static files. This allows browsers to cache the files for the
+    /// specified duration, improving performance by reducing the number of
+    /// requests to the server.
+    ///
+    /// If not set, no caching headers will be sent, and browsers will need to
+    /// revalidate the files on each request.
+    ///
+    /// # TOML
+    ///
+    /// This field is serialized as a "human-readable" duration, like `4h`,
+    /// `1year`, etc. Please refer to the [`humantime::parse_duration`]
+    /// documentation for the supported formats for this field.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::StaticFilesConfig;
+    ///
+    /// let config = StaticFilesConfig::builder()
+    ///     .cache_timeout(Duration::from_secs(86400)) // 1 day
+    ///     .build();
+    /// assert_eq!(config.cache_timeout, Some(Duration::from_secs(86400)));
+    /// ```
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::ProjectConfig;
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [static_files]
+    /// cache_timeout = "1h"
+    /// "#,
+    /// )?;
+    ///
+    /// assert_eq!(
+    ///     config.static_files.cache_timeout,
+    ///     Some(Duration::from_secs(3600))
+    /// );
+    /// # Ok::<(), cot::Error>(())
+    /// ```
+    #[serde(with = "crate::serializers::humantime")]
+    #[builder(setter(strip_option), default)]
+    pub cache_timeout: Option<Duration>,
+}
+
+/// Configuration for the URL rewriting of static files.
+///
+/// This is used as part of the [`StaticFilesConfig`] struct.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum StaticFilesPathRewriteMode {
+    /// No rewriting. The path to the static files is returned as is (with the
+    /// URL prefix, if any).
+    #[default]
+    None,
+    /// The path is suffixed with a query parameter `?v=<hash>`, where `<hash>`
+    /// is the hash of the file. This is used to allow long-lived caching of
+    /// static files, while still serving the files at the same URL (because
+    /// providing the query parameter does not change the actual URL). The hash
+    /// is used to invalidate the cache when the file changes. This is the
+    /// recommended option, along with a long cache timeout (e.g., 1 year).
+    QueryParam,
+}
+
+impl StaticFilesConfigBuilder {
+    /// Builds the static files configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
+    ///
+    /// let config = StaticFilesConfig::builder()
+    ///     .url("/assets/")
+    ///     .rewrite(StaticFilesPathRewriteMode::QueryParam)
+    ///     .cache_timeout(Duration::from_secs(3600))
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> StaticFilesConfig {
+        StaticFilesConfig {
+            url: self.url.clone().unwrap_or("/static/".to_string()),
+            rewrite: self.rewrite.clone().unwrap_or_default(),
+            cache_timeout: self.cache_timeout.unwrap_or_default(),
+        }
+    }
+}
+
+impl Default for StaticFilesConfig {
+    fn default() -> Self {
+        StaticFilesConfig::builder().build()
+    }
+}
+
+impl StaticFilesConfig {
+    /// Create a new [`StaticFilesConfigBuilder`] to build a
+    /// [`StaticFilesConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
+    ///
+    /// let config = StaticFilesConfig::builder()
+    ///     .rewrite(StaticFilesPathRewriteMode::QueryParam)
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> StaticFilesConfigBuilder {
+        StaticFilesConfigBuilder::default()
     }
 }
 
@@ -773,6 +1014,12 @@ mod tests {
             secret_key = "123abc"
             fallback_secret_keys = ["456def", "789ghi"]
             auth_backend = { type = "none" }
+
+            [static_files]
+            url = "/assets/"
+            rewrite = "none"
+            cache_timeout = "1h"
+
             [middlewares]
             live_reload.enabled = true
             [middlewares.session]
@@ -788,6 +1035,15 @@ mod tests {
         assert_eq!(config.fallback_secret_keys[0].as_bytes(), b"456def");
         assert_eq!(config.fallback_secret_keys[1].as_bytes(), b"789ghi");
         assert_eq!(config.auth_backend, AuthBackendConfig::None);
+        assert_eq!(config.static_files.url, "/assets/");
+        assert_eq!(
+            config.static_files.rewrite,
+            StaticFilesPathRewriteMode::None
+        );
+        assert_eq!(
+            config.static_files.cache_timeout,
+            Some(Duration::from_secs(3600))
+        );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
     }
@@ -807,10 +1063,19 @@ mod tests {
     fn from_toml_missing_fields() {
         let toml_content = r#"
             secret_key = "123abc"
+
+            [static_files]
+            rewrite = "query_param"
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
         assert_eq!(config.debug, cfg!(debug_assertions));
         assert_eq!(config.secret_key.as_bytes(), b"123abc");
+
+        assert_eq!(config.static_files.url, "/static/");
+        assert_eq!(
+            config.static_files.rewrite,
+            StaticFilesPathRewriteMode::QueryParam
+        );
     }
 }

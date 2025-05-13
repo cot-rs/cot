@@ -9,14 +9,18 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 use bytes::Bytes;
+use cot::config::StaticFilesPathRewriteMode;
+use digest::Digest;
 use futures_core::ready;
 use http::{Request, header};
 use pin_project_lite::pin_project;
 use tower::Service;
 
 use crate::Body;
+use crate::config::StaticFilesConfig;
 use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
 
@@ -33,6 +37,7 @@ use crate::response::{Response, ResponseExt};
 ///
 /// ```
 /// use bytes::Bytes;
+/// use cot::static_files::StaticFile;
 /// use cot::{App, static_files};
 ///
 /// pub struct ExampleApp;
@@ -49,7 +54,7 @@ use crate::response::{Response, ResponseExt};
 ///         "test_app"
 ///     }
 ///
-///     fn static_files(&self) -> Vec<(String, Bytes)> {
+///     fn static_files(&self) -> Vec<StaticFile> {
 ///         static_files!("admin/admin.css")
 ///     }
 /// }
@@ -58,7 +63,7 @@ use crate::response::{Response, ResponseExt};
 macro_rules! static_files {
     ($($path:literal),* $(,)?) => {
         ::std::vec![$(
-            (
+            $crate::static_files::StaticFile::new(
                 $path.to_string(),
                 $crate::__private::Bytes::from_static(
                     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/", $path))
@@ -71,56 +76,95 @@ macro_rules! static_files {
 /// Struct representing a collection of static files.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StaticFiles {
-    files: HashMap<String, File>,
+    url_prefix: String,
+    files: HashMap<String, StaticFileWithMeta>,
+    rewrite_mode: StaticFilesPathRewriteMode,
+    cache_timeout: Option<Duration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StaticFileWithMeta {
+    url: String,
+    file: StaticFile,
 }
 
 impl StaticFiles {
     /// Creates a new `StaticFiles` instance.
     #[must_use]
-    fn new() -> Self {
+    pub(crate) fn new(config: &StaticFilesConfig) -> Self {
         Self {
+            url_prefix: config.url.clone(),
             files: HashMap::new(),
+            rewrite_mode: config.rewrite.clone(),
+            cache_timeout: config.cache_timeout,
         }
     }
 
-    fn add_file(&mut self, path: &str, content: impl Into<Bytes>) {
-        let mime_type = mime_guess::from_path(path).first_or_octet_stream();
-        let file = File::new(content, mime_type);
-        self.files.insert(path.to_string(), file);
+    pub(crate) fn add_file(&mut self, file: StaticFile) {
+        let path = file.path.clone();
+        let file = StaticFileWithMeta {
+            url: self.file_url(&file),
+            file,
+        };
+        self.files.insert(path, file);
+    }
+
+    fn file_url(&self, file: &StaticFile) -> String {
+        match self.rewrite_mode {
+            StaticFilesPathRewriteMode::None => {
+                format!("{}{}", self.url_prefix, file.path.clone())
+            }
+            StaticFilesPathRewriteMode::QueryParam => {
+                format!(
+                    "{}{}?v={}",
+                    self.url_prefix,
+                    file.path.clone(),
+                    Self::file_hash(file)
+                )
+            }
+        }
     }
 
     #[must_use]
-    fn get_file(&self, path: &str) -> Option<&File> {
-        self.files.get(path)
+    fn file_hash(file: &StaticFile) -> String {
+        hex::encode(&sha2::Sha256::digest(&file.content).as_slice()[0..6])
+    }
+
+    #[must_use]
+    fn get_file(&self, path: &str) -> Option<&StaticFile> {
+        self.files
+            .get(path)
+            .map(|file_with_meta| &file_with_meta.file)
+    }
+
+    #[must_use]
+    pub(crate) fn path_for(&self, path: &str) -> Option<&str> {
+        self.files
+            .get(path)
+            .map(|file_with_meta| file_with_meta.url.as_str())
     }
 
     pub(crate) fn collect_into(&self, path: &Path) -> Result<(), std::io::Error> {
-        for (file_path, file) in &self.files {
+        for (file_path, file_with_meta) in &self.files {
             let file_path = path.join(file_path);
             std::fs::create_dir_all(
                 file_path
                     .parent()
-                    .expect("joined file path should always have a parent"),
+                    .expect("a joined file path should always have a parent"),
             )?;
-            std::fs::write(file_path, &file.content)?;
+            std::fs::write(file_path, &file_with_meta.file.content)?;
         }
         Ok(())
     }
 }
 
-impl Default for StaticFiles {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl From<&MiddlewareContext> for StaticFiles {
     fn from(context: &MiddlewareContext) -> Self {
-        let mut static_files = StaticFiles::new();
+        let mut static_files = StaticFiles::new(&context.config().static_files);
 
         for module in context.apps() {
-            for (path, content) in module.static_files() {
-                static_files.add_file(&path, content);
+            for file in module.static_files() {
+                static_files.add_file(file);
             }
         }
 
@@ -128,17 +172,77 @@ impl From<&MiddlewareContext> for StaticFiles {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct File {
+/// A static file that can be served by the application.
+///
+/// This struct represents a static file that can be served by the application.
+/// It contains the file's path, content, and MIME type. The MIME type is
+/// automatically detected based on the file extension.
+///
+/// # Examples
+///
+/// ```
+/// use bytes::Bytes;
+/// use cot::static_files::StaticFile;
+/// use cot::{App, static_files};
+///
+/// pub struct ExampleApp;
+///
+/// // Project structure:
+/// // .
+/// // ├── Cargo.toml
+/// // └── static
+/// //     └── admin
+/// //         └── admin.css
+///
+/// impl App for ExampleApp {
+///     fn name(&self) -> &str {
+///         "test_app"
+///     }
+///
+///     fn static_files(&self) -> Vec<StaticFile> {
+///         static_files!("admin/admin.css")
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct StaticFile {
+    /// The path of the file, relative to the static files directory.
+    path: String,
+    /// The content of the file.
     content: Bytes,
+    /// The MIME type of the file.
     mime_type: mime_guess::Mime,
 }
 
-impl File {
+impl StaticFile {
+    /// Creates a new `StaticFile` instance.
+    ///
+    /// The MIME type is automatically detected based on the file extension.
+    /// If the file extension is not recognized, it defaults to
+    /// `application/octet-stream`.
+    ///
+    /// Instead of using this constructor, it's typically more convenient
+    /// to use the [`static_files!`](macro@static_files) macro.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::static_files::StaticFile;
+    ///
+    /// let file = StaticFile::new("style.css", "body { color: red; }");
+    /// ```
     #[must_use]
-    fn new(content: impl Into<Bytes>, mime_type: mime_guess::Mime) -> Self {
+    pub fn new<Path, Content>(path: Path, content: Content) -> Self
+    where
+        Path: Into<String>,
+        Content: Into<Bytes>,
+    {
+        let path = path.into();
+        let content = content.into();
+        let mime_type = mime_guess::from_path(&path).first_or_octet_stream();
         Self {
-            content: content.into(),
+            path,
+            content,
             mime_type,
         }
     }
@@ -216,23 +320,31 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        const STATIC_PATH: &str = "/static/";
-
+    fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
         let path = req.uri().path();
-        let file_contents = if let Some(stripped_path) = path.strip_prefix(STATIC_PATH) {
-            self.static_files
-                .get_file(stripped_path)
-                .map(File::as_response)
-        } else {
-            None
-        };
+        let file_contents =
+            if let Some(stripped_path) = path.strip_prefix(&self.static_files.url_prefix) {
+                self.static_files
+                    .get_file(stripped_path)
+                    .map(StaticFile::as_response)
+            } else {
+                None
+            };
 
-        match file_contents {
-            Some(response) => ResponseFuture::StaticFileResponse { response },
-            None => ResponseFuture::Inner {
+        if let Some(mut response) = file_contents {
+            if let Some(timeout) = self.static_files.cache_timeout {
+                response.headers_mut().insert(
+                    header::CACHE_CONTROL,
+                    header::HeaderValue::from_str(&format!("max-age={}", timeout.as_secs()))
+                        .expect("failed to create cache control header"),
+                );
+            }
+            ResponseFuture::StaticFileResponse { response }
+        } else {
+            req.extensions_mut().insert(Arc::clone(&self.static_files));
+            ResponseFuture::Inner {
                 future: self.inner.call(req),
-            },
+            }
         }
     }
 }
@@ -285,15 +397,15 @@ mod tests {
     use tower::{Layer, ServiceExt};
 
     use super::*;
-    use crate::config::ProjectConfig;
+    use crate::config::{ProjectConfig, StaticFilesConfig, StaticFilesPathRewriteMode};
     use crate::project::RegisterAppsContext;
     use crate::{App, AppBuilder, Bootstrapper, Project};
 
     #[test]
     #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
     fn static_files_add_and_get_file() {
-        let mut static_files = StaticFiles::new();
-        static_files.add_file("test.txt", "This is a test file");
+        let mut static_files = StaticFiles::new(&StaticFilesConfig::default());
+        static_files.add_file(StaticFile::new("test.txt", "This is a test file"));
 
         let file = static_files.get_file("test.txt");
 
@@ -303,7 +415,11 @@ mod tests {
 
     #[cot::test]
     async fn file_as_response() {
-        let file = File::new("This is a test file", mime_guess::mime::TEXT_PLAIN);
+        let file = StaticFile {
+            path: "test.txt".to_owned(),
+            content: Bytes::from("This is a test file"),
+            mime_type: mime_guess::mime::TEXT_PLAIN,
+        };
 
         let response = file.as_response();
 
@@ -316,8 +432,8 @@ mod tests {
     }
 
     fn create_static_files() -> StaticFiles {
-        let mut static_files = StaticFiles::new();
-        static_files.add_file("test.txt", "This is a test file");
+        let mut static_files = StaticFiles::new(&StaticFilesConfig::default());
+        static_files.add_file(StaticFile::new("test.txt", "This is a test file"));
         static_files
     }
 
@@ -337,6 +453,40 @@ mod tests {
             .body(Body::empty())
             .unwrap();
 
+        let response = service.oneshot(request).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["content-type"], "text/plain");
+        assert_eq!(
+            response.into_body().into_bytes().await.unwrap(),
+            Bytes::from("This is a test file")
+        );
+    }
+
+    #[cot::test]
+    async fn static_files_middleware_with_config() {
+        let mut static_files = StaticFiles::new(
+            &StaticFilesConfig::builder()
+                .url("/assets/")
+                .rewrite(StaticFilesPathRewriteMode::QueryParam)
+                .cache_timeout(Duration::from_secs(300))
+                .build(),
+        );
+        static_files.add_file(StaticFile::new("test.txt", "This is a test file"));
+        let static_files = Arc::new(static_files);
+
+        let middleware = StaticFilesMiddleware {
+            static_files: Arc::clone(&static_files),
+        };
+
+        let service = middleware.layer(tower::service_fn(|_req| async {
+            Ok::<_, std::convert::Infallible>(Response::new(Body::empty()))
+        }));
+
+        let url = static_files.path_for("test.txt").unwrap();
+        assert!(url.starts_with("/assets/test.txt?v="));
+
+        let request = Request::builder().uri(url).body(Body::empty()).unwrap();
         let response = service.oneshot(request).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -380,7 +530,7 @@ mod tests {
                 "app1"
             }
 
-            fn static_files(&self) -> Vec<(String, Bytes)> {
+            fn static_files(&self) -> Vec<StaticFile> {
                 static_files!("admin/admin.css")
             }
         }
@@ -391,8 +541,8 @@ mod tests {
                 "app2"
             }
 
-            fn static_files(&self) -> Vec<(String, Bytes)> {
-                vec![("app2/test.js".to_string(), Bytes::from("test"))]
+            fn static_files(&self) -> Vec<StaticFile> {
+                vec![StaticFile::new("app2/test.js", "test")]
             }
         }
 
@@ -429,9 +579,12 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = temp_dir.path().to_path_buf();
 
-        let mut static_files = StaticFiles::new();
-        static_files.add_file("test.txt", "This is a test file");
-        static_files.add_file("nested/test2.txt", "This is another test file");
+        let mut static_files = StaticFiles::new(&StaticFilesConfig::default());
+        static_files.add_file(StaticFile::new("test.txt", "This is a test file"));
+        static_files.add_file(StaticFile::new(
+            "nested/test2.txt",
+            "This is another test file",
+        ));
 
         static_files.collect_into(&temp_path).unwrap();
 
@@ -456,7 +609,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = temp_dir.path().to_path_buf();
 
-        let static_files = StaticFiles::new();
+        let static_files = StaticFiles::new(&StaticFilesConfig::default());
         static_files.collect_into(&temp_path).unwrap();
 
         assert!(fs::read_dir(&temp_path).unwrap().next().is_none());
@@ -467,9 +620,9 @@ mod tests {
         let static_files = static_files!("admin/admin.css");
 
         assert_eq!(static_files.len(), 1);
-        assert_eq!(static_files[0].0, "admin/admin.css");
+        assert_eq!(static_files[0].path, "admin/admin.css");
         assert_eq!(
-            static_files[0].1,
+            static_files[0].content,
             Bytes::from_static(include_bytes!("../static/admin/admin.css"))
         );
     }
@@ -479,5 +632,107 @@ mod tests {
         let static_files = static_files!("admin/admin.css",);
 
         assert_eq!(static_files.len(), 1);
+    }
+
+    #[test]
+    fn static_file_mime_type_detection() {
+        let file = StaticFile::new("style.css", "body { color: red; }");
+        assert_eq!(file.mime_type, mime_guess::mime::TEXT_CSS);
+
+        let file = StaticFile::new("script.js", "console.log('test');");
+        assert_eq!(file.mime_type, mime_guess::mime::TEXT_JAVASCRIPT);
+
+        let file = StaticFile::new("image.png", "fake image data");
+        assert_eq!(file.mime_type, mime_guess::mime::IMAGE_PNG);
+
+        let file = StaticFile::new("unknown", "some content");
+        assert_eq!(file.mime_type, mime_guess::mime::APPLICATION_OCTET_STREAM);
+    }
+
+    #[test]
+    fn static_files_url_rewriting() {
+        let mut static_files = StaticFiles::new(&StaticFilesConfig {
+            url: "/static/".to_string(),
+            rewrite: StaticFilesPathRewriteMode::None,
+            cache_timeout: None,
+        });
+
+        let file = StaticFile::new("test.txt", "test content");
+        static_files.add_file(file);
+
+        // Test None rewrite mode
+        let url = static_files.path_for("test.txt").unwrap();
+        assert_eq!(url, "/static/test.txt");
+
+        // Test QueryParam rewrite mode
+        let mut static_files = StaticFiles::new(&StaticFilesConfig {
+            url: "/static/".to_string(),
+            rewrite: StaticFilesPathRewriteMode::QueryParam,
+            cache_timeout: None,
+        });
+
+        let file = StaticFile::new("test.txt", "test content");
+        static_files.add_file(file);
+
+        let url = static_files.path_for("test.txt").unwrap();
+        assert!(url.starts_with("/static/test.txt?v="));
+        assert_eq!(url.len(), "/static/test.txt?v=".len() + 12); // 6 bytes of hash in hex = 12 chars
+    }
+
+    #[test]
+    fn static_files_url_rewriting_with_different_prefix() {
+        let mut static_files = StaticFiles::new(&StaticFilesConfig {
+            url: "/assets/".to_string(),
+            rewrite: StaticFilesPathRewriteMode::QueryParam,
+            cache_timeout: None,
+        });
+
+        let file = StaticFile::new("images/logo.png", "fake image data");
+        static_files.add_file(file);
+
+        let url = static_files.path_for("images/logo.png").unwrap();
+        assert!(url.starts_with("/assets/images/logo.png?v="));
+    }
+
+    #[test]
+    fn static_files_hash_consistency() {
+        let mut static_files = StaticFiles::new(&StaticFilesConfig {
+            url: "/static/".to_string(),
+            rewrite: StaticFilesPathRewriteMode::QueryParam,
+            cache_timeout: None,
+        });
+
+        let file = StaticFile::new("test.txt", "test content");
+        static_files.add_file(file);
+
+        // Get the URL twice and verify the hash is consistent
+        let url1 = static_files.path_for("test.txt").unwrap().to_owned();
+        let url2 = static_files.path_for("test.txt").unwrap().to_owned();
+        assert_eq!(url1, url2);
+
+        // Add the same file again and verify the hash is still consistent
+        let file = StaticFile::new("test.txt", "test content");
+        static_files.add_file(file);
+        let url3 = static_files.path_for("test.txt").unwrap();
+        assert_eq!(url1, url3);
+    }
+
+    #[test]
+    fn static_files_hash_changes_with_content() {
+        let mut static_files = StaticFiles::new(&StaticFilesConfig {
+            url: "/static/".to_string(),
+            rewrite: StaticFilesPathRewriteMode::QueryParam,
+            cache_timeout: None,
+        });
+
+        let file1 = StaticFile::new("test.txt", "content 1");
+        static_files.add_file(file1);
+        let url1 = static_files.path_for("test.txt").unwrap().to_owned();
+
+        let file2 = StaticFile::new("test.txt", "content 2");
+        static_files.add_file(file2);
+        let url2 = static_files.path_for("test.txt").unwrap();
+
+        assert_ne!(url1, url2);
     }
 }

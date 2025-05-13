@@ -151,6 +151,7 @@ impl_error_from_repr!(tower_sessions::session::Error);
 impl_error_from_repr!(crate::form::FormError);
 impl_error_from_repr!(crate::auth::AuthError);
 impl_error_from_repr!(crate::request::PathParamsDeserializerError);
+impl_error_from_repr!(crate::request::extractors::StaticFilesGetError);
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -238,6 +239,9 @@ pub(crate) enum ErrorRepr {
     /// An error occured in an [`AdminModel`](crate::admin::AdminModel).
     #[error("Admin error: {0}")]
     AdminError(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// An error occurred while getting a URL for a static files.
+    #[error("Could not get URL for a static file: {0}")]
+    StaticFilesGetError(#[from] crate::request::extractors::StaticFilesGetError),
 }
 
 #[cfg(test)]

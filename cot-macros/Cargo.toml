@@ -30,6 +30,6 @@ quote = { workspace = true, features = ["proc-macro"] }
 syn.workspace = true
 
 [dev-dependencies]
-cot = { path = "../cot" }
+cot = { path = "../cot", features = ["test"] }
 trybuild.workspace = true
 rustversion.workspace = true

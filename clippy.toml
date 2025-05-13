@@ -1,1 +1,2 @@
-doc-valid-idents = ["PostgreSQL", "MySQL", "SQLite", "JavaScript", "OpenAPI"]
+avoid-breaking-exported-api = false
+doc-valid-idents = ["PostgreSQL", "MySQL", "SQLite", "OpenAPI", ".."]

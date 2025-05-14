@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use deadpool_redis::{Config, ConfigError, CreatePoolError, Pool as RedisPool, Runtime};
-use redis::{AsyncCommands, Commands, Connection, ExistenceCheck, SetExpiry, SetOptions};
+use deadpool_redis::{Config, CreatePoolError, Pool as RedisPool, Runtime};
+use redis::{AsyncCommands, Commands, ExistenceCheck, SetExpiry, SetOptions};
 use thiserror::Error;
 use time::OffsetDateTime;
 use tower_sessions::session::{Id, Record};

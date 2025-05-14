@@ -1,5 +1,6 @@
 pub mod file;
 pub mod memory;
+#[cfg(feature = "redis")]
 pub mod redis;
 
 pub mod db;

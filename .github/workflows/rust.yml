@@ -359,6 +359,8 @@ jobs:
           MIRIFLAGS: -Zmiri-disable-isolation
 
   cargo-deny:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
     runs-on: ubuntu-latest
     env:
       SCCACHE_GHA_ENABLED: ""

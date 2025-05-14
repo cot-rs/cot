@@ -56,6 +56,10 @@ struct ErrorPageTemplate {
     project_config: String,
 }
 
+fn error_css() -> &'static str {
+    include_str!(concat!(env!("OUT_DIR"), "/templates/css/error.css"))
+}
+
 #[derive(Debug, Default, Clone)]
 struct ErrorPageTemplateBuilder {
     kind: Kind,

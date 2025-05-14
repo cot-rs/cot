@@ -706,7 +706,8 @@ pub struct Auth {
 }
 
 impl Auth {
-    #[cfg(feature = "db")] // only currently used in TestRequestBuilder if database is enabled
+    // only currently used in TestRequestBuilder if database is enabled
+    #[cfg(all(feature = "db", feature = "test"))]
     pub(crate) async fn new(
         session: Session,
         backend: Arc<dyn AuthBackend>,

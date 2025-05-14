@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 
 use askama::Template;
 use async_trait::async_trait;
+use bytes::Bytes;
 use cot::request::extractors::StaticFiles;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
@@ -32,7 +33,7 @@ use crate::request::{Request, RequestExt};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
 use crate::static_files::StaticFile;
-use crate::{App, Error, Method, RequestHandler, reverse_redirect, static_files};
+use crate::{App, Error, Method, RequestHandler, reverse_redirect};
 
 struct AdminAuthenticated<T, H: Send + Sync>(H, PhantomData<fn() -> T>);
 
@@ -715,6 +716,12 @@ impl App for AdminApp {
     }
 
     fn static_files(&self) -> Vec<StaticFile> {
-        static_files!("admin/admin.css")
+        vec![StaticFile::new(
+            "admin/admin.css",
+            Bytes::from_static(include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/static/admin/admin.css"
+            ))),
+        )]
     }
 }

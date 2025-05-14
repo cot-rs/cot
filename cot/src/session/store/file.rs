@@ -1,3 +1,16 @@
+//! File session store
+//!
+//! This module provides a session store that uses the file system to store
+//! session records.
+//!
+//! # Examples
+//!
+//! ```
+//! use cot::session::store::file::FileStore;
+//!
+//! let store = FileStore::new("/var/lib/cot/sessions").unwrap();
+//! ```
+//!  
 use std::borrow::Cow;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -9,15 +22,17 @@ use tokio::fs::remove_file;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
+/// Errors that can occur when using the File session store.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum FileStoreError {
+    /// An error occurred during an I/O operation.  
     #[error(transparent)]
     IoError(#[from] io::Error),
-    /// Failed to serialize the record to JSON.
+    /// An error occurred during JSON serialization.
     #[error("JSON serialization error: {0}")]
     SerializeError(serde_json::Error),
-    /// Failed to deserialize the record to JSON.
+    /// An error occurred during JSON deserialization.
     #[error("JSON serialization error: {0}")]
     DeserializeError(serde_json::Error),
 }
@@ -36,8 +51,30 @@ impl From<FileStoreError> for session_store::Error {
     }
 }
 
+/// A file-based session store implementation.
+///
+/// This store persists sessions in a directory on the file system, providing
+/// a simple and lightweight session storage solution.
+///
+/// # Examples
+///
+/// ```
+/// use cot::session::store::file::FileStore;
+/// use time::{Duration, OffsetDateTime};
+/// use tower_sessions::SessionStore;
+/// use tower_sessions::session::{Id, Record};
+///
+/// let store = FileStore::new("/var/lib/cot/sessions").unwrap();
+/// let mut record = Record {
+///     id: Default::default(),
+///     data: Default::default(),
+///     expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
+/// };
+/// let _ = store.create(&mut record).await.unwrap();
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileStore {
+    /// The directory to save session files.
     dir_path: Cow<'static, Path>,
 }
 

@@ -25,7 +25,6 @@ use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use tower_sessions::{SessionStore, session_store};
-use url::Url;
 
 use crate::ProjectContext;
 use crate::db::Database;
@@ -34,6 +33,7 @@ use crate::session::store::ToSessionStore;
 use crate::session::store::db::DbStore;
 use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
+#[cfg(feature = "redis")]
 use crate::session::store::redis::RedisStore;
 
 /// The configuration for a project.
@@ -792,6 +792,7 @@ impl ToSessionStore for SessionStoreTypeConfig {
                 Ok(Box::new(file_store))
             }
             Self::Cache { ref uri } => match CacheType::from(uri.clone()) {
+                #[cfg(feature = "redis")]
                 CacheType::Redis => Ok(Box::new(RedisStore::new(uri)?)),
                 CacheType::Unknown => Err(session_store::Error::Backend(format!(
                     "Unsupported cache URI scheme: {}",
@@ -1072,7 +1073,7 @@ impl From<&str> for DatabaseUrl {
 #[cfg(feature = "db")]
 impl Debug for DatabaseUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut new_url = conceal_url_details(&self.0);
+        let mut new_url = conceal_url_parts(&self.0);
 
         f.debug_tuple("DatabaseUrl")
             .field(&new_url.as_str())
@@ -1082,6 +1083,7 @@ impl Debug for DatabaseUrl {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CacheType {
+    #[cfg(feature = "redis")]
     Redis,
     Unknown,
 }
@@ -1089,6 +1091,7 @@ pub enum CacheType {
 impl From<&str> for CacheType {
     fn from(value: &str) -> Self {
         match value {
+            #[cfg(feature = "redis")]
             "redis" => Self::Redis,
             _ => Self::Unknown,
         }
@@ -1097,7 +1100,6 @@ impl From<&str> for CacheType {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-#[derive(Debug)]
 pub struct CacheUrl(url::Url);
 
 impl CacheUrl {
@@ -1127,13 +1129,13 @@ impl From<CacheUrl> for CacheType {
 
 impl Debug for CacheUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let new_url = conceal_url_details(&self.0);
+        let new_url = conceal_url_parts(&self.0);
 
         f.debug_tuple("CacheUrl").field(&new_url.as_str()).finish()
     }
 }
 
-fn conceal_url_details(url: &Url) -> url::Url {
+fn conceal_url_parts(url: &url::Url) -> url::Url {
     let mut new_url = url.clone();
     if !new_url.username().is_empty() {
         new_url
@@ -1265,7 +1267,7 @@ mod tests {
     fn cacheurl_as_str_roundtrip() {
         let raw = "https://user:pass@host:1234/path?query#frag";
         let cu = CacheUrl::from(raw);
-        assert_eq!(cu.as_str(), Url::parse(raw).unwrap().as_str());
+        assert_eq!(cu.as_str(), url::Url::parse(raw).unwrap().as_str());
     }
 
     #[test]
@@ -1279,8 +1281,8 @@ mod tests {
     #[test]
     fn conceal_url_details_leaves_no_credentials() {
         let raw = "ftp://alice:alicepwd@server/";
-        let parsed = Url::parse(raw).unwrap();
-        let concealed = super::conceal_url_details(&parsed);
+        let parsed = url::Url::parse(raw).unwrap();
+        let concealed = super::conceal_url_parts(&parsed);
         assert_eq!(concealed.username(), "********");
         assert_eq!(concealed.password(), Some("********"));
     }

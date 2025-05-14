@@ -10,7 +10,6 @@
 //!
 //! let store = FileStore::new("/var/lib/cot/sessions").unwrap();
 //! ```
-//!  
 use std::borrow::Cow;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -26,7 +25,7 @@ use tower_sessions::{SessionStore, session_store};
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum FileStoreError {
-    /// An error occurred during an I/O operation.  
+    /// An error occurred during an I/O operation.
     #[error(transparent)]
     IoError(#[from] io::Error),
     /// An error occurred during JSON serialization.

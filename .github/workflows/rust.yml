@@ -360,6 +360,9 @@ jobs:
 
   cargo-deny:
     runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: ""
+      RUSTC_WRAPPER: ""
     steps:
       - name: Checkout source
         uses: actions/checkout@v4

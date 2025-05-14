@@ -324,8 +324,7 @@ impl IntoResponse for Html {
     /// let response = html.into_response();
     /// ```
     fn into_response(self) -> cot::Result<Response> {
-        self.as_str()
-            .to_owned()
+        self.0
             .into_response()
             .with_content_type(HTML_CONTENT_TYPE)
             .into_response()

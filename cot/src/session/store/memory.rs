@@ -1,3 +1,14 @@
+//! Memory session store
+//!
+//! This module provides an implementation of an in-memory session store.
+//!
+//! # Examples
+//!
+//! ```
+//! use cot::session::store::memory::MemoryStore;
+//! let store = MemoryStore::new();
+//! ```
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -7,6 +18,17 @@ use tokio::sync::Mutex;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
+/// An in-memory session store implementation.
+///
+/// This store keeps all sessions in memory using a thread-safe hashmap.
+/// It's primarily useful for development and testing environments.
+///
+/// # Examples
+///
+/// ```
+/// use cot::session::store::memory::MemoryStore;
+/// let store = MemoryStore::new();
+/// ```
 #[derive(Debug, Default, Clone)]
 pub struct MemoryStore(Arc<Mutex<HashMap<Id, Record>>>);
 

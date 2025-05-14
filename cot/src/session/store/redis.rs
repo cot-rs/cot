@@ -1,6 +1,18 @@
+//! Redis session store
+//!
+//! This module provides a session store that uses Redis as the storage backend.
+//!
+//! # Examples
+//!
+//! ```
+//! use cot::config::CacheUrl;
+//! use cot::session::store::redis::RedisStore;
+//!
+//! let store = RedisStore::new(&CacheUrl::from("redis://127.0.0.1/")).unwrap();
+//! ```
 use async_trait::async_trait;
 use deadpool_redis::{Config, CreatePoolError, Pool as RedisPool, Runtime};
-use redis::{AsyncCommands, Commands, ExistenceCheck, SetExpiry, SetOptions};
+use redis::{AsyncCommands, ExistenceCheck, SetExpiry, SetOptions};
 use thiserror::Error;
 use time::OffsetDateTime;
 use tower_sessions::session::{Id, Record};
@@ -9,24 +21,26 @@ use tower_sessions::{SessionStore, session_store};
 use crate::config::CacheUrl;
 
 #[derive(Debug, Error)]
+/// Errors that can occur when using the Redis session store.
 #[non_exhaustive]
 pub enum RedisStoreError {
-    /// Pool creation or checkout failures
+    /// An error occurred during a pool connection or checkout.
     #[error(transparent)]
     PoolConnectionError(#[from] deadpool_redis::PoolError),
 
+    /// An error occurred during Redis connection pool creation.
     #[error(transparent)]
     PoolCreationError(#[from] CreatePoolError),
 
-    /// Any Redis‐client command or protocol error
+    /// An error occurred during a Redis command execution.
     #[error(transparent)]
     CommandError(#[from] redis::RedisError),
 
-    /// JSON serialization failures
+    /// An error occurred during JSON serialization.
     #[error("Serialization error: {0}")]
     SerializeError(serde_json::Error),
 
-    /// JSON deserialization failures
+    /// An error occurred during JSON deserialization.
     #[error("Deserialization error: {0}")]
     DeserializeError(serde_json::Error),
 }
@@ -53,13 +67,36 @@ impl From<RedisStoreError> for session_store::Error {
     }
 }
 
+/// A Redis-backed session store implementation.
+///
+/// This store persists sessions in Redis, providing a scalable and
+/// production-ready session storage solution.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::CacheUrl;
+/// use cot::session::store::redis::RedisStore;
+/// use time::{Duration, OffsetDateTime};
+/// use tower_sessions::SessionStore;
+/// use tower_sessions::session::{Id, Record};
+///
+/// let store = RedisStore::new(&CacheUrl::from("redis://127.0.0.1/")).unwrap();
+/// let mut record = Record {
+///     id: Id::default(),
+///     data: Default::default(),
+///     expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
+/// };
+/// let _ = store.create(&mut record).await.unwrap();
+/// ```
 #[derive(Debug, Clone)]
 pub struct RedisStore {
+    /// The Redis connection pool.
     pool: RedisPool,
 }
 
 impl RedisStore {
-    pub(crate) fn new(url: &CacheUrl) -> Result<RedisStore, RedisStoreError> {
+    pub fn new(url: &CacheUrl) -> Result<RedisStore, RedisStoreError> {
         let mut cfg = Config::from_url(url.as_str());
         let pool = cfg
             .create_pool(Some(Runtime::Tokio1))

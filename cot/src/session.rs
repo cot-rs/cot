@@ -41,7 +41,6 @@
 //! # Ok(())
 //! # }
 //! ```
-pub mod db;
 pub mod store;
 
 use std::ops::{Deref, DerefMut};

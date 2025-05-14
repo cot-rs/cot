@@ -357,3 +357,15 @@ jobs:
         run: cargo miri nextest run --no-fail-fast --all-features
         env:
           MIRIFLAGS: -Zmiri-disable-isolation
+
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Check licenses
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          log-level: warn
+          command: check licenses

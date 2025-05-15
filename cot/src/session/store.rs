@@ -7,33 +7,6 @@
 //! Session stores are responsible for persisting session data between requests.
 //! Different implementations store data in different places, such as memory,
 //! files, databases, or external caching services like Redis.
-//!
-//! # Examples
-//!
-//! ```
-//! use std::sync::Arc;
-//!
-//! use cot::ProjectContext;
-//! use cot::config::SessionStoreTypeConfig;
-//! use cot::project::WithDatabase;
-//! use cot::session::store::{SessionStoreWrapper, ToSessionStore};
-//! use tower_sessions::session_store::SessionStore;
-//!
-//! // Convert a configuration into a session store
-//! fn create_store(context: &ProjectContext<WithDatabase>) -> Arc<dyn SessionStore + Send + Sync> {
-//!     // Use a memory store from configuration
-//!     let config = SessionStoreTypeConfig::Memory;
-//!
-//!     // Convert to a concrete session store
-//!     let store = config
-//!         .to_session_store(context)
-//!         .expect("Failed to create session store");
-//!
-//!     // Wrap in Arc for thread-safe reference counting
-//!     Arc::new(store)
-//! }
-//! ```
-
 pub mod file;
 pub mod memory;
 #[cfg(feature = "redis")]
@@ -68,7 +41,6 @@ use crate::project::WithDatabase;
 /// use cot::session::store::ToSessionStore;
 /// use tower_sessions::session_store;
 ///
-/// // A simple configuration enum
 /// enum MyStoreConfig {
 ///     InMemory,
 ///     // Other variants...
@@ -81,7 +53,6 @@ use crate::project::WithDatabase;
 ///     ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error> {
 ///         match self {
 ///             MyStoreConfig::InMemory => {
-///                 // Create and return a boxed session store
 ///                 Ok(Box::new(cot::session::store::memory::MemoryStore::new()))
 ///             } // Handle other variants...
 ///         }

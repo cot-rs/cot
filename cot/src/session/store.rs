@@ -63,20 +63,7 @@ pub trait ToSessionStore {
     /// Converts self into a boxed session store implementation.
     ///
     /// This method creates a concrete session store from the configuration
-    /// that can be used by the session middleware. The implementation may use
-    /// the provided project context to access database connections or other
-    /// resources needed to initialize the store.
-    ///
-    /// # Arguments
-    ///
-    /// * `context` - The project context, which provides access to the database
-    ///   and other application-wide resources.
-    ///
-    /// # Returns
-    ///
-    /// A boxed session store implementation that can be used with the session
-    /// middleware, or an error if the store cannot be created.
-    #[must_use]
+    /// that can be used by the session middleware.
     fn to_session_store(
         self,
         context: &ProjectContext<WithDatabase>,

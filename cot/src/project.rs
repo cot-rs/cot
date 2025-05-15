@@ -1250,16 +1250,18 @@ impl Bootstrapper<WithDatabase> {
 }
 
 impl Bootstrapper<WithEmail> {
-    async fn init_email_backend(config: &EmailBackendConfig) -> cot::Result<Option<Arc<Mutex<SmtpEmailBackend>>>> {
+    async fn init_email_backend(
+        config: &EmailBackendConfig,
+    ) -> cot::Result<Option<Arc<Mutex<SmtpEmailBackend>>>> {
         match &config.backend_type {
             EmailBackendType::None => Ok(None),
             EmailBackendType::Smtp => {
-                let smtp_config = SmtpConfig{
+                let smtp_config = SmtpConfig {
                     mode: config.smtp_mode.clone(),
                     port: config.port,
                     username: config.username.clone(),
                     password: config.password.clone(),
-                    timeout: config.timeout
+                    timeout: config.timeout,
                 };
                 let backend = SmtpEmailBackend::new(smtp_config);
                 Ok(Some(Arc::new(Mutex::new(backend))))
@@ -1267,16 +1269,16 @@ impl Bootstrapper<WithEmail> {
         }
     }
     /// Moves forward to the next phase of bootstrapping, the with-email phase.
-    
+
     pub async fn with_email(self) -> cot::Result<Bootstrapper<WithEmail>> {
         let email_backend = Self::init_email_backend(&self.context.config.email_backend).await?;
         let context = self.context.with_email(email_backend);
 
         Ok(Bootstrapper {
-                project: self.project,
-                context,
-                handler: self.handler,
-            })
+            project: self.project,
+            context,
+            handler: self.handler,
+        })
     }
 }
 impl Bootstrapper<Initialized> {
@@ -1641,28 +1643,31 @@ impl ProjectContext<WithDatabase> {
 }
 impl ProjectContext<WithEmail> {
     #[must_use]
-    fn with_email(self, email_backend: Option<Arc<Mutex<SmtpEmailBackend>>>) -> ProjectContext<WithEmail> {
+    fn with_email(
+        self,
+        email_backend: Option<Arc<Mutex<SmtpEmailBackend>>>,
+    ) -> ProjectContext<WithEmail> {
         match email_backend {
             Some(email_backend) => ProjectContext {
-                                    config: self.config,
-                                    apps: self.apps,
-                                    router: self.router,
-                                    auth_backend: self.auth_backend,
-                                #[cfg(feature = "db")]
-                                database: self.database,
-                                email_backend: Some(email_backend),
-                },
+                config: self.config,
+                apps: self.apps,
+                router: self.router,
+                auth_backend: self.auth_backend,
+                #[cfg(feature = "db")]
+                database: self.database,
+                email_backend: Some(email_backend),
+            },
             None => ProjectContext {
                 config: self.config,
                 apps: self.apps,
                 router: self.router,
                 auth_backend: self.auth_backend,
-            #[cfg(feature = "db")]
-            database: self.database,
-            email_backend: None,
+                #[cfg(feature = "db")]
+                database: self.database,
+                email_backend: None,
+            },
         }
-    }        
-}
+    }
 }
 impl ProjectContext<Initialized> {
     pub(crate) fn initialized(

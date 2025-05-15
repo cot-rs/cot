@@ -1,15 +1,12 @@
-use cot::email::{EmailBackend, EmailMessage,SmtpTransportMode};
+use cot::cli::CliMetadata;
+use cot::config::{DatabaseConfig, EmailBackendConfig, EmailBackendType, ProjectConfig};
+use cot::email::{EmailBackend, EmailMessage, SmtpTransportMode};
 use cot::form::Form;
 use cot::project::RegisterAppsContext;
 use cot::request::{Request, RequestExt};
 use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
-use cot::{App, AppBuilder};
-use cot::Body;
-use cot::StatusCode;
-use cot::Project;
-use cot::cli::CliMetadata;
-use cot::config::{DatabaseConfig, EmailBackendConfig, EmailBackendType, ProjectConfig};
+use cot::{App, AppBuilder, Body, Project, StatusCode};
 
 struct EmailApp;
 
@@ -39,7 +36,7 @@ struct EmailForm {
 }
 async fn send_email(mut request: Request) -> cot::Result<Response> {
     let form = EmailForm::from_request(&mut request).await?.unwrap();
-    
+
     let from = form.from;
     let to = form.to;
     let subject = form.subject;
@@ -59,10 +56,10 @@ async fn send_email(mut request: Request) -> cot::Result<Response> {
     let backend_clone = email_backend.clone();
     {
         let backend = &backend_clone;
-        let _x= backend.lock().unwrap().send_message(&email);
+        let _x = backend.lock().unwrap().send_message(&email);
     }
-    //let template = include_str!("../templates/sent.html");
-    //Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
+    // let template = include_str!("../templates/sent.html");
+    // Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
     let template = include_str!("../templates/sent.html");
 
     Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
@@ -74,7 +71,7 @@ impl Project for MyProject {
     }
 
     fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
-        //Create the email backend
+        // Create the email backend
         // let config = ProjectConfig::from_toml(
         //     r#"
         //     [database]
@@ -99,15 +96,14 @@ impl Project for MyProject {
     }
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views(EmailApp, "");
-
     }
-    
+
     fn middlewares(
         &self,
         handler: cot::project::RootHandlerBuilder,
         _context: &cot::project::MiddlewareContext,
     ) -> cot::BoxedHandler {
-        //context.config().email_backend().unwrap();
+        // context.config().email_backend().unwrap();
         handler.build()
     }
 }

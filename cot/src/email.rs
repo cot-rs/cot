@@ -321,7 +321,7 @@ impl TryFrom<&EmailMessage> for Message {
 /// `EmailError::SendError` if there is an issue with sending the email.
 /// `EmailError::ConfigurationError` if the SMTP configuration is invalid.
 #[cfg_attr(test, automock)]
-pub trait EmailTransport: Send +Sync {
+pub trait EmailTransport: Send + Sync {
     /// Test the connection to the SMTP server.
     /// # Errors
     /// Returns Ok(true) if the connection is successful, otherwise

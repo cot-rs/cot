@@ -1239,7 +1239,10 @@ impl Bootstrapper<WithDatabase> {
         let handler = self.project.middlewares(handler, &self.context);
 
         let auth_backend = self.project.auth_backend(&self.context);
-        let context = self.context.with_auth(auth_backend);
+        let email_backend = Self::init_email_backend(&self.context.config.email_backend).await;
+        let context = self
+            .context
+            .with_auth_and_email(auth_backend, email_backend);
 
         Ok(Bootstrapper {
             project: self.project,
@@ -1247,14 +1250,12 @@ impl Bootstrapper<WithDatabase> {
             handler,
         })
     }
-}
 
-impl Bootstrapper<WithEmail> {
     async fn init_email_backend(
         config: &EmailBackendConfig,
-    ) -> cot::Result<Option<Arc<Mutex<SmtpEmailBackend>>>> {
+    ) -> Option<Arc<Mutex<SmtpEmailBackend>>> {
         match &config.backend_type {
-            EmailBackendType::None => Ok(None),
+            EmailBackendType::None => None,
             EmailBackendType::Smtp => {
                 let smtp_config = SmtpConfig {
                     mode: config.smtp_mode.clone(),
@@ -1264,21 +1265,9 @@ impl Bootstrapper<WithEmail> {
                     timeout: config.timeout,
                 };
                 let backend = SmtpEmailBackend::new(smtp_config);
-                Ok(Some(Arc::new(Mutex::new(backend))))
+                Some(Arc::new(Mutex::new(backend)))
             }
         }
-    }
-    /// Moves forward to the next phase of bootstrapping, the with-email phase.
-
-    pub async fn with_email(self) -> cot::Result<Bootstrapper<WithEmail>> {
-        let email_backend = Self::init_email_backend(&self.context.config.email_backend).await?;
-        let context = self.context.with_email(email_backend);
-
-        Ok(Bootstrapper {
-            project: self.project,
-            context,
-            handler: self.handler,
-        })
     }
 }
 impl Bootstrapper<Initialized> {
@@ -1459,27 +1448,7 @@ impl BootstrapPhase for WithDatabase {
     #[cfg(feature = "db")]
     type Database = Option<Arc<Database>>;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
-    type EmailBackend = ();
-}
-/// Fifth phase of bootstrapping a Cot project, the with-email phase.
-///
-/// # See also
-///
-/// See the details about the different bootstrap phases in the
-/// [`BootstrapPhase`] trait documentation.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum WithEmail {}
-
-impl sealed::Sealed for WithEmail {}
-impl BootstrapPhase for WithEmail {
-    type RequestHandler = ();
-    type Config = <WithApps as BootstrapPhase>::Config;
-    type Apps = <WithApps as BootstrapPhase>::Apps;
-    type Router = <WithApps as BootstrapPhase>::Router;
-    #[cfg(feature = "db")]
-    type Database = <WithDatabase as BootstrapPhase>::Database;
-    type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
-    type EmailBackend = Option<Arc<Mutex<SmtpEmailBackend>>>;
+    type EmailBackend = <WithApps as BootstrapPhase>::EmailBackend;
 }
 
 /// The final phase of bootstrapping a Cot project, the initialized phase.
@@ -1629,7 +1598,11 @@ impl ProjectContext<WithApps> {
 
 impl ProjectContext<WithDatabase> {
     #[must_use]
-    fn with_auth(self, auth_backend: Arc<dyn AuthBackend>) -> ProjectContext<Initialized> {
+    fn with_auth_and_email(
+        self,
+        auth_backend: Arc<dyn AuthBackend>,
+        email_backend: Option<Arc<Mutex<SmtpEmailBackend>>>,
+    ) -> ProjectContext<Initialized> {
         ProjectContext {
             config: self.config,
             apps: self.apps,
@@ -1637,35 +1610,7 @@ impl ProjectContext<WithDatabase> {
             auth_backend,
             #[cfg(feature = "db")]
             database: self.database,
-            email_backend: None,
-        }
-    }
-}
-impl ProjectContext<WithEmail> {
-    #[must_use]
-    fn with_email(
-        self,
-        email_backend: Option<Arc<Mutex<SmtpEmailBackend>>>,
-    ) -> ProjectContext<WithEmail> {
-        match email_backend {
-            Some(email_backend) => ProjectContext {
-                config: self.config,
-                apps: self.apps,
-                router: self.router,
-                auth_backend: self.auth_backend,
-                #[cfg(feature = "db")]
-                database: self.database,
-                email_backend: Some(email_backend),
-            },
-            None => ProjectContext {
-                config: self.config,
-                apps: self.apps,
-                router: self.router,
-                auth_backend: self.auth_backend,
-                #[cfg(feature = "db")]
-                database: self.database,
-                email_backend: None,
-            },
+            email_backend,
         }
     }
 }

@@ -260,7 +260,7 @@ where
     })
 }
 
-pub type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;
+type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;
 
 /// A middleware that provides session management.
 ///
@@ -310,7 +310,7 @@ impl SessionMiddleware {
             .store
             .store_type
             .clone()
-            .to_session_store(&context)
+            .to_session_store(context)
             .expect("session store not supported");
         let arc_store: Arc<dyn SessionStore + Send + Sync> = Arc::from(boxed_store);
         let session_cfg = &context.config().middlewares.session;

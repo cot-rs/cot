@@ -14,8 +14,8 @@
 //! ```
 use std::borrow::Cow;
 use std::fs::OpenOptions;
-use std::path::{Path, PathBuf};
-use std::{fs, io};
+use std::io;
+use std::path::Path;
 
 use async_trait::async_trait;
 use thiserror::Error;
@@ -105,7 +105,6 @@ impl SessionStore for FileStore {
                 }
                 Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
                     record.id = Id::default();
-                    continue;
                 }
                 Err(err) => return Err(FileStoreError::IoError(err))?,
             }
@@ -144,7 +143,7 @@ impl SessionStore for FileStore {
         let file = OpenOptions::new()
             .read(true)
             .open(path)
-            .map_err(|err| FileStoreError::IoError(err))?;
+            .map_err(FileStoreError::IoError)?;
         let out = serde_json::from_reader(file).map_err(FileStoreError::SerializeError)?;
 
         Ok(out)
@@ -152,12 +151,9 @@ impl SessionStore for FileStore {
 
     async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
         let res = remove_file(self.dir_path.join(session_id.to_string())).await;
-        match res {
-            Ok(_) => {}
-            Err(e) => {
-                if e.kind() != io::ErrorKind::NotFound {
-                    return Err(FileStoreError::IoError(e))?;
-                }
+        if let Err(e) = res {
+            if e.kind() != io::ErrorKind::NotFound {
+                return Err(FileStoreError::IoError(e))?;
             }
         }
         Ok(())
@@ -166,8 +162,12 @@ impl SessionStore for FileStore {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
     use tempfile::tempdir;
     use time::{Duration, OffsetDateTime};
+    use tokio::fs;
     use tower_sessions::session::{Id, Record};
 
     use super::*;
@@ -180,7 +180,7 @@ mod tests {
     fn make_record() -> Record {
         Record {
             id: Id::default(),
-            data: Default::default(),
+            data: HashMap::default(),
             expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
         }
     }
@@ -238,7 +238,9 @@ mod tests {
         assert!(dir_path.exists(), "Directory should be created when saving");
 
         // Now manually delete the directory
-        fs::remove_dir_all(&dir_path).expect("failed to remove directory");
+        fs::remove_dir_all(&dir_path)
+            .await
+            .expect("failed to remove directory");
         assert!(!dir_path.exists(), "Directory should be removed");
 
         // Saving again should recreate the directory
@@ -251,7 +253,7 @@ mod tests {
             "Directory should be recreated when saving"
         );
 
-        fs::remove_dir_all(&dir_path).expect("cleanup failed");
+        fs::remove_dir_all(&dir_path).await.expect("cleanup failed");
     }
 
     #[tokio::test]
@@ -320,15 +322,14 @@ mod tests {
 
         let mut r1 = Record {
             id: Id::default(),
-            data: Default::default(),
+            data: HashMap::default(),
             expiry_date: expiry,
         };
         store.create(&mut r1).await.unwrap();
 
-        let collision_path = store.dir_path.join(r1.id.to_string());
         let mut r2 = Record {
             id: r1.id,
-            data: Default::default(),
+            data: HashMap::default(),
             expiry_date: expiry,
         };
         store.create(&mut r2).await.unwrap();

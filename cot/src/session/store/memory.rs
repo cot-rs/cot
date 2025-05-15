@@ -86,8 +86,8 @@ mod tests {
     async fn test_create() {
         let store = MemoryStore::default();
         let mut record = Record {
-            id: Default::default(),
-            data: Default::default(),
+            id: Id::default(),
+            data: HashMap::default(),
             expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
         };
         assert!(store.create(&mut record).await.is_ok());
@@ -97,8 +97,8 @@ mod tests {
     async fn test_save() {
         let store = MemoryStore::default();
         let record = Record {
-            id: Default::default(),
-            data: Default::default(),
+            id: Id::default(),
+            data: HashMap::default(),
             expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
         };
         assert!(store.save(&record).await.is_ok());
@@ -108,8 +108,8 @@ mod tests {
     async fn test_load() {
         let store = MemoryStore::default();
         let mut record = Record {
-            id: Default::default(),
-            data: Default::default(),
+            id: Id::default(),
+            data: HashMap::default(),
             expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
         };
         store.create(&mut record).await.unwrap();
@@ -121,8 +121,8 @@ mod tests {
     async fn test_delete() {
         let store = MemoryStore::default();
         let mut record = Record {
-            id: Default::default(),
-            data: Default::default(),
+            id: Id::default(),
+            data: HashMap::default(),
             expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
         };
         store.create(&mut record).await.unwrap();
@@ -135,13 +135,13 @@ mod tests {
         let store = MemoryStore::default();
         let expiry_date = OffsetDateTime::now_utc() + Duration::minutes(30);
         let mut record1 = Record {
-            id: Default::default(),
-            data: Default::default(),
+            id: Id::default(),
+            data: HashMap::default(),
             expiry_date,
         };
         let mut record2 = Record {
-            id: Default::default(),
-            data: Default::default(),
+            id: Id::default(),
+            data: HashMap::default(),
             expiry_date,
         };
         store.create(&mut record1).await.unwrap();

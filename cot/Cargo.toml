@@ -1,6 +1,6 @@
 [package]
 name = "cot"
-version = "0.2.0"
+version = "0.3.0"
 description = "The Rust web framework for lazy developers."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true
@@ -16,39 +16,45 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
+aide = { workspace = true, optional = true }
+askama = { workspace = true, features = ["derive", "std"] }
 async-trait.workspace = true
 axum = { workspace = true, features = ["http1", "tokio"] }
 backtrace.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 clap.workspace = true
+cot_macros.workspace = true
 derive_builder.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
+digest.workspace = true
+email_address.workspace = true
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
-cot_macros.workspace = true
 form_urlencoded.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
+hex.workspace = true
 hmac.workspace = true
 http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
-humansize.workspace = true
+humantime.workspace = true
 indexmap.workspace = true
 lettre.workspace = true
 mime_guess.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
 pin-project-lite.workspace = true
-rinja.workspace = true
-sea-query = { workspace = true }
-sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"] }
+schemars = { workspace = true, optional = true }
+sea-query = { workspace = true, optional = true }
+sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_html_form = { workspace = true }
 serde_json = { workspace = true, optional = true }
 serde_path_to_error = { workspace = true }
 sha2.workspace = true
-sqlx = { workspace = true, features = ["runtime-tokio", "chrono"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
 subtle = { workspace = true, features = ["std"] }
+swagger-ui-redist = { workspace = true, optional = true }
 sync_wrapper.workspace = true
 thiserror.workspace = true
 time.workspace = true
@@ -63,10 +69,16 @@ url = { workspace = true, features = ["serde"], optional = true }
 [dev-dependencies]
 async-stream.workspace = true
 fake.workspace = true
+fantoccini.workspace = true
 futures.workspace = true
 mockall.workspace = true
 tempfile.workspace = true
 tracing-test.workspace = true
+trybuild.workspace = true
+
+[build-dependencies]
+ahash.workspace = true
+grass.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
@@ -74,20 +86,23 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-machete]
 ignored = [
-    # rinja doesn't seem to be working with minimal versions of its dependencies at the moment,
-    # so we're manually setting the required versions in the main crate.
-    "humansize",
+    # Used indirectly by `grass`, but it doesn't work with the latest versions of Rust if minimal dependency versions
+    # are used
+    "ahash",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly
     "time",
 ]
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
-full = ["default", "fake", "live-reload"]
+full = ["default", "fake", "live-reload", "test"]
 fake = ["dep:fake"]
-db = ["dep:url"]
+db = ["dep:url", "dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
 sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
 postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres", "sqlx/postgres"]
 mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
-json = ["serde_json"]
+json = ["dep:serde_json"]
+openapi = ["json", "dep:aide", "dep:schemars"]
+swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
+test = []

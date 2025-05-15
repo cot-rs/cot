@@ -169,13 +169,14 @@ impl PathMatcher {
 
     #[must_use]
     fn param_len(&self) -> usize {
-        self.parts
-            .iter()
-            .map(|part| match part {
-                PathPart::Literal(..) => 0,
-                PathPart::Param { .. } => 1,
-            })
-            .sum()
+        self.param_names().count()
+    }
+
+    pub(super) fn param_names(&self) -> impl Iterator<Item = &str> {
+        self.parts.iter().filter_map(|part| match part {
+            PathPart::Literal(..) => None,
+            PathPart::Param { name } => Some(name.as_str()),
+        })
     }
 }
 
@@ -241,7 +242,7 @@ impl ReverseParamMap {
     /// map.insert("id", "123");
     /// map.insert("id", "456");
     /// ```
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub fn insert<K: ToString, V: ToString>(&mut self, key: K, value: V) {
         self.params.insert(key.to_string(), value.to_string());
     }
@@ -256,7 +257,7 @@ impl ReverseParamMap {
 #[macro_export]
 macro_rules! reverse_param_map {
     ($($key:ident = $value:expr),*) => {{
-        #[allow(unused_mut)]
+        #[allow(unused_mut)] // for the case when there are no parameters
         let mut map = $crate::router::path::ReverseParamMap::new();
         $( map.insert(stringify!($key), &$value); )*
         map
@@ -265,6 +266,7 @@ macro_rules! reverse_param_map {
 
 /// An error that occurs when reversing a path with missing parameters.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ReverseError {
     /// A parameter is missing for the reverse operation.
     #[error("Missing parameter for reverse: `{0}`")]

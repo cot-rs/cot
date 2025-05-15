@@ -1,6 +1,8 @@
-use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts};
+use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
+use cot_codegen::symbol_resolver::{SymbolResolver, VisibleSymbol, VisibleSymbolKind};
 use darling::FromMeta;
 use darling::ast::NestedMeta;
+use heck::ToSnakeCase;
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, TokenStreamExt, format_ident, quote};
 use syn::Token;
@@ -26,8 +28,12 @@ pub(super) fn impl_model_for_struct(
             return err.write_errors();
         }
     };
-
-    let model = match opts.as_model(&args) {
+    let symbol_resolver = SymbolResolver::new(vec![VisibleSymbol::new(
+        &opts.ident.to_string(),
+        &opts.ident.to_string(),
+        VisibleSymbolKind::Struct,
+    )]);
+    let model = match opts.as_model(&args, &symbol_resolver) {
         Ok(val) => val,
         Err(err) => {
             return err.to_compile_error();
@@ -44,10 +50,11 @@ pub(super) fn impl_model_for_struct(
         syn::Data::Struct(data) => &mut data.fields,
         _ => panic!("Only structs are supported"),
     };
-    let fields = remove_helper_field_attributes(fields);
+    let fields = get_fields_punctuated(fields);
 
     quote!(
         #(#attrs)*
+        #[derive(::cot::__private::ModelHelper)]
         #vis struct #ident {
             #fields
         }
@@ -55,20 +62,16 @@ pub(super) fn impl_model_for_struct(
     )
 }
 
-fn remove_helper_field_attributes(fields: &mut syn::Fields) -> &Punctuated<syn::Field, Token![,]> {
+fn get_fields_punctuated(fields: &mut syn::Fields) -> &Punctuated<syn::Field, Token![,]> {
     match fields {
-        syn::Fields::Named(fields) => {
-            for field in &mut fields.named {
-                field.attrs.retain(|a| !a.path().is_ident("model"));
-            }
-            &fields.named
-        }
+        syn::Fields::Named(fields) => &fields.named,
         _ => panic!("Only named fields are supported"),
     }
 }
 
 #[derive(Debug)]
 struct ModelBuilder {
+    app_name: String,
     name: Ident,
     vis: syn::Visibility,
     table_name: String,
@@ -91,10 +94,21 @@ impl ToTokens for ModelBuilder {
 impl ModelBuilder {
     fn from_model(model: Model) -> Self {
         let field_count = model.field_count();
+        let app_name = std::env::var("CARGO_PKG_NAME")
+            .expect("cargo should set the `CARGO_PKG_NAME` environment variable");
+        let table_name = match model.model_type {
+            ModelType::Internal => model.table_name,
+            _ => format!(
+                "{}__{}",
+                app_name.to_snake_case(),
+                model.table_name.to_snake_case()
+            ),
+        };
         let mut model_builder = Self {
+            app_name,
             name: model.name.clone(),
             vis: model.vis,
-            table_name: model.table_name,
+            table_name,
             pk_field: model.pk_field.clone(),
             fields_struct_name: format_ident!("{}Fields", model.name),
             fields_as_columns: Vec::with_capacity(field_count),
@@ -113,7 +127,7 @@ impl ModelBuilder {
     fn push_field(&mut self, field: &Field) {
         let orm_ident = orm_ident();
 
-        let name = &field.field_name;
+        let name = &field.name;
         let ty = &field.ty;
         let index = self.fields_as_columns.len();
         let column_name = &field.column_name;
@@ -150,10 +164,11 @@ impl ModelBuilder {
         let orm_ident = orm_ident();
 
         let name = &self.name;
+        let app_name = &self.app_name;
         let table_name = &self.table_name;
         let fields_struct_name = &self.fields_struct_name;
         let fields_as_columns = &self.fields_as_columns;
-        let pk_field_name = &self.pk_field.field_name;
+        let pk_field_name = &self.pk_field.name;
         let pk_column_name = &self.pk_field.column_name;
         let pk_type = &self.pk_field.ty;
         let fields_as_from_db = &self.fields_as_from_db;
@@ -170,7 +185,7 @@ impl ModelBuilder {
                 const COLUMNS: &'static [#orm_ident::Column] = &[
                     #(#fields_as_columns,)*
                 ];
-                const APP_NAME: &'static str = env!("CARGO_PKG_NAME");
+                const APP_NAME: &'static str = #app_name;
                 const TABLE_NAME: #orm_ident::Identifier = #orm_ident::Identifier::new(#table_name);
                 const PRIMARY_KEY_NAME: #orm_ident::Identifier = #orm_ident::Identifier::new(#pk_column_name);
 
@@ -233,7 +248,7 @@ impl ModelBuilder {
             #[derive(::core::fmt::Debug)]
             #vis struct #fields_struct_name;
 
-            #[allow(non_upper_case_globals)]
+            #[expect(non_upper_case_globals)]
             impl #fields_struct_name {
                 #(#fields_as_field_refs)*
             }

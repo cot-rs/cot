@@ -1,0 +1,29 @@
+---
+source: cot-cli/tests/snapshot_testing/new/mod.rs
+description: "Verbosity level: debug"
+info:
+  program: cot
+  args:
+    - new
+    - "--name"
+    - my_project
+    - "-vvvv"
+    - /tmp/cot-test-BEJYfS/project
+---
+success: true
+exit_code: 0
+----- stdout -----
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/Cargo.toml"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/Cargo.lock"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/bacon.toml"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/.gitignore"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/src/main.rs"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/src/migrations.rs"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/static/css/main.css"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/templates/index.html"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/config/dev.toml"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/config/prod.toml.example"
+
+----- stderr -----
+[1m[92m    Creating[0m Cot project `my_project`
+[1m[32m     Created[0m Cot project `my_project`

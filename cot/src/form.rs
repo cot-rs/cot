@@ -38,7 +38,7 @@ use bytes::Bytes;
 ///
 /// In order for the [`FormContext`] to be renderable in templates, all the form
 /// fields (i.e. [`AsFormField::Type`]) must implement the [`Display`] and
-/// [`rinja::filters::HtmlSafe`] traits. If you are implementing your own form
+/// [`askama::filters::HtmlSafe`] traits. If you are implementing your own form
 /// field types, you should make sure they implement these traits (and you have
 /// to make sure the types are safe to render as HTML, possibly escaping user
 /// input if needed).
@@ -61,6 +61,7 @@ use crate::request::{Request, RequestExt};
 
 /// Error occurred while processing a form.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum FormError {
     /// An error occurred while processing the request, before validating the
     /// form data.
@@ -107,6 +108,7 @@ impl<T: Form> FormResult<T> {
 
 /// An error that can occur when validating a form field.
 #[derive(Debug, Error, PartialEq, Eq)]
+#[non_exhaustive]
 #[error("{message}")]
 pub enum FormFieldValidationError {
     /// The field is required.
@@ -118,6 +120,28 @@ pub enum FormFieldValidationError {
         /// The maximum length of the field.
         max_length: u32,
     },
+
+    /// The field value is too short.
+    #[error("This is below the minimum length of {min_length}.")]
+    MinimumLengthNotMet {
+        /// The minimum length of the field.
+        min_length: u32,
+    },
+
+    /// The field value is below the permitted minimum.
+    #[error("This is below the minimum value of {min_value}.")]
+    MinimumValueNotMet {
+        /// The minimum permitted value.
+        min_value: String,
+    },
+
+    /// The field value exceeds the permitted maximum.
+    #[error("This exceeds the maximum value of {max_value}.")]
+    MaximumValueExceeded {
+        /// The maximum permitted value.
+        max_value: String,
+    },
+
     /// The field value is required to be true.
     #[error("This field must be checked.")]
     BooleanRequiredToBeTrue,
@@ -144,6 +168,31 @@ impl FormFieldValidationError {
         Self::MaximumLengthExceeded { max_length }
     }
 
+    /// Creates a new `FormFieldValidationError` for a field value that is too
+    /// short.
+    #[must_use]
+    pub fn minimum_length_not_met(min_length: u32) -> Self {
+        FormFieldValidationError::MinimumLengthNotMet { min_length }
+    }
+
+    /// Creates a new `FormFieldValidatorError`for a field value below the
+    /// permitted minimum value.
+    #[must_use]
+    pub fn minimum_value_not_met<T: Display>(min_value: T) -> Self {
+        FormFieldValidationError::MinimumValueNotMet {
+            min_value: min_value.to_string(),
+        }
+    }
+
+    /// Creates a new `FormFieldValidationError` for a field value that exceeds
+    /// the permitted maximum value
+    #[must_use]
+    pub fn maximum_value_exceeded<T: Display>(max_value: T) -> Self {
+        FormFieldValidationError::MaximumValueExceeded {
+            max_value: max_value.to_string(),
+        }
+    }
+
     /// Creates a new `FormFieldValidationError` from a `String`.
     #[must_use]
     pub const fn from_string(message: String) -> Self {
@@ -154,6 +203,12 @@ impl FormFieldValidationError {
     #[must_use]
     pub const fn from_static(message: &'static str) -> Self {
         Self::Custom(Cow::Borrowed(message))
+    }
+}
+
+impl From<email_address::Error> for FormFieldValidationError {
+    fn from(error: email_address::Error) -> Self {
+        FormFieldValidationError::from_string(error.to_string())
     }
 }
 
@@ -189,6 +244,11 @@ pub enum FormErrorTarget<'a> {
 /// }
 /// ```
 #[async_trait]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement the `Form` trait",
+    label = "`{Self}` is not a form",
+    note = "add #[derive(cot::form::Form)] to the struct to automatically derive the trait"
+)]
 pub trait Form: Sized {
     /// The context type associated with the form.
     type Context: FormContext;

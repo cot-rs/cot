@@ -1,6 +1,6 @@
 [package]
 name = "cot_macros"
-version = "0.2.0"
+version = "0.3.0"
 description = "The Rust web framework for lazy developers - macros."
 edition.workspace = true
 rust-version.workspace = true
@@ -30,6 +30,6 @@ quote = { workspace = true, features = ["proc-macro"] }
 syn.workspace = true
 
 [dev-dependencies]
-cot = { path = "../cot" }
+cot = { path = "../cot", features = ["test"] }
 trybuild.workspace = true
 rustversion.workspace = true

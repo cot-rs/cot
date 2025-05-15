@@ -7,7 +7,7 @@ use std::fmt::{Debug, Formatter};
 
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
-use tracing::info;
+use tracing::{Level, info};
 
 use crate::db::migrations::sorter::{MigrationSorter, MigrationSorterError};
 use crate::db::relations::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
@@ -176,24 +176,34 @@ impl MigrationEngine {
             .await?;
 
         for migration in &self.migrations {
-            for operation in migration.operations() {
-                if Self::is_migration_applied(database, migration).await? {
-                    info!(
-                        "Migration {} for app {} is already applied",
-                        migration.name(),
-                        migration.app_name()
-                    );
-                    continue;
-                }
+            let span = tracing::span!(
+                Level::TRACE,
+                "apply_migration",
+                app_name = migration.app_name(),
+                migration_name = migration.name()
+            );
+            let _enter = span.enter();
 
+            if Self::is_migration_applied(database, migration).await? {
                 info!(
-                    "Applying migration {} for app {}",
+                    "Migration {} for app {} is already applied",
                     migration.name(),
                     migration.app_name()
                 );
-                operation.forwards(database).await?;
-                Self::mark_migration_applied(database, migration).await?;
+                continue;
             }
+
+            info!(
+                "Applying migration {} for app {}",
+                migration.name(),
+                migration.app_name()
+            );
+
+            for operation in migration.operations() {
+                operation.forwards(database).await?;
+            }
+
+            Self::mark_migration_applied(database, migration).await?;
         }
 
         Ok(())
@@ -599,7 +609,7 @@ enum OperationInner {
 }
 
 /// A field in a model.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Copy, Clone)]
 pub struct Field {
     /// The name of the field
@@ -1839,7 +1849,7 @@ impl MigrationDependency {
 /// # }
 /// ```
 pub fn wrap_migrations(migrations: &[&'static SyncDynMigration]) -> Vec<Box<SyncDynMigration>> {
-    #[allow(trivial_casts)] // cast to the correct trait object type
+    #[expect(trivial_casts)] // cast to the correct trait object type
     migrations
         .iter()
         .copied()
@@ -1918,7 +1928,7 @@ mod tests {
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_multiple_migrations_run(test_db: &mut TestDatabase) {
-        #[allow(trivial_casts)] // cast to the correct trait object type
+        #[expect(trivial_casts)] // cast to the correct trait object type
         let engine = MigrationEngine::new([
             &TestMigration as &SyncDynMigration,
             &DummyMigration as &SyncDynMigration,

@@ -5,11 +5,12 @@ use std::num::{
     NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
 };
 
+use askama::filters::HtmlSafe;
 #[cfg(feature = "db")]
 use cot::db::Auto;
-use rinja::filters::HtmlSafe;
 
-use crate::auth::{Password, PasswordHash};
+use crate::auth::PasswordHash;
+use crate::common_types::{Email, Password};
 #[cfg(feature = "db")]
 use crate::db::LimitedString;
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
@@ -199,6 +200,81 @@ impl AsFormField for PasswordHash {
     }
 }
 
+impl_form_field!(EmailField, EmailFieldOptions, "an email");
+
+/// Custom options for [`EmailField`]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct EmailFieldOptions {
+    /// The maximum length of the field used to set the `maxlength` attribute
+    /// in the HTML input element.
+    pub max_length: Option<u32>,
+    /// The minimum length of the field used to set the `minlength` attribute
+    /// in the HTML input element.
+    pub min_length: Option<u32>,
+}
+
+impl Display for EmailField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag = HtmlTag::input("email");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+        if let Some(max_length) = self.custom_options.max_length {
+            tag.attr("maxlength", &max_length.to_string());
+        }
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", &min_length.to_string());
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl AsFormField for Email {
+    type Type = EmailField;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized,
+    {
+        let value = check_required(field)?;
+        let opts = &field.custom_options;
+
+        if let (Some(min), Some(max)) = (opts.min_length, opts.max_length) {
+            if min > max {
+                return Err(FormFieldValidationError::from_string(format!(
+                    "min_length ({min}) exceeds max_length ({max})"
+                )));
+            }
+        }
+
+        if let Some(min) = opts.min_length {
+            if value.len() < min as usize {
+                return Err(FormFieldValidationError::minimum_length_not_met(min));
+            }
+        }
+
+        if let Some(max) = opts.max_length {
+            if value.len() > max as usize {
+                return Err(FormFieldValidationError::maximum_length_exceeded(max));
+            }
+        }
+
+        Ok(value.parse()?)
+    }
+
+    fn to_field_value(&self) -> String {
+        self.as_str().to_owned()
+    }
+}
+
+impl HtmlSafe for EmailField {}
+
 impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer);
 
 /// Custom options for a `IntegerField`.
@@ -320,9 +396,27 @@ macro_rules! impl_integer_as_form_field {
             fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
                 let value = check_required(field)?;
 
-                value
+                let parsed: $type = value
                     .parse()
-                    .map_err(|_| FormFieldValidationError::invalid_value(value))
+                    .map_err(|_| FormFieldValidationError::invalid_value(value))?;
+
+                if let Some(min) = field.custom_options.min {
+                    if parsed < min {
+                        return Err(FormFieldValidationError::minimum_value_not_met(
+                            min.to_string(),
+                        ));
+                    }
+                }
+
+                if let Some(max) = field.custom_options.max {
+                    if parsed > max {
+                        return Err(FormFieldValidationError::maximum_value_exceeded(
+                            max.to_string(),
+                        ));
+                    }
+                }
+
+                Ok(parsed)
             }
 
             fn to_field_value(&self) -> String {
@@ -401,7 +495,7 @@ impl HtmlSafe for BoolField {}
 /// Implementation of `AsFormField` for `bool`.
 ///
 /// This implementation converts the string values "true", "on", and "1" to
-/// `true`, and "false", "  off", and "0" to `false`. It returns an error if the
+/// `true`, and "false", "off", and "0" to `false`. It returns an error if the
 /// value is not one of these strings. If the field is required to be `true` by
 /// the field's options, it will return an error if the value is `false`.
 impl AsFormField for bool {
@@ -508,6 +602,137 @@ fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldValidationEr
     }
 }
 
+impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float);
+
+/// Custom options for a `FloatField`.
+#[derive(Debug, Copy, Clone)]
+pub struct FloatFieldOptions<T> {
+    /// The minimum value of the field. Used to set the `min` attribute in the
+    /// HTML input element.
+    pub min: Option<T>,
+    /// The maximum value of the field. Used to set the `max` attribute in the
+    /// HTML input element.
+    pub max: Option<T>,
+}
+
+impl<T: Float> Default for FloatFieldOptions<T> {
+    fn default() -> Self {
+        Self {
+            min: T::MIN,
+            max: T::MAX,
+        }
+    }
+}
+
+impl<T: Float> Display for FloatField<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag: HtmlTag = HtmlTag::input("number");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+
+        if let Some(min) = &self.custom_options.min {
+            tag.attr("min", &min.to_string());
+        }
+        if let Some(max) = &self.custom_options.max {
+            tag.attr("max", &max.to_string());
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl<T: Float> HtmlSafe for FloatField<T> {}
+
+/// A trait for types that can be represented as a float.
+///
+/// This trait is implemented for `f32` and `f64`.
+pub trait Float: Sized + ToString {
+    /// The minimum value of the type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::fields::Float;
+    ///
+    /// assert_eq!(<f32 as Float>::MIN, Some(f32::MIN));
+    /// ```
+    const MIN: Option<Self>;
+    /// The maximum value of the type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::fields::Float;
+    ///
+    /// assert_eq!(<f32 as Float>::MAX, Some(f32::MAX));
+    /// ```
+    const MAX: Option<Self>;
+}
+
+macro_rules! impl_float {
+    ($type:ty) => {
+        impl Float for $type {
+            const MIN: Option<Self> = Some(Self::MIN);
+            const MAX: Option<Self> = Some(Self::MAX);
+        }
+    };
+}
+
+impl_float!(f32);
+impl_float!(f64);
+
+macro_rules! impl_float_as_form_field {
+    ($type:ty) => {
+        impl AsFormField for $type {
+            type Type = FloatField<$type>;
+
+            fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
+                let value = check_required(field)?;
+                let parsed: $type = value
+                    .parse()
+                    .map_err(|_| FormFieldValidationError::invalid_value(value))?;
+
+                if parsed.is_nan() || parsed.is_infinite() {
+                    return Err(FormFieldValidationError::from_static(
+                        "Cannot have NaN or inf as form input values",
+                    ));
+                }
+
+                if let Some(min) = field.custom_options.min {
+                    if parsed < min {
+                        return Err(FormFieldValidationError::minimum_value_not_met(
+                            min.to_string(),
+                        ));
+                    }
+                }
+
+                if let Some(max) = field.custom_options.max {
+                    if parsed > max {
+                        return Err(FormFieldValidationError::maximum_value_exceeded(
+                            max.to_string(),
+                        ));
+                    }
+                }
+
+                Ok(parsed)
+            }
+
+            fn to_field_value(&self) -> String {
+                self.to_string()
+            }
+        }
+    };
+}
+
+impl_float_as_form_field!(f32);
+impl_float_as_form_field!(f64);
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -551,6 +776,29 @@ mod tests {
     }
 
     #[test]
+    fn email_field_render() {
+        let field = EmailField::with_options(
+            FormFieldOptions {
+                id: "test_id".to_owned(),
+                name: "test_name".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        let html = field.to_string();
+        assert!(html.contains("type=\"email\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("minlength=\"10\""));
+        assert!(html.contains("maxlength=\"50\""));
+        assert!(html.contains("name=\"test_name\""));
+        assert!(html.contains("id=\"test_id\""));
+    }
+
+    #[test]
     fn integer_field_render() {
         let field = IntegerField::<i32>::with_options(
             FormFieldOptions {
@@ -570,6 +818,25 @@ mod tests {
         assert!(html.contains("max=\"10\""));
     }
 
+    #[test]
+    fn float_field_render() {
+        let field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.5),
+                max: Some(10.7),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"number\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"1.5\""));
+        assert!(html.contains("max=\"10.7\""));
+    }
     #[test]
     fn bool_field_render() {
         let field = BoolField::with_options(
@@ -658,6 +925,116 @@ mod tests {
     }
 
     #[test]
+    fn email_field_clean_valid() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("user@example.com"));
+        let email = Email::clean_value(&field).unwrap();
+
+        assert_eq!(email.as_str(), "user@example.com");
+    }
+
+    #[test]
+    fn email_field_clean_invalid_format() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("invalid-email"));
+        let result = Email::clean_value(&field);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn email_field_clean_exceeds_max_length() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(5),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("averylongemail@example.com"));
+        let result = Email::clean_value(&field);
+
+        assert!(matches!(
+            result,
+            Err(FormFieldValidationError::MaximumLengthExceeded { max_length: _ })
+        ));
+    }
+
+    #[test]
+    fn email_field_clean_below_min_length() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(5),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("cot"));
+        let result = Email::clean_value(&field);
+
+        assert!(matches!(
+            result,
+            Err(FormFieldValidationError::MinimumLengthNotMet { min_length: _ })
+        ));
+    }
+
+    #[test]
+    fn email_field_clean_invalid_length_options() {
+        let mut field = EmailField::with_options(
+            FormFieldOptions {
+                id: "email_test".to_owned(),
+                name: "email_test".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(50),
+                max_length: Some(10),
+            },
+        );
+
+        field.set_value(Cow::Borrowed("user@example.com"));
+        let result = Email::clean_value(&field);
+
+        assert!(result.is_err());
+        if let Err(err) = result {
+            let msg = err.to_string();
+            assert!(msg.contains("min_length") && msg.contains("exceeds max_length"));
+        }
+    }
+
+    #[test]
     fn integer_field_clean_value() {
         let mut field = IntegerField::<i32>::with_options(
             FormFieldOptions {
@@ -676,6 +1053,48 @@ mod tests {
     }
 
     #[test]
+    fn integer_field_clean_value_below_min_value() {
+        let mut field = IntegerField::<i32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            IntegerFieldOptions {
+                min: Some(10),
+                max: Some(50),
+            },
+        );
+        field.set_value(Cow::Borrowed("5"));
+        let value = i32::clean_value(&field);
+        assert!(matches!(
+            value,
+            Err(FormFieldValidationError::MinimumValueNotMet { min_value: _ })
+        ));
+    }
+
+    #[test]
+    fn integer_field_clean_value_above_max_value() {
+        let mut field = IntegerField::<i32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            IntegerFieldOptions {
+                min: Some(10),
+                max: Some(50),
+            },
+        );
+        field.set_value(Cow::Borrowed("100"));
+        let value = i32::clean_value(&field);
+        assert!(matches!(
+            value,
+            Err(FormFieldValidationError::MaximumValueExceeded { max_value: _ })
+        ));
+    }
+
+    #[test]
     fn bool_field_clean_value() {
         let mut field = BoolField::with_options(
             FormFieldOptions {
@@ -690,5 +1109,111 @@ mod tests {
         field.set_value(Cow::Borrowed("true"));
         let value = bool::clean_value(&field).unwrap();
         assert!(value);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn float_field_clean_value() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.0),
+                max: Some(10.0),
+            },
+        );
+        field.set_value(Cow::Borrowed("5.0"));
+        let value = f32::clean_value(&field).unwrap();
+        assert_eq!(value, 5.0f32);
+    }
+
+    #[test]
+    fn float_field_clean_value_min_value_not_met() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(5.0),
+                max: Some(10.0),
+            },
+        );
+        field.set_value(Cow::Borrowed("2.0"));
+        let value = f32::clean_value(&field);
+        assert!(matches!(
+            value,
+            Err(FormFieldValidationError::MinimumValueNotMet { min_value: _ })
+        ));
+    }
+
+    #[test]
+    fn float_field_clean_value_max_value_exceeded() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(5.0),
+                max: Some(10.0),
+            },
+        );
+        field.set_value(Cow::Borrowed("20.0"));
+        let value = f32::clean_value(&field);
+        assert!(matches!(
+            value,
+            Err(FormFieldValidationError::MaximumValueExceeded { max_value: _ })
+        ));
+    }
+
+    #[test]
+    fn float_field_clean_value_nan_and_inf() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.0),
+                max: Some(10.0),
+            },
+        );
+        let bad_inputs = ["NaN", "inf"];
+
+        for &bad_input in &bad_inputs {
+            field.set_value(Cow::Borrowed(bad_input));
+            let value = f32::clean_value(&field);
+            assert_eq!(
+                value,
+                Err(FormFieldValidationError::from_static(
+                    "Cannot have NaN or inf as form input values"
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn float_field_clean_required() {
+        let mut field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.0),
+                max: Some(10.0),
+            },
+        );
+        field.set_value(Cow::Borrowed(""));
+        let value = f32::clean_value(&field);
+        assert_eq!(value, Err(FormFieldValidationError::Required));
     }
 }

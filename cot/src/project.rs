@@ -27,7 +27,6 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
-use bytes::Bytes;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use http::request::Parts;
@@ -50,10 +49,12 @@ use crate::email::{EmailBackend, SmtpConfig, SmtpEmailBackend};
 use crate::error::ErrorRepr;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
+use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{AppName, Request, RequestExt};
-use crate::response::{Response, ResponseExt};
+use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
+use crate::static_files::StaticFile;
 use crate::{Body, Error, StatusCode, cli, error_page};
 
 /// A building block for a Cot project.
@@ -99,7 +100,7 @@ pub trait App: Send + Sync {
     /// # Errors
     ///
     /// This method returns an error if the app fails to initialize.
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     async fn init(&self, context: &mut ProjectContext) -> crate::Result<()> {
         Ok(())
     }
@@ -151,7 +152,7 @@ pub trait App: Send + Sync {
 
     /// Returns a list of static files that the app serves. By default, it
     /// returns an empty list.
-    fn static_files(&self) -> Vec<(String, Bytes)> {
+    fn static_files(&self) -> Vec<StaticFile> {
         vec![]
     }
 }
@@ -283,7 +284,7 @@ pub trait Project {
     ///     }
     /// }
     /// ```
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn register_tasks(&self, cli: &mut Cli) {}
 
     /// Registers the apps for the project.
@@ -308,7 +309,7 @@ pub trait Project {
     ///     }
     /// }
     /// ```
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {}
 
     /// Sets the authentication backend to use.
@@ -334,7 +335,7 @@ pub trait Project {
     /// }
     /// ```
     fn auth_backend(&self, context: &AuthBackendContext) -> Arc<dyn AuthBackend> {
-        #[allow(trivial_casts)] // cast to Arc<dyn AuthBackend>
+        #[expect(trivial_casts)] // cast to Arc<dyn AuthBackend>
         match &context.config().auth_backend {
             AuthBackendConfig::None => Arc::new(NoAuthBackend) as Arc<dyn AuthBackend>,
             #[cfg(feature = "db")]
@@ -376,7 +377,7 @@ pub trait Project {
     ///     }
     /// }
     /// ```
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn middlewares(
         &self,
         handler: RootHandlerBuilder,
@@ -686,12 +687,12 @@ impl AppBuilder {
     ///     }
     /// }
     /// ```
-    pub fn register_with_views<T: App + 'static>(&mut self, module: T, url_prefix: &str) {
-        let mut router = module.router();
-        router.set_app_name(AppName(module.name().to_owned()));
+    pub fn register_with_views<T: App + 'static>(&mut self, app: T, url_prefix: &str) {
+        let mut router = app.router();
+        router.set_app_name(AppName(app.name().to_owned()));
 
         self.urls.push(Route::with_router(url_prefix, router));
-        self.register(module);
+        self.register(app);
     }
 }
 
@@ -763,20 +764,18 @@ pub trait ErrorPageHandler: Send + Sync {
 struct DefaultNotFoundHandler;
 impl ErrorPageHandler for DefaultNotFoundHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::NOT_FOUND,
-            Body::fixed(include_str!("../templates/404.html")),
-        ))
+        Html::new(include_str!("../templates/404.html"))
+            .with_status(StatusCode::NOT_FOUND)
+            .into_response()
     }
 }
 
 struct DefaultServerErrorHandler;
 impl ErrorPageHandler for DefaultServerErrorHandler {
     fn handle(&self) -> crate::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Body::fixed(include_str!("../templates/500.html")),
-        ))
+        Html::new(include_str!("../templates/500.html"))
+            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
+            .into_response()
     }
 }
 
@@ -895,7 +894,7 @@ impl<S: BootstrapPhase> Bootstrapper<S> {
 }
 
 impl Bootstrapper<Uninitialized> {
-    #[allow(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
+    #[expect(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
     async fn run_cli(self) -> cot::Result<()> {
         let mut cli = Cli::new();
 
@@ -1042,7 +1041,7 @@ impl Bootstrapper<WithConfig> {
     /// # }
     /// ```
     // Send not needed; Bootstrapper is run async in a single thread
-    #[allow(clippy::future_not_send)]
+    #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_apps().boot().await
     }
@@ -1127,7 +1126,7 @@ impl Bootstrapper<WithApps> {
     /// # }
     /// ```
     // Send not needed; Bootstrapper is run async in a single thread
-    #[allow(clippy::future_not_send)]
+    #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_database().await?.boot().await
     }
@@ -1165,7 +1164,7 @@ impl Bootstrapper<WithApps> {
     /// # }
     /// ```
     // Send not needed; Bootstrapper is run async in a single thread
-    #[allow(clippy::future_not_send)]
+    #[expect(clippy::future_not_send)]
     pub async fn with_database(self) -> cot::Result<Bootstrapper<WithDatabase>> {
         #[cfg(feature = "db")]
         let database = Self::init_database(&self.context.config.database).await?;
@@ -1230,7 +1229,7 @@ impl Bootstrapper<WithDatabase> {
     /// ```
     // Function marked `async` to be consistent with the other `boot` methods
     // Send not needed; Bootstrapper is run async in a single thread
-    #[allow(clippy::unused_async, clippy::future_not_send)]
+    #[expect(clippy::unused_async, clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler = RootHandlerBuilder {
@@ -1615,6 +1614,7 @@ impl ProjectContext<WithDatabase> {
     }
 }
 impl ProjectContext<Initialized> {
+    #[cfg(feature = "test")]
     pub(crate) fn initialized(
         config: <Initialized as BootstrapPhase>::Config,
         apps: <Initialized as BootstrapPhase>::Apps,
@@ -1779,7 +1779,7 @@ impl<S: BootstrapPhase<EmailBackend = Option<Arc<Mutex<SmtpEmailBackend>>>>> Pro
 ///
 /// This function returns an error if the server fails to start.
 // Send not needed; Bootstrapper/CLI is run async in a single thread
-#[allow(clippy::future_not_send)]
+#[expect(clippy::future_not_send)]
 pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> cot::Result<()> {
     let listener = tokio::net::TcpListener::bind(address_str)
         .await
@@ -1795,17 +1795,40 @@ pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> 
 ///
 /// If you need more control over the server listening socket, such as modifying
 /// the underlying buffer sizes, you can create a [`tokio::net::TcpListener`]
-/// and pass it to this function. Otherwise, [`run`] function will be more
+/// and pass it to this function. Otherwise, the [`run`] function will be more
 /// convenient.
 ///
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
 // Send not needed; Bootstrapper/CLI is run async in a single thread
-#[allow(clippy::future_not_send)]
+#[expect(clippy::future_not_send)]
 pub async fn run_at(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
+) -> cot::Result<()> {
+    run_at_with_shutdown(bootstrapper, listener, shutdown_signal()).await
+}
+
+/// Runs the Cot project on the given listener.
+///
+/// This function takes a Cot project and a [`tokio::net::TcpListener`] and
+/// runs the project on the given listener, similarly to the [`run_at`]
+/// function. In addition to that, it takes a shutdown signal that can be used
+/// to gracefully shut down the server in a response to a signal or other event.
+///
+/// If you don't need to customize shutdown signal handling, you should instead
+/// use the [`run`] or [`run_at`] functions, as they are more convenient.
+///
+/// # Errors
+///
+/// This function returns an error if the server fails to start.
+// Send not needed; Bootstrapper/CLI is run async in a single thread
+#[expect(clippy::future_not_send)]
+pub async fn run_at_with_shutdown(
+    bootstrapper: Bootstrapper<Initialized>,
+    listener: tokio::net::TcpListener,
+    shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> cot::Result<()> {
     let not_found_handler: Arc<dyn ErrorPageHandler> =
         bootstrapper.project().not_found_handler().into();
@@ -1895,7 +1918,7 @@ pub async fn run_at(
         std::panic::set_hook(Box::new(new_hook));
     }
     axum::serve(listener, handler.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal)
         .await
         .map_err(|e| ErrorRepr::StartServer { source: e })?;
     if register_panic_hook {
@@ -1990,7 +2013,7 @@ fn build_custom_error_page(
 /// # Ok(())
 /// # }
 /// ```
-#[allow(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
+#[expect(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
 pub async fn run_cli(project: impl Project + 'static) -> cot::Result<()> {
     Bootstrapper::new(project).run_cli().await
 }

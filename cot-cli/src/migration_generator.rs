@@ -10,6 +10,7 @@ use cot::db::migrations::{DynMigration, MigrationEngine};
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::SymbolResolver;
 use darling::FromMeta;
+use heck::ToSnakeCase;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use proc_macro2::TokenStream;
@@ -20,30 +21,21 @@ use tracing::{debug, trace};
 use crate::utils::{CargoTomlManager, PackageManager, StatusType, print_status_msg};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
-    if let Some(manager) = CargoTomlManager::from_path(path)? {
-        if let Some(app_name) = &options.app_name {
-            match manager.get_package_manager(app_name) {
-                Some(package_manager) => {
-                    make_package_migrations(package_manager, options)?;
-                    return Ok(());
-                }
-                None => {
-                    bail!("Package manager not found for the specified app name.")
-                }
-            }
-        }
-
-        match manager {
-            CargoTomlManager::Workspace(workspace) => {
-                for package in workspace.get_packages() {
-                    make_package_migrations(package, options.clone())?;
-                }
-                Ok(())
-            }
-            CargoTomlManager::Package(package) => make_package_migrations(&package, options),
-        }
-    } else {
+    let Some(manager) = CargoTomlManager::from_path(path)? else {
         bail!("Cargo.toml not found in the specified directory or any parent directory.")
+    };
+
+    match manager {
+        CargoTomlManager::Workspace(workspace) => {
+            let Some(package) = workspace.get_current_package_manager() else {
+                bail!(
+                    "Generating migrations for workspaces is not supported yet. \
+                        Please generate migrations for each package separately."
+                );
+            };
+            make_package_migrations(package, options)
+        }
+        CargoTomlManager::Package(package) => make_package_migrations(&package, options),
     }
 }
 
@@ -58,6 +50,14 @@ fn make_package_migrations(
     let migrations = generator
         .generate_migrations_as_source()
         .context("unable to generate migrations")?;
+    let Some(migrations) = migrations else {
+        print_status_msg(
+            StatusType::Notice,
+            "No changes in models detected; no migrations were generated",
+        );
+        return Ok(());
+    };
+
     generator
         .write_migrations(&migrations)
         .context("unable to write migrations")?;
@@ -124,7 +124,7 @@ impl MigrationGenerator {
         }
     }
 
-    pub fn generate_migrations_as_source(&self) -> anyhow::Result<MigrationAsSource> {
+    pub fn generate_migrations_as_source(&self) -> anyhow::Result<Option<MigrationAsSource>> {
         let source_files = self.get_source_files()?;
         self.generate_migrations_as_source_from_files(source_files)
     }
@@ -132,14 +132,15 @@ impl MigrationGenerator {
     pub fn generate_migrations_as_source_from_files(
         &self,
         source_files: Vec<SourceFile>,
-    ) -> anyhow::Result<MigrationAsSource> {
-        if let Some(migration) = self.generate_migrations_as_generated_from_files(source_files)? {
-            let migration_name = migration.migration_name.clone();
-            let content = self.generate_migration_file_content(migration);
-            Ok(MigrationAsSource::new(migration_name, content))
-        } else {
-            bail!("unable to generate migrations from source files")
-        }
+    ) -> anyhow::Result<Option<MigrationAsSource>> {
+        let migrations = self
+            .generate_migrations_as_generated_from_files(source_files)?
+            .map(|migration| {
+                let migration_name = migration.migration_name.clone();
+                let content = self.generate_migration_file_content(migration);
+                MigrationAsSource::new(migration_name, content)
+            });
+        Ok(migrations)
     }
 
     /// Generate migrations and return internal structures that can be used to
@@ -280,8 +281,12 @@ impl MigrationGenerator {
                         symbol_resolver.resolve_struct(&mut item);
 
                         let args = Self::model_args_from_attr(&path, attr)?;
-                        let model_in_source =
-                            ModelInSource::from_item(item, &args, &symbol_resolver)?;
+                        let model_in_source = ModelInSource::from_item(
+                            self.crate_name.as_str(),
+                            item,
+                            &args,
+                            &symbol_resolver,
+                        )?;
 
                         match args.model_type {
                             ModelType::Application => {
@@ -373,7 +378,10 @@ impl MigrationGenerator {
                     modified_models.push(app_model.clone());
                 }
                 (Some(&app_model), Some(&migration_model)) => {
-                    if app_model.model != migration_model.model {
+                    if app_model.model.table_name != migration_model.model.table_name
+                        || app_model.model.pk_field != migration_model.model.pk_field
+                        || app_model.model.fields != migration_model.model.fields
+                    {
                         modified_models.push(app_model.clone());
                         operations.extend(
                             MigrationOperationGenerator::make_alter_model_operations(
@@ -685,7 +693,7 @@ impl MigrationOperationGenerator {
             StatusType::Adding,
             &format!(
                 "Field '{}' to Model '{}'",
-                &field.field_name, app_model.model.name
+                &field.name, app_model.model.name
             ),
         );
 
@@ -699,7 +707,7 @@ impl MigrationOperationGenerator {
             StatusType::Added,
             &format!(
                 "Field '{}' to Model '{}'",
-                &field.field_name, app_model.model.name
+                &field.name, app_model.model.name
             ),
         );
 
@@ -720,19 +728,18 @@ impl MigrationOperationGenerator {
             StatusType::Modifying,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
+                &migration_field.name, migration_model.model.name
             ),
         );
 
         todo!();
 
-        // line below should be removed once todo is implemented
-        #[allow(unreachable_code)]
+        #[expect(unreachable_code)]
         print_status_msg(
             StatusType::Modified,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
+                &migration_field.name, migration_model.model.name
             ),
         );
     }
@@ -746,7 +753,7 @@ impl MigrationOperationGenerator {
             StatusType::Removing,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
+                &migration_field.name, migration_model.model.name
             ),
         );
 
@@ -760,7 +767,7 @@ impl MigrationOperationGenerator {
             StatusType::Removed,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.field_name, migration_model.model.name
+                &migration_field.name, migration_model.model.name
             ),
         );
 
@@ -890,6 +897,7 @@ pub struct ModelInSource {
 
 impl ModelInSource {
     fn from_item(
+        app_name: &str,
         item: syn::ItemStruct,
         args: &ModelArgs,
         symbol_resolver: &SymbolResolver,
@@ -897,7 +905,8 @@ impl ModelInSource {
         let input: syn::DeriveInput = item.clone().into();
         let opts = ModelOpts::new_from_derive_input(&input)
             .map_err(|e| anyhow::anyhow!("cannot parse model: {}", e))?;
-        let model = opts.as_model(args, symbol_resolver)?;
+        let mut model = opts.as_model(args, symbol_resolver)?;
+        model.table_name = format!("{}__{}", app_name.to_snake_case(), model.table_name);
 
         Ok(Self {
             model_item: item,
@@ -1114,7 +1123,6 @@ impl GeneratedMigration {
     /// operation that creates given model.
     #[must_use]
     fn get_create_ops_map(operations: &[DynOperation]) -> HashMap<syn::Type, usize> {
-        #[allow(clippy::match_wildcard_for_single_variants)] // we only care about CreateModel here
         operations
             .iter()
             .enumerate()
@@ -1466,7 +1474,7 @@ mod tests {
                 table_name: "table2".to_string(),
                 model_ty: parse_quote!(Table2),
                 field: Box::new(Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(i32),
                     auto_value: false,
@@ -1506,7 +1514,7 @@ mod tests {
                 table_name: "table1".to_string(),
                 model_ty: parse_quote!(Table1),
                 fields: vec![Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(ForeignKey<Table2>),
                     auto_value: false,
@@ -1521,7 +1529,7 @@ mod tests {
                 table_name: "table2".to_string(),
                 model_ty: parse_quote!(Table2),
                 fields: vec![Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(ForeignKey<Table1>),
                     auto_value: false,
@@ -1568,7 +1576,7 @@ mod tests {
             table_name: "table1".to_string(),
             model_ty: parse_quote!(Table1),
             fields: vec![Field {
-                field_name: format_ident!("field1"),
+                name: format_ident!("field1"),
                 column_name: "field1".to_string(),
                 ty: parse_quote!(ForeignKey<Table2>),
                 auto_value: false,
@@ -1623,7 +1631,7 @@ mod tests {
             table_name: "table1".to_string(),
             model_ty: parse_quote!(Table1),
             fields: vec![Field {
-                field_name: format_ident!("field1"),
+                name: format_ident!("field1"),
                 column_name: "field1".to_string(),
                 ty: parse_quote!(ForeignKey<Table2>),
                 auto_value: false,
@@ -1652,7 +1660,7 @@ mod tests {
                 table_name: "table1".to_string(),
                 model_ty: parse_quote!(Table1),
                 fields: vec![Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(ForeignKey<Table2>),
                     auto_value: false,
@@ -1667,7 +1675,7 @@ mod tests {
                 table_name: "table3".to_string(),
                 model_ty: parse_quote!(Table3),
                 fields: vec![Field {
-                    field_name: format_ident!("field2"),
+                    name: format_ident!("field2"),
                     column_name: "field2".to_string(),
                     ty: parse_quote!(ForeignKey<Table4>),
                     auto_value: false,
@@ -1707,7 +1715,7 @@ mod tests {
                 model_type: ModelType::default(),
                 table_name: "test_model".to_string(),
                 pk_field: Field {
-                    field_name: format_ident!("id"),
+                    name: format_ident!("id"),
                     column_name: "id".to_string(),
                     ty: parse_quote!(i32),
                     auto_value: true,
@@ -1716,7 +1724,7 @@ mod tests {
                     foreign_key: None,
                 },
                 fields: vec![Field {
-                    field_name: format_ident!("field1"),
+                    name: format_ident!("field1"),
                     column_name: "field1".to_string(),
                     ty: parse_quote!(String),
                     auto_value: false,
@@ -1745,7 +1753,7 @@ mod tests {
                 model_type: ModelType::default(),
                 table_name: "test_model".to_string(),
                 pk_field: Field {
-                    field_name: format_ident!("id"),
+                    name: format_ident!("id"),
                     column_name: "id".to_string(),
                     ty: parse_quote!(i32),
                     auto_value: true,
@@ -1755,7 +1763,7 @@ mod tests {
                 },
                 fields: vec![
                     Field {
-                        field_name: format_ident!("field1"),
+                        name: format_ident!("field1"),
                         column_name: "field1".to_string(),
                         ty: parse_quote!(String),
                         auto_value: false,
@@ -1764,7 +1772,7 @@ mod tests {
                         foreign_key: None,
                     },
                     Field {
-                        field_name: format_ident!("field2"),
+                        name: format_ident!("field2"),
                         column_name: "field2".to_string(),
                         ty: parse_quote!(f32),
                         auto_value: false,
@@ -1781,7 +1789,7 @@ mod tests {
     fn make_add_field_operation() {
         let app_model = get_test_model();
         let field = Field {
-            field_name: format_ident!("new_field"),
+            name: format_ident!("new_field"),
             column_name: "new_field".to_string(),
             ty: parse_quote!(i32),
             auto_value: false,
@@ -1930,7 +1938,7 @@ mod tests {
             table_name: "test_table".to_string(),
             model_ty: parse_quote!(TestModel),
             field: Box::new(Field {
-                field_name: format_ident!("test_field"),
+                name: format_ident!("test_field"),
                 column_name: "test_field".to_string(),
                 ty: parse_quote!(String),
                 auto_value: false,

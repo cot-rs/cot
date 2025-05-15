@@ -44,16 +44,16 @@ h1 {
     padding: 0.5rem;
     font-size: 2rem;
     font-weight: lighter;
-}
 
-h1.error {
-    background-color: #ff3f4fff;
-    color: #fff;
-}
+    &.error {
+        background-color: #ff3f4fff;
+        color: #fff;
+    }
 
-h1.warning {
-    background-color: #ffdb5b;
-    color: #000;
+    &.warning {
+        background-color: #ffdb5b;
+        color: #000;
+    }
 }
 
 h2 {
@@ -71,37 +71,36 @@ table {
     font-size: .9rem;
     background-color: #fff;
 
-}
+    &, th, td {
+        border: 1px solid #d9dde1;
+        border-collapse: collapse;
+    }
 
-table, th, td {
-    border: 1px solid #d9dde1;
-    border-collapse: collapse;
-}
+    & > thead {
+        vertical-align: bottom;
+    }
 
-table.compact {
-    font-size: 0.75rem;
-}
+    th {
+        font-weight: bold;
 
-table > thead {
-    vertical-align: bottom;
-}
+        &.index {
+            text-align: right;
+        }
+    }
 
-table th {
-    font-weight: bold;
-}
+    th, td {
+        padding: .4rem;
+        border-bottom-color: #d9dde1;
+        border-bottom-width: 1px;
+    }
 
-table th.index {
-    text-align: right;
-}
+    &.compact {
+        font-size: 0.75rem;
 
-table th, table td {
-    padding: .4rem;
-    border-bottom-color: #d9dde1;
-    border-bottom-width: 1px;
-}
-
-table.compact th, table.compact td {
-    padding: .1rem .25rem;
+        th, td {
+            padding: .1rem .25rem;
+        }
+    }
 }
 
 pre {
@@ -109,16 +108,16 @@ pre {
     word-wrap: break-word;
 
     font-family: "Noto Sans Mono", monospace;
-}
 
-pre.small {
-    font-size: .75rem;
-}
+    &.small {
+        font-size: .75rem;
+    }
 
-pre.config {
-    background-color: #fff;
-    border: 1px solid #d9dde1;
-    padding: 1em;
+    &.config {
+        background-color: #fff;
+        border: 1px solid #d9dde1;
+        padding: 1em;
+    }
 }
 
 samp {
@@ -140,27 +139,29 @@ samp {
     vertical-align: baseline;
 }
 
-.backtrace-table .frame .symbol-name {
-    font-weight: bold;
-}
-
-.backtrace-table .frame .symbol-location {
-    padding-left: 4em;
-}
-
 .backtrace-table {
     display: table;
-}
 
-.backtrace-table .backtrace-row {
-    display: table-row;
-}
+    .backtrace-row {
+        display: table-row;
+    }
 
-.backtrace-table .backtrace-cell {
-    display: table-cell;
-}
+    .backtrace-cell {
+        display: table-cell;
+    }
 
-.backtrace-table .frame-index {
-    text-align: right;
-    padding-right: .5em;
+    .frame-index {
+        text-align: right;
+        padding-right: .5em;
+    }
+
+    .backtrace-table .frame {
+        .symbol-name {
+            font-weight: bold;
+        }
+
+        .symbol-location {
+            padding-left: 4em;
+        }
+    }
 }

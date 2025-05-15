@@ -6,8 +6,10 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
+use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
+use cot::request::extractors::StaticFiles;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.
@@ -18,18 +20,20 @@ use bytes::Bytes;
 pub use cot_macros::AdminModel;
 use derive_more::Debug;
 use http::request::Parts;
-use rinja::Template;
 use serde::Deserialize;
 
-use crate::auth::{Auth, Password};
+use crate::auth::Auth;
+use crate::common_types::Password;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
+use crate::html::Html;
 use crate::request::extractors::{FromRequestParts, Path, UrlQuery};
 use crate::request::{Request, RequestExt};
-use crate::response::{Response, ResponseExt};
+use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
-use crate::{App, Body, Error, Method, RequestHandler, StatusCode, reverse_redirect, static_files};
+use crate::static_files::StaticFile;
+use crate::{App, Error, Method, RequestHandler, reverse_redirect};
 
 struct AdminAuthenticated<T, H: Send + Sync>(H, PhantomData<fn() -> T>);
 
@@ -51,26 +55,38 @@ impl<T, H: RequestHandler<T> + Send + Sync> RequestHandler<T> for AdminAuthentic
     }
 }
 
-async fn index(
+#[derive(Debug)]
+struct BaseContext {
     urls: Urls,
+    static_files: StaticFiles,
+}
+
+impl FromRequestParts for BaseContext {
+    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+        let urls = Urls::from_request_parts(parts).await?;
+        let static_files = StaticFiles::from_request_parts(parts).await?;
+
+        Ok(Self { urls, static_files })
+    }
+}
+
+async fn index(
+    base_context: BaseContext,
     AdminModelManagers(managers): AdminModelManagers,
-) -> crate::Result<Response> {
+) -> crate::Result<Html> {
     #[derive(Debug, Template)]
     #[template(path = "admin/model_list.html")]
     struct ModelListTemplate<'a> {
-        urls: &'a Urls,
+        ctx: &'a BaseContext,
         #[debug("..")]
         model_managers: Vec<Box<dyn AdminModelManager>>,
     }
 
     let template = ModelListTemplate {
-        urls: &urls,
+        ctx: &base_context,
         model_managers: managers,
     };
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Ok(Html::new(template.render()?))
 }
 
 #[derive(Debug, Form)]
@@ -79,11 +95,15 @@ struct LoginForm {
     password: Password,
 }
 
-async fn login(urls: Urls, auth: Auth, mut request: Request) -> crate::Result<Response> {
+async fn login(
+    base_context: BaseContext,
+    auth: Auth,
+    mut request: Request,
+) -> crate::Result<Response> {
     #[derive(Debug, Template)]
     #[template(path = "admin/login.html")]
     struct LoginTemplate<'a> {
-        urls: &'a Urls,
+        ctx: &'a BaseContext,
         form: <LoginForm as Form>::Context,
     }
 
@@ -94,7 +114,7 @@ async fn login(urls: Urls, auth: Auth, mut request: Request) -> crate::Result<Re
         match login_form {
             FormResult::Ok(login_form) => {
                 if authenticate(&auth, login_form).await? {
-                    return Ok(reverse_redirect!(urls, "index")?);
+                    return Ok(reverse_redirect!(base_context.urls, "index")?);
                 }
 
                 let mut context = LoginForm::build_context(&mut request).await?;
@@ -111,13 +131,10 @@ async fn login(urls: Urls, auth: Auth, mut request: Request) -> crate::Result<Re
     };
 
     let template = LoginTemplate {
-        urls: &urls,
+        ctx: &base_context,
         form: login_form_context,
     };
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Html::new(template.render()?).into_response()
 }
 
 async fn authenticate(auth: &Auth, login_form: LoginForm) -> cot::Result<bool> {
@@ -177,7 +194,7 @@ struct PaginationParams {
 }
 
 async fn view_model(
-    urls: Urls,
+    base_context: BaseContext,
     managers: AdminModelManagers,
     Path(model_name): Path<String>,
     UrlQuery(pagination_params): UrlQuery<PaginationParams>,
@@ -186,7 +203,7 @@ async fn view_model(
     #[derive(Debug, Template)]
     #[template(path = "admin/model.html")]
     struct ModelTemplate<'a> {
-        urls: &'a Urls,
+        ctx: &'a BaseContext,
         #[debug("..")]
         model: &'a dyn AdminModelManager,
         #[debug("..")]
@@ -207,7 +224,7 @@ async fn view_model(
     let total_object_counts = manager.get_total_object_counts(&request).await?;
     let total_pages = total_object_counts.div_ceil(page_size);
 
-    if page == 0 || page > total_pages {
+    if (page == 0 || page > total_pages) && total_pages > 0 {
         return Err(Error::not_found_message(format!("page {page} not found")));
     }
 
@@ -216,7 +233,7 @@ async fn view_model(
     let objects = manager.get_objects(&request, pagination).await?;
 
     let template = ModelTemplate {
-        urls: &urls,
+        ctx: &base_context,
         model: &*manager,
         objects,
         page,
@@ -225,32 +242,36 @@ async fn view_model(
         total_pages,
     };
 
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Html::new(template.render()?).into_response()
 }
 
 async fn create_model_instance(
-    urls: Urls,
+    base_context: BaseContext,
     managers: AdminModelManagers,
     Path(model_name): Path<String>,
     request: Request,
 ) -> cot::Result<Response> {
-    edit_model_instance_impl(urls, managers, request, &model_name, None).await
+    edit_model_instance_impl(base_context, managers, request, &model_name, None).await
 }
 
 async fn edit_model_instance(
-    urls: Urls,
+    base_context: BaseContext,
     managers: AdminModelManagers,
     Path((model_name, object_id)): Path<(String, String)>,
     request: Request,
 ) -> cot::Result<Response> {
-    edit_model_instance_impl(urls, managers, request, &model_name, Some(&object_id)).await
+    edit_model_instance_impl(
+        base_context,
+        managers,
+        request,
+        &model_name,
+        Some(&object_id),
+    )
+    .await
 }
 
 async fn edit_model_instance_impl(
-    urls: Urls,
+    base_context: BaseContext,
     managers: AdminModelManagers,
     mut request: Request,
     model_name: &str,
@@ -259,7 +280,7 @@ async fn edit_model_instance_impl(
     #[derive(Debug, Template)]
     #[template(path = "admin/model_edit.html")]
     struct ModelEditTemplate<'a> {
-        urls: &'a Urls,
+        ctx: &'a BaseContext,
         #[debug("..")]
         model: &'a dyn AdminModelManager,
         form_context: Box<dyn FormContext>,
@@ -275,7 +296,7 @@ async fn edit_model_instance_impl(
             form_context
         } else {
             return Ok(reverse_redirect!(
-                urls,
+                base_context.urls,
                 "view_model",
                 model_name = manager.url_name()
             )?);
@@ -289,20 +310,17 @@ async fn edit_model_instance_impl(
     };
 
     let template = ModelEditTemplate {
-        urls: &urls,
+        ctx: &base_context,
         model: &*manager,
         form_context,
         is_edit: object_id.is_some(),
     };
 
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Html::new(template.render()?).into_response()
 }
 
 async fn remove_model_instance(
-    urls: Urls,
+    base_context: BaseContext,
     managers: AdminModelManagers,
     Path((model_name, object_id)): Path<(String, String)>,
     mut request: Request,
@@ -310,7 +328,7 @@ async fn remove_model_instance(
     #[derive(Debug, Template)]
     #[template(path = "admin/model_remove.html")]
     struct ModelRemoveTemplate<'a> {
-        urls: &'a Urls,
+        ctx: &'a BaseContext,
         #[debug("..")]
         model: &'a dyn AdminModelManager,
         #[debug("..")]
@@ -324,21 +342,18 @@ async fn remove_model_instance(
         manager.remove_by_id(&mut request, &object_id).await?;
 
         Ok(reverse_redirect!(
-            urls,
+            base_context.urls,
             "view_model",
             model_name = manager.url_name()
         )?)
     } else {
         let template = ModelRemoveTemplate {
-            urls: &urls,
+            ctx: &base_context,
             model: &*manager,
             object: &*object,
         };
 
-        Ok(Response::new_html(
-            StatusCode::OK,
-            Body::fixed(template.render()?),
-        ))
+        Html::new(template.render()?).into_response()
     }
 }
 
@@ -492,7 +507,7 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         request: &Request,
         pagination: Pagination,
     ) -> cot::Result<Vec<Box<dyn AdminModel>>> {
-        #[allow(trivial_casts)] // Upcast to the correct Box type
+        #[expect(trivial_casts)] // Upcast to the correct Box type
         T::get_objects(request, pagination).await.map(|objects| {
             objects
                 .into_iter()
@@ -506,7 +521,7 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         request: &Request,
         id: &str,
     ) -> cot::Result<Option<Box<dyn AdminModel>>> {
-        #[allow(trivial_casts)] // Upcast to the correct Box type
+        #[expect(trivial_casts)] // Upcast to the correct Box type
         T::get_object_by_id(request, id)
             .await
             .map(|object| object.map(|object| Box::new(object) as Box<dyn AdminModel>))
@@ -540,6 +555,11 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
 
 /// A model that can be managed by the admin panel.
 #[async_trait]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement the `AdminModel` trait",
+    label = "`{Self}` is not an admin model",
+    note = "add #[derive(cot::admin::AdminModel)] to the struct to automatically derive the trait"
+)]
 pub trait AdminModel: Any + Send + 'static {
     /// Returns the object as an `Any` trait object.
     // TODO: consider removing this when Rust trait_upcasting is stabilized and we
@@ -695,7 +715,13 @@ impl App for AdminApp {
         ])
     }
 
-    fn static_files(&self) -> Vec<(String, Bytes)> {
-        static_files!("admin/admin.css")
+    fn static_files(&self) -> Vec<StaticFile> {
+        vec![StaticFile::new(
+            "admin/admin.css",
+            Bytes::from_static(include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/static/admin/admin.css"
+            ))),
+        )]
     }
 }

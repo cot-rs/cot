@@ -15,7 +15,7 @@ use syn::{ItemFn, parse_macro_input};
 use crate::admin::impl_admin_model_for_struct;
 use crate::dbtest::fn_to_dbtest;
 use crate::form::impl_form_for_struct;
-use crate::main_fn::{fn_to_cot_main, fn_to_cot_test};
+use crate::main_fn::{fn_to_cot_e2e_test, fn_to_cot_main, fn_to_cot_test};
 use crate::model::impl_model_for_struct;
 use crate::query::{Query, query_to_tokens};
 
@@ -114,6 +114,20 @@ pub fn model(args: TokenStream, input: TokenStream) -> TokenStream {
     token_stream.into()
 }
 
+// Simple derive macro that doesn't do anything useful but defines the `model`
+// helper attribute.
+//
+// It's used internally by the `model` macro to avoid having to remove the
+// `#[model]` attributes from the struct fields. Typically, the Rust compiler
+// complains when there are unused attributes, so we define this macro to avoid
+// that. This way, we don't have to remove the `#[model]` attributes from the
+// struct fields, while other derive macros (such as `AdminModel`) can still use
+// them.
+#[proc_macro_derive(ModelHelper, attributes(model))]
+pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
+    TokenStream::new()
+}
+
 #[proc_macro]
 pub fn query(input: TokenStream) -> TokenStream {
     let query_input = parse_macro_input!(input as Query);
@@ -128,39 +142,6 @@ pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// An attribute macro that defines an entry point to a Cot-powered app.
-///
-/// This macro is meant to wrap a function returning a structure implementing
-/// [`CotProject`]. It should just initialize a [`CotProject`] and return it,
-/// while the macro takes care of initializing an async runtime, creating a CLI
-/// and running the app.
-///
-/// # Examples
-///
-/// ```no_run
-/// use cot::project::RegisterAppsContext;
-/// use cot::{App, AppBuilder, Project};
-///
-/// struct HelloApp;
-///
-/// impl App for HelloApp {
-///     fn name(&self) -> &'static str {
-///         env!("CARGO_PKG_NAME")
-///     }
-/// }
-///
-/// struct HelloProject;
-/// impl Project for HelloProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
-///         apps.register_with_views(HelloApp, "");
-///     }
-/// }
-///
-/// #[cot::main]
-/// fn main() -> impl Project {
-///     HelloProject
-/// }
-/// ```
 #[proc_macro_attribute]
 pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);
@@ -191,6 +172,12 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn test(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);
     fn_to_cot_test(&fn_input).into()
+}
+
+#[proc_macro_attribute]
+pub fn e2e_test(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let fn_input = parse_macro_input!(input as ItemFn);
+    fn_to_cot_e2e_test(&fn_input).into()
 }
 
 pub(crate) fn cot_ident() -> proc_macro2::TokenStream {

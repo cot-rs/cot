@@ -9,5 +9,9 @@ type = "database"
 [middlewares]
 live_reload.enabled = true
 
+[static_files]
+rewrite = "query_param"
+cache_timeout = "1year"
+
 [middlewares.session]
 secure = false

@@ -3,8 +3,10 @@ name = "example-json"
 version = "0.1.0"
 publish = false
 description = "JSON - Cot example."
-edition = "2021"
+license = "MIT OR Apache-2.0"
+edition = "2024"
 
 [dependencies]
-cot = { path = "../../cot" }
+cot = { path = "../../cot", features = ["openapi", "swagger-ui"] }
 serde = "1"
+schemars = "0.8"

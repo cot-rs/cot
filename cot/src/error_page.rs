@@ -2,7 +2,7 @@ use std::any::Any;
 use std::panic::PanicHookInfo;
 use std::sync::Arc;
 
-use rinja::Template;
+use askama::Template;
 use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
@@ -54,6 +54,10 @@ struct ErrorPageTemplate {
     route_data: Vec<RouteData>,
     request_data: Option<RequestData>,
     project_config: String,
+}
+
+fn error_css() -> &'static str {
+    include_str!(concat!(env!("OUT_DIR"), "/templates/css/error.css"))
 }
 
 #[derive(Debug, Default, Clone)]
@@ -274,7 +278,6 @@ pub(super) fn handle_response_panic(
     log_panic(
         panic_payload,
         panic_location.as_deref(),
-        backtrace.as_ref(),
         request_data.as_ref(),
     );
     build_response(
@@ -310,6 +313,10 @@ fn build_response(
     match response_string {
         Ok(error_str) => axum::response::Response::builder()
             .status(status_code)
+            .header(
+                http::header::CONTENT_TYPE,
+                crate::headers::HTML_CONTENT_TYPE,
+            )
             .body(axum::body::Body::new(error_str))
             .unwrap_or_else(|_| build_cot_failure_page()),
         Err(error) => {
@@ -397,8 +404,7 @@ fn log_error(error: &Error, request_data: Option<&RequestData>) {
     let span = tracing::span!(Level::ERROR,
         "request_error",
         error_type = %error.inner,
-        error_message = %error,
-        backtrace = ?error.backtrace()
+        error_message = %error
     );
     let _enter = span.enter();
     if let Some(req) = request_data {
@@ -411,15 +417,13 @@ fn log_error(error: &Error, request_data: Option<&RequestData>) {
 fn log_panic(
     panic_payload: &Box<dyn Any + Send>,
     panic_location: Option<&str>,
-    backtrace: Option<&Backtrace>,
     request_data: Option<&RequestData>,
 ) {
     let span = tracing::span!(
         Level::ERROR,
         "request_panic",
         panic_message = ?ErrorPageTemplateBuilder::get_panic_string(panic_payload),
-        location = ?panic_location,
-        backtrace = ?backtrace
+        location = ?panic_location
     );
     let _enter = span.enter();
     if let Some(req) = request_data {
@@ -481,15 +485,9 @@ mod tests {
     fn test_log_panic() {
         let panic_payload: Box<dyn Any + Send> = Box::new("Test panic");
         let panic_location = Some("src/test.rs:10");
-        let backtrace = Some(__cot_create_backtrace());
         let request_data = Some(create_test_request_data());
 
-        log_panic(
-            &panic_payload,
-            panic_location,
-            backtrace.as_ref(),
-            request_data.as_ref(),
-        );
+        log_panic(&panic_payload, panic_location, request_data.as_ref());
 
         assert!(logs_contain("Request handler panicked"));
         assert!(logs_contain("Test panic"));

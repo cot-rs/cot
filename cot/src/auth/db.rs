@@ -20,9 +20,10 @@ use thiserror::Error;
 use crate::App;
 use crate::admin::{AdminModelManager, DefaultAdminModelManager};
 use crate::auth::{
-    AuthBackend, AuthError, Password, PasswordHash, PasswordVerificationResult, Result,
-    SessionAuthHash, User, UserId,
+    AuthBackend, AuthError, PasswordHash, PasswordVerificationResult, Result, SessionAuthHash,
+    User, UserId,
 };
+use crate::common_types::Password;
 use crate::config::SecretKey;
 use crate::db::migrations::SyncDynMigration;
 use crate::db::{Database, DatabaseBackend, LimitedString, Model, model, query};
@@ -532,7 +533,7 @@ impl AuthBackend for DatabaseUserBackend {
         credentials: &(dyn Any + Send + Sync),
     ) -> Result<Option<Box<dyn User + Send + Sync>>> {
         if let Some(credentials) = credentials.downcast_ref::<DatabaseUserCredentials>() {
-            #[allow(trivial_casts)] // Upcast to the correct Box type
+            #[expect(trivial_casts)] // Upcast to the correct Box type
             Ok(DatabaseUser::authenticate(&self.database, credentials)
                 .await
                 .map(|user| user.map(|user| Box::new(user) as Box<dyn User + Send + Sync>))?)
@@ -546,7 +547,7 @@ impl AuthBackend for DatabaseUserBackend {
             return Err(AuthError::UserIdTypeNotSupported);
         };
 
-        #[allow(trivial_casts)] // Upcast to the correct Box type
+        #[expect(trivial_casts)] // Upcast to the correct Box type
         Ok(DatabaseUser::get_by_id(&self.database, id)
             .await?
             .map(|user| Box::new(user) as Box<dyn User + Send + Sync>))

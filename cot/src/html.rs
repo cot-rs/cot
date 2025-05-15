@@ -31,8 +31,8 @@
 
 use std::fmt::Write;
 
+use askama::filters::Escaper;
 use derive_more::{Deref, Display, From};
-use rinja::filters::Escaper;
 
 /// A type that represents HTML content as a string.
 ///
@@ -51,7 +51,7 @@ use rinja::filters::Escaper;
 /// assert_eq!(html.as_str(), "<div>Hello</div>");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Deref, From, Display)]
-pub struct Html(String);
+pub struct Html(pub String);
 
 impl Html {
     /// Creates a new `Html` instance from a string.
@@ -81,6 +81,12 @@ impl Html {
     /// ```
     #[must_use]
     pub fn as_str(&self) -> &str {
+        self.as_ref()
+    }
+}
+
+impl AsRef<str> for Html {
+    fn as_ref(&self) -> &str {
         &self.0
     }
 }
@@ -230,7 +236,7 @@ impl HtmlTag {
 
         for (key, value) in &self.attributes {
             write!(&mut result, " {key}=\"").expect(FAIL_MSG);
-            rinja::filters::Html
+            askama::filters::Html
                 .write_escaped_str(&mut result, value)
                 .expect(FAIL_MSG);
             write!(&mut result, "\"").expect(FAIL_MSG);

@@ -7,6 +7,6 @@ impl Project for MyProject {}
 fn main() -> impl Project {
     std::process::exit(0);
 
-    #[allow(unreachable_code)]
+    #[expect(unreachable_code)]
     MyProject
 }

@@ -114,6 +114,11 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
 /// }
 /// ```
 #[async_trait]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not marked as a database model",
+    label = "`{Self}` is not annotated with `#[cot::db::model]`",
+    note = "annotate `{Self}` with the `#[cot::db::model]` attribute"
+)]
 pub trait Model: Sized + Send + 'static {
     /// A helper structure for the fields of the model.
     ///
@@ -1428,7 +1433,7 @@ pub struct RowsNum(pub u64);
 /// # async fn main() -> Result<()> {
 ///
 /// # const OPERATION: Operation = Operation::create_model()
-/// #     .table_name(Identifier::new("my_model"))
+/// #     .table_name(Identifier::new("cot__my_model"))
 /// #     .fields(&[
 /// #         Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
 /// #             .primary_key()
@@ -1467,7 +1472,7 @@ impl<T> Auto<T> {
     /// assert!(matches!(auto, Auto::Auto));
     /// ```
     #[must_use]
-    #[allow(clippy::self_named_constructors)]
+    #[expect(clippy::self_named_constructors)]
     pub const fn auto() -> Self {
         Self::Auto
     }
@@ -1725,6 +1730,7 @@ impl<const LIMIT: u32> fake::Dummy<fake::Faker> for LimitedString<LIMIT> {
 /// }
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum ColumnType {
     /// A boolean column type.
     Boolean,

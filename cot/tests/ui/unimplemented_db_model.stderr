@@ -1,0 +1,9 @@
+error[E0277]: `TodoItem` is not marked as a database model
+ --> tests/ui/unimplemented_db_model.rs:6:14
+  |
+6 |     let _ = <TodoItem as Model>::objects();
+  |              ^^^^^^^^ `TodoItem` is not annotated with `#[cot::db::model]`
+  |
+  = help: the trait `cot::db::Model` is not implemented for `TodoItem`
+  = note: annotate `TodoItem` with the `#[cot::db::model]` attribute
+  = help: the trait `cot::db::Model` is implemented for `DatabaseUser`

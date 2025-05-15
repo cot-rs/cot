@@ -9,6 +9,8 @@ use cot_cli::migration_generator::{
 use cot_cli::test_utils;
 use syn::parse_quote;
 
+pub const EXAMPLE_DATABASE_MODEL: &str = include_str!("resources/example_database_model.rs");
+
 /// Test that the migration generator can generate a "create model" migration
 /// for a given model that has an expected state.
 #[test]
@@ -26,11 +28,11 @@ fn create_model_state_test() {
     assert!(migration.dependencies.is_empty());
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "parent");
+    assert_eq!(table_name, "cot__parent");
     assert_eq!(fields.len(), 1);
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[1]);
-    assert_eq!(table_name, "my_model");
+    assert_eq!(table_name, "cot__my_model");
     assert_eq!(fields.len(), 4);
 
     let field = &fields[0];
@@ -74,11 +76,11 @@ fn create_models_foreign_key() {
 
     // Parent must be created before Child
     let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "parent");
+    assert_eq!(table_name, "cot__parent");
     assert_eq!(fields.len(), 1);
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[1]);
-    assert_eq!(table_name, "child");
+    assert_eq!(table_name, "cot__child");
     assert_eq!(fields.len(), 2);
 
     let field = &fields[0];
@@ -110,16 +112,16 @@ fn create_models_foreign_key_cycle() {
 
     // Parent must be created before Child
     let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "parent");
+    assert_eq!(table_name, "cot__parent");
     assert_eq!(fields.len(), 1);
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[1]);
-    assert_eq!(table_name, "child");
+    assert_eq!(table_name, "cot__child");
     assert_eq!(fields.len(), 2);
 
     let (table_name, field) = unwrap_add_field(&migration.operations[2]);
-    assert_eq!(table_name, "parent");
-    assert_eq!(field.field_name, "child");
+    assert_eq!(table_name, "cot__parent");
+    assert_eq!(field.name, "child");
 }
 
 #[test]
@@ -130,6 +132,7 @@ fn create_models_foreign_key_two_migrations() {
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
     let migration_file = generator
         .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
         .unwrap();
 
     let src = include_str!("migration_generator/foreign_key_two_migrations/step_2.rs");
@@ -144,7 +147,7 @@ fn create_models_foreign_key_two_migrations() {
 
     assert_eq!(migration.dependencies.len(), 2);
     assert!(migration.dependencies.contains(&DynDependency::Migration {
-        app: "my_crate".to_string(),
+        app: "cot".to_string(),
         migration: "m_0001_initial".to_string()
     }));
     assert!(migration.dependencies.contains(&DynDependency::Model {
@@ -154,7 +157,7 @@ fn create_models_foreign_key_two_migrations() {
     assert_eq!(migration.operations.len(), 1);
 
     let (table_name, _fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "child");
+    assert_eq!(table_name, "cot__child");
 }
 
 /// Test that the migration generator can generate a "create model" migration
@@ -168,6 +171,7 @@ fn create_model_compile_test() {
 
     let migration_opt = generator
         .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
         .unwrap();
     let MigrationAsSource {
         name: migration_name,
@@ -199,9 +203,9 @@ fn write_migrations_module() {
 
     let generator = MigrationGenerator::new(
         PathBuf::from("Cargo.toml"),
-        String::from("my_crate"),
+        String::from("cot"),
         MigrationGeneratorOptions {
-            app_name: Some("my_crate".to_string()),
+            app_name: Some("cot".to_string()),
             output_dir: Some(tempdir.path().to_path_buf()),
         },
     );
@@ -260,11 +264,7 @@ fn list_migrations() {
         .append(true)
         .open(temp_dir.path().join("src").join("main.rs"))
         .unwrap();
-    write!(
-        main,
-        "#[model]\nstruct Test {{\n#[model(primary_key)]\nid: Auto<i32>\n}}"
-    )
-    .unwrap();
+    write!(main, "{EXAMPLE_DATABASE_MODEL}").unwrap();
     migration_generator::make_migrations(
         temp_dir.path(),
         MigrationGeneratorOptions {
@@ -304,7 +304,7 @@ fn list_migrations_missing_migrations_dir() {
 fn test_generator() -> MigrationGenerator {
     MigrationGenerator::new(
         PathBuf::from("Cargo.toml"),
-        String::from("my_crate"),
+        String::from("cot"),
         MigrationGeneratorOptions::default(),
     )
 }

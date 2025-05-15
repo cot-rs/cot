@@ -1,0 +1,5 @@
+test:
+  runner: "nextest"
+  # whether to fallback to `cargo-test` if `nextest` is not available,
+  test_runner_fallback: true
+  auto_accept_unseen: true

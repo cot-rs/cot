@@ -1,0 +1,16 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+description: "Verbosity level: error"
+info:
+  program: cot
+  args:
+    - migration
+    - make
+    - "-v"
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+[1m[37m      Notice[0m No changes in models detected; no migrations were generated

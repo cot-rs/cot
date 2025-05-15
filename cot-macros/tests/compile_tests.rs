@@ -23,6 +23,15 @@ fn attr_model() {
 #[rustversion::attr(not(nightly), ignore)]
 #[test]
 #[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+fn derive_admin_model() {
+    let t = trybuild::TestCases::new();
+    t.pass("tests/ui/derive_admin_model.rs");
+    t.pass("tests/ui/derive_admin_model_derive_first.rs");
+}
+
+#[rustversion::attr(not(nightly), ignore)]
+#[test]
+#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
 fn func_query() {
     let t = trybuild::TestCases::new();
     t.pass("tests/ui/func_query.rs");

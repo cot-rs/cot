@@ -1,25 +1,24 @@
 mod migrations;
 
-use cot::bytes::Bytes;
+use askama::Template;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
+use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
-use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
-use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Body, BoxedHandler, Project, StatusCode, static_files};
-use rinja::Template;
+use cot::static_files::{StaticFile, StaticFilesMiddleware};
+use cot::{App, AppBuilder, BoxedHandler, Project, static_files};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {}
 
-async fn index() -> cot::Result<Response> {
+async fn index() -> cot::Result<Html> {
     let index_template = IndexTemplate {};
     let rendered = index_template.render()?;
 
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(rendered)))
+    Ok(Html::new(rendered))
 }
 
 struct {{ app_name }};
@@ -37,7 +36,7 @@ impl App for {{ app_name }} {
         Router::with_urls([Route::with_handler_and_name("/", index, "index")])
     }
 
-    fn static_files(&self) -> Vec<(String, Bytes)> {
+    fn static_files(&self) -> Vec<StaticFile> {
         static_files!("css/main.css")
     }
 }

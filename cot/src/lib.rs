@@ -66,24 +66,98 @@ pub mod admin;
 pub mod auth;
 mod body;
 pub mod cli;
+pub mod common_types;
 pub mod config;
 pub mod email;
 mod error_page;
-mod handler;
+#[macro_use]
+pub(crate) mod handler;
 pub mod html;
+#[cfg(feature = "json")]
+pub mod json;
 pub mod middleware;
+#[cfg(feature = "openapi")]
+pub mod openapi;
 pub mod project;
 pub mod request;
 pub mod response;
 pub mod router;
+mod serializers;
 pub mod session;
 pub mod static_files;
+#[cfg(feature = "test")]
 pub mod test;
 pub(crate) mod utils;
 
+#[cfg(feature = "openapi")]
+pub use aide;
 pub use body::Body;
-pub use cot_macros::{main, test};
+/// An attribute macro that defines an end-to-end test function for a
+/// Cot-powered app.
+///
+/// This is primarily useful for use with the
+/// [`TestServerBuilder`](cot::test::TestServerBuilder) struct, which allows you
+/// to run a full-fledged Cot server in a test environment.
+///
+/// Internally, this is equivalent to `#[tokio::test]` with the test body
+/// wrapped in a [`tokio::task::LocalSet`] to allow for running non-`Send` async
+/// code in the test.
+///
+/// # Examples
+///
+/// ```
+/// use cot::test::TestServerBuilder;
+///
+/// struct TestProject;
+/// impl cot::Project for TestProject {}
+///
+/// #[cot::e2e_test]
+/// async fn test_server() -> cot::Result<()> {
+///     let server = TestServerBuilder::new(TestProject).start().await;
+///
+///     server.close().await;
+///     Ok(())
+/// }
+/// ```
+pub use cot_macros::e2e_test;
+/// An attribute macro that defines an entry point to a Cot-powered app.
+///
+/// This macro is meant to wrap a function returning a structure implementing
+/// [`cot::Project`]. It should just initialize a [`cot::Project`] and return
+/// it, while the macro takes care of initializing an async runtime, creating a
+/// CLI and running the app.
+///
+/// # Examples
+///
+/// ```no_run
+/// use cot::project::RegisterAppsContext;
+/// use cot::{App, AppBuilder, Project};
+///
+/// struct HelloApp;
+///
+/// impl App for HelloApp {
+///     fn name(&self) -> &'static str {
+///         env!("CARGO_PKG_NAME")
+///     }
+/// }
+///
+/// struct HelloProject;
+/// impl Project for HelloProject {
+///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+///         apps.register_with_views(HelloApp, "");
+///     }
+/// }
+///
+/// #[cot::main]
+/// fn main() -> impl Project {
+///     HelloProject
+/// }
+/// ```
+pub use cot_macros::main;
+pub use cot_macros::test;
 pub use error::Error;
+#[cfg(feature = "openapi")]
+pub use schemars;
 pub use {bytes, http};
 
 pub use crate::handler::{BoxedHandler, RequestHandler};

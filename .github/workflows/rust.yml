@@ -5,10 +5,15 @@ on:
   pull_request:
   schedule:
     - cron: "0 0 * * *"
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # Required by cargo-insta: https://insta.rs/docs/quickstart/#continuous-integration
+  CI: true
+  SCCACHE_GHA_ENABLED: true
+  RUSTC_WRAPPER: sccache
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
@@ -39,14 +44,23 @@ jobs:
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
           tool: nextest
 
+      - name: Fetch dependencies
+        run: cargo +${{ matrix.rust }} fetch --locked
+
       - name: Build
-        run: cargo +${{ matrix.rust }} build
+        run: cargo +${{ matrix.rust }} build --all-features --tests
 
       - name: Test
         run: cargo +${{ matrix.rust }} nextest run --all-features
@@ -76,7 +90,12 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Run clippy
         run: cargo clippy --no-deps --all-targets -- -D warnings
@@ -99,7 +118,12 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -107,10 +131,10 @@ jobs:
           tool: nextest
 
       - name: Build
-        run: cargo build
+        run: cargo build --all-features --tests
 
       - name: Run the external dependencies
-        run: docker compose up -d
+        run: docker compose up -d --wait
 
       - name: Test
         run: cargo nextest run --all-features --run-ignored only
@@ -149,7 +173,12 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Run the external dependencies
         run: docker compose up -d
@@ -158,7 +187,7 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Generate code coverage
-        run: cargo llvm-cov --all-features --workspace --branch --doctests --codecov --output-path codecov.json
+        run: cargo llvm-cov --all-features --workspace --branch --doctests --codecov --output-path codecov.json -- --include-ignored
 
       - uses: codecov/codecov-action@v5
         with:
@@ -187,7 +216,12 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Run fmt
         run: cargo fmt --all -- --check
@@ -210,7 +244,12 @@ jobs:
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Run cargo-machete
         uses: bnjbvr/cargo-machete@v0.8.0
@@ -230,13 +269,18 @@ jobs:
         with:
           toolchain: nightly
 
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
-
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Run cargo check with minimal versions
         run: |
@@ -262,13 +306,18 @@ jobs:
         with:
           toolchain: nightly
 
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
-
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Run cargo check with every combination of features
         run: cargo hack check --feature-powerset --exclude-features db --no-dev-deps
@@ -289,15 +338,17 @@ jobs:
           toolchain: nightly
           components: miri
 
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
           tool: nextest
-
-      - name: Cache Cargo registry
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: false
 
       - name: Miri setup
         run: cargo miri setup
@@ -306,3 +357,20 @@ jobs:
         run: cargo miri nextest run --no-fail-fast --all-features
         env:
           MIRIFLAGS: -Zmiri-disable-isolation
+
+  cargo-deny:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: ""
+      RUSTC_WRAPPER: ""
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Check licenses
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          log-level: warn
+          command: check licenses

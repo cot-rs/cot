@@ -1,0 +1,169 @@
+---
+source: cot-cli/tests/snapshot_testing/cli/mod.rs
+info:
+  program: cot
+  args:
+    - cli
+    - completions
+    - elvish
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+use builtin;
+use str;
+
+set edit:completion:arg-completer[cot] = {|@words|
+    fn spaces {|n|
+        builtin:repeat $n ' ' | str:join ''
+    }
+    fn cand {|text desc|
+        edit:complex-candidate $text &display=$text' '(spaces (- 14 (wcswidth $text)))$desc
+    }
+    var command = 'cot'
+    for word $words[1..-1] {
+        if (str:has-prefix $word '-') {
+            break
+        }
+        set command = $command';'$word
+    }
+    var completions = [
+        &'cot'= {
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand -V 'Print version'
+            cand --version 'Print version'
+            cand new 'Create a new Cot project'
+            cand migration 'Manage migrations for a Cot project'
+            cand cli 'Manage Cot CLI'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'cot;new'= {
+            cand --name 'Set the resulting crate name (defaults to the directory name)'
+            cand --cot-path 'Use `cot` from the specified path instead of a published crate'
+            cand --use-git 'Use the latest `cot` version from git instead of a published crate'
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'cot;migration'= {
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all migrations for a Cot project'
+            cand make 'Generate migrations for a Cot project'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'cot;migration;list'= {
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'cot;migration;make'= {
+            cand --app-name 'Name of the app to use in the migration (default: crate name)'
+            cand --output-dir 'Directory to write the migrations to (default: migrations/ directory in the crate''s src/ directory)'
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'cot;migration;help'= {
+            cand list 'List all migrations for a Cot project'
+            cand make 'Generate migrations for a Cot project'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'cot;migration;help;list'= {
+        }
+        &'cot;migration;help;make'= {
+        }
+        &'cot;migration;help;help'= {
+        }
+        &'cot;cli'= {
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand manpages 'Generate manpages for the Cot CLI'
+            cand completions 'Generate completions for the Cot CLI'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'cot;cli;manpages'= {
+            cand -o 'Directory to write the manpages to [default: current directory]'
+            cand --output-dir 'Directory to write the manpages to [default: current directory]'
+            cand -c 'Create the directory if it doesn''t exist'
+            cand --create 'Create the directory if it doesn''t exist'
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'cot;cli;completions'= {
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'cot;cli;help'= {
+            cand manpages 'Generate manpages for the Cot CLI'
+            cand completions 'Generate completions for the Cot CLI'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'cot;cli;help;manpages'= {
+        }
+        &'cot;cli;help;completions'= {
+        }
+        &'cot;cli;help;help'= {
+        }
+        &'cot;help'= {
+            cand new 'Create a new Cot project'
+            cand migration 'Manage migrations for a Cot project'
+            cand cli 'Manage Cot CLI'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'cot;help;new'= {
+        }
+        &'cot;help;migration'= {
+            cand list 'List all migrations for a Cot project'
+            cand make 'Generate migrations for a Cot project'
+        }
+        &'cot;help;migration;list'= {
+        }
+        &'cot;help;migration;make'= {
+        }
+        &'cot;help;cli'= {
+            cand manpages 'Generate manpages for the Cot CLI'
+            cand completions 'Generate completions for the Cot CLI'
+        }
+        &'cot;help;cli;manpages'= {
+        }
+        &'cot;help;cli;completions'= {
+        }
+        &'cot;help;help'= {
+        }
+    ]
+    $completions[$command]
+}
+
+----- stderr -----

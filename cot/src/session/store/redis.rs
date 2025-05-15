@@ -184,7 +184,7 @@ mod tests {
 
     use super::*;
     use crate::config::CacheUrl;
-    async fn make_store(ttl: usize) -> RedisStore {
+    async fn make_store() -> RedisStore {
         let redis_url =
             env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
         let url = CacheUrl::from(redis_url);
@@ -205,7 +205,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires external Redis service"]
     async fn test_create_and_load() {
-        let store = make_store(60).await;
+        let store = make_store().await;
         let mut rec = make_record();
 
         store.create(&mut rec).await.expect("create failed");
@@ -216,7 +216,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires external Redis service"]
     async fn test_save_overwrites() {
-        let store = make_store(60).await;
+        let store = make_store().await;
         let mut rec = make_record();
         store.create(&mut rec).await.unwrap();
 
@@ -231,7 +231,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires external Redis service"]
     async fn test_save_creates_if_missing() {
-        let store = make_store(60).await;
+        let store = make_store().await;
         let rec = make_record();
 
         store.save(&rec).await.expect("save failed");
@@ -243,7 +243,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires external Redis service"]
     async fn test_delete() {
-        let store = make_store(60).await;
+        let store = make_store().await;
         let mut rec = make_record();
         store.create(&mut rec).await.unwrap();
 
@@ -257,7 +257,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires external Redis service"]
     async fn test_create_id_collision() {
-        let store = make_store(60).await;
+        let store = make_store().await;
         let expiry = OffsetDateTime::now_utc() + Duration::minutes(30);
 
         let mut r1 = Record {

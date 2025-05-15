@@ -16,10 +16,8 @@
 #![allow(missing_copy_implementations)]
 
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
@@ -27,7 +25,6 @@ use subtle::ConstantTimeEq;
 use tower_sessions::{SessionStore, session_store};
 
 use crate::ProjectContext;
-use crate::db::Database;
 use crate::project::WithDatabase;
 use crate::session::store::ToSessionStore;
 use crate::session::store::file::FileStore;
@@ -848,7 +845,7 @@ pub enum SessionStoreTypeConfig {
 }
 
 impl ToSessionStore for SessionStoreTypeConfig {
-    #[must_use]
+    #[expect(unused_variables)]
     fn to_session_store(
         self,
         context: &ProjectContext<WithDatabase>,
@@ -1220,7 +1217,7 @@ impl From<&str> for DatabaseUrl {
 #[cfg(feature = "db")]
 impl Debug for DatabaseUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut new_url = conceal_url_parts(&self.0);
+        let new_url = conceal_url_parts(&self.0);
 
         f.debug_tuple("DatabaseUrl")
             .field(&new_url.as_str())
@@ -1228,10 +1225,13 @@ impl Debug for DatabaseUrl {
     }
 }
 
+/// A structure that holds the type of Cache.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CacheType {
+    /// A redis cache type.
     #[cfg(feature = "redis")]
     Redis,
+    /// The cache type is not known or supported.
     Unknown,
 }
 
@@ -1320,7 +1320,7 @@ fn conceal_url_parts(url: &url::Url) -> url::Url {
         new_url
             .set_password(Some("********"))
             .expect("set_password should succeed if password is present");
-    };
+    }
     new_url
 }
 
@@ -1401,9 +1401,10 @@ mod tests {
         );
     }
     #[test]
+    #[cfg(feature = "redis")]
     fn cache_type_from_str_redis() {
         assert_eq!(CacheType::from("redis"), CacheType::Redis);
-        assert_eq!(CacheType::from("REDIS"), CacheType::Unknown); // case-sensitive
+        assert_eq!(CacheType::from("REDIS"), CacheType::Unknown);
     }
 
     #[test]
@@ -1414,6 +1415,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "redis")]
     fn cache_type_from_cacheurl() {
         let url = CacheUrl::from("redis://localhost/");
         assert_eq!(CacheType::from(url.clone()), CacheType::Redis);
@@ -1448,7 +1450,7 @@ mod tests {
     fn cacheurl_debug_masks_credentials() {
         let raw = "https://user:secret@host:1234/path";
         let cu = CacheUrl::from(raw);
-        let dbg = format!("{:?}", cu);
+        let dbg = format!("{cu:?}");
         assert!(dbg.starts_with("CacheUrl(\"https://********:********@host:1234/path\")"));
     }
 

@@ -176,6 +176,8 @@ impl SessionStore for RedisStore {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+
     use redis::AsyncCommands;
     use time::{Duration, OffsetDateTime};
     use tower_sessions::session::{Id, Record};
@@ -183,7 +185,8 @@ mod tests {
     use super::*;
     use crate::config::CacheUrl;
     async fn make_store(ttl: usize) -> RedisStore {
-        let url = CacheUrl::from("redis://127.0.0.1/");
+        let redis_url = env::var("REDIS_URL").unwrap_or("redis://redis:6379".to_string());
+        let url = CacheUrl::from(redis_url);
         let store = RedisStore::new(&url).expect("failed to create RedisStore");
         let mut conn = store.get_connection().await.expect("get_connection failed");
         let _: () = conn.flushdb().await.expect("flushdb failed");

@@ -19,8 +19,8 @@ use std::time::Duration;
 
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
+use secure_string::SecureBytes;
 use serde::{Deserialize, Serialize};
-use subtle::ConstantTimeEq;
 
 /// The configuration for a project.
 ///
@@ -819,11 +819,12 @@ impl SessionMiddlewareConfigBuilder {
 ///
 /// # Security
 ///
-/// The implementation of the [`PartialEq`] trait for this type is constant-time
-/// to prevent timing attacks.
+/// The implementation of the [`PartialEq`] trait for this type is inherited from
+/// [`SecureBytes`], which is constant-time to prevent timing attacks.
 ///
-/// The implementation of the [`Debug`] trait for this type hides the secret key
-/// to prevent it from being leaked in logs or other debug output.
+/// The implementation of the [`Debug`] trait for this type is inherited from
+/// [`SecureBytes`], which hides the secret key to prevent it from being leaked
+/// in logs or other debug output.
 ///
 /// # Examples
 ///
@@ -834,9 +835,18 @@ impl SessionMiddlewareConfigBuilder {
 /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
 /// ```
 #[repr(transparent)]
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Deserialize, Debug)]
 #[serde(from = "String")]
-pub struct SecretKey(Box<[u8]>);
+pub struct SecretKey(SecureBytes);
+
+impl Serialize for SecretKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.as_bytes())
+    }
+}
 
 impl SecretKey {
     /// Create a new [`SecretKey`] from a byte array.
@@ -851,7 +861,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn new(hash: &[u8]) -> Self {
-        Self(Box::from(hash))
+        Self(SecureBytes::new(hash.to_vec()))
     }
 
     /// Get the byte array stored in the [`SecretKey`].
@@ -866,7 +876,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.0
+        self.0.unsecure()
     }
 
     /// Consume the [`SecretKey`] and return the byte array stored in it.
@@ -881,7 +891,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn into_bytes(self) -> Box<[u8]> {
-        self.0
+        self.0.unsecure().to_vec().into_boxed_slice()
     }
 }
 
@@ -905,18 +915,11 @@ impl From<&str> for SecretKey {
 
 impl PartialEq for SecretKey {
     fn eq(&self, other: &Self) -> bool {
-        self.0.ct_eq(&other.0).into()
+        self.0 == other.0
     }
 }
 
 impl Eq for SecretKey {}
-
-impl Debug for SecretKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write in single line, regardless whether alternate mode was used or not
-        write!(f, "SecretKey(\"**********\")")
-    }
-}
 
 impl Default for SecretKey {
     fn default() -> Self {
@@ -1005,6 +1008,7 @@ impl Debug for DatabaseUrl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json;
 
     #[test]
     fn from_toml_valid() {
@@ -1077,5 +1081,13 @@ mod tests {
             config.static_files.rewrite,
             StaticFilesPathRewriteMode::QueryParam
         );
+    }
+
+    #[test]
+    fn secret_key_serialize_json() {
+        let key = SecretKey::from("abc123");
+        let serialized = serde_json::to_string(&key).unwrap();
+        // Should serialize as a byte array
+        assert_eq!(serialized, "[97,98,99,49,50,51]");
     }
 }

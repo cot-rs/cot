@@ -33,14 +33,6 @@ jobs:
 
     name: Build & test
     runs-on: ${{ matrix.os }}
-    services:
-      redis:
-        image: redis:latest
-        options: >-
-          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
-        ports:
-          # Maps port 6379 on service container to the host
-          - 6379:6379
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -145,8 +137,6 @@ jobs:
         run: docker compose up -d --wait
 
       - name: Test
-        env:
-          REDIS_URL: redis://redis:6379
         run: cargo nextest run --all-features --run-ignored only
 
       - name: Test docs

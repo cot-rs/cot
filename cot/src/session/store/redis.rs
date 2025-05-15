@@ -185,7 +185,8 @@ mod tests {
     use super::*;
     use crate::config::CacheUrl;
     async fn make_store(ttl: usize) -> RedisStore {
-        let redis_url = env::var("REDIS_URL").unwrap_or("redis://redis:6379".to_string());
+        let redis_url =
+            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
         let url = CacheUrl::from(redis_url);
         let store = RedisStore::new(&url).expect("failed to create RedisStore");
         let mut conn = store.get_connection().await.expect("get_connection failed");
@@ -202,6 +203,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires external Redis service"]
     async fn test_create_and_load() {
         let store = make_store(60).await;
         let mut rec = make_record();
@@ -212,6 +214,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires external Redis service"]
     async fn test_save_overwrites() {
         let store = make_store(60).await;
         let mut rec = make_record();
@@ -226,6 +229,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires external Redis service"]
     async fn test_save_creates_if_missing() {
         let store = make_store(60).await;
         let rec = make_record();
@@ -237,6 +241,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires external Redis service"]
     async fn test_delete() {
         let store = make_store(60).await;
         let mut rec = make_record();
@@ -250,6 +255,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires external Redis service"]
     async fn test_create_id_collision() {
         let store = make_store(60).await;
         let expiry = OffsetDateTime::now_utc() + Duration::minutes(30);

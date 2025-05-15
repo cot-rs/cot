@@ -77,17 +77,8 @@ impl From<RedisStoreError> for session_store::Error {
 /// ```
 /// use cot::config::CacheUrl;
 /// use cot::session::store::redis::RedisStore;
-/// use time::{Duration, OffsetDateTime};
-/// use tower_sessions::SessionStore;
-/// use tower_sessions::session::{Id, Record};
 ///
 /// let store = RedisStore::new(&CacheUrl::from("redis://127.0.0.1/")).unwrap();
-/// let mut record = Record {
-///     id: Id::default(),
-///     data: Default::default(),
-///     expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
-/// };
-/// let _ = store.create(&mut record).await.unwrap();
 /// ```
 #[derive(Debug, Clone)]
 pub struct RedisStore {

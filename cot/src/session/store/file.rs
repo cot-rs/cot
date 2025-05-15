@@ -6,9 +6,11 @@
 //! # Examples
 //!
 //! ```
+//! use std::path::PathBuf;
+//!
 //! use cot::session::store::file::FileStore;
 //!
-//! let store = FileStore::new("/var/lib/cot/sessions").unwrap();
+//! let store = FileStore::new(PathBuf::from("/var/lib/cot/sessions"));
 //! ```
 use std::borrow::Cow;
 use std::fs::OpenOptions;
@@ -58,18 +60,11 @@ impl From<FileStoreError> for session_store::Error {
 /// # Examples
 ///
 /// ```
-/// use cot::session::store::file::FileStore;
-/// use time::{Duration, OffsetDateTime};
-/// use tower_sessions::SessionStore;
-/// use tower_sessions::session::{Id, Record};
+/// use std::path::PathBuf;
 ///
-/// let store = FileStore::new("/var/lib/cot/sessions").unwrap();
-/// let mut record = Record {
-///     id: Default::default(),
-///     data: Default::default(),
-///     expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
-/// };
-/// let _ = store.create(&mut record).await.unwrap();
+/// use cot::session::store::file::FileStore;
+///
+/// let store = FileStore::new(PathBuf::from("/var/lib/cot/sessions"));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileStore {
@@ -79,22 +74,23 @@ pub struct FileStore {
 
 impl FileStore {
     #[must_use]
-    pub fn new(dir_path: impl Into<Cow<'static, Path>>) -> Result<Self, FileStoreError> {
-        let dir: PathBuf = dir_path.into().into();
-        fs::create_dir_all(&dir).map_err(FileStoreError::IoError)?;
-        let canonical = dir.canonicalize().map_err(FileStoreError::IoError)?;
-        Ok(Self {
-            dir_path: canonical.into(),
-        })
+    pub fn new(dir_path: impl Into<Cow<'static, Path>>) -> Self {
+        Self {
+            dir_path: dir_path.into(),
+        }
+    }
+
+    async fn create_dir_if_not_exists(&self) -> Result<(), FileStoreError> {
+        tokio::fs::create_dir_all(&self.dir_path)
+            .await
+            .map_err(FileStoreError::IoError)
     }
 }
 
 #[async_trait]
 impl SessionStore for FileStore {
     async fn create(&self, record: &mut Record) -> session_store::Result<()> {
-        tokio::fs::create_dir_all(&self.dir_path)
-            .await
-            .map_err(FileStoreError::IoError)?;
+        self.create_dir_if_not_exists().await?;
 
         loop {
             let file_path = self.dir_path.join(record.id.to_string());
@@ -103,7 +99,7 @@ impl SessionStore for FileStore {
                 .write(true)
                 .open(&file_path)
             {
-                Ok(mut file) => {
+                Ok(file) => {
                     serde_json::to_writer(file, &record).map_err(FileStoreError::SerializeError)?;
                     break;
                 }
@@ -119,12 +115,14 @@ impl SessionStore for FileStore {
     }
 
     async fn save(&self, record: &Record) -> session_store::Result<()> {
+        self.create_dir_if_not_exists().await?;
+
         match OpenOptions::new()
             .write(true)
             .truncate(true)
             .open(self.dir_path.join(record.id.to_string()))
         {
-            Ok(mut file) => {
+            Ok(file) => {
                 serde_json::to_writer(file, &record).map_err(FileStoreError::SerializeError)?;
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
@@ -176,7 +174,7 @@ mod tests {
 
     fn make_store() -> FileStore {
         let dir = tempdir().expect("failed to make tempdir");
-        FileStore::new(dir.into_path()).expect("failed to init FileStore")
+        FileStore::new(dir.into_path())
     }
 
     fn make_record() -> Record {
@@ -224,6 +222,64 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_save_creates_directory() {
+        let dir = tempdir().expect("failed to make tempdir");
+        let dir_path = dir.path().to_path_buf();
+        // we only want a valid and safe disposable path.
+        dir.close().expect("failed to remove tempdir");
+        assert!(!dir_path.exists());
+
+        let store = FileStore::new(dir_path.clone());
+        let rec = make_record();
+        store
+            .save(&rec)
+            .await
+            .expect("save should succeed and create directory");
+        assert!(dir_path.exists(), "Directory should be created when saving");
+
+        // Now manually delete the directory
+        fs::remove_dir_all(&dir_path).expect("failed to remove directory");
+        assert!(!dir_path.exists(), "Directory should be removed");
+
+        // Saving again should recreate the directory
+        store
+            .save(&rec)
+            .await
+            .expect("save should recreate directory");
+        assert!(
+            dir_path.exists(),
+            "Directory should be recreated when saving"
+        );
+
+        fs::remove_dir_all(&dir_path).expect("cleanup failed");
+    }
+
+    #[tokio::test]
+    async fn test_load_with_nonexistent_directory() {
+        let dir = tempdir().expect("failed to make tempdir");
+        let dir_path = PathBuf::from("non/existent/path");
+        dir.close().expect("failed to remove tempdir");
+
+        let store = FileStore::new(dir_path.clone());
+
+        let id = Id::default();
+        let result = store.load(&id).await;
+        assert!(
+            result.is_ok(),
+            "Load should not error with non-existent directory"
+        );
+        assert!(
+            result.unwrap().is_none(),
+            "Load should return None with non-existent directory"
+        );
+
+        assert!(
+            !dir_path.exists(),
+            "Directory should not be created when just loading"
+        );
+    }
+
+    #[tokio::test]
     async fn test_delete() {
         let store = make_store();
         let mut rec = make_record();
@@ -234,6 +290,27 @@ mod tests {
         assert!(!path.exists());
 
         store.delete(&rec.id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_delete_with_nonexistent_directory() {
+        let dir = tempdir().expect("failed to make tempdir");
+        let dir_path = dir.path().to_path_buf();
+        dir.close().expect("failed to remove tempdir");
+        let store = FileStore::new(dir_path.clone());
+
+        // Delete should work with non-existent directory
+        let id = Id::default();
+        let result = store.delete(&id).await;
+        assert!(
+            result.is_ok(),
+            "Delete should not error with non-existent directory"
+        );
+
+        assert!(
+            !dir_path.exists(),
+            "Directory should not be created when just deleting"
+        );
     }
 
     #[tokio::test]

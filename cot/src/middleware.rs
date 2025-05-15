@@ -334,9 +334,13 @@ impl SessionMiddleware {
     /// # Examples
     ///
     /// ```
-    /// use cot::middleware::SessionMiddleware;
+    /// use std::sync::Arc;
     ///
-    /// let middleware = SessionMiddleware::new().secure(false);
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = Arc::new(MemoryStore::new());
+    /// let middleware = SessionMiddleware::new(store).secure(false);
     /// ```
     #[must_use]
     pub fn secure(self, secure: bool) -> Self {

@@ -862,11 +862,7 @@ impl ToSessionStore for SessionStoreTypeConfig {
     ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error> {
         match self {
             Self::Memory => Ok(Box::new(MemoryStore::new())),
-            Self::File { path } => {
-                let file_store =
-                    FileStore::new(path).unwrap_or_else(|e| panic!("{}", e.to_string()));
-                Ok(Box::new(file_store))
-            }
+            Self::File { path } => Ok(Box::new(FileStore::new(path))),
             Self::Cache { ref uri } => match CacheType::from(uri.clone()) {
                 #[cfg(feature = "redis")]
                 CacheType::Redis => Ok(Box::new(RedisStore::new(uri)?)),
@@ -1821,7 +1817,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "invalid URL")]
+    #[should_panic(expected = "invalid cache URL")]
     fn cacheurl_from_invalid_str_panics() {
         let _ = CacheUrl::from("not a url");
     }
@@ -1845,7 +1841,7 @@ mod tests {
     fn conceal_url_details_leaves_no_credentials() {
         let raw = "ftp://alice:alicepwd@server/";
         let parsed = url::Url::parse(raw).unwrap();
-        let concealed = super::conceal_url_parts(&parsed);
+        let concealed = conceal_url_parts(&parsed);
         assert_eq!(concealed.username(), "********");
         assert_eq!(concealed.password(), Some("********"));
     }

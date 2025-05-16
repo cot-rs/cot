@@ -105,7 +105,7 @@ pub trait User {
     /// [`AnonymousUser`] always returns `None`.
     // mockall requires lifetimes to be specified here
     // (see related issue: https://github.com/asomers/mockall/issues/571)
-    #[expect(clippy::needless_lifetimes)]
+    #[expect(clippy::elidable_lifetime_names)]
     fn username<'a>(&'a self) -> Option<Cow<'a, str>> {
         None
     }

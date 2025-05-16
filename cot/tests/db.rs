@@ -522,3 +522,36 @@ async fn foreign_keys_cascade(db: &mut TestDatabase) {
         .unwrap();
     assert!(Child::objects().all(&**db).await.unwrap().is_empty());
 }
+
+// Check different types for the primary key
+#[derive(Debug, PartialEq)]
+#[model]
+struct TestModelu32Key {
+    #[model(primary_key)]
+    id: Auto<u32>,
+    name: String,
+}
+
+#[derive(Debug, PartialEq)]
+#[model]
+struct TestModelu64Key {
+    #[model(primary_key)]
+    id: Auto<u64>,
+    name: String,
+}
+
+#[derive(Debug, PartialEq)]
+#[model]
+struct TestModeli64Key {
+    #[model(primary_key)]
+    id: Auto<i64>,
+    name: String,
+}
+
+#[derive(Debug, PartialEq)]
+#[model]
+struct TestModelStringKey {
+    #[model(primary_key)]
+    id: String,
+    name: String,
+}

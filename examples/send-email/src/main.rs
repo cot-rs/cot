@@ -1,0 +1,114 @@
+use cot::cli::CliMetadata;
+use cot::config::{DatabaseConfig, EmailBackendConfig, EmailBackendType, ProjectConfig};
+use cot::email::{EmailBackend, EmailMessage, SmtpTransportMode};
+use cot::form::Form;
+use cot::project::RegisterAppsContext;
+use cot::request::{Request, RequestExt};
+use cot::response::{Response, ResponseExt};
+use cot::router::{Route, Router};
+use cot::{App, AppBuilder, Body, Project, StatusCode};
+
+struct EmailApp;
+
+impl App for EmailApp {
+    fn name(&self) -> &str {
+        "email"
+    }
+
+    fn router(&self) -> Router {
+        Router::with_urls([
+            Route::with_handler_and_name("/", email_form, "email_form"),
+            Route::with_handler_and_name("/send", send_email, "send_email"),
+        ])
+    }
+}
+
+async fn email_form(_request: Request) -> cot::Result<Response> {
+    let template = include_str!("../templates/index.html");
+    Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
+}
+#[derive(Debug, Form)]
+struct EmailForm {
+    from: String,
+    to: String,
+    subject: String,
+    body: String,
+}
+async fn send_email(mut request: Request) -> cot::Result<Response> {
+    let form = EmailForm::from_request(&mut request).await?.unwrap();
+
+    let from = form.from;
+    let to = form.to;
+    let subject = form.subject;
+    let body = form.body;
+
+    // Create the email
+    let email = EmailMessage {
+        subject,
+        from: from.into(),
+        to: vec![to],
+        body,
+        alternative_html: None,
+        ..Default::default()
+    };
+    let _database = request.context().database();
+    let email_backend = request.context().email_backend();
+    let backend_clone = email_backend.clone();
+    {
+        let backend = &backend_clone;
+        let _x = backend.lock().unwrap().send_message(&email);
+    }
+    // let template = include_str!("../templates/sent.html");
+    // Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
+    let template = include_str!("../templates/sent.html");
+
+    Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
+}
+struct MyProject;
+impl Project for MyProject {
+    fn cli_metadata(&self) -> CliMetadata {
+        cot::cli::metadata!()
+    }
+
+    fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
+        // Create the email backend
+        // let config = ProjectConfig::from_toml(
+        //     r#"
+        //     [database]
+        //     url = "sqlite::memory:"
+
+        //     [email_backend]
+        //     backend_type = "Smtp"
+        //     smtp_mode = "Localhost"
+        //     port = 1025
+        //     "#,
+        // )?;
+        let mut email_config = EmailBackendConfig::builder();
+        email_config.backend_type(EmailBackendType::Smtp);
+        email_config.smtp_mode(SmtpTransportMode::Localhost);
+        email_config.port(1025_u16);
+        let config = ProjectConfig::builder()
+            .debug(true)
+            .database(DatabaseConfig::builder().url("sqlite::memory:").build())
+            .email_backend(email_config.build())
+            .build();
+        Ok(config)
+    }
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+        apps.register_with_views(EmailApp, "");
+    }
+
+    fn middlewares(
+        &self,
+        handler: cot::project::RootHandlerBuilder,
+        _context: &cot::project::MiddlewareContext,
+    ) -> cot::BoxedHandler {
+        // context.config().email_backend().unwrap();
+        handler.build()
+    }
+}
+
+#[cot::main]
+fn main() -> impl Project {
+    MyProject
+}

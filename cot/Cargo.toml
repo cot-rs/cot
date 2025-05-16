@@ -1,6 +1,6 @@
 [package]
 name = "cot"
-version = "0.3.0"
+version = "0.3.1"
 description = "The Rust web framework for lazy developers."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true

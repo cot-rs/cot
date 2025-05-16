@@ -111,7 +111,10 @@ impl FromDbValue for Option<WeekdaySet> {
     where
         Self: Sized,
     {
-        value.get::<u8>().map(|v| Some(WeekdaySet::from(v))).into()
+        value
+            .get::<Option<u8>>()
+            .map(|v| v.map(|v| WeekdaySet::from(v)))
+            .into()
     }
 
     fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
@@ -119,8 +122,8 @@ impl FromDbValue for Option<WeekdaySet> {
         Self: Sized,
     {
         value
-            .get::<i16>()
-            .map(|v| Some(WeekdaySet::from(v as u8)))
+            .get::<Option<i16>>()
+            .map(|v| v.map(|v| WeekdaySet::from(v as u8)))
             .into()
     }
 
@@ -128,7 +131,10 @@ impl FromDbValue for Option<WeekdaySet> {
     where
         Self: Sized,
     {
-        value.get::<u8>().map(|v| Some(WeekdaySet::from(v))).into()
+        value
+            .get::<Option<u8>>()
+            .map(|v| v.map(|v| WeekdaySet::from(v)))
+            .into()
     }
 }
 

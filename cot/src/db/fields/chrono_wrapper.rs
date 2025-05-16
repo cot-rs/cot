@@ -1,10 +1,9 @@
-use async_trait::async_trait;
 use chrono::Weekday;
 
 use crate::db::impl_mysql::MySqlValueRef;
 use crate::db::impl_postgres::PostgresValueRef;
 use crate::db::impl_sqlite::SqliteValueRef;
-use crate::db::{DbValue, FromDbValue, SqlxValueRef, ToDbValue};
+use crate::db::{DatabaseError, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WeekdaySet(u8);
@@ -142,5 +141,44 @@ impl ToDbValue for WeekdaySet {
 impl ToDbValue for Option<WeekdaySet> {
     fn to_db_value(&self) -> DbValue {
         self.map(|val| val.0).to_db_value()
+    }
+}
+
+impl FromDbValue for Weekday {
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<u8>()
+            .and_then(|v| Weekday::try_from(v).map_err(|e| DatabaseError::ValueDecode(e.into())))
+            .into()
+    }
+
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<i16>()
+            .and_then(|v| {
+                Weekday::try_from(v as u8).map_err(|e| DatabaseError::ValueDecode(e.into()))
+            })
+            .into()
+    }
+
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<u8>()
+            .and_then(|v| Weekday::try_from(v).map_err(|e| DatabaseError::ValueDecode(e.into())))
+            .into()
+    }
+}
+impl ToDbValue for Weekday {
+    fn to_db_value(&self) -> DbValue {
+        self.num_days_from_monday().into()
     }
 }

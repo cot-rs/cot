@@ -30,6 +30,7 @@ use axum::handler::HandlerWithoutStateExt;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use http::request::Parts;
+use subsecond::HotFn;
 use tower::{Layer, Service};
 use tracing::{error, info, trace};
 
@@ -1756,6 +1757,8 @@ pub async fn run_at_with_shutdown(
     listener: tokio::net::TcpListener,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> cot::Result<()> {
+    dioxus_devtools::connect_subsecond();
+
     let not_found_handler: Arc<dyn ErrorPageHandler> =
         bootstrapper.project().not_found_handler().into();
     let server_error_handler: Arc<dyn ErrorPageHandler> =
@@ -1968,14 +1971,19 @@ pub(crate) fn prepare_request(request: &mut Request, context: Arc<ProjectContext
     request.extensions_mut().insert(context);
 }
 
-async fn pass_to_axum(
+fn pass_to_axum(
     request: Request,
     handler: &mut BoxedHandler,
-) -> cot::Result<axum::response::Response> {
-    poll_fn(|cx| handler.poll_ready(cx)).await?;
-    let response = handler.call(request).await?;
+) -> impl Future<Output = cot::Result<axum::response::Response>> {
+    let hot_fn = async |request: Request, handler: &mut BoxedHandler| {
+        poll_fn(|cx| handler.poll_ready(cx)).await?;
+        let response = handler.call(request).await?;
 
-    Ok(response_cot_to_axum(response))
+        Ok(response_cot_to_axum(response))
+    };
+
+    let mut hot_fn = HotFn::current(hot_fn);
+    hot_fn.call((request, handler))
 }
 
 fn response_cot_to_axum(response: Response) -> axum::response::Response {

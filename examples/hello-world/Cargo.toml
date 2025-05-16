@@ -8,3 +8,4 @@ edition = "2024"
 
 [dependencies]
 cot = { path = "../../cot" }
+subsecond = "0.7.0-alpha.0"

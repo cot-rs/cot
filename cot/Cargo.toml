@@ -53,6 +53,8 @@ serde_path_to_error = { workspace = true }
 sha2.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
 subtle = { workspace = true, features = ["std"] }
+subsecond.workspace = true
+dioxus-devtools = "0.7.0-alpha.0"
 swagger-ui-redist = { workspace = true, optional = true }
 sync_wrapper.workspace = true
 thiserror.workspace = true

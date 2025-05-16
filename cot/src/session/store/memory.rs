@@ -33,6 +33,13 @@ use tower_sessions::{SessionStore, session_store};
 pub struct MemoryStore(Arc<Mutex<HashMap<Id, Record>>>);
 
 impl MemoryStore {
+    /// Creates a new, empty `MemoryStore` session store.
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::session::store::memory::MemoryStore;
+    /// let store = MemoryStore::new();
+    /// ```
     #[must_use]
     pub fn new() -> Self {
         Self::default()

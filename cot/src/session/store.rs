@@ -64,6 +64,10 @@ pub trait ToSessionStore {
     ///
     /// This method creates a concrete session store from the configuration
     /// that can be used by the session middleware.
+    ///
+    /// # Errors
+    ///
+    /// will return `Err` if the conversion fails.
     fn to_session_store(
         self,
         context: &ProjectContext<WithDatabase>,
@@ -95,6 +99,19 @@ pub trait ToSessionStore {
 pub struct SessionStoreWrapper(Arc<dyn SessionStore>);
 
 impl SessionStoreWrapper {
+    /// Create a new [`SessionStoreWrapper`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    ///
+    /// use cot::session::store::SessionStoreWrapper;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = MemoryStore::new();
+    /// let wrapper = SessionStoreWrapper::new(Arc::new(store));
+    /// ```
     pub fn new(boxed: Arc<dyn SessionStore + Send + Sync>) -> Self {
         Self(boxed)
     }

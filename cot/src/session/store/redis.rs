@@ -26,43 +26,37 @@ use crate::config::CacheUrl;
 pub enum RedisStoreError {
     /// An error occurred during a pool connection or checkout.
     #[error(transparent)]
-    PoolConnectionError(#[from] deadpool_redis::PoolError),
+    PoolConnection(#[from] deadpool_redis::PoolError),
 
     /// An error occurred during Redis connection pool creation.
     #[error(transparent)]
-    PoolCreationError(#[from] CreatePoolError),
+    PoolCreation(#[from] CreatePoolError),
 
     /// An error occurred during a Redis command execution.
     #[error(transparent)]
-    CommandError(#[from] redis::RedisError),
+    Command(#[from] redis::RedisError),
 
     /// An error occurred during JSON serialization.
     #[error("Serialization error: {0}")]
-    SerializeError(serde_json::Error),
+    Serialize(serde_json::Error),
 
     /// An error occurred during JSON deserialization.
     #[error("Deserialization error: {0}")]
-    DeserializeError(serde_json::Error),
+    Deserialize(serde_json::Error),
 }
 
 impl From<RedisStoreError> for session_store::Error {
     fn from(err: RedisStoreError) -> session_store::Error {
         match err {
-            RedisStoreError::PoolConnectionError(inner) => {
+            RedisStoreError::PoolConnection(inner) => {
                 session_store::Error::Backend(inner.to_string())
             }
-            RedisStoreError::PoolCreationError(inner) => {
+            RedisStoreError::PoolCreation(inner) => {
                 session_store::Error::Backend(inner.to_string())
             }
-            RedisStoreError::CommandError(inner) => {
-                session_store::Error::Backend(inner.to_string())
-            }
-            RedisStoreError::SerializeError(inner) => {
-                session_store::Error::Encode(inner.to_string())
-            }
-            RedisStoreError::DeserializeError(inner) => {
-                session_store::Error::Decode(inner.to_string())
-            }
+            RedisStoreError::Command(inner) => session_store::Error::Backend(inner.to_string()),
+            RedisStoreError::Serialize(inner) => session_store::Error::Encode(inner.to_string()),
+            RedisStoreError::Deserialize(inner) => session_store::Error::Decode(inner.to_string()),
         }
     }
 }
@@ -87,20 +81,54 @@ pub struct RedisStore {
 }
 
 impl RedisStore {
+    /// Creates and configures a new Redis-backed session store.
+    ///
+    /// This initializes a `deadpool_redis::Pool` immediately, so your
+    /// URL is validated and the pool’s settings are applied right away.
+    /// **However**, no actual TCP connections to the Redis server are opened
+    /// until you call `get_connection()` for the first time. This avoids
+    /// connection overhead at startup but still fails fast if your URL is
+    /// invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cot::config::CacheUrl;
+    /// use cot::session::store::redis::RedisStore;
+    ///
+    /// let store = RedisStore::new(&CacheUrl::from("redis://127.0.0.1/"))
+    ///     .expect("failed to configure RedisStore");
+    /// ```
     pub fn new(url: &CacheUrl) -> Result<RedisStore, RedisStoreError> {
         let mut cfg = Config::from_url(url.as_str());
         let pool = cfg
             .create_pool(Some(Runtime::Tokio1))
-            .map_err(RedisStoreError::PoolCreationError)?;
+            .map_err(RedisStoreError::PoolCreation)?;
 
         Ok(Self { pool })
     }
 
-    async fn get_connection(&self) -> Result<deadpool_redis::Connection, RedisStoreError> {
+    /// Asynchronously checks out a Redis connection from the internal pool.
+    ///
+    /// You’ll typically call this at the start of each session operation.
+    /// The returned `Connection` implements
+    /// `AsyncCommands` so you can run Redis commands directly.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use cot::config::CacheUrl;
+    /// use cot::session::store::redis::RedisStore;
+    ///
+    /// let store = RedisStore::new(&CacheUrl::from("redis://127.0.0.1/"))?;
+    /// // Actual TCP connection happens here:
+    /// let mut conn = store.get_connection().await?;
+    /// ```
+    pub async fn get_connection(&self) -> Result<deadpool_redis::Connection, RedisStoreError> {
         self.pool
             .get()
             .await
-            .map_err(RedisStoreError::PoolConnectionError)
+            .map_err(RedisStoreError::PoolConnection)
     }
 }
 
@@ -117,7 +145,7 @@ impl SessionStore for RedisStore {
     async fn create(&self, session_record: &mut Record) -> session_store::Result<()> {
         let mut conn = self.get_connection().await?;
         let data: String =
-            serde_json::to_string(&session_record).map_err(RedisStoreError::SerializeError)?;
+            serde_json::to_string(&session_record).map_err(RedisStoreError::Serialize)?;
         let options = SetOptions::default()
             .conditional_set(ExistenceCheck::NX)
             .with_expiration(SetExpiry::EX(get_expiry_as_u64(session_record.expiry_date)));
@@ -127,10 +155,11 @@ impl SessionStore for RedisStore {
             let set_ok: bool = conn
                 .set_options(key, &data, options)
                 .await
-                .map_err(RedisStoreError::CommandError)?;
+                .map_err(RedisStoreError::Command)?;
             if set_ok {
                 break;
             }
+            // On collusion, recycle the ID and try again.
             session_record.id = Id::default();
         }
         Ok(())
@@ -139,14 +168,14 @@ impl SessionStore for RedisStore {
         let mut conn = self.get_connection().await?;
         let key: String = session_record.id.to_string();
         let data: String =
-            serde_json::to_string(&session_record).map_err(RedisStoreError::SerializeError)?;
+            serde_json::to_string(&session_record).map_err(RedisStoreError::Serialize)?;
         let options = SetOptions::default()
             .conditional_set(ExistenceCheck::XX)
             .with_expiration(SetExpiry::EX(get_expiry_as_u64(session_record.expiry_date)));
         let set_ok: bool = conn
             .set_options(key, data, options)
             .await
-            .map_err(RedisStoreError::CommandError)?;
+            .map_err(RedisStoreError::Command)?;
         if !set_ok {
             let mut record = session_record.clone();
             self.create(&mut record).await?
@@ -157,10 +186,10 @@ impl SessionStore for RedisStore {
     async fn load(&self, session_id: &Id) -> session_store::Result<Option<Record>> {
         let mut conn = self.get_connection().await?;
         let key = session_id.to_string();
-        let data: Option<String> = conn.get(key).await.map_err(RedisStoreError::CommandError)?;
+        let data: Option<String> = conn.get(key).await.map_err(RedisStoreError::Command)?;
         if let Some(data) = data {
             let rec =
-                serde_json::from_str::<Record>(&data).map_err(RedisStoreError::DeserializeError)?;
+                serde_json::from_str::<Record>(&data).map_err(RedisStoreError::Deserialize)?;
             return Ok(Some(rec));
         };
         Ok(None)
@@ -169,7 +198,7 @@ impl SessionStore for RedisStore {
     async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
         let mut conn = self.get_connection().await?;
         let key = session_id.to_string();
-        let _: () = conn.del(key).await.map_err(RedisStoreError::CommandError)?;
+        let _: () = conn.del(key).await.map_err(RedisStoreError::Command)?;
         Ok(())
     }
 }

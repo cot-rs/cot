@@ -301,6 +301,10 @@ impl SessionMiddleware {
     ///     }
     /// }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the session store type is not supported.
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let cfg = context.config();

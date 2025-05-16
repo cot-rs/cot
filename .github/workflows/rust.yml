@@ -357,3 +357,20 @@ jobs:
         run: cargo miri nextest run --no-fail-fast --all-features
         env:
           MIRIFLAGS: -Zmiri-disable-isolation
+
+  cargo-deny:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: ""
+      RUSTC_WRAPPER: ""
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Check licenses
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          log-level: warn
+          command: check licenses

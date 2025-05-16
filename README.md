@@ -103,6 +103,14 @@ docker compose down
  </picture>
 </a>
 
+## Contributors
+
+<a href="https://github.com/cot-rs/cot/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=cot-rs/cot" />
+</a>
+
+Made with [contrib.rocks](https://contrib.rocks).
+
 ## License
 
 Cot is licensed under either of the following, at your option:

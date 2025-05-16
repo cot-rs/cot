@@ -3,6 +3,7 @@ name = "example-custom-task"
 version = "0.1.0"
 publish = false
 description = "Custom tasks - Cot example."
+license = "MIT OR Apache-2.0"
 edition = "2024"
 
 [dependencies]

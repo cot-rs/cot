@@ -4,8 +4,10 @@ use std::num::{
     NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
     NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
 };
+use std::time::Duration;
 
 use askama::filters::HtmlSafe;
+use chrono::{NaiveTime, Timelike};
 #[cfg(feature = "db")]
 use cot::db::Auto;
 
@@ -402,17 +404,13 @@ macro_rules! impl_integer_as_form_field {
 
                 if let Some(min) = field.custom_options.min {
                     if parsed < min {
-                        return Err(FormFieldValidationError::minimum_value_not_met(
-                            min.to_string(),
-                        ));
+                        return Err(FormFieldValidationError::minimum_value_not_met(min));
                     }
                 }
 
                 if let Some(max) = field.custom_options.max {
                     if parsed > max {
-                        return Err(FormFieldValidationError::maximum_value_exceeded(
-                            max.to_string(),
-                        ));
+                        return Err(FormFieldValidationError::maximum_value_exceeded(max));
                     }
                 }
 
@@ -706,17 +704,13 @@ macro_rules! impl_float_as_form_field {
 
                 if let Some(min) = field.custom_options.min {
                     if parsed < min {
-                        return Err(FormFieldValidationError::minimum_value_not_met(
-                            min.to_string(),
-                        ));
+                        return Err(FormFieldValidationError::minimum_value_not_met(min));
                     }
                 }
 
                 if let Some(max) = field.custom_options.max {
                     if parsed > max {
-                        return Err(FormFieldValidationError::maximum_value_exceeded(
-                            max.to_string(),
-                        ));
+                        return Err(FormFieldValidationError::maximum_value_exceeded(max));
                     }
                 }
 
@@ -732,6 +726,104 @@ macro_rules! impl_float_as_form_field {
 
 impl_float_as_form_field!(f32);
 impl_float_as_form_field!(f64);
+
+impl_form_field!(TimeField, TimeFieldOptions, "a time");
+
+/// Custom options for a [`TimeField`].
+///
+/// This struct configures the behavior and constraints of time input fields.
+/// It allows setting minimum and maximum allowed times, as well as the step
+/// interval between allowed time values.
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use chrono::NaiveTime;
+/// use cot::form::fields::{TimeField, TimeFieldOptions};
+/// use cot::form::{FormField, FormFieldOptions};
+///
+/// let options = TimeFieldOptions {
+///     min: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
+///     max: Some(NaiveTime::from_hms_opt(17, 0, 0).unwrap()),
+///     step: Some(Duration::from_secs(900)), // 15-minute intervals
+/// };
+///
+/// let field = TimeField::with_options(FormFieldOptions::new("appointment_time"), options);
+/// ```
+#[derive(Debug, Copy, Clone, Default)]
+pub struct TimeFieldOptions {
+    /// The minimum value of the field. Used to set the `min` attribute in the
+    /// HTML input element.
+    pub min: Option<NaiveTime>,
+    /// The maximum value of the field. Used to set the `max` attribute in the
+    /// HTML input element.
+    pub max: Option<NaiveTime>,
+    /// The step interval between valid time values. Used to set the [`step`
+    /// attribute] in the HTML input element.
+    ///
+    /// [`step` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/time#using_the_step_attribute
+    pub step: Option<Duration>,
+}
+
+impl Display for TimeField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag: HtmlTag = HtmlTag::input("time");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+
+        if let Some(min) = &self.custom_options.min {
+            tag.attr("min", &min.to_string());
+        }
+        if let Some(max) = &self.custom_options.max {
+            tag.attr("max", &max.to_string());
+        }
+        if let Some(step) = &self.custom_options.step {
+            tag.attr("step", &step.as_secs().to_string());
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl HtmlSafe for TimeField {}
+
+impl AsFormField for NaiveTime {
+    type Type = TimeField;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
+        let value = check_required(field)?;
+
+        let parsed: NaiveTime = value
+            .parse()
+            .map_err(|_| FormFieldValidationError::invalid_value(value))?;
+
+        if let Some(min) = field.custom_options.min {
+            if parsed < min {
+                return Err(FormFieldValidationError::minimum_value_not_met(min));
+            }
+        }
+
+        if let Some(max) = field.custom_options.max {
+            if parsed > max {
+                return Err(FormFieldValidationError::maximum_value_exceeded(max));
+            }
+        }
+
+        Ok(parsed)
+    }
+
+    fn to_field_value(&self) -> String {
+        self.to_string()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1215,5 +1307,111 @@ mod tests {
         field.set_value(Cow::Borrowed(""));
         let value = f32::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
+    }
+
+    #[test]
+    fn time_field_render() {
+        let field = TimeField::with_options(
+            FormFieldOptions {
+                id: "appointment".to_owned(),
+                name: "appointment".to_owned(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
+                max: Some(NaiveTime::from_hms_opt(17, 0, 0).unwrap()),
+                step: Some(Duration::from_secs(900)), // 15 minutes
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"time\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"09:00:00\""));
+        assert!(html.contains("max=\"17:00:00\""));
+        assert!(html.contains("step=\"900\""));
+    }
+
+    #[test]
+    fn time_field_clean_value() {
+        let mut field = TimeField::with_options(
+            FormFieldOptions {
+                id: "appointment".to_owned(),
+                name: "appointment".to_owned(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
+                max: Some(NaiveTime::from_hms_opt(17, 0, 0).unwrap()),
+                step: None,
+            },
+        );
+        field.set_value(Cow::Borrowed("13:30:00"));
+        let value = NaiveTime::clean_value(&field).unwrap();
+        assert_eq!(value.hour(), 13);
+        assert_eq!(value.minute(), 30);
+        assert_eq!(value.second(), 0);
+    }
+
+    #[test]
+    fn time_field_clean_value_below_min() {
+        let mut field = TimeField::with_options(
+            FormFieldOptions {
+                id: "appointment".to_owned(),
+                name: "appointment".to_owned(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
+                max: Some(NaiveTime::from_hms_opt(17, 0, 0).unwrap()),
+                step: None,
+            },
+        );
+        field.set_value(Cow::Borrowed("08:30:00"));
+        let result = NaiveTime::clean_value(&field);
+        assert!(matches!(
+            result,
+            Err(FormFieldValidationError::MinimumValueNotMet { min_value: _ })
+        ));
+    }
+
+    #[test]
+    fn time_field_clean_value_above_max() {
+        let mut field = TimeField::with_options(
+            FormFieldOptions {
+                id: "appointment".to_owned(),
+                name: "appointment".to_owned(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
+                max: Some(NaiveTime::from_hms_opt(17, 0, 0).unwrap()),
+                step: None,
+            },
+        );
+        field.set_value(Cow::Borrowed("18:30:00"));
+        let result = NaiveTime::clean_value(&field);
+        assert!(matches!(
+            result,
+            Err(FormFieldValidationError::MaximumValueExceeded { max_value: _ })
+        ));
+    }
+
+    #[test]
+    fn time_field_clean_required() {
+        let mut field = TimeField::with_options(
+            FormFieldOptions {
+                id: "appointment".to_owned(),
+                name: "appointment".to_owned(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: None,
+                max: None,
+                step: None,
+            },
+        );
+        field.set_value(Cow::Borrowed(""));
+        let result = NaiveTime::clean_value(&field);
+        assert_eq!(result, Err(FormFieldValidationError::Required));
     }
 }

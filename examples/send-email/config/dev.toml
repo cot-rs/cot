@@ -1,0 +1,5 @@
+[email_backend]
+backend_type = "smtp"
+smtp_mode = "encrypted"
+host = "localhost"
+port = 1025

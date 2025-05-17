@@ -35,9 +35,10 @@ use tower_sessions::{SessionStore, session_store};
 use crate::ProjectContext;
 use crate::project::WithDatabase;
 use crate::session::store::ToSessionStore;
+#[cfg(feature = "json")]
 use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
-#[cfg(feature = "redis")]
+#[cfg(all(feature = "json", feature = "redis"))]
 use crate::session::store::redis::RedisStore;
 
 /// The configuration for a project.
@@ -827,6 +828,7 @@ pub enum SessionStoreTypeConfig {
     ///     path: PathBuf::from("/tmp/sessions"),
     /// };
     /// ```
+    #[cfg(feature = "json")]
     File {
         /// The path to the directory where session files will be stored.
         path: PathBuf,
@@ -846,6 +848,7 @@ pub enum SessionStoreTypeConfig {
     ///     uri: CacheUrl::from("redis://localhost:6379"),
     /// };
     /// ```
+    #[cfg(feature = "cache")]
     Cache {
         /// The URI to the cache service.
         uri: CacheUrl,
@@ -860,15 +863,18 @@ impl ToSessionStore for SessionStoreTypeConfig {
     ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error> {
         match self {
             Self::Memory => Ok(Box::new(MemoryStore::new())),
+            #[cfg(feature = "json")]
             Self::File { path } => Ok(Box::new(FileStore::new(path))),
+            #[cfg(feature = "cache")]
             Self::Cache { ref uri } => match CacheType::from(uri.clone()) {
-                #[cfg(feature = "redis")]
+                #[cfg(all(feature = "json", feature = "redis"))]
                 CacheType::Redis => Ok(Box::new(RedisStore::new(uri)?)),
                 CacheType::Unknown => Err(session_store::Error::Backend(format!(
                     "Unsupported cache URI scheme: {}",
                     uri.0.scheme()
                 ))),
             },
+            #[cfg(feature = "db")]
             Self::Database => {
                 unimplemented!();
             }
@@ -1523,18 +1529,20 @@ impl Debug for DatabaseUrl {
 
 /// A structure that holds the type of Cache.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg(feature = "cache")]
 pub enum CacheType {
     /// A redis cache type.
-    #[cfg(feature = "redis")]
+    #[cfg(all(feature = "redis", feature = "json"))]
     Redis,
     /// The cache type is not known or supported.
     Unknown,
 }
 
+#[cfg(feature = "cache")]
 impl From<&str> for CacheType {
     fn from(value: &str) -> Self {
         match value {
-            #[cfg(feature = "redis")]
+            #[cfg(all(feature = "redis", feature = "json"))]
             "redis" => Self::Redis,
             _ => Self::Unknown,
         }
@@ -1560,8 +1568,10 @@ impl From<&str> for CacheType {
 /// ```
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
+#[cfg(feature = "cache")]
 pub struct CacheUrl(url::Url);
 
+#[cfg(feature = "cache")]
 impl CacheUrl {
     /// Returns the string representation of the cache URL.
     ///
@@ -1579,24 +1589,28 @@ impl CacheUrl {
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<String> for CacheUrl {
     fn from(url: String) -> Self {
         Self(url::Url::parse(&url).expect("invalid  cache URL"))
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<&str> for CacheUrl {
     fn from(url: &str) -> Self {
         Self(url::Url::parse(url).expect("invalid cache URL"))
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<CacheUrl> for CacheType {
     fn from(url: CacheUrl) -> Self {
         url.0.scheme().into()
     }
 }
 
+#[cfg(feature = "cache")]
 impl Debug for CacheUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let new_url = conceal_url_parts(&self.0);
@@ -1605,6 +1619,7 @@ impl Debug for CacheUrl {
     }
 }
 
+#[cfg(any(feature = "cache", feature = "db"))]
 fn conceal_url_parts(url: &url::Url) -> url::Url {
     let mut new_url = url.clone();
     if !new_url.username().is_empty() {

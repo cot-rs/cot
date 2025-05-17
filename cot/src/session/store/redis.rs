@@ -218,8 +218,7 @@ mod tests {
             env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
         let url = CacheUrl::from(redis_url);
         let store = RedisStore::new(&url).expect("failed to create RedisStore");
-        let mut conn = store.get_connection().await.expect("get_connection failed");
-        let _: () = conn.flushdb().await.expect("flushdb failed");
+        let conn = store.get_connection().await.expect("get_connection failed");
         store
     }
 

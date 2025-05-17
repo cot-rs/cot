@@ -60,7 +60,7 @@ impl Project for {{ project_struct_name }} {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .middleware(AuthMiddleware::new())
-            .middleware(SessionMiddleware::new())
+            .middleware(SessionMiddleware::from_context(context))
             .middleware(LiveReloadMiddleware::from_context(context))
             .build()
     }

@@ -60,7 +60,7 @@ swagger-ui-redist = { workspace = true, optional = true }
 sync_wrapper.workspace = true
 thiserror.workspace = true
 time.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs"] }
 toml = { workspace = true, features = ["parse"] }
 tower = { workspace = true, features = ["util"] }
 tower-livereload = { workspace = true, optional = true }
@@ -103,9 +103,10 @@ db = ["dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
 sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
 postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres", "sqlx/postgres"]
 mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
-redis = ["dep:deadpool-redis", "dep:redis"]
+redis = ["cache","dep:deadpool-redis", "dep:redis"]
 json = ["dep:serde_json"]
 openapi = ["json", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
+cache = ["dep:url"]
 test = []

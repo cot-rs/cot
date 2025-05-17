@@ -7,8 +7,10 @@
 //! Session stores are responsible for persisting session data between requests.
 //! Different implementations store data in different places, such as memory,
 //! files, databases, or external caching services like Redis.
+#[cfg(feature = "json")]
 pub mod file;
 pub mod memory;
+#[cfg(feature = "json")]
 #[cfg(feature = "redis")]
 pub mod redis;
 

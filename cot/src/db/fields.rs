@@ -366,3 +366,9 @@ impl<T: PrimaryKey> PrimaryKey for Auto<T> {}
 impl PrimaryKey for i32 {}
 
 impl PrimaryKey for i64 {}
+
+impl PrimaryKey for u32 {}
+
+impl PrimaryKey for u64 {}
+
+impl PrimaryKey for String {}

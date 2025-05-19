@@ -87,7 +87,7 @@ hex = "0.4"
 hmac = "0.12"
 http = "1.3"
 http-body = "1"
-http-body-util = "0.1"
+http-body-util = "0.1.3"
 humantime = "2"
 indexmap = "2"
 insta = { version = "1", features = ["filters"] }

@@ -76,6 +76,11 @@ impl<'a> FormFieldValue<'a> {
     /// For text fields, this converts the text into bytes. For multipart
     /// fields, this reads the field's content as bytes.
     ///
+    /// # Errors
+    ///
+    /// This method can return an error if the field is a multipart field and
+    /// the content cannot be read, for example, because of an I/O error.
+    ///
     /// # Examples
     ///
     /// ```
@@ -104,6 +109,11 @@ impl<'a> FormFieldValue<'a> {
     ///
     /// For text fields, this returns the text directly. For multipart fields,
     /// this reads the field's content as text.
+    ///
+    /// # Errors
+    ///
+    /// This method can return an error if the field is a multipart field and
+    /// the content cannot be read, for example, because of an I/O error.
     ///
     /// # Examples
     ///
@@ -244,8 +254,6 @@ mod tests {
         let mut multipart = Multipart::new(stream, boundary);
 
         let field = multipart.next_field().await.unwrap().unwrap();
-        let value = FormFieldValue::new_multipart(field);
-
-        value
+        FormFieldValue::new_multipart(field)
     }
 }

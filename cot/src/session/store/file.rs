@@ -62,7 +62,7 @@ impl From<FileStoreError> for session_store::Error {
 ///
 /// let store = FileStore::new(PathBuf::from("/var/lib/cot/sessions"));
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct FileStore {
     /// The directory to save session files.
     dir_path: Cow<'static, Path>,
@@ -116,7 +116,7 @@ impl SessionStore for FileStore {
                     break;
                 }
                 Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                    // On collusion, recycle the ID and try again.
+                    // On collision, recycle the ID and try again.
                     record.id = Id::default();
                 }
                 Err(err) => return Err(FileStoreError::Io(err))?,

@@ -365,8 +365,10 @@ enum FormData<'a> {
     Form {
         #[debug("..")]
         inner: form_urlencoded::Parse<'a>,
-        #[expect(dead_code)]
-        data: Bytes,
+        // needed to store the data used by the parser in `inner`
+        // must be declared after `inner` to avoid dropping it first
+        // see `new_urlencoded` for details
+        _data: Bytes,
     },
     Multipart {
         inner: multer::Multipart<'a>,
@@ -378,19 +380,19 @@ impl<'a> FormData<'a> {
         #[expect(unsafe_code)]
         let slice = unsafe {
             // SAFETY:
-            // * `Bytes` guarantees that `data` is a non-null, valid for reads for
+            // * `Bytes` guarantees that `data` is non-null, valid for reads for
             //   `data.len()` bytes
             // * `data` is not mutated inside `Bytes`
             // * data inside `slice` will not get deallocated as long as the underlying
             //   `Bytes` object is alive
-            // * Struct fields are dropped in the order of declaration, so `data` will be
+            // * struct fields are dropped in the order of declaration, so `data` will be
             //   dropped after `inner`
             std::slice::from_raw_parts(data.as_ptr(), data.len())
         };
 
         FormData::Form {
-            data,
             inner: form_urlencoded::parse(slice),
+            _data: data,
         }
     }
 
@@ -635,6 +637,18 @@ mod tests {
     async fn urlencoded_form_data_extract_get() {
         let mut request = http::Request::builder()
             .method(http::Method::GET)
+            .uri("https://example.com/?hello=world")
+            .body(Body::empty())
+            .unwrap();
+
+        let bytes = urlencoded_form_data(&mut request).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b"hello=world"));
+    }
+
+    #[cot::test]
+    async fn urlencoded_form_data_extract_head() {
+        let mut request = http::Request::builder()
+            .method(http::Method::HEAD)
             .uri("https://example.com/?hello=world")
             .body(Body::empty())
             .unwrap();

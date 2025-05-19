@@ -1423,6 +1423,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cache")]
     fn cache_type_from_str_unknown() {
         for s in &["", "foo", "redis://foo"] {
             assert_eq!(CacheType::from(*s), CacheType::Unknown);
@@ -1440,6 +1441,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cache")]
     fn cacheurl_from_str_and_string() {
         let s = "http://example.com/foo";
         let u1 = CacheUrl::from(s);
@@ -1449,12 +1451,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cache")]
     #[should_panic(expected = "invalid cache URL")]
     fn cacheurl_from_invalid_str_panics() {
         let _ = CacheUrl::from("not a url");
     }
 
     #[test]
+    #[cfg(feature = "cache")]
     fn cacheurl_as_str_roundtrip() {
         let raw = "https://user:pass@host:1234/path?query#frag";
         let cu = CacheUrl::from(raw);
@@ -1462,6 +1466,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cache")]
     fn cacheurl_debug_masks_credentials() {
         let raw = "https://user:secret@host:1234/path";
         let cu = CacheUrl::from(raw);

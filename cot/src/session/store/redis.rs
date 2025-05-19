@@ -100,7 +100,7 @@ impl RedisStore {
     ///     .expect("failed to configure RedisStore");
     /// ```
     pub fn new(url: &CacheUrl) -> Result<RedisStore, RedisStoreError> {
-        let mut cfg = Config::from_url(url.as_str());
+        let cfg = Config::from_url(url.as_str());
         let pool = cfg
             .create_pool(Some(Runtime::Tokio1))
             .map_err(RedisStoreError::PoolCreation)?;
@@ -147,7 +147,7 @@ impl SessionStore for RedisStore {
         let data: String =
             serde_json::to_string(&session_record).map_err(RedisStoreError::Serialize)?;
         let options = SetOptions::default()
-            .conditional_set(ExistenceCheck::NX)
+            .conditional_set(ExistenceCheck::NX) // only create if the key does not exist.
             .with_expiration(SetExpiry::EX(get_expiry_as_u64(session_record.expiry_date)));
 
         loop {
@@ -159,7 +159,7 @@ impl SessionStore for RedisStore {
             if set_ok {
                 break;
             }
-            // On collusion, recycle the ID and try again.
+            // On collision, recycle the ID and try again.
             session_record.id = Id::default();
         }
         Ok(())
@@ -170,7 +170,7 @@ impl SessionStore for RedisStore {
         let data: String =
             serde_json::to_string(&session_record).map_err(RedisStoreError::Serialize)?;
         let options = SetOptions::default()
-            .conditional_set(ExistenceCheck::XX)
+            .conditional_set(ExistenceCheck::XX) // only update if the key exists.
             .with_expiration(SetExpiry::EX(get_expiry_as_u64(session_record.expiry_date)));
         let set_ok: bool = conn
             .set_options(key, data, options)
@@ -294,10 +294,6 @@ mod tests {
             expiry_date: expiry,
         };
         store.create(&mut r1).await.unwrap();
-
-        let mut conn = store.get_connection().await.unwrap();
-        let fake = serde_json::to_string(&r1).unwrap();
-        let _: () = conn.set(&r1.id.to_string(), fake).await.unwrap();
 
         let mut r2 = Record {
             id: r1.id,

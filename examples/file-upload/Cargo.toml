@@ -1,0 +1,12 @@
+[package]
+name = "example-file-upload"
+version = "0.1.0"
+publish = false
+description = "File upload - Cot example."
+license = "MIT OR Apache-2.0"
+edition = "2024"
+
+[dependencies]
+askama = "0.14"
+base64 = "0.22"
+cot = { path = "../../cot" }

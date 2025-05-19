@@ -31,9 +31,6 @@ use crate::project::WithDatabase;
 /// Implementing this trait allows a configuration type to be used directly with
 /// Cot's session middleware system.
 ///
-/// The conversion process may require access to the project context to
-/// establish connections to external services or databases.
-///
 /// # Examples
 ///
 /// ```
@@ -76,8 +73,13 @@ pub trait ToSessionStore {
     ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error>;
 }
 
-/// A wrapper around a session store that implements the `SessionStore` trait
-/// which allows for dynamic dispatch of session store operations.
+/// A wrapper that provides a concrete type for
+/// [`tower_session::SessionManagerLayer`] while delegating to a boxed
+/// [`SessionStore`] trait object.
+///
+/// This enables runtime selection of session store implementations, as
+/// [`tower_sessions::SessionManagerLayer`] requires a concrete type rather than
+/// a boxed trait object.
 ///
 /// # Examples
 ///
@@ -86,16 +88,11 @@ pub trait ToSessionStore {
 ///
 /// use cot::session::store::SessionStoreWrapper;
 /// use cot::session::store::memory::MemoryStore;
-/// use tower_sessions::session_store::SessionStore;
+/// use tower_sessions::{SessionManagerLayer, SessionStore};
 ///
-/// // Create a memory-based session store
-/// let memory_store = MemoryStore::new();
-///
-/// // Wrap it for shared ownership and dynamic dispatch
-/// let store = SessionStoreWrapper::new(Arc::new(memory_store));
-///
-/// // The wrapper can be cloned cheaply
-/// let store_clone = store.clone();
+/// let store = Arc::new(MemoryStore::new()) as Arc<dyn SessionStore + Send + Sync>;
+/// let wrapper = SessionStoreWrapper::new(store);
+/// let session_layer = SessionManagerLayer::new(wrapper);
 /// ```
 #[derive(Debug, Clone)]
 pub struct SessionStoreWrapper(Arc<dyn SessionStore>);

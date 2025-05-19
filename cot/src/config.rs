@@ -794,7 +794,7 @@ impl LiveReloadMiddlewareConfigBuilder {
 ///     uri: CacheUrl::from("redis://localhost:6379"),
 /// };
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SessionStoreTypeConfig {
     /// In-memory session storage.

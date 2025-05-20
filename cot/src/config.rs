@@ -748,6 +748,40 @@ impl LiveReloadMiddlewareConfigBuilder {
     }
 }
 
+/// How strictly browsers send cookies on cross-site requests.
+///
+/// - `Strict`: Cookie is only sent for same-site requests (most restrictive).
+/// - `Lax`: Cookie is sent for same-site requests and top-level navigations (a
+///   reasonable default).
+/// - `None`: Cookie is sent on all requests, including third-party contexts
+///   (least restrictive).
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum SameSite {
+    /// Only send cookie for same-site requests.
+    #[default]
+    Strict,
+
+    /// Send cookie on same-site requests and top-level cross-site navigations.
+    Lax,
+
+    /// Send cookie on all requests, including third-party.
+    None,
+}
+
+use tower_sessions::cookie::SameSite as TowerSameSite;
+
+impl From<SameSite> for TowerSameSite {
+    fn from(value: SameSite) -> Self {
+        match value {
+            SameSite::Strict => Self::Strict,
+            SameSite::Lax => Self::Lax,
+            SameSite::None => Self::None,
+        }
+    }
+}
+
 /// The configuration for the session middleware.
 ///
 /// This is used as part of the [`MiddlewareConfig`] struct.
@@ -773,6 +807,84 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
+    /// The HttpOnly of the cookie used for the session. It is set to `true` by
+    /// default.
+    ///
+    ///  # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().http_only(true).build();
+    /// ```
+    pub http_only: bool,
+    /// The `SameSite` attribute of the cookie used for the session.
+    /// The default value is [`SameSite::Strict`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{SameSite, SessionMiddlewareConfig};
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .same_site(SameSite::None)
+    ///     .build();
+    /// ```
+    pub same_site: SameSite,
+
+    /// The Domain attribute of the cookie used for the session. This is set to
+    /// None by default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .domain("localhost".to_string())
+    ///     .build();
+    /// ```
+    #[builder(setter(strip_option), default)]
+    pub domain: Option<String>,
+    /// The "Path" attribute of the cookie used for the session. It is set to
+    /// "/" by default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    ///
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .path(String::from("/random/path"))
+    ///     .build();
+    /// ```
+    pub path: String,
+    /// The name of the cookie used for the session. It is set to "id" by
+    /// default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .name("some.id".to_string())
+    ///     .build();
+    /// ```
+    pub name: String,
+    /// Whether the unmodified session should be saved on read or not.
+    /// If set to `true`, the session will be saved even if it was not modified.
+    /// It is set to `false` by default.
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().always_save(true).build();
+    /// ```
+    pub always_save: bool,
 }
 
 impl SessionMiddlewareConfig {
@@ -806,6 +918,12 @@ impl SessionMiddlewareConfigBuilder {
     pub fn build(&self) -> SessionMiddlewareConfig {
         SessionMiddlewareConfig {
             secure: self.secure.unwrap_or(true),
+            http_only: self.http_only.unwrap_or(true),
+            same_site: self.same_site.unwrap_or_default(),
+            domain: self.domain.clone().unwrap_or_default(),
+            name: self.name.clone().unwrap_or("String".to_string()),
+            path: self.path.clone().unwrap_or(String::from("/")),
+            always_save: self.always_save.unwrap_or(false),
         }
     }
 }
@@ -1024,6 +1142,12 @@ mod tests {
             live_reload.enabled = true
             [middlewares.session]
             secure = false
+            http_only = false
+            domain = "localhost"
+            same_site = "lax"
+            path = "/some/path"
+            always_save = true
+            name = "some.sid"
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
@@ -1046,6 +1170,15 @@ mod tests {
         );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
+        assert!(!config.middlewares.session.http_only);
+        assert_eq!(
+            config.middlewares.session.domain,
+            Some(String::from("localhost"))
+        );
+        assert_eq!(config.middlewares.session.same_site, SameSite::Lax);
+        assert!(config.middlewares.session.always_save);
+        assert_eq!(config.middlewares.session.name, String::from("some.sid"));
+        assert_eq!(config.middlewares.session.path, String::from("/"))
     }
 
     #[test]

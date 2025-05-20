@@ -4,6 +4,7 @@
 //! are used to add functionality to the request/response cycle, such as
 //! session management, adding security headers, and more.
 
+use std::borrow::Cow;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
@@ -14,6 +15,7 @@ use http_body_util::combinators::BoxBody;
 use tower::Service;
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 
+use crate::config::SameSite;
 use crate::error::ErrorRepr;
 use crate::project::MiddlewareContext;
 use crate::request::Request;
@@ -289,7 +291,14 @@ impl SessionMiddleware {
     /// ```
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
-        Self::new().secure(context.config().middlewares.session.secure)
+        let session_cfg = &context.config().middlewares.session;
+        Self::new()
+            .secure(session_cfg.secure)
+            .path(session_cfg.path.clone())
+            .name(session_cfg.name.clone())
+            .http_only(session_cfg.http_only)
+            .always_save(session_cfg.always_save)
+            .same_site(session_cfg.same_site.clone())
     }
 
     /// Sets the secure flag for the session middleware.
@@ -305,6 +314,107 @@ impl SessionMiddleware {
     pub fn secure(self, secure: bool) -> Self {
         Self {
             inner: self.inner.with_secure(secure),
+        }
+    }
+
+    /// Enables or disables the `HttpOnly` flag on the session cookie.
+    ///
+    /// When `true`, the cookie is inaccessible to JavaScript.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    ///
+    /// let middleware = SessionMiddleware::new().http_only(false);
+    /// ```
+    #[must_use]
+    pub fn http_only(self, http_only: bool) -> Self {
+        Self {
+            inner: self.inner.with_http_only(http_only),
+        }
+    }
+
+    /// Sets the `Domain` attribute for the session cookie.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    ///
+    /// let middleware = SessionMiddleware::new().domain("example.com");
+    /// ```
+    #[must_use]
+    pub fn domain<D: Into<Cow<'static, str>>>(self, domain: D) -> Self {
+        Self {
+            inner: self.inner.with_domain(domain),
+        }
+    }
+
+    /// Sets the `SameSite` attribute for the session cookie.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SameSite;
+    /// use cot::middleware::SessionMiddleware;
+    ///
+    /// let middleware = SessionMiddleware::new().same_site(SameSite::Lax);
+    /// ```
+    #[must_use]
+    pub fn same_site(self, same_site: SameSite) -> Self {
+        Self {
+            inner: self.inner.with_same_site(same_site.into()),
+        }
+    }
+
+    /// Sets the cookie **name** (default `"id"`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    ///
+    /// let middleware = SessionMiddleware::new().name("session_id");
+    /// ```
+    #[must_use]
+    pub fn name<N: Into<Cow<'static, str>>>(self, name: N) -> Self {
+        Self {
+            inner: self.inner.with_name(name.into()),
+        }
+    }
+
+    /// Sets the cookie **path** (default `"/"`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    ///
+    /// let middleware = SessionMiddleware::new().path("/api");
+    /// ```
+    #[must_use]
+    pub fn path<P: Into<Cow<'static, str>>>(self, path: P) -> Self {
+        Self {
+            inner: self.inner.with_path(path.into()),
+        }
+    }
+
+    /// When `true`, always writes back the session even if unmodified.
+    ///
+    /// Useful for resetting expiry on every request.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    ///
+    /// let middleware = SessionMiddleware::new().always_save(true);
+    /// ```
+    #[must_use]
+    pub fn always_save(self, always_save: bool) -> Self {
+        Self {
+            inner: self.inner.with_always_save(always_save),
         }
     }
 }

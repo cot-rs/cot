@@ -1178,7 +1178,7 @@ mod tests {
         assert_eq!(config.middlewares.session.same_site, SameSite::Lax);
         assert!(config.middlewares.session.always_save);
         assert_eq!(config.middlewares.session.name, String::from("some.sid"));
-        assert_eq!(config.middlewares.session.path, String::from("/"))
+        assert_eq!(config.middlewares.session.path, String::from("/some/path"))
     }
 
     #[test]

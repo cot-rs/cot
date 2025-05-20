@@ -1,7 +1,9 @@
+use cot::db::ForeignKey;
 use cot::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
 use cot::test::TestRequestBuilder;
+use cot_macros::model;
 
 #[derive(Debug, Form)]
 struct MyForm {
@@ -86,5 +88,39 @@ async fn values_persist_on_form_errors() {
             );
         }
         _ => panic!("Expected a validation error"),
+    }
+}
+
+#[cot::test]
+async fn foreign_key_field() {
+    #[model]
+    struct TestModel {
+        #[model(primary_key)]
+        name: String,
+    }
+
+    #[derive(Form)]
+    struct TestModelForm {
+        test_field: ForeignKey<TestModel>,
+    }
+
+    // test field rendering
+    let context = TestModelForm::build_context(&mut TestRequestBuilder::get("/").build())
+        .await
+        .unwrap();
+    let form_rendered = context.to_string();
+    assert!(form_rendered.contains("test_field"));
+    assert!(form_rendered.contains("type=\"text\""));
+
+    // test form data
+    let mut request = TestRequestBuilder::post("/")
+        .form_data(&[("test_field", "Alice")])
+        .build();
+    let form = TestModelForm::from_request(&mut request).await;
+    match form {
+        Ok(FormResult::Ok(instance)) => {
+            assert_eq!(instance.test_field.primary_key(), "Alice");
+        }
+        _ => panic!("Expected a valid form"),
     }
 }

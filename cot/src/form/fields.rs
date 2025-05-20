@@ -12,9 +12,7 @@ pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
 use crate::auth::PasswordHash;
 use crate::common_types::{Email, Password};
 #[cfg(feature = "db")]
-use crate::db::Auto;
-#[cfg(feature = "db")]
-use crate::db::LimitedString;
+use crate::db::{Auto, ForeignKey, LimitedString, Model};
 use crate::form::{
     AsFormField, FormField, FormFieldOptions, FormFieldValidationError, FormFieldValue,
     FormFieldValueError,
@@ -588,6 +586,40 @@ impl<T: AsFormField> AsFormField for Auto<T> {
         match self {
             Auto::Fixed(value) => value.to_field_value(),
             Auto::Auto => String::new(),
+        }
+    }
+}
+
+#[cfg(feature = "db")]
+impl<T> AsFormField for ForeignKey<T>
+where
+    T: Model,
+    <T as Model>::PrimaryKey: AsFormField,
+{
+    type Type = <<T as Model>::PrimaryKey as AsFormField>::Type;
+
+    fn new_field(
+        options: FormFieldOptions,
+        custom_options: <Self::Type as FormField>::CustomOptions,
+    ) -> Self::Type {
+        Self::Type::with_options(options, custom_options)
+    }
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized,
+    {
+        let value = <T as Model>::PrimaryKey::clean_value(field);
+        match value {
+            Ok(value) => Ok(ForeignKey::PrimaryKey(value)),
+            Err(error) => Err(error),
+        }
+    }
+
+    fn to_field_value(&self) -> String {
+        match self {
+            ForeignKey::PrimaryKey(primary_key) => primary_key.to_field_value(),
+            ForeignKey::Model(model) => model.primary_key().to_field_value(),
         }
     }
 }

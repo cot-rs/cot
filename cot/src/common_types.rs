@@ -647,6 +647,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_url() {
+        let parse_url = Url::new("https://example.com/").unwrap();
+        assert_eq!(parse_url.as_str(), "https://example.com/");
+        assert_eq!(parse_url.scheme(), "https");
+        assert_eq!(parse_url.host(), Some("example.com"));
+    }
+
+    #[test]
     fn password_debug() {
         let password = Password::new("password");
         assert_eq!(format!("{password:?}"), "Password(\"**********\")");

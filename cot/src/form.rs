@@ -220,12 +220,6 @@ impl FormFieldValidationError {
     }
 }
 
-impl From<email_address::Error> for FormFieldValidationError {
-    fn from(error: email_address::Error) -> Self {
-        FormFieldValidationError::from_string(error.to_string())
-    }
-}
-
 /// An enum indicating the target of a form validation error.
 #[derive(Debug)]
 pub enum FormErrorTarget<'a> {

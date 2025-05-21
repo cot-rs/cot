@@ -1333,9 +1333,8 @@ mod tests {
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }
 
-    #[test]
-    #[cfg(feature = "test")]
-    fn url_field_clean_value() {
+    #[cot::test]
+    async fn url_field_clean_value() {
         let mut field = UrlField::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1344,7 +1343,7 @@ mod tests {
             },
             UrlFieldOptions,
         );
-        field.set_value(Cow::Borrowed("https://example.com"));
+        field.set_value(FormFieldValue::new_text("https://example.com")).await.unwrap();
         let value = Url::clean_value(&field).unwrap();
         assert_eq!(
             value.as_str(),
@@ -1352,9 +1351,8 @@ mod tests {
         );
     }
 
-    #[test]
-    #[cfg(feature = "test")]
-    fn url_field_render() {
+    #[cot::test]
+    async fn url_field_render() {
         let mut field = UrlField::with_options(
             FormFieldOptions {
                 id: "id_url".to_owned(),
@@ -1363,16 +1361,15 @@ mod tests {
             },
             UrlFieldOptions,
         );
-        field.set_value(Cow::Borrowed("http://example.com"));
+        field.set_value(FormFieldValue::new_text("http://example.com")).await.unwrap();
         let html = field.to_string();
         assert!(html.contains("type=\"url\""));
         assert!(html.contains("required"));
         assert!(html.contains("value=\"http://example.com\""));
     }
 
-    #[test]
-    #[cfg(feature = "test")]
-    fn url_field_clean_required() {
+    #[cot::test]
+    async fn url_field_clean_required() {
         let mut field = UrlField::with_options(
             FormFieldOptions {
                 id: "id_url".to_owned(),
@@ -1381,7 +1378,7 @@ mod tests {
             },
             UrlFieldOptions,
         );
-        field.set_value(Cow::Borrowed(""));
+        field.set_value(FormFieldValue::new_text("")).await.unwrap();
         let value = Url::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }

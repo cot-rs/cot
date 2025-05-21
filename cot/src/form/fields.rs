@@ -10,7 +10,7 @@ use askama::filters::HtmlSafe;
 use cot::db::Auto;
 
 use crate::auth::PasswordHash;
-use crate::common_types::{Email, Password};
+use crate::common_types::{Email, Password, Url};
 #[cfg(feature = "db")]
 use crate::db::LimitedString;
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
@@ -733,6 +733,47 @@ macro_rules! impl_float_as_form_field {
 impl_float_as_form_field!(f32);
 impl_float_as_form_field!(f64);
 
+impl_form_field!(UrlField, UrlFieldOptions, "a URL");
+
+/// Custom options for a `FloatField`.
+#[derive(Debug, Default, Copy, Clone)]
+pub struct UrlFieldOptions;
+
+impl Display for UrlField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag = HtmlTag::input("url");
+        tag.attr("name", self.id());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl HtmlSafe for UrlField {}
+
+impl AsFormField for Url {
+    type Type = UrlField;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized,
+    {
+        let value = check_required(field)?;
+
+        Ok(value.parse()?)
+    }
+
+    fn to_field_value(&self) -> String {
+        self.as_str().to_owned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -1215,5 +1256,24 @@ mod tests {
         field.set_value(Cow::Borrowed(""));
         let value = f32::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
+    }
+
+    #[test]
+    #[cfg(feature = "test")]
+    fn url_field_clean_value() {
+        let mut field = UrlField::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            UrlFieldOptions,
+        );
+        field.set_value(Cow::Borrowed("https://example.com"));
+        let value = Url::clean_value(&field).unwrap();
+        assert_eq!(
+            value.as_str(),
+            Url::new("https://example.com").unwrap().as_str()
+        );
     }
 }

@@ -51,9 +51,15 @@ async fn api_route_integration() {
     ]);
 
     // Test the OpenAPI data
-    let aide::openapi::Paths {
-        paths: api_spec, ..
-    } = router.as_api();
+    let aide::openapi::OpenApi {
+        paths: Some(aide::openapi::Paths {
+            paths: api_spec, ..
+        }),
+        ..
+    } = router.as_api()
+    else {
+        panic!("Expected OpenAPI data");
+    };
 
     assert!(api_spec.contains_key("/test"));
     assert!(api_spec.contains_key("/json"));
@@ -120,14 +126,20 @@ fn api_router_nested() {
     let nested_router = Router::with_urls(vec![Route::with_router("/b", router)]);
     let root_router = Router::with_urls(vec![Route::with_router("/a", nested_router)]);
 
-    let aide::openapi::Paths {
-        paths: api_spec, ..
-    } = root_router.as_api();
-
-    assert!(matches!(
-        api_spec.get("/a/b/test"),
-        Some(ReferenceOr::Item(PathItem { get: Some(_), .. }))
-    ));
+    if let aide::openapi::OpenApi {
+        paths: Some(aide::openapi::Paths {
+            paths: api_spec, ..
+        }),
+        ..
+    } = root_router.as_api()
+    {
+        assert!(matches!(
+            api_spec.get("/a/b/test"),
+            Some(ReferenceOr::Item(PathItem { get: Some(_), .. }))
+        ));
+    } else {
+        panic!("Expected OpenAPI data");
+    }
 }
 
 #[test]

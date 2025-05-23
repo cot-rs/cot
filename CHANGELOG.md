@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/cot-rs/cot/compare/cot-v0.3.0...cot-v0.3.1) - 2025-05-16
+
+### <!-- 1 -->New features
+
+- allow more types to be used as a primary key ([#330](https://github.com/cot-rs/cot/pull/330))
+- more just commands and clippy fix ([#331](https://github.com/cot-rs/cot/pull/331))
+
+### <!-- 2 -->Fixes
+
+- don't clone string in `<Html as IntoResponse>` ([#324](https://github.com/cot-rs/cot/pull/324))
+
+### <!-- 3 -->Other
+
+- add contributors to the README.md ([#327](https://github.com/cot-rs/cot/pull/327))
+
 ## [0.3.0](https://github.com/cot-rs/cot/compare/cot-v0.2.2...cot-v0.3.0) - 2025-05-13
 
 ### <!-- 1 -->New features

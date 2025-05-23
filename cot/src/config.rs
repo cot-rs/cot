@@ -1772,6 +1772,63 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cache")]
+    fn session_store_valid_toml() {
+        let toml_content = r#"
+            debug = true
+            register_panic_hook = true
+            secret_key = "123abc"
+            fallback_secret_keys = ["456def", "789ghi"]
+            auth_backend = { type = "none" }
+
+            [static_files]
+            url = "/assets/"
+            rewrite = "none"
+            cache_timeout = "1h"
+
+            [middlewares]
+            live_reload.enabled = true
+            [middlewares.session]
+            secure = false
+        "#;
+
+        let store_configs = [
+            (
+                r#"
+            [middlewares.session.store]
+            type = "memory"
+            "#,
+                SessionStoreTypeConfig::Memory,
+            ),
+            (
+                r#"
+            [middlewares.session.store]
+            type = "cache"
+            uri = "redis://redis"
+            "#,
+                SessionStoreTypeConfig::Cache {
+                    uri: CacheUrl::from("redis://redis"),
+                },
+            ),
+            (
+                r#"
+            [middlewares.session.store]
+            type = "file"
+            path = "session/path/"
+            "#,
+                SessionStoreTypeConfig::File {
+                    path: PathBuf::from("session/path"),
+                },
+            ),
+        ];
+
+        for (cfg_toml, cfg_type) in store_configs {
+            let full_cfg_str = format!("{toml_content}\n{cfg_toml}");
+            let config = ProjectConfig::from_toml(&full_cfg_str).unwrap();
+            assert_eq!(config.middlewares.session.store.store_type, cfg_type);
+        }
+    }
+    #[test]
     fn from_toml_invalid() {
         let toml_content = r"
             debug = true

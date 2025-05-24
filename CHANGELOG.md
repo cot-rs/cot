@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/cot-rs/cot/compare/cot-v0.3.1...cot-v0.4.0) - 2025-05-24
+
+### <!-- 1 -->New features
+
+- [**breaking**] add support for file fields in forms ([#334](https://github.com/cot-rs/cot/pull/334))
+
 ## [0.3.1](https://github.com/cot-rs/cot/compare/cot-v0.3.0...cot-v0.3.1) - 2025-05-16
 
 ### <!-- 1 -->New features

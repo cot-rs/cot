@@ -41,6 +41,7 @@ http.workspace = true
 humantime.workspace = true
 indexmap.workspace = true
 mime_guess.workspace = true
+multer.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
 pin-project-lite.workspace = true
 schemars = { workspace = true, optional = true }

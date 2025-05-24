@@ -176,12 +176,13 @@ impl HtmlTag {
     ///     "<input type=\"text\" placeholder=\"Enter text\" />"
     /// );
     /// ```
-    pub fn attr(&mut self, key: &str, value: &str) -> &mut Self {
+    pub fn attr<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> &mut Self {
+        let key = key.into();
         assert!(
-            !self.attributes.iter().any(|(k, _)| k == key),
+            !self.attributes.iter().any(|(k, _)| k == &key),
             "Attribute already exists: {key}"
         );
-        self.attributes.push((key.to_string(), value.to_string()));
+        self.attributes.push((key, value.into()));
         self
     }
 

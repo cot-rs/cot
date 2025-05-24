@@ -5,13 +5,14 @@ members = [
     "cot-codegen",
     "cot-macros",
     # Examples
-    "examples/hello-world",
-    "examples/todo-list",
-    "examples/sessions",
     "examples/admin",
-    "examples/json",
-    "examples/custom-task",
     "examples/custom-error-pages",
+    "examples/custom-task",
+    "examples/file-upload",
+    "examples/hello-world",
+    "examples/json",
+    "examples/sessions",
+    "examples/todo-list",
 ]
 resolver = "2"
 
@@ -86,13 +87,14 @@ hex = "0.4"
 hmac = "0.12"
 http = "1.3"
 http-body = "1"
-http-body-util = "0.1"
+http-body-util = "0.1.3"
 humantime = "2"
 indexmap = "2"
 insta = { version = "1", features = ["filters"] }
 insta-cmd = "0.6"
 mime_guess = { version = "2", default-features = false }
 mockall = "0.13"
+multer = "3"
 password-auth = { version = "1", default-features = false }
 petgraph = { version = "0.8", default-features = false }
 pin-project-lite = "0.2"

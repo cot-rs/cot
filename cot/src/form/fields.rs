@@ -1,4 +1,5 @@
-use std::borrow::Cow;
+mod files;
+
 use std::fmt::{Debug, Display, Formatter};
 use std::num::{
     NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
@@ -6,14 +7,18 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
-#[cfg(feature = "db")]
-use cot::db::Auto;
+pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
 
 use crate::auth::PasswordHash;
 use crate::common_types::{Email, Password, Url};
 #[cfg(feature = "db")]
+use crate::db::Auto;
+#[cfg(feature = "db")]
 use crate::db::LimitedString;
-use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
+use crate::form::{
+    AsFormField, FormField, FormFieldOptions, FormFieldValidationError, FormFieldValue,
+    FormFieldValueError,
+};
 use crate::html::HtmlTag;
 
 macro_rules! impl_form_field {
@@ -48,8 +53,9 @@ macro_rules! impl_form_field {
                 self.value.as_deref()
             }
 
-            fn set_value(&mut self, value: Cow<'_, str>) {
-                self.value = Some(value.into_owned());
+            async fn set_value(&mut self, field: FormFieldValue<'_>) -> std::result::Result<(), FormFieldValueError> {
+                self.value = Some(field.into_text().await?);
+                Ok(())
             }
         }
     };
@@ -74,7 +80,7 @@ impl Display for StringField {
             tag.bool_attr("required");
         }
         if let Some(max_length) = self.custom_options.max_length {
-            tag.attr("maxlength", &max_length.to_string());
+            tag.attr("maxlength", max_length.to_string());
         }
         if let Some(value) = &self.value {
             tag.attr("value", value);
@@ -144,7 +150,7 @@ impl Display for PasswordField {
             tag.bool_attr("required");
         }
         if let Some(max_length) = self.custom_options.max_length {
-            tag.attr("maxlength", &max_length.to_string());
+            tag.attr("maxlength", max_length.to_string());
         }
         // we don't set the value attribute for password fields
         // to avoid leaking the password in the HTML
@@ -222,10 +228,10 @@ impl Display for EmailField {
             tag.bool_attr("required");
         }
         if let Some(max_length) = self.custom_options.max_length {
-            tag.attr("maxlength", &max_length.to_string());
+            tag.attr("maxlength", max_length.to_string());
         }
         if let Some(min_length) = self.custom_options.min_length {
-            tag.attr("minlength", &min_length.to_string());
+            tag.attr("minlength", min_length.to_string());
         }
         if let Some(value) = &self.value {
             tag.attr("value", value);
@@ -306,10 +312,10 @@ impl<T: Integer> Display for IntegerField<T> {
             tag.bool_attr("required");
         }
         if let Some(min) = &self.custom_options.min {
-            tag.attr("min", &min.to_string());
+            tag.attr("min", min.to_string());
         }
         if let Some(max) = &self.custom_options.max {
-            tag.attr("max", &max.to_string());
+            tag.attr("max", max.to_string());
         }
         if let Some(value) = &self.value {
             tag.attr("value", value);
@@ -331,7 +337,7 @@ impl<T: Integer> HtmlSafe for IntegerField<T> {}
 /// assert_eq!(<i8 as Integer>::MIN, Some(-128));
 /// assert_eq!(<i8 as Integer>::MAX, Some(127));
 /// ```
-pub trait Integer: Sized + ToString {
+pub trait Integer: Sized + ToString + Send {
     /// The minimum value of the type.
     ///
     /// # Examples
@@ -402,17 +408,13 @@ macro_rules! impl_integer_as_form_field {
 
                 if let Some(min) = field.custom_options.min {
                     if parsed < min {
-                        return Err(FormFieldValidationError::minimum_value_not_met(
-                            min.to_string(),
-                        ));
+                        return Err(FormFieldValidationError::minimum_value_not_met(min));
                     }
                 }
 
                 if let Some(max) = field.custom_options.max {
                     if parsed > max {
-                        return Err(FormFieldValidationError::maximum_value_exceeded(
-                            max.to_string(),
-                        ));
+                        return Err(FormFieldValidationError::maximum_value_exceeded(max));
                     }
                 }
 
@@ -634,10 +636,10 @@ impl<T: Float> Display for FloatField<T> {
         }
 
         if let Some(min) = &self.custom_options.min {
-            tag.attr("min", &min.to_string());
+            tag.attr("min", min.to_string());
         }
         if let Some(max) = &self.custom_options.max {
-            tag.attr("max", &max.to_string());
+            tag.attr("max", max.to_string());
         }
         if let Some(value) = &self.value {
             tag.attr("value", value);
@@ -652,7 +654,7 @@ impl<T: Float> HtmlSafe for FloatField<T> {}
 /// A trait for types that can be represented as a float.
 ///
 /// This trait is implemented for `f32` and `f64`.
-pub trait Float: Sized + ToString {
+pub trait Float: Sized + ToString + Send {
     /// The minimum value of the type.
     ///
     /// # Examples
@@ -706,17 +708,13 @@ macro_rules! impl_float_as_form_field {
 
                 if let Some(min) = field.custom_options.min {
                     if parsed < min {
-                        return Err(FormFieldValidationError::minimum_value_not_met(
-                            min.to_string(),
-                        ));
+                        return Err(FormFieldValidationError::minimum_value_not_met(min));
                     }
                 }
 
                 if let Some(max) = field.custom_options.max {
                     if parsed > max {
-                        return Err(FormFieldValidationError::maximum_value_exceeded(
-                            max.to_string(),
-                        ));
+                        return Err(FormFieldValidationError::maximum_value_exceeded(max));
                     }
                 }
 
@@ -778,8 +776,6 @@ impl AsFormField for Url {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-
     use super::*;
 
     #[test]
@@ -916,8 +912,8 @@ mod tests {
         assert!(html.contains("required"));
     }
 
-    #[test]
-    fn string_field_clean_value() {
+    #[cot::test]
+    async fn string_field_clean_value() {
         let mut field = StringField::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -928,13 +924,16 @@ mod tests {
                 max_length: Some(10),
             },
         );
-        field.set_value(Cow::Borrowed("test"));
+        field
+            .set_value(FormFieldValue::new_text("test"))
+            .await
+            .unwrap();
         let value = String::clean_value(&field).unwrap();
         assert_eq!(value, "test");
     }
 
-    #[test]
-    fn string_field_clean_required() {
+    #[cot::test]
+    async fn string_field_clean_required() {
         let mut field = StringField::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -945,13 +944,13 @@ mod tests {
                 max_length: Some(10),
             },
         );
-        field.set_value(Cow::Borrowed(""));
+        field.set_value(FormFieldValue::new_text("")).await.unwrap();
         let value = String::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }
 
-    #[test]
-    fn password_field_clean_value() {
+    #[cot::test]
+    async fn password_field_clean_value() {
         let mut field = PasswordField::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -962,13 +961,16 @@ mod tests {
                 max_length: Some(10),
             },
         );
-        field.set_value(Cow::Borrowed("password"));
+        field
+            .set_value(FormFieldValue::new_text("password"))
+            .await
+            .unwrap();
         let value = Password::clean_value(&field).unwrap();
         assert_eq!(value.as_str(), "password");
     }
 
-    #[test]
-    fn email_field_clean_valid() {
+    #[cot::test]
+    async fn email_field_clean_valid() {
         let mut field = EmailField::with_options(
             FormFieldOptions {
                 id: "email_test".to_owned(),
@@ -981,14 +983,17 @@ mod tests {
             },
         );
 
-        field.set_value(Cow::Borrowed("user@example.com"));
+        field
+            .set_value(FormFieldValue::new_text("user@example.com"))
+            .await
+            .unwrap();
         let email = Email::clean_value(&field).unwrap();
 
         assert_eq!(email.as_str(), "user@example.com");
     }
 
-    #[test]
-    fn email_field_clean_invalid_format() {
+    #[cot::test]
+    async fn email_field_clean_invalid_format() {
         let mut field = EmailField::with_options(
             FormFieldOptions {
                 id: "email_test".to_owned(),
@@ -1001,14 +1006,17 @@ mod tests {
             },
         );
 
-        field.set_value(Cow::Borrowed("invalid-email"));
+        field
+            .set_value(FormFieldValue::new_text("invalid-email"))
+            .await
+            .unwrap();
         let result = Email::clean_value(&field);
 
         assert!(result.is_err());
     }
 
-    #[test]
-    fn email_field_clean_exceeds_max_length() {
+    #[cot::test]
+    async fn email_field_clean_exceeds_max_length() {
         let mut field = EmailField::with_options(
             FormFieldOptions {
                 id: "email_test".to_owned(),
@@ -1021,7 +1029,10 @@ mod tests {
             },
         );
 
-        field.set_value(Cow::Borrowed("averylongemail@example.com"));
+        field
+            .set_value(FormFieldValue::new_text("averylongemail@example.com"))
+            .await
+            .unwrap();
         let result = Email::clean_value(&field);
 
         assert!(matches!(
@@ -1030,8 +1041,8 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn email_field_clean_below_min_length() {
+    #[cot::test]
+    async fn email_field_clean_below_min_length() {
         let mut field = EmailField::with_options(
             FormFieldOptions {
                 id: "email_test".to_owned(),
@@ -1044,7 +1055,10 @@ mod tests {
             },
         );
 
-        field.set_value(Cow::Borrowed("cot"));
+        field
+            .set_value(FormFieldValue::new_text("cot"))
+            .await
+            .unwrap();
         let result = Email::clean_value(&field);
 
         assert!(matches!(
@@ -1053,8 +1067,8 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn email_field_clean_invalid_length_options() {
+    #[cot::test]
+    async fn email_field_clean_invalid_length_options() {
         let mut field = EmailField::with_options(
             FormFieldOptions {
                 id: "email_test".to_owned(),
@@ -1067,7 +1081,10 @@ mod tests {
             },
         );
 
-        field.set_value(Cow::Borrowed("user@example.com"));
+        field
+            .set_value(FormFieldValue::new_text("user@example.com"))
+            .await
+            .unwrap();
         let result = Email::clean_value(&field);
 
         assert!(result.is_err());
@@ -1077,8 +1094,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn integer_field_clean_value() {
+    #[cot::test]
+    async fn integer_field_clean_value() {
         let mut field = IntegerField::<i32>::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1090,13 +1107,16 @@ mod tests {
                 max: Some(10),
             },
         );
-        field.set_value(Cow::Borrowed("5"));
+        field
+            .set_value(FormFieldValue::new_text("5"))
+            .await
+            .unwrap();
         let value = i32::clean_value(&field).unwrap();
         assert_eq!(value, 5);
     }
 
-    #[test]
-    fn integer_field_clean_value_below_min_value() {
+    #[cot::test]
+    async fn integer_field_clean_value_below_min_value() {
         let mut field = IntegerField::<i32>::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1108,7 +1128,10 @@ mod tests {
                 max: Some(50),
             },
         );
-        field.set_value(Cow::Borrowed("5"));
+        field
+            .set_value(FormFieldValue::new_text("5"))
+            .await
+            .unwrap();
         let value = i32::clean_value(&field);
         assert!(matches!(
             value,
@@ -1116,8 +1139,8 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn integer_field_clean_value_above_max_value() {
+    #[cot::test]
+    async fn integer_field_clean_value_above_max_value() {
         let mut field = IntegerField::<i32>::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1129,7 +1152,10 @@ mod tests {
                 max: Some(50),
             },
         );
-        field.set_value(Cow::Borrowed("100"));
+        field
+            .set_value(FormFieldValue::new_text("100"))
+            .await
+            .unwrap();
         let value = i32::clean_value(&field);
         assert!(matches!(
             value,
@@ -1137,8 +1163,8 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn bool_field_clean_value() {
+    #[cot::test]
+    async fn bool_field_clean_value() {
         let mut field = BoolField::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1149,14 +1175,17 @@ mod tests {
                 must_be_true: Some(true),
             },
         );
-        field.set_value(Cow::Borrowed("true"));
+        field
+            .set_value(FormFieldValue::new_text("true"))
+            .await
+            .unwrap();
         let value = bool::clean_value(&field).unwrap();
         assert!(value);
     }
 
-    #[test]
+    #[cot::test]
     #[allow(clippy::float_cmp)]
-    fn float_field_clean_value() {
+    async fn float_field_clean_value() {
         let mut field = FloatField::<f32>::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1168,13 +1197,16 @@ mod tests {
                 max: Some(10.0),
             },
         );
-        field.set_value(Cow::Borrowed("5.0"));
+        field
+            .set_value(FormFieldValue::new_text("5.0"))
+            .await
+            .unwrap();
         let value = f32::clean_value(&field).unwrap();
         assert_eq!(value, 5.0f32);
     }
 
-    #[test]
-    fn float_field_clean_value_min_value_not_met() {
+    #[cot::test]
+    async fn float_field_clean_value_min_value_not_met() {
         let mut field = FloatField::<f32>::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1186,7 +1218,10 @@ mod tests {
                 max: Some(10.0),
             },
         );
-        field.set_value(Cow::Borrowed("2.0"));
+        field
+            .set_value(FormFieldValue::new_text("2.0"))
+            .await
+            .unwrap();
         let value = f32::clean_value(&field);
         assert!(matches!(
             value,
@@ -1194,8 +1229,8 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn float_field_clean_value_max_value_exceeded() {
+    #[cot::test]
+    async fn float_field_clean_value_max_value_exceeded() {
         let mut field = FloatField::<f32>::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1207,7 +1242,10 @@ mod tests {
                 max: Some(10.0),
             },
         );
-        field.set_value(Cow::Borrowed("20.0"));
+        field
+            .set_value(FormFieldValue::new_text("20.0"))
+            .await
+            .unwrap();
         let value = f32::clean_value(&field);
         assert!(matches!(
             value,
@@ -1215,8 +1253,8 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn float_field_clean_value_nan_and_inf() {
+    #[cot::test]
+    async fn float_field_clean_value_nan_and_inf() {
         let mut field = FloatField::<f32>::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1231,7 +1269,10 @@ mod tests {
         let bad_inputs = ["NaN", "inf"];
 
         for &bad_input in &bad_inputs {
-            field.set_value(Cow::Borrowed(bad_input));
+            field
+                .set_value(FormFieldValue::new_text(bad_input))
+                .await
+                .unwrap();
             let value = f32::clean_value(&field);
             assert_eq!(
                 value,
@@ -1242,8 +1283,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn float_field_clean_required() {
+    #[cot::test]
+    async fn float_field_clean_required() {
         let mut field = FloatField::<f32>::with_options(
             FormFieldOptions {
                 id: "test".to_owned(),
@@ -1255,7 +1296,7 @@ mod tests {
                 max: Some(10.0),
             },
         );
-        field.set_value(Cow::Borrowed(""));
+        field.set_value(FormFieldValue::new_text("")).await.unwrap();
         let value = f32::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }

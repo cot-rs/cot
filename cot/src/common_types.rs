@@ -5,6 +5,7 @@
 //! general-purpose newtype wrappers and associated trait implementations to
 //! ensure consistent and safe processing of form data.
 
+use secure_string::SecureString;
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -45,12 +46,13 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///    compare it with the other password. This method uses constant-time
 ///    equality comparison, which protects against timing attacks.
 ///
-/// 2. An alternative is to use the [`Password::as_str`] method and compare the
-///    strings directly. This approach uses non-constant-time comparison, which
-///    is less secure but may be acceptable in certain legitimate use cases
-///    where the security tradeoff is understood, e.g., when you're creating a
-///    user registration form with the "retype your password" field, where both
-///    passwords come from the same source anyway.
+/// 2. An alternative is to compare 2 instances of the [`Password`] type directly
+///    because this password struct implements the [`PartialEq`] trait. You can also
+///    use the [`Password::as_str`] method to compare the strings directly. This
+///    approach uses non-constant-time comparison, which is less secure but may be
+///    acceptable in certain legitimate use cases where the security tradeoff is
+///    understood, e.g., when you're creating a user registration form with the
+///    "retype your password" field, where both passwords come from the same source anyway.
 ///
 /// # Examples
 ///
@@ -58,16 +60,22 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 /// use cot::auth::Password;
 ///
 /// let password = Password::new("pass");
-/// assert_eq!(&format!("{:?}", password), "Password(\"**********\")");
+/// assert_eq!(&format!("{:?}", password), "Password(***SECRET***)");
+///
+/// let another_password = Password::new("pass");
+/// assert_eq!(password, another_password);
+///
 /// ```
-#[derive(Clone)]
-pub struct Password(String);
+#[derive(Clone, Debug)]
+pub struct Password(SecureString);
 
-impl Debug for Password {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Password").field(&"**********").finish()
+impl PartialEq for Password {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
     }
 }
+
+impl Eq for Password {}
 
 impl Password {
     /// Creates a new password object.
@@ -80,7 +88,7 @@ impl Password {
     /// let password = Password::new("password");
     /// ```
     #[must_use]
-    pub fn new<T: Into<String>>(password: T) -> Self {
+    pub fn new<T: Into<SecureString>>(password: T) -> Self {
         Self(password.into())
     }
 
@@ -96,7 +104,7 @@ impl Password {
     /// ```
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.0
+        self.0.unsecure()
     }
 
     /// Consumes the object and returns the password as a string.
@@ -111,7 +119,7 @@ impl Password {
     /// ```
     #[must_use]
     pub fn into_string(self) -> String {
-        self.0
+        self.0.into_unsecure()
     }
 }
 
@@ -422,7 +430,21 @@ mod tests {
     #[test]
     fn password_debug() {
         let password = Password::new("password");
-        assert_eq!(format!("{password:?}"), "Password(\"**********\")");
+        assert_eq!(format!("{password:?}"), "Password(***SECRET***)");
+    }
+
+    #[test]
+    fn password_eq() {
+        let password1 = Password::new("password");
+        let password2 = Password::new("password");
+        assert_eq!(password1, password2);
+    }
+
+    #[test]
+    fn password_ne() {
+        let password1 = Password::new("password");
+        let password2 = Password::new("password2");
+        assert_ne!(password1, password2);
     }
 
     #[test]

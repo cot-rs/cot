@@ -10,7 +10,7 @@ use darling::ast::NestedMeta;
 use proc_macro::TokenStream;
 use proc_macro_crate::crate_name;
 use quote::quote;
-use syn::{ItemFn, parse_macro_input};
+use syn::{Data, Field, Fields, ItemFn, parse_macro_input};
 
 use crate::admin::impl_admin_model_for_struct;
 use crate::dbtest::fn_to_dbtest;
@@ -189,6 +189,85 @@ pub(crate) fn cot_ident() -> proc_macro2::TokenStream {
         proc_macro_crate::FoundCrate::Name(name) => {
             let ident = syn::Ident::new(&name, proc_macro2::Span::call_site());
             quote! { ::#ident }
+        }
+    }
+}
+
+#[proc_macro_derive(FromRequestParts)]
+pub fn derive_from_request_parts(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    impl_from_request_parts_for_struct(&ast).into()
+}
+
+fn impl_from_request_parts_for_struct(ast: &syn::DeriveInput) -> proc_macro2::TokenStream {
+    let struct_name = &ast.ident;
+    let cot = cot_ident();
+
+    let fields = if let Data::Struct(data_struct) = &ast.data {
+        &data_struct.fields
+    } else {
+        let err = Error::custom("Only structs can derive `FromRequestParts`");
+        return err.write_errors();
+    };
+
+    match fields {
+        Fields::Named(fields_named) => {
+            let field_initializers = fields_named.named.iter().map(|field: &Field| {
+                let field_name = &field.ident;
+                let field_type = &field.ty;
+                quote! {
+                    #field_name: #field_type::from_request_parts(parts).await?,
+                }
+            });
+
+            quote! {
+            #[::core::automatically_derived]
+                            impl
+                            impl #cot::axum::extract::FromRequestParts<#cot::http::Request, #cot::anyhow::Error> for #struct_name {
+                                async fn from_request_parts(
+                                    parts: &mut #cot::axum::extract::RequestParts,
+                                ) -> ::std::result::Result<Self, #cot::anyhow::Error> {
+                                    Ok(Self {
+                                        #(#field_initializers)*
+                                    })
+                                }
+                            }
+                        }
+        }
+        Fields::Unnamed(fields_unnamed) => {
+            let field_initializers = fields_unnamed.unnamed.iter().map(|field: &Field| {
+                let field_type = &field.ty;
+                quote! {
+                    #field_type::from_request_parts(parts).await?,
+                }
+            });
+
+            quote! {
+            #[::core::automatically_derived]
+                            impl
+                            impl #cot::axum::extract::FromRequestParts<#cot::http::Request, #cot::anyhow::Error> for #struct_name {
+                                async fn from_request_parts(
+                                    parts: &mut #cot::axum::extract::RequestParts,
+                                ) -> ::std::result::Result<Self, #cot::anyhow::Error> {
+                                    Ok(Self(
+                                        #(#field_initializers)*
+                                    ))
+                                }
+                            }
+                        }
+        }
+        Fields::Unit => {
+            quote! {
+            #[::core::automatically_derived]
+                            impl
+                            impl #cot::axum::extract::FromRequestParts<#cot::http::Request, #cot::anyhow::Error> for #struct_name {
+                                async fn from_request_parts(
+                                    parts: &mut #cot::axum::extract::RequestParts,
+                                ) -> ::std::result::Result<Self, #cot::anyhow::Error> {
+                                    Ok(Self)
+                                }
+                            }
+                        }
         }
     }
 }

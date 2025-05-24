@@ -143,6 +143,40 @@ fn api_router_nested() {
 }
 
 #[test]
+fn api_router_cycle() {
+    #[derive(Deserialize, Serialize, schemars::JsonSchema)]
+    struct NestedData {
+        nested: Option<Box<Self>>,
+    }
+
+    async fn test_handler(_data: Json<NestedData>) -> cot::Result<Response> {
+        unimplemented!()
+    }
+
+    let router = Router::with_urls([Route::with_api_handler(
+        "/test",
+        ApiMethodRouter::new().get(test_handler),
+    )]);
+
+    let openapi = router.as_api();
+
+    // cycled objects should be put into components.schemas
+    let schemas = openapi.components.unwrap().schemas;
+    let nested_schema = schemas.get("NestedData").unwrap();
+    let nested_object = nested_schema.json_schema.clone().into_object().object;
+    let reference = nested_object
+        .unwrap()
+        .properties
+        .get("nested")
+        .unwrap()
+        .clone()
+        .into_object()
+        .reference;
+
+    assert_eq!(reference.unwrap(), "#/components/schemas/NestedData");
+}
+
+#[test]
 fn api_method_router() {
     let router = ApiMethodRouter::new()
         .get(test_handler)

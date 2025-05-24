@@ -1,6 +1,7 @@
-use cot::db::ForeignKey;
+use cot::db::{Auto, ForeignKey};
 use cot::form::{
-    Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
+    AsFormField, Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError,
+    FormResult,
 };
 use cot::test::TestRequestBuilder;
 use cot_macros::model;
@@ -123,4 +124,37 @@ async fn foreign_key_field() {
         }
         _ => panic!("Expected a valid form"),
     }
+
+    // test re-raising validation errors
+    let mut request = TestRequestBuilder::post("/")
+        .form_data(&[("test_field", "")])
+        .build();
+    let form = TestModelForm::from_request(&mut request).await;
+    match form {
+        Ok(FormResult::ValidationError(context)) => {
+            assert_eq!(
+                context.errors_for(FormErrorTarget::Field("test_field")),
+                &[FormFieldValidationError::Required]
+            );
+        }
+        _ => panic!("Expected a validation error"),
+    }
+}
+
+#[cot::test]
+async fn foreign_key_field_to_field_value() {
+    #[model]
+    struct TestModel {
+        #[model(primary_key)]
+        id: Auto<i32>,
+    }
+
+    let field_value = ForeignKey::<TestModel>::Model(Box::new(TestModel {
+        id: Auto::fixed(123),
+    }))
+    .to_field_value();
+    assert_eq!(field_value, "123");
+
+    let field_value = ForeignKey::<TestModel>::PrimaryKey(Auto::fixed(456)).to_field_value();
+    assert_eq!(field_value, "456");
 }

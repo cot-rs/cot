@@ -1,3 +1,4 @@
+mod chrono;
 mod files;
 
 use std::fmt::{Debug, Display, Formatter};
@@ -7,7 +8,9 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
+pub use chrono::{TimeField, TimeFieldOptions};
 pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
+use indexmap::IndexSet;
 
 use crate::auth::PasswordHash;
 use crate::common_types::{Email, Password};
@@ -19,21 +22,23 @@ use crate::form::{
 };
 use crate::html::HtmlTag;
 
+#[doc(hidden)]
+#[macro_export]
 macro_rules! impl_form_field {
     ($field_type_name:ident, $field_options_type_name:ident, $purpose:literal $(, $generic_param:ident $(: $generic_param_bound:ident $(+ $generic_param_bound_more:ident)*)?)?) => {
         #[derive(Debug)]
         #[doc = concat!("A form field for ", $purpose, ".")]
         pub struct $field_type_name $(<$generic_param>)? {
-            options: FormFieldOptions,
+            options: $crate::form::FormFieldOptions,
             custom_options: $field_options_type_name $(<$generic_param>)?,
             value: Option<String>,
         }
 
-        impl $(<$generic_param $(: $generic_param_bound $(+ $generic_param_bound_more)* )?>)? FormField for $field_type_name $(<$generic_param>)? {
+        impl $(<$generic_param $(: $generic_param_bound $(+ $generic_param_bound_more)* )?>)? $crate::form::FormField for $field_type_name $(<$generic_param>)? {
             type CustomOptions = $field_options_type_name $(<$generic_param>)?;
 
             fn with_options(
-                options: FormFieldOptions,
+                options: $crate::form::FormFieldOptions,
                 custom_options: Self::CustomOptions,
             ) -> Self {
                 Self {
@@ -43,7 +48,7 @@ macro_rules! impl_form_field {
                 }
             }
 
-            fn options(&self) -> &FormFieldOptions {
+            fn options(&self) -> &$crate::form::FormFieldOptions {
                 &self.options
             }
 
@@ -51,7 +56,7 @@ macro_rules! impl_form_field {
                 self.value.as_deref()
             }
 
-            async fn set_value(&mut self, field: FormFieldValue<'_>) -> std::result::Result<(), FormFieldValueError> {
+            async fn set_value(&mut self, field: $crate::form::FormFieldValue<'_>) -> std::result::Result<(), $crate::form::FormFieldValueError> {
                 self.value = Some(field.into_text().await?);
                 Ok(())
             }
@@ -624,7 +629,7 @@ where
     }
 }
 
-fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldValidationError> {
+pub(crate) fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldValidationError> {
     if let Some(value) = field.value() {
         if value.is_empty() {
             Err(FormFieldValidationError::Required)
@@ -762,6 +767,169 @@ macro_rules! impl_float_as_form_field {
 
 impl_float_as_form_field!(f32);
 impl_float_as_form_field!(f64);
+
+impl_form_field!(SelectField, SelectFieldOptions, "a dropdown list", T: SelectChoice + Send);
+
+#[derive(Debug, Clone)]
+pub struct SelectFieldOptions<T> {
+    pub choices: Option<Vec<T>>,
+}
+
+impl<T> Default for SelectFieldOptions<T> {
+    fn default() -> Self {
+        Self { choices: None }
+    }
+}
+
+impl<T: SelectChoice + Send> Display for SelectField<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let value = if let Some(value) = self.value.clone() {
+            IndexSet::from([value])
+        } else {
+            IndexSet::new()
+        };
+        render_select(f, self, false, None, &self.custom_options.choices, &value)
+    }
+}
+
+impl<T: SelectChoice + Send> HtmlSafe for SelectField<T> {}
+
+/// A form field for a multiple-choice select box.
+#[derive(Debug)]
+pub struct SelectMultipleField<T> {
+    options: FormFieldOptions,
+    custom_options: SelectMultipleFieldOptions<T>,
+    value: IndexSet<String>,
+}
+
+impl<T> SelectMultipleField<T> {
+    pub fn values(&self) -> impl Iterator<Item = &str> {
+        self.value.iter().map(|x| x.as_ref())
+    }
+}
+
+impl<T: SelectChoice + Send> FormField for SelectMultipleField<T> {
+    type CustomOptions = SelectMultipleFieldOptions<T>;
+
+    fn with_options(options: FormFieldOptions, custom_options: Self::CustomOptions) -> Self {
+        Self {
+            options,
+            custom_options,
+            value: IndexSet::new(),
+        }
+    }
+
+    fn options(&self) -> &FormFieldOptions {
+        &self.options
+    }
+
+    fn value(&self) -> Option<&str> {
+        None
+    }
+
+    async fn set_value(&mut self, field: FormFieldValue<'_>) -> Result<(), FormFieldValueError> {
+        self.value.insert(field.into_text().await?);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SelectMultipleFieldOptions<T> {
+    pub choices: Option<Vec<T>>,
+    pub size: Option<u32>,
+}
+
+impl<T> Default for SelectMultipleFieldOptions<T> {
+    fn default() -> Self {
+        Self {
+            choices: None,
+            size: None,
+        }
+    }
+}
+
+impl<T: SelectChoice + Send> Display for SelectMultipleField<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        render_select(
+            f,
+            self,
+            true,
+            self.custom_options.size,
+            &self.custom_options.choices,
+            &self.value,
+        )
+    }
+}
+
+impl<T: SelectChoice + Send> HtmlSafe for SelectMultipleField<T> {}
+
+fn render_select<T: FormField, S: SelectChoice>(
+    f: &mut Formatter<'_>,
+    field: &T,
+    multiple: bool,
+    size: Option<u32>,
+    choices: &Option<Vec<S>>,
+    selected: &IndexSet<String>,
+) -> std::fmt::Result {
+    let mut tag: HtmlTag = HtmlTag::input("time");
+    tag.attr("name", field.name());
+    tag.attr("id", field.id());
+    if multiple {
+        tag.bool_attr("multiple");
+    }
+    if field.options().required {
+        tag.bool_attr("required");
+    }
+
+    if let Some(size) = size {
+        tag.attr("size", size.to_string());
+    }
+
+    let choices = if let Some(choices) = choices {
+        choices
+    } else {
+        &S::default_choices()
+    };
+    for choice in choices {
+        let mut child = HtmlTag::new("option");
+        child
+            .attr("value", choice.id())
+            .push_str(choice.to_string());
+        if selected.contains(&choice.id()) {
+            child.bool_attr("selected");
+        }
+        tag.push_tag(child);
+    }
+
+    write!(f, "{}", tag.render())
+}
+
+pub(crate) fn check_required_multiple<T>(
+    field: &SelectMultipleField<T>,
+) -> Result<&IndexSet<String>, FormFieldValidationError> {
+    if field.value.is_empty() {
+        Err(FormFieldValidationError::Required)
+    } else {
+        Ok(&field.value)
+    }
+}
+
+trait SelectChoice {
+    fn default_choices() -> Vec<Self>
+    where
+        Self: Sized,
+    {
+        vec![]
+    }
+
+    fn from_str(s: &str) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized;
+
+    fn id(&self) -> String;
+
+    fn to_string(&self) -> String;
+}
 
 #[cfg(test)]
 mod tests {

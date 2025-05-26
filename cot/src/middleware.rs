@@ -299,17 +299,15 @@ impl SessionMiddleware {
     /// Will panic if the session store type is not supported.
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
-        let cfg = context.config();
-        let boxed_store = cfg
-            .middlewares
-            .session
+        let session_cfg = &context.config().middlewares.session;
+        let boxed_store = session_cfg
             .store
             .store_type
             .clone()
             .to_session_store(context)
             .expect("session store not supported");
         let arc_store: Arc<dyn SessionStore + Send + Sync> = Arc::from(boxed_store);
-        SessionMiddleware::new(arc_store).secure(cfg.middlewares.session.secure)
+        SessionMiddleware::new(arc_store).secure(session_cfg.secure)
     }
 
     /// Sets the secure flag for the session middleware.

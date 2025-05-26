@@ -1,6 +1,6 @@
 [package]
 name = "cot_codegen"
-version = "0.3.0"
+version = "0.3.1"
 description = "The Rust web framework for lazy developers - code generation utils."
 edition.workspace = true
 rust-version.workspace = true

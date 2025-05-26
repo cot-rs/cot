@@ -20,14 +20,16 @@
 //! }
 //! ```
 
+mod field_value;
 /// Built-in form fields that can be used in a form.
 pub mod fields;
 
 use std::borrow::Cow;
-use std::fmt::{Debug, Display};
+use std::fmt::Display;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use cot::error::ErrorRepr;
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
 /// This macro will generate an implementation of the [`Form`] trait for the
@@ -53,10 +55,12 @@ use bytes::Bytes;
 /// fields. If the form fields are not safe to render as HTML, the form context
 /// will not be safe to render as HTML either.
 pub use cot_macros::Form;
+use derive_more::with_trait::Debug;
+pub use field_value::{FormFieldValue, FormFieldValueError};
+use http_body_util::BodyExt;
 use thiserror::Error;
 
-use crate::headers::FORM_CONTENT_TYPE;
-use crate::request;
+use crate::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
 use crate::request::{Request, RequestExt};
 
 /// Error occurred while processing a form.
@@ -70,6 +74,13 @@ pub enum FormError {
         /// The error that occurred while processing the request.
         #[from]
         error: Box<crate::Error>,
+    },
+    /// An error occurred while processing a multipart form.
+    #[error("Multipart error: {error}")]
+    MultipartError {
+        /// The error that occurred while processing the multipart form.
+        #[from]
+        error: FormFieldValueError,
     },
 }
 
@@ -148,7 +159,10 @@ pub enum FormFieldValidationError {
     /// The field value is invalid.
     #[error("Value is not valid for this field.")]
     InvalidValue(String),
-    /// Custom error with given message.
+    /// An error occurred while getting the field value.
+    #[error("Error getting field value: {0}")]
+    FormFieldValueError(#[from] FormFieldValueError),
+    /// Custom error with a given message.
     #[error("{0}")]
     Custom(Cow<'static, str>),
 }
@@ -251,7 +265,7 @@ pub enum FormErrorTarget<'a> {
 )]
 pub trait Form: Sized {
     /// The context type associated with the form.
-    type Context: FormContext;
+    type Context: FormContext + Send;
 
     /// Creates a form struct from a request.
     ///
@@ -265,7 +279,7 @@ pub trait Form: Sized {
     ///
     /// This is useful for pre-populating forms with objects created in the code
     /// or obtained externally, such as from a database.
-    fn to_context(&self) -> Self::Context;
+    async fn to_context(&self) -> Self::Context;
 
     /// Builds the context for the form from a request.
     ///
@@ -278,19 +292,13 @@ pub trait Form: Sized {
     /// This method should return an error if the form data could not be read
     /// from the request.
     async fn build_context(request: &mut Request) -> Result<Self::Context, FormError> {
-        let form_data = form_data(request)
-            .await
-            .map_err(|error| FormError::RequestError {
-                error: Box::new(error),
-            })?;
-
         let mut context = Self::Context::new();
 
-        for (field_id, value) in request::query_pairs(&form_data) {
-            let field_id = field_id.as_ref();
+        let mut form_data = form_data(request).await?;
 
-            if let Err(err) = context.set_value(field_id, value) {
-                context.add_error(FormErrorTarget::Field(field_id), err);
+        while let Some((field_id, value)) = form_data.next_value().await? {
+            if let Err(err) = context.set_value(&field_id, value).await {
+                context.add_error(FormErrorTarget::Field(&field_id), err);
             }
         }
 
@@ -298,30 +306,121 @@ pub trait Form: Sized {
     }
 }
 
-/// Get the request body as bytes. If the request method is GET or HEAD, the
-/// query string is returned. Otherwise, if the request content type is
-/// `application/x-www-form-urlencoded`, then the body is read and returned.
-/// Otherwise, an error is thrown.
-///
-/// # Errors
-///
-/// Throws an error if the request method is not GET or HEAD and the content
-/// type is not `application/x-www-form-urlencoded`.
-/// Throws an error if the request body could not be read.
-pub async fn form_data(request: &mut Request) -> crate::Result<Bytes> {
-    if request.method() == http::Method::GET || request.method() == http::Method::HEAD {
-        if let Some(query) = request.uri().query() {
-            return Ok(Bytes::copy_from_slice(query.as_bytes()));
-        }
+async fn form_data(request: &mut Request) -> Result<FormData<'_>, FormError> {
+    let form_data = if content_type_str(request).starts_with(MULTIPART_FORM_CONTENT_TYPE) {
+        let multipart = multipart_form_data(request)?;
 
-        Ok(Bytes::new())
+        FormData::Multipart { inner: multipart }
     } else {
-        request.expect_content_type(FORM_CONTENT_TYPE)?;
+        let form_data_bytes = urlencoded_form_data(request).await?;
 
+        FormData::new_urlencoded(form_data_bytes)
+    };
+    Ok(form_data)
+}
+
+fn multipart_form_data(request: &mut Request) -> Result<multer::Multipart<'_>, FormError> {
+    let content_type = content_type_str(request);
+
+    let boundary =
+        multer::parse_boundary(content_type).map_err(FormFieldValueError::from_multer)?;
+    let body = std::mem::take(request.body_mut());
+    let multipart = multer::Multipart::new(body.into_data_stream(), boundary);
+
+    Ok(multipart)
+}
+
+async fn urlencoded_form_data(request: &mut Request) -> Result<Bytes, FormError> {
+    let result = if request.method() == http::Method::GET || request.method() == http::Method::HEAD
+    {
+        if let Some(query) = request.uri().query() {
+            Bytes::copy_from_slice(query.as_bytes())
+        } else {
+            Bytes::new()
+        }
+    } else if content_type_str(request) == URLENCODED_FORM_CONTENT_TYPE {
         let body = std::mem::take(request.body_mut());
-        let bytes = body.into_bytes().await?;
 
-        Ok(bytes)
+        body.into_bytes()
+            .await
+            .map_err(|e| FormError::RequestError { error: Box::new(e) })?
+    } else {
+        return Err(FormError::RequestError {
+            error: Box::new(crate::Error::new(ErrorRepr::ExpectedForm)),
+        });
+    };
+
+    Ok(result)
+}
+
+fn content_type_str(request: &mut Request) -> String {
+    request
+        .content_type()
+        .map_or("".into(), |value| String::from_utf8_lossy(value.as_bytes()))
+        .into_owned()
+}
+
+#[derive(Debug)]
+enum FormData<'a> {
+    Form {
+        #[debug("..")]
+        inner: form_urlencoded::Parse<'a>,
+        // needed to store the data used by the parser in `inner`
+        // must be declared after `inner` to avoid dropping it first
+        // see `new_urlencoded` for details
+        _data: Bytes,
+    },
+    Multipart {
+        inner: multer::Multipart<'a>,
+    },
+}
+
+impl<'a> FormData<'a> {
+    fn new_urlencoded(data: Bytes) -> Self {
+        #[expect(unsafe_code)]
+        let slice = unsafe {
+            // SAFETY:
+            // * `Bytes` guarantees that `data` is non-null, valid for reads for
+            //   `data.len()` bytes
+            // * `data` is not mutated inside `Bytes`
+            // * data inside `slice` will not get deallocated as long as the underlying
+            //   `Bytes` object is alive
+            // * struct fields are dropped in the order of declaration, so `data` will be
+            //   dropped after `inner`
+            std::slice::from_raw_parts(data.as_ptr(), data.len())
+        };
+
+        FormData::Form {
+            inner: form_urlencoded::parse(slice),
+            _data: data,
+        }
+    }
+
+    async fn next_value(
+        &mut self,
+    ) -> Result<Option<(String, FormFieldValue<'a>)>, FormFieldValueError> {
+        match self {
+            FormData::Form { inner, .. } => Ok(inner
+                .next()
+                .map(|(key, value)| (key.into_owned(), FormFieldValue::new_text(value)))),
+            FormData::Multipart { inner } => {
+                let next_field = inner.next_field().await;
+
+                match next_field {
+                    Ok(Some(field)) => {
+                        let name = field
+                            .name()
+                            .ok_or_else(FormFieldValueError::no_name)?
+                            .to_owned();
+                        let value = FormFieldValue::new_multipart(field);
+
+                        Ok(Some((name, value)))
+                    }
+                    Ok(None) => Ok(None),
+                    Err(err) => Err(FormFieldValueError::from_multer(err)),
+                }
+            }
+        }
     }
 }
 
@@ -335,6 +434,7 @@ pub async fn form_data(request: &mut Request) -> crate::Result<Bytes> {
 /// This trait is typically not implemented directly; instead, its
 /// implementations are generated automatically through the
 /// [`Form`](derive@Form) derive macro.
+#[async_trait]
 pub trait FormContext: Debug {
     /// Creates a new form context without any initial form data.
     fn new() -> Self
@@ -349,10 +449,10 @@ pub trait FormContext: Debug {
     /// # Errors
     ///
     /// This method should return an error if the value is invalid.
-    fn set_value(
+    async fn set_value(
         &mut self,
         field_id: &str,
-        value: Cow<'_, str>,
+        value: FormFieldValue<'_>,
     ) -> Result<(), FormFieldValidationError>;
 
     /// Adds a validation error to the form context.
@@ -379,8 +479,8 @@ pub struct FormFieldOptions {
     pub id: String,
     /// Display name of the form field.
     pub name: String,
-    /// Whether the field is required. Note that this really only adds
-    /// "required" field to the HTML input element, since by default all
+    /// Whether the field is required. Note that this really only adds the
+    /// "required" attribute to the HTML input element, since by default all
     /// fields are required. If you want to make a field optional, just use
     /// [`Option`] in the struct definition.
     pub required: bool,
@@ -417,11 +517,14 @@ pub trait FormField: Display {
     /// Returns the string value of the form field.
     fn value(&self) -> Option<&str>;
 
-    /// Sets the string value of the form field.
+    /// Sets the value of the form field.
     ///
     /// This method should convert the value to the appropriate type for the
     /// field, such as a number for a number field.
-    fn set_value(&mut self, value: Cow<'_, str>);
+    fn set_value(
+        &mut self,
+        field: FormFieldValue<'_>,
+    ) -> impl Future<Output = Result<(), FormFieldValueError>> + Send;
 }
 
 /// A version of [`FormField`] that can be used in a dynamic context.
@@ -431,6 +534,7 @@ pub trait FormField: Display {
 /// options, value, and rendering, among others.
 ///
 /// This trait is implemented for all types that implement [`FormField`].
+#[async_trait]
 pub trait DynFormField: Display {
     /// Returns the generic options for the form field.
     fn dyn_options(&self) -> &FormFieldOptions;
@@ -438,14 +542,17 @@ pub trait DynFormField: Display {
     /// Returns the HTML ID of the form field.
     fn dyn_id(&self) -> &str;
 
-    /// Returns the string value of the form field.
+    /// Returns the string value of the form field if any has been set (and
+    /// makes sense for the field type).
     fn dyn_value(&self) -> Option<&str>;
 
-    /// Sets the string value of the form field.
-    fn dyn_set_value(&mut self, value: Cow<'_, str>);
+    /// Sets the value of the form field.
+    async fn dyn_set_value(&mut self, field: FormFieldValue<'_>)
+    -> Result<(), FormFieldValueError>;
 }
 
-impl<T: FormField> DynFormField for T {
+#[async_trait]
+impl<T: FormField + Send> DynFormField for T {
     fn dyn_options(&self) -> &FormFieldOptions {
         FormField::options(self)
     }
@@ -458,8 +565,11 @@ impl<T: FormField> DynFormField for T {
         FormField::value(self)
     }
 
-    fn dyn_set_value(&mut self, value: Cow<'_, str>) {
-        FormField::set_value(self, value);
+    async fn dyn_set_value(
+        &mut self,
+        field: FormFieldValue<'_>,
+    ) -> Result<(), FormFieldValueError> {
+        FormField::set_value(self, field).await
     }
 }
 
@@ -507,43 +617,165 @@ pub trait AsFormField {
 mod tests {
     use bytes::Bytes;
 
+    use super::*;
     use crate::Body;
-    use crate::form::form_data;
-    use crate::headers::FORM_CONTENT_TYPE;
+    use crate::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
 
     #[cot::test]
-    async fn form_data_extract_get_empty() {
+    async fn urlencoded_form_data_extract_get_empty() {
         let mut request = http::Request::builder()
             .method(http::Method::GET)
             .uri("https://example.com")
             .body(Body::empty())
             .unwrap();
 
-        let bytes = form_data(&mut request).await.unwrap();
+        let bytes = urlencoded_form_data(&mut request).await.unwrap();
         assert_eq!(bytes, Bytes::from_static(b""));
     }
 
     #[cot::test]
-    async fn form_data_extract_get() {
+    async fn urlencoded_form_data_extract_get() {
         let mut request = http::Request::builder()
             .method(http::Method::GET)
             .uri("https://example.com/?hello=world")
             .body(Body::empty())
             .unwrap();
 
-        let bytes = form_data(&mut request).await.unwrap();
+        let bytes = urlencoded_form_data(&mut request).await.unwrap();
         assert_eq!(bytes, Bytes::from_static(b"hello=world"));
     }
 
     #[cot::test]
-    async fn form_data_extract() {
+    async fn urlencoded_form_data_extract_head() {
+        let mut request = http::Request::builder()
+            .method(http::Method::HEAD)
+            .uri("https://example.com/?hello=world")
+            .body(Body::empty())
+            .unwrap();
+
+        let bytes = urlencoded_form_data(&mut request).await.unwrap();
+        assert_eq!(bytes, Bytes::from_static(b"hello=world"));
+    }
+
+    #[cot::test]
+    async fn urlencoded_form_data_extract_urlencoded() {
         let mut request = http::Request::builder()
             .method(http::Method::POST)
-            .header(http::header::CONTENT_TYPE, FORM_CONTENT_TYPE)
+            .header(http::header::CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE)
             .body(Body::fixed("hello=world"))
             .unwrap();
 
-        let bytes = form_data(&mut request).await.unwrap();
-        assert_eq!(bytes, Bytes::from_static(b"hello=world"));
+        let result = urlencoded_form_data(&mut request).await.unwrap();
+        assert_eq!(result, Bytes::from_static(b"hello=world"));
+    }
+
+    #[cot::test]
+    async fn form_data_extract_multipart() {
+        let boundary = "boundary";
+        let body = format!(
+            "--{boundary}\r\n\
+            Content-Disposition: form-data; name=\"hello\"\r\n\
+            \r\n\
+            world\r\n\
+            --{boundary}\r\n\
+            Content-Disposition: form-data; name=\"test\"\r\n\
+            \r\n\
+            123\r\n\
+            --{boundary}--\r\n"
+        );
+
+        let mut request = http::Request::builder()
+            .method(http::Method::POST)
+            .header(
+                http::header::CONTENT_TYPE,
+                format!("{MULTIPART_FORM_CONTENT_TYPE}; boundary={boundary}"),
+            )
+            .body(Body::fixed(body))
+            .unwrap();
+
+        let mut form_data = form_data(&mut request).await.unwrap();
+
+        let mut values = Vec::new();
+        while let Some((field_id, value)) = form_data.next_value().await.unwrap() {
+            values.push((field_id, value.into_text().await.unwrap()));
+        }
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[0].0, "hello");
+        assert_eq!(values[0].1, "world");
+        assert_eq!(values[1].0, "test");
+        assert_eq!(values[1].1, "123");
+    }
+
+    #[cot::test]
+    async fn form_data_extract_multipart_with_file() {
+        let boundary = "boundary";
+        let body = format!(
+            "--{boundary}\r\n\
+            Content-Disposition: form-data; name=\"hello\"\r\n\
+            \r\n\
+            world\r\n\
+            --{boundary}\r\n\
+            Content-Disposition: form-data; name=\"file\"; filename=\"test.txt\"\r\n\
+            Content-Type: text/plain\r\n\
+            \r\n\
+            file content\r\n\
+            --{boundary}--\r\n"
+        );
+
+        let mut request = http::Request::builder()
+            .method(http::Method::POST)
+            .header(
+                http::header::CONTENT_TYPE,
+                format!("{MULTIPART_FORM_CONTENT_TYPE}; boundary={boundary}"),
+            )
+            .body(Body::fixed(body))
+            .unwrap();
+
+        let mut form_data = form_data(&mut request).await.unwrap();
+
+        let mut values = Vec::new();
+        while let Some((field_id, value)) = form_data.next_value().await.unwrap() {
+            assert!(value.is_multipart());
+            values.push((
+                field_id,
+                value.filename().map(ToOwned::to_owned),
+                value.content_type().map(ToOwned::to_owned),
+                value.into_text().await.unwrap(),
+            ));
+        }
+
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[0].0, "hello");
+        assert_eq!(values[0].1, None);
+        assert_eq!(values[0].2, None);
+        assert_eq!(values[0].3, "world");
+        assert_eq!(values[1].0, "file");
+        assert_eq!(values[1].1, Some("test.txt".to_owned()));
+        assert_eq!(values[1].2, Some("text/plain".to_owned()));
+        assert_eq!(values[1].3, "file content");
+    }
+
+    #[cot::test]
+    async fn form_data_extract_invalid_content_type() {
+        let mut request = http::Request::builder()
+            .method(http::Method::POST)
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(Body::fixed("{}"))
+            .unwrap();
+
+        let result = form_data(&mut request).await;
+
+        assert!(result.is_err());
+        if let Err(FormError::RequestError { error }) = result {
+            assert!(
+                error
+                    .to_string()
+                    .contains("Request does not contain a form"),
+                "{}",
+                error
+            );
+        } else {
+            panic!("Expected RequestError");
+        }
     }
 }

@@ -304,7 +304,7 @@ async fn edit_model_instance_impl(
     } else if let Some(object_id) = object_id {
         let object = get_object(&mut request, &*manager, object_id).await?;
 
-        manager.form_context_from_object(object)
+        manager.form_context_from_object(object).await
     } else {
         manager.form_context()
     };
@@ -441,7 +441,7 @@ pub trait AdminModelManager: Send + Sync {
     /// that if you always return the same object type from these methods,
     /// you can safely downcast the object to the same type in this method
     /// as well.
-    fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext>;
+    async fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext>;
 
     /// Saves the object by using the form data from given request.
     ///
@@ -531,13 +531,13 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
         T::form_context()
     }
 
-    fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext> {
+    async fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext> {
         let object_casted = object
             .as_any()
             .downcast_ref::<T>()
             .expect("Invalid object type");
 
-        T::form_context_from_self(object_casted)
+        T::form_context_from_self(object_casted).await
     }
 
     async fn save_from_request(
@@ -603,7 +603,7 @@ pub trait AdminModel: Any + Send + 'static {
         Self: Sized;
 
     /// Get the form context with the data pre-filled from this model instance.
-    fn form_context_from_self(&self) -> Box<dyn FormContext>;
+    async fn form_context_from_self(&self) -> Box<dyn FormContext>;
 
     /// Save the model instance from the form data in the request.
     ///

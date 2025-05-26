@@ -78,7 +78,7 @@ struct TodoApp;
 
 impl App for TodoApp {
     fn name(&self) -> &'static str {
-        "todo-app"
+        env!("CARGO_PKG_NAME")
     }
 
     fn migrations(&self) -> Vec<Box<SyncDynMigration>> {

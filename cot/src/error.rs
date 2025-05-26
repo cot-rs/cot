@@ -149,6 +149,7 @@ impl_error_from_repr!(crate::router::path::ReverseError);
 impl_error_from_repr!(crate::db::DatabaseError);
 impl_error_from_repr!(tower_sessions::session::Error);
 impl_error_from_repr!(crate::form::FormError);
+impl_error_from_repr!(crate::form::FormFieldValueError);
 impl_error_from_repr!(crate::auth::AuthError);
 impl_error_from_repr!(crate::request::PathParamsDeserializerError);
 impl_error_from_repr!(crate::request::extractors::StaticFilesGetError);
@@ -189,6 +190,12 @@ pub(crate) enum ErrorRepr {
         expected: &'static str,
         actual: String,
     },
+    /// The request does not contain a form.
+    #[error(
+        "Request does not contain a form (expected `application/x-www-form-urlencoded` or \
+        `multipart/form-data` content type, or a GET or HEAD request)"
+    )]
+    ExpectedForm,
     /// Could not find a route for the request.
     #[error("Not found: {message:?}")]
     NotFound { message: Option<String> },
@@ -218,6 +225,9 @@ pub(crate) enum ErrorRepr {
     /// An error occurred while parsing a form.
     #[error("Failed to process a form: {0}")]
     Form(#[from] crate::form::FormError),
+    /// An error occurred while trying to retrieve the value of a form field.
+    #[error("Failed to retrieve the value of a form field: {0}")]
+    FormFieldValueError(#[from] crate::form::FormFieldValueError),
     /// An error occurred while trying to authenticate a user.
     #[error("Failed to authenticate user: {0}")]
     Authentication(#[from] crate::auth::AuthError),

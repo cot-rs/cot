@@ -887,7 +887,7 @@ impl<F: Form + JsonSchema> ApiOperationPart for RequestForm<F> {
         } else {
             operation.request_body = Some(ReferenceOr::Item(RequestBody {
                 content: IndexMap::from([(
-                    crate::headers::FORM_CONTENT_TYPE.to_string(),
+                    crate::headers::URLENCODED_FORM_CONTENT_TYPE.to_string(),
                     MediaType {
                         schema: Some(aide::openapi::SchemaObject {
                             json_schema: F::json_schema(schema_generator),

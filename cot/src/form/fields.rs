@@ -810,6 +810,216 @@ impl AsFormField for Url {
     }
 }
 
+impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
+use crate::common_types::{Date, DateTime, Time};
+
+#[derive(Debug, Default, Clone)]
+pub struct DateTimeFieldOptions {
+    pub max: Option<DateTime>,
+
+    pub min: Option<DateTime>,
+
+    pub readonly: Option<bool>,
+}
+
+impl Display for DateTimeField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag = HtmlTag::input("datetime-local");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+        if let Some(max) = self.custom_options.max.clone() {
+            tag.attr("max", max.to_string());
+        }
+        if let Some(min) = self.custom_options.min.clone() {
+            tag.attr("min", min.to_string());
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl AsFormField for DateTime {
+    type Type = DateTimeField;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized,
+    {
+        let value = check_required(field)?;
+        let date_time = DateTime::from_datetime_local(value).expect("invalid datetime");
+        let opts = &field.custom_options;
+
+        if let Some(min) = &opts.min {
+            // let min_date_time = DateTime::new(min).expect("invalid min datetime");
+            if date_time < min.clone() {
+                return Err(FormFieldValidationError::MinimumValueNotMet {
+                    min_value: min.to_string(),
+                });
+            }
+        }
+
+        if let Some(max) = &opts.max {
+            if date_time > max.clone() {
+                return Err(FormFieldValidationError::MaximumValueExceeded {
+                    max_value: max.to_string(),
+                });
+            }
+        }
+
+        Ok(date_time.to_local_string().parse()?)
+    }
+
+    fn to_field_value(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl HtmlSafe for DateTimeField {}
+
+impl_form_field!(TimeField, TimeFieldOptions, "a time");
+
+#[derive(Debug, Default, Clone)]
+pub struct TimeFieldOptions {
+    pub max: Option<Time>,
+
+    pub min: Option<Time>,
+}
+
+impl Display for TimeField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag = HtmlTag::input("time");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+        if let Some(max) = self.custom_options.max.clone() {
+            tag.attr("max", max.to_string());
+        }
+        if let Some(min) = self.custom_options.min.clone() {
+            tag.attr("min", min.to_string());
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl AsFormField for Time {
+    type Type = TimeField;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized,
+    {
+        let value = check_required(field)?;
+        let time = Time::from_time_local(value).expect("invalid datetime");
+        let opts = &field.custom_options;
+
+        if let Some(min) = &opts.min {
+            if time < min.clone() {
+                return Err(FormFieldValidationError::MinimumValueNotMet {
+                    min_value: min.to_string(),
+                });
+            }
+        }
+
+        if let Some(max) = &opts.max {
+            if time > max.clone() {
+                return Err(FormFieldValidationError::MaximumValueExceeded {
+                    max_value: max.to_string(),
+                });
+            }
+        }
+
+        Ok(time.to_local_string().parse()?)
+    }
+
+    fn to_field_value(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl HtmlSafe for TimeField {}
+
+impl_form_field!(DateField, DateFieldOptions, "a date");
+
+#[derive(Debug, Default, Clone)]
+pub struct DateFieldOptions {
+    pub max: Option<Date>,
+
+    pub min: Option<Date>,
+
+    pub readonly: Option<bool>,
+}
+
+impl Display for DateField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut tag = HtmlTag::input("date");
+        tag.attr("name", self.name());
+        tag.attr("id", self.id());
+        if self.options.required {
+            tag.bool_attr("required");
+        }
+        if let Some(max) = self.custom_options.max.clone() {
+            tag.attr("max", max.to_string());
+        }
+        if let Some(min) = self.custom_options.min.clone() {
+            tag.attr("min", min.to_string());
+        }
+        if let Some(value) = &self.value {
+            tag.attr("value", value);
+        }
+
+        write!(f, "{}", tag.render())
+    }
+}
+
+impl AsFormField for Date {
+    type Type = DateField;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
+    where
+        Self: Sized,
+    {
+        let value = check_required(field)?;
+        let date = Date::new(value).expect("invalid datetime");
+        let opts = &field.custom_options;
+
+        if let Some(min) = &opts.min {
+            if date < min.clone() {
+                return Err(FormFieldValidationError::MinimumValueNotMet {
+                    min_value: min.to_string(),
+                });
+            }
+        }
+
+        if let Some(max) = &opts.max {
+            if date > max.clone() {
+                return Err(FormFieldValidationError::MaximumValueExceeded {
+                    max_value: max.to_string(),
+                });
+            }
+        }
+
+        Ok(date.to_local_string().parse()?)
+    }
+
+    fn to_field_value(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl HtmlSafe for DateField {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

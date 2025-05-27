@@ -39,12 +39,7 @@ pub struct SwaggerUi {
 }
 
 async fn openapi_json(request: Request) -> Json<aide::openapi::OpenApi> {
-    let openapi = aide::openapi::OpenApi {
-        paths: Some(request.router().as_api()),
-        ..Default::default()
-    };
-
-    Json(openapi)
+    Json(request.router().as_api())
 }
 
 impl Default for SwaggerUi {

@@ -347,12 +347,35 @@ impl Router {
     /// specs.
     #[cfg(feature = "openapi")]
     #[must_use]
-    pub fn as_api(&self) -> aide::openapi::Paths {
+    pub fn as_api(&self) -> aide::openapi::OpenApi {
         let mut paths = aide::openapi::Paths::default();
-        let mut schema_generator = schemars::SchemaGenerator::default();
+        let mut schema_generator =
+            schemars::SchemaGenerator::new(schemars::r#gen::SchemaSettings::openapi3());
 
         self.as_openapi_impl("", &[], &mut paths, &mut schema_generator);
-        paths
+
+        let component_schemas = schema_generator
+            .take_definitions()
+            .into_iter()
+            .map(|(name, json_schema)| {
+                (
+                    name,
+                    aide::openapi::SchemaObject {
+                        json_schema,
+                        example: None,
+                        external_docs: None,
+                    },
+                )
+            })
+            .collect();
+        aide::openapi::OpenApi {
+            paths: Some(paths),
+            components: Some(aide::openapi::Components {
+                schemas: component_schemas,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
     }
 
     #[cfg(feature = "openapi")]

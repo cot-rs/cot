@@ -29,6 +29,7 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use chrono::ParseError;
 use cot::error::ErrorRepr;
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
@@ -217,6 +218,12 @@ impl FormFieldValidationError {
     #[must_use]
     pub const fn from_static(message: &'static str) -> Self {
         Self::Custom(Cow::Borrowed(message))
+    }
+}
+
+impl From<chrono::ParseError> for FormFieldValidationError {
+    fn from(error: ParseError) -> Self {
+        FormFieldValidationError::from_string(error.to_string())
     }
 }
 

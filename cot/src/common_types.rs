@@ -5,15 +5,19 @@
 //! general-purpose newtype wrappers and associated trait implementations to
 //! ensure consistent and safe processing of form data.
 
-use std::fmt::Debug;
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime, ParseError};
+use cot::db;
 #[cfg(feature = "mysql")]
 use cot::db::impl_mysql::MySqlValueRef;
 #[cfg(feature = "postgres")]
 use cot::db::impl_postgres::PostgresValueRef;
 #[cfg(feature = "sqlite")]
 use cot::db::impl_sqlite::SqliteValueRef;
+use cot::db::{DbFieldValue, ToDbFieldValue};
 use email_address::EmailAddress;
 
 #[cfg(feature = "db")]
@@ -352,7 +356,6 @@ impl TryFrom<&str> for Email {
 ///
 /// let email = Email::try_from(String::from("user@example.com")).unwrap();
 /// ```
-#[cfg(feature = "db")]
 impl TryFrom<String> for Email {
     type Error = email_address::Error;
 
@@ -380,27 +383,27 @@ impl ToDbValue for Email {
 #[cfg(feature = "db")]
 impl FromDbValue for Email {
     #[cfg(feature = "sqlite")]
-    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    fn from_sqlite(value: SqliteValueRef<'_>) -> db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
     }
 
     #[cfg(feature = "postgres")]
-    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    fn from_postgres(value: PostgresValueRef<'_>) -> db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
     }
 
     #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    fn from_mysql(value: MySqlValueRef<'_>) -> db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
     }
 }
 
@@ -411,6 +414,305 @@ impl FromDbValue for Email {
 #[cfg(feature = "db")]
 impl DatabaseField for Email {
     const TYPE: ColumnType = ColumnType::String(MAX_EMAIL_LENGTH);
+}
+
+/// A “naive” date‐and‐time (no timezone).
+/// Parses strings like `"2025-05-27T13:03:00"` (seconds mandatory),
+/// or you can add a convenience for HTML’s `datetime-local` format.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DateTime(NaiveDateTime);
+
+impl DateTime {
+    /// Parse an RFC-3339-style local datetime **without** a zone:
+    ///
+    /// ```ignore
+    /// // expects exactly `YYYY-MM-DDTHH:MM:SS`
+    /// DateTime::new("2025-05-27T13:03:00")?;
+    /// ```
+    pub fn new<S: AsRef<str>>(s: S) -> Result<Self, ParseError> {
+        Self::with_format(s.as_ref(), "%Y-%m-%dT%H:%M:%S")
+    }
+
+    pub fn with_format<S: AsRef<str>>(s: S, format: &str) -> Result<Self, ParseError> {
+        NaiveDateTime::parse_from_str(s.as_ref(), format).map(Self)
+    }
+
+    /// Convenience for `<input type="datetime-local">` (no seconds):
+    ///
+    /// ```ignore
+    /// // expects `YYYY-MM-DDTHH:MM`
+    /// DateTime::from_datetime_local("2025-05-27T13:03")?;
+    /// ```
+    pub fn from_datetime_local<S: AsRef<str>>(s: S) -> Result<Self, ParseError> {
+        // parse without seconds, then append ":00"
+        let mut buf = s.as_ref().to_string();
+        buf.push_str(":00");
+        Self::new(buf)
+    }
+
+    /// Format back to the same `YYYY-MM-DDTHH:MM:SS` style.
+    #[must_use]
+    pub fn to_local_string(&self) -> String {
+        self.0.format("%Y-%m-%dT%H:%M:%S").to_string()
+    }
+
+    /// Expose the inner `NaiveDateTime` for further operations.
+    #[must_use]
+    pub fn inner(&self) -> &NaiveDateTime {
+        &self.0
+    }
+}
+
+impl FromStr for DateTime {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s)
+    }
+}
+impl TryFrom<&str> for DateTime {
+    type Error = ParseError;
+    fn try_from(v: &str) -> Result<Self, Self::Error> {
+        Self::new(v)
+    }
+}
+impl TryFrom<String> for DateTime {
+    type Error = ParseError;
+    fn try_from(v: String) -> Result<Self, Self::Error> {
+        Self::new(&v)
+    }
+}
+
+impl Display for DateTime {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_local_string())
+    }
+}
+
+#[cfg(feature = "db")]
+impl DatabaseField for DateTime {
+    const TYPE: ColumnType = ColumnType::DateTime;
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for DateTime {
+    fn to_db_value(&self) -> DbValue {
+        self.to_local_string().into()
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for DateTime {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        DateTime::new(s).map_err(db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        DateTime::new(s).map_err(db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        DateTime::new(s).map_err(db::DatabaseError::value_decode)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct Time(NaiveTime);
+
+impl Time {
+    pub fn new<T: AsRef<str>>(time: T) -> Result<Self, ParseError> {
+        Self::with_format(time.as_ref(), "%H:%M:%S")
+    }
+
+    pub fn with_format<S: AsRef<str>>(s: S, fmt: &str) -> Result<Self, ParseError> {
+        NaiveTime::parse_from_str(s.as_ref(), fmt).map(Self)
+    }
+    pub fn from_time_local<T: AsRef<str>>(time: T) -> Result<Self, ParseError> {
+        let mut buf = time.as_ref().to_string();
+        buf.push_str(":00");
+        Self::new(buf)
+    }
+
+    pub fn to_local_string(&self) -> String {
+        self.0.format("%H:%M:%S").to_string()
+    }
+
+    pub fn inner(&self) -> &NaiveTime {
+        &self.0
+    }
+}
+
+impl FromStr for Time {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s)
+    }
+}
+
+impl TryFrom<&str> for Time {
+    type Error = ParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<String> for Time {
+    type Error = ParseError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl Display for Time {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_local_string())
+    }
+}
+
+impl FromDbValue for Time {
+    fn from_sqlite(value: SqliteValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        Time::new(s).map_err(db::DatabaseError::value_decode)
+    }
+
+    fn from_postgres(value: PostgresValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        Time::new(s).map_err(db::DatabaseError::value_decode)
+    }
+
+    fn from_mysql(value: MySqlValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        Time::new(s).map_err(db::DatabaseError::value_decode)
+    }
+}
+
+impl ToDbFieldValue for Time {
+    fn to_db_field_value(&self) -> DbFieldValue {
+        self.0.into()
+    }
+}
+
+#[cfg(feature = "db")]
+impl DatabaseField for Time {
+    const TYPE: ColumnType = ColumnType::Time;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct Date(NaiveDate);
+
+impl Date {
+    pub fn new<D: AsRef<str>>(date: D) -> Result<Self, ParseError> {
+        Self::with_format(date.as_ref(), "%Y-%m-%d")
+    }
+
+    pub fn with_format<D: AsRef<str>>(date: D, fmt: &str) -> Result<Self, ParseError> {
+        NaiveDate::parse_from_str(date.as_ref(), fmt).map(Self)
+    }
+
+    pub fn to_local_string(&self) -> String {
+        self.0.format("%Y-%m-%d").to_string()
+    }
+
+    pub fn inner(&self) -> &NaiveDate {
+        &self.0
+    }
+}
+
+impl FromStr for Date {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s)
+    }
+}
+
+impl TryFrom<&str> for Date {
+    type Error = ParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<String> for Date {
+    type Error = ParseError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl Display for Date {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_local_string())
+    }
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for Date {
+    fn to_db_value(&self) -> DbValue {
+        self.0.into()
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for Date {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        Date::new(s).map_err(db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        Date::new(s).map_err(db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> db::Result<Self>
+    where
+        Self: Sized,
+    {
+        let s = value.get::<&str>()?;
+        Date::new(s).map_err(db::DatabaseError::value_decode)
+    }
+}
+
+impl DatabaseField for Date {
+    const TYPE: ColumnType = ColumnType::Date;
 }
 
 #[cfg(test)]

@@ -5,7 +5,6 @@
 //! general-purpose newtype wrappers and associated trait implementations to
 //! ensure consistent and safe processing of form data.
 
-use secure_string::SecureString;
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -16,6 +15,8 @@ use cot::db::impl_postgres::PostgresValueRef;
 #[cfg(feature = "sqlite")]
 use cot::db::impl_sqlite::SqliteValueRef;
 use email_address::EmailAddress;
+#[cfg(not(miri))]
+use secure_string::SecureString;
 
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
@@ -46,13 +47,14 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///    compare it with the other password. This method uses constant-time
 ///    equality comparison, which protects against timing attacks.
 ///
-/// 2. An alternative is to compare 2 instances of the [`Password`] type directly
-///    because this password struct implements the [`PartialEq`] trait. You can also
-///    use the [`Password::as_str`] method to compare the strings directly. This
-///    approach uses non-constant-time comparison, which is less secure but may be
-///    acceptable in certain legitimate use cases where the security tradeoff is
-///    understood, e.g., when you're creating a user registration form with the
-///    "retype your password" field, where both passwords come from the same source anyway.
+/// 2. An alternative is to compare 2 instances of the [`Password`] type
+///    directly because this password struct implements the [`PartialEq`] trait.
+///    You can also use the [`Password::as_str`] method to compare the strings
+///    directly. This approach uses non-constant-time comparison, which is less
+///    secure but may be acceptable in certain legitimate use cases where the
+///    security tradeoff is understood, e.g., when you're creating a user
+///    registration form with the "retype your password" field, where both
+///    passwords come from the same source anyway.
 ///
 /// # Examples
 ///
@@ -64,9 +66,9 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///
 /// let another_password = Password::new("pass");
 /// assert_eq!(password, another_password);
-///
 /// ```
 #[derive(Clone, Debug)]
+#[cfg(not(miri))]
 pub struct Password(SecureString);
 
 impl PartialEq for Password {
@@ -77,6 +79,15 @@ impl PartialEq for Password {
 
 impl Eq for Password {}
 
+/// A password - simplified version for Miri testing.
+///
+/// When running under Miri, we use a simple String wrapper instead of
+/// SecureString to avoid the mlock system call that Miri doesn't support.
+#[derive(Clone)]
+#[cfg(miri)]
+pub struct Password(String);
+
+#[cfg(not(miri))]
 impl Password {
     /// Creates a new password object.
     ///
@@ -88,8 +99,8 @@ impl Password {
     /// let password = Password::new("password");
     /// ```
     #[must_use]
-    pub fn new<T: Into<SecureString>>(password: T) -> Self {
-        Self(password.into())
+    pub fn new<T: Into<String>>(password: T) -> Self {
+        Self(SecureString::from(password.into()))
     }
 
     /// Returns the password as a string.
@@ -123,6 +134,27 @@ impl Password {
     }
 }
 
+#[cfg(miri)]
+impl Password {
+    /// Creates a new password object - Miri version.
+    #[must_use]
+    pub fn new<T: Into<String>>(password: T) -> Self {
+        Self(password.into())
+    }
+
+    /// Returns the password as a string - Miri version.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Consumes the object and returns the password as a string - Miri version.
+    #[must_use]
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
 impl From<&Password> for Password {
     fn from(password: &Password) -> Self {
         password.clone()
@@ -138,6 +170,13 @@ impl From<&str> for Password {
 impl From<String> for Password {
     fn from(password: String) -> Self {
         Self::new(password)
+    }
+}
+
+#[cfg(miri)]
+impl Debug for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Password(***SECRET***)")
     }
 }
 

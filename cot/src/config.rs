@@ -821,8 +821,8 @@ impl SessionMiddlewareConfigBuilder {
 ///
 /// # Security
 ///
-/// The implementation of the [`PartialEq`] trait for this type is inherited
-/// from [`SecureBytes`], which is constant-time to prevent timing attacks.
+/// The implementation of the [`PartialEq`] trait for this type uses
+/// constant-time comparison to prevent timing attacks.
 ///
 /// The implementation of the [`Debug`] trait for this type is inherited from
 /// [`SecureBytes`], which hides the secret key to prevent it from being leaked

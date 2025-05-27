@@ -5,15 +5,17 @@
 //! general-purpose newtype wrappers and associated trait implementations to
 //! ensure consistent and safe processing of form data.
 
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
+use cot::db;
 #[cfg(feature = "mysql")]
 use cot::db::impl_mysql::MySqlValueRef;
 #[cfg(feature = "postgres")]
 use cot::db::impl_postgres::PostgresValueRef;
 #[cfg(feature = "sqlite")]
 use cot::db::impl_sqlite::SqliteValueRef;
+use cot::db::{DbFieldValue, ToDbFieldValue};
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
 use thiserror::Error;
@@ -656,27 +658,27 @@ impl ToDbValue for Email {
 #[cfg(feature = "db")]
 impl FromDbValue for Email {
     #[cfg(feature = "sqlite")]
-    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    fn from_sqlite(value: SqliteValueRef<'_>) -> db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
     }
 
     #[cfg(feature = "postgres")]
-    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    fn from_postgres(value: PostgresValueRef<'_>) -> db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
     }
 
     #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    fn from_mysql(value: MySqlValueRef<'_>) -> db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
     }
 }
 

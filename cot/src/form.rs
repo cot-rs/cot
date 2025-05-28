@@ -212,8 +212,8 @@ impl From<email_address::Error> for FormFieldValidationError {
     }
 }
 
-impl From<url::ParseError> for FormFieldValidationError {
-    fn from(error: url::ParseError) -> Self {
+impl From<crate::error::url::UrlParseError> for FormFieldValidationError {
+    fn from(error: crate::error::url::UrlParseError) -> Self {
         FormFieldValidationError::from_string(error.to_string())
     }
 }

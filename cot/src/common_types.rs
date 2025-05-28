@@ -8,6 +8,7 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
+use crate::error::url::UrlParseError;
 #[cfg(feature = "mysql")]
 use cot::db::impl_mysql::MySqlValueRef;
 #[cfg(feature = "postgres")]
@@ -176,7 +177,7 @@ impl From<String> for Password {
 ///   [`url::Url`] parser.
 /// - **Normalization**: The internal URL is normalized (e.g., trailing slash added
 ///   for HTTP URLs) during construction.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Url(url::Url);
 
 impl Url {
@@ -185,12 +186,9 @@ impl Url {
     /// # Parameters
     /// - `s`: The input string to parse as a URL
     ///
-    /// # Returns
-    /// - `Ok(Url)`: Successfully parsed URL
-    /// - `Err(url::ParseError)`: If parsing fails
-    ///
     /// # Errors
-    /// Returns `url::ParseError` if the input string is not a valid URL format.
+    ///
+    /// Returns [`UrlParseError::InvalidUrl`] if the input string is not a valid URL.
     ///
     /// # Examples
     /// ```
@@ -198,31 +196,19 @@ impl Url {
     ///
     /// let valid_url = Url::new("https://example.com").unwrap();
     /// ```
-    pub fn new<S: AsRef<str>>(s: S) -> Result<Url, url::ParseError> {
-        url::Url::from_str(s.as_ref()).map(Self)
+    pub fn new<S: AsRef<str>>(s: S) -> Result<Url, UrlParseError> {
+        url::Url::from_str(s.as_ref())
+            .map(Self)
+            .map_err(UrlParseError::InvalidUrl)
     }
 
     /// Returns a string slice reference to the URL's string representation.
-    ///
-    /// # Returns
-    /// - `&str`: A reference to the underlying URL string
-    ///
-    /// # Examples
-    /// ```
-    /// use cot::common_types::Url;
-    ///
-    /// let url = Url::new("https://example.com").unwrap();
-    /// assert_eq!(url.as_str(), "https://example.com/");
-    /// ```
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
 
     /// Converts the `Url` into a owned `String` representation.
-    ///
-    /// # Returns
-    /// - `String`: The URL converted to a heap-allocated string
     ///
     /// # Examples
     /// ```
@@ -237,9 +223,6 @@ impl Url {
         self.0.into()
     }
     /// Returns the URL scheme (e.g., "http", "https").
-    ///
-    /// # Returns
-    /// - `&str`: A string slice containing the scheme part of the URL.
     ///
     /// # Example
     /// ```
@@ -256,10 +239,6 @@ impl Url {
     /// Returns the host part of the URL, if present.
     ///
     /// This typically includes the domain name or IP address.
-    ///
-    /// # Returns
-    /// - `Option<&str>`: The host as a string slice, or `None` if not available.
-    ///
     /// # Example
     /// ```
     /// use cot::common_types::Url;
@@ -275,9 +254,6 @@ impl Url {
     /// Returns the path component of the URL.
     ///
     /// This includes everything after the host and before the query or fragment.
-    ///
-    /// # Returns
-    /// - `&str`: A string slice containing the path.
     ///
     /// # Example
     /// ```
@@ -295,9 +271,6 @@ impl Url {
     ///
     /// The query is the part that follows the '?' character.
     ///
-    /// # Returns
-    /// - `Option<&str>`: The query string, or `None` if not present.
-    ///
     /// # Example
     /// ```
     /// use cot::common_types::Url;
@@ -313,9 +286,6 @@ impl Url {
     /// Returns the fragment identifier of the URL, if present.
     ///
     /// The fragment is the part that follows the '#' character.
-    ///
-    /// # Returns
-    /// - `Option<&str>`: The fragment string, or `None` if not present.
     ///
     /// # Example
     /// ```
@@ -337,7 +307,7 @@ impl Url {
 ///
 /// # Errors
 ///
-/// Returns [`url::ParseError`] if the input string is not a valid URL format.
+/// Returns [`url::UrlParseError`] if the input string is not a valid URL format.
 ///
 /// # Examples
 ///
@@ -353,7 +323,7 @@ impl Url {
 /// assert!(Url::from_str("not-a-url").is_err());
 /// ```
 impl FromStr for Url {
-    type Err = url::ParseError;
+    type Err = UrlParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Url::new(s)

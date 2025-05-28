@@ -1,4 +1,5 @@
 pub(crate) mod backtrace;
+pub(crate) mod url;
 
 use std::fmt::Display;
 

@@ -735,12 +735,14 @@ impl_float_as_form_field!(f64);
 
 impl_form_field!(UrlField, UrlFieldOptions, "a URL");
 
-/// Custom options for a `FloatField`.
+/// Custom options for a `UrlField`.
 #[derive(Debug, Default, Copy, Clone)]
 pub struct UrlFieldOptions;
 
 impl Display for UrlField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // no custom options
+        let _ = self.custom_options;
         let mut tag = HtmlTag::input("url");
         tag.attr("name", self.id());
         tag.attr("id", self.id());
@@ -1275,5 +1277,39 @@ mod tests {
             value.as_str(),
             Url::new("https://example.com").unwrap().as_str()
         );
+    }
+
+    #[test]
+    #[cfg(feature = "test")]
+    fn url_field_render() {
+        let mut field = UrlField::with_options(
+            FormFieldOptions {
+                id: "id_url".to_owned(),
+                name: "url".to_owned(),
+                required: true,
+            },
+            UrlFieldOptions,
+        );
+        field.set_value(Cow::Borrowed("http://example.com"));
+        let html = field.to_string();
+        assert!(html.contains("type=\"url\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("value=\"http://example.com\""));
+    }
+
+    #[test]
+    #[cfg(feature = "test")]
+    fn url_field_clean_required() {
+        let mut field = UrlField::with_options(
+            FormFieldOptions {
+                id: "id_url".to_owned(),
+                name: "url".to_owned(),
+                required: true,
+            },
+            UrlFieldOptions,
+        );
+        field.set_value(Cow::Borrowed(""));
+        let value = Url::clean_value(&field);
+        assert_eq!(value, Err(FormFieldValidationError::Required));
     }
 }

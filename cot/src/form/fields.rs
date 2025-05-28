@@ -1025,6 +1025,10 @@ mod tests {
     use super::*;
     use crate::form::FormFieldValue;
 
+    // ------------------------
+    // StringField tests
+    // ------------------------
+
     #[test]
     fn string_field_render() {
         let field = StringField::with_options(
@@ -1041,122 +1045,6 @@ mod tests {
         assert!(html.contains("type=\"text\""));
         assert!(html.contains("required"));
         assert!(html.contains("maxlength=\"10\""));
-    }
-
-    #[test]
-    fn password_field_render() {
-        let field = PasswordField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            PasswordFieldOptions {
-                max_length: Some(10),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"password\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("maxlength=\"10\""));
-    }
-
-    #[test]
-    fn email_field_render() {
-        let field = EmailField::with_options(
-            FormFieldOptions {
-                id: "test_id".to_owned(),
-                name: "test_name".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(10),
-                max_length: Some(50),
-            },
-        );
-
-        let html = field.to_string();
-        assert!(html.contains("type=\"email\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("minlength=\"10\""));
-        assert!(html.contains("maxlength=\"50\""));
-        assert!(html.contains("name=\"test_id\""));
-        assert!(html.contains("id=\"test_id\""));
-    }
-
-    #[test]
-    fn integer_field_render() {
-        let field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            IntegerFieldOptions {
-                min: Some(1),
-                max: Some(10),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"number\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("min=\"1\""));
-        assert!(html.contains("max=\"10\""));
-    }
-
-    #[test]
-    fn float_field_render() {
-        let field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FloatFieldOptions {
-                min: Some(1.5),
-                max: Some(10.7),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"number\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("min=\"1.5\""));
-        assert!(html.contains("max=\"10.7\""));
-    }
-    #[test]
-    fn bool_field_render() {
-        let field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            BoolFieldOptions {
-                must_be_true: Some(false),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"checkbox\""));
-        assert!(html.contains("type=\"hidden\""));
-        assert!(!html.contains("required"));
-    }
-
-    #[test]
-    fn bool_field_render_must_be_true() {
-        let field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            BoolFieldOptions {
-                must_be_true: Some(true),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"checkbox\""));
-        assert!(!html.contains("type=\"hidden\""));
-        assert!(html.contains("required"));
     }
 
     #[cot::test]
@@ -1195,7 +1083,27 @@ mod tests {
         let value = String::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }
+    // ------------------------
+    // PasswordField tests
+    // ------------------------
 
+    #[test]
+    fn password_field_render() {
+        let field = PasswordField::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            PasswordFieldOptions {
+                max_length: Some(10),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"password\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("maxlength=\"10\""));
+    }
     #[cot::test]
     async fn password_field_clean_value() {
         let mut field = PasswordField::with_options(
@@ -1214,6 +1122,31 @@ mod tests {
             .unwrap();
         let value = Password::clean_value(&field).unwrap();
         assert_eq!(value.as_str(), "password");
+    }
+    // ------------------------
+    // EmailField tests
+    // ------------------------
+    #[test]
+    fn email_field_render() {
+        let field = EmailField::with_options(
+            FormFieldOptions {
+                id: "test_id".to_owned(),
+                name: "test_name".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        let html = field.to_string();
+        assert!(html.contains("type=\"email\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("minlength=\"10\""));
+        assert!(html.contains("maxlength=\"50\""));
+        assert!(html.contains("name=\"test_name\""));
+        assert!(html.contains("id=\"test_id\""));
     }
 
     #[cot::test]
@@ -1340,6 +1273,29 @@ mod tests {
             assert!(msg.contains("min_length") && msg.contains("exceeds max_length"));
         }
     }
+    // ------------------------
+    // IntegerField tests
+    // ------------------------
+
+    #[test]
+    fn integer_field_render() {
+        let field = IntegerField::<i32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            IntegerFieldOptions {
+                min: Some(1),
+                max: Some(10),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"number\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"1\""));
+        assert!(html.contains("max=\"10\""));
+    }
 
     #[cot::test]
     async fn integer_field_clean_value() {
@@ -1409,6 +1365,45 @@ mod tests {
             Err(FormFieldValidationError::MaximumValueExceeded { max_value: _ })
         ));
     }
+    // ------------------------
+    // BoolField tests
+    // ------------------------
+
+    #[test]
+    fn bool_field_render() {
+        let field = BoolField::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            BoolFieldOptions {
+                must_be_true: Some(false),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"checkbox\""));
+        assert!(html.contains("type=\"hidden\""));
+        assert!(!html.contains("required"));
+    }
+
+    #[test]
+    fn bool_field_render_must_be_true() {
+        let field = BoolField::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            BoolFieldOptions {
+                must_be_true: Some(true),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"checkbox\""));
+        assert!(!html.contains("type=\"hidden\""));
+        assert!(html.contains("required"));
+    }
 
     #[cot::test]
     async fn bool_field_clean_value() {
@@ -1428,6 +1423,29 @@ mod tests {
             .unwrap();
         let value = bool::clean_value(&field).unwrap();
         assert!(value);
+    }
+    // ------------------------
+    // FloatField tests
+    // ------------------------
+
+    #[test]
+    fn float_field_render() {
+        let field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.5),
+                max: Some(10.7),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"number\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"1.5\""));
+        assert!(html.contains("max=\"10.7\""));
     }
 
     #[cot::test]
@@ -1602,5 +1620,227 @@ mod tests {
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
         let value = Url::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
+    }
+
+    // ------------------------
+    // DateTimeField tests
+    // ------------------------
+    #[cot::test]
+    async fn datetime_field_clean_valid() {
+        let mut field = DateTimeField::with_options(
+            FormFieldOptions {
+                id: "dt".into(),
+                name: "dt".into(),
+                required: true,
+            },
+            DateTimeFieldOptions {
+                min: Some(DateTime::new("2025-05-27T00:00:00").unwrap()),
+                max: Some(DateTime::new("2025-05-28T00:00:00").unwrap()),
+                readonly: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2025-05-27T12:34"))
+            .await
+            .unwrap();
+        let dt = DateTime::clean_value(&field).unwrap();
+        assert_eq!(dt.to_local_string(), "2025-05-27T12:34:00");
+    }
+
+    #[cot::test]
+    async fn datetime_field_clean_below_min() {
+        let mut field = DateTimeField::with_options(
+            FormFieldOptions {
+                id: "dt".into(),
+                name: "dt".into(),
+                required: true,
+            },
+            DateTimeFieldOptions {
+                min: Some(DateTime::new("2025-05-27T10:00:00").unwrap()),
+                max: None,
+                readonly: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2025-05-27T09:59"))
+            .await
+            .unwrap();
+        let err = DateTime::clean_value(&field).unwrap_err();
+        assert!(matches!(
+            err,
+            FormFieldValidationError::MinimumValueNotMet { .. }
+        ));
+    }
+
+    #[cot::test]
+    async fn datetime_field_clean_above_max() {
+        let mut field = DateTimeField::with_options(
+            FormFieldOptions {
+                id: "dt".into(),
+                name: "dt".into(),
+                required: true,
+            },
+            DateTimeFieldOptions {
+                min: None,
+                max: Some(DateTime::new("2025-05-27T10:00:00").unwrap()),
+                readonly: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2025-05-27T10:01"))
+            .await
+            .unwrap();
+        let err = DateTime::clean_value(&field).unwrap_err();
+        assert!(matches!(
+            err,
+            FormFieldValidationError::MaximumValueExceeded { .. }
+        ));
+    }
+
+    // ------------------------
+    // TimeField tests
+    // ------------------------
+    #[cot::test]
+    async fn time_field_clean_valid() {
+        let mut field = TimeField::with_options(
+            FormFieldOptions {
+                id: "t".into(),
+                name: "t".into(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: Some(Time::new("09:00:00").unwrap()),
+                max: Some(Time::new("17:00:00").unwrap()),
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("12:30"))
+            .await
+            .unwrap();
+        let t = Time::clean_value(&field).unwrap();
+        assert_eq!(t.to_local_string(), "12:30:00");
+    }
+
+    #[cot::test]
+    async fn time_field_clean_below_min() {
+        let mut field = TimeField::with_options(
+            FormFieldOptions {
+                id: "t".into(),
+                name: "t".into(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: Some(Time::new("09:00:00").unwrap()),
+                max: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("08:59"))
+            .await
+            .unwrap();
+        let err = Time::clean_value(&field).unwrap_err();
+        assert!(matches!(
+            err,
+            FormFieldValidationError::MinimumValueNotMet { .. }
+        ));
+    }
+
+    #[cot::test]
+    async fn time_field_clean_above_max() {
+        let mut field = TimeField::with_options(
+            FormFieldOptions {
+                id: "t".into(),
+                name: "t".into(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: None,
+                max: Some(Time::new("17:00:00").unwrap()),
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("17:01"))
+            .await
+            .unwrap();
+        let err = Time::clean_value(&field).unwrap_err();
+        assert!(matches!(
+            err,
+            FormFieldValidationError::MaximumValueExceeded { .. }
+        ));
+    }
+
+    // ------------------------
+    // DateField tests
+    // ------------------------
+    #[cot::test]
+    async fn date_field_clean_valid() {
+        let mut field = DateField::with_options(
+            FormFieldOptions {
+                id: "d".into(),
+                name: "d".into(),
+                required: true,
+            },
+            DateFieldOptions {
+                min: Some(Date::new("2025-05-27").unwrap()),
+                max: Some(Date::new("2025-05-28").unwrap()),
+                readonly: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2025-05-27"))
+            .await
+            .unwrap();
+        let d = Date::clean_value(&field).unwrap();
+        assert_eq!(d.to_local_string(), "2025-05-27");
+    }
+
+    #[cot::test]
+    async fn date_field_clean_below_min() {
+        let mut field = DateField::with_options(
+            FormFieldOptions {
+                id: "d".into(),
+                name: "d".into(),
+                required: true,
+            },
+            DateFieldOptions {
+                min: Some(Date::new("2025-05-27").unwrap()),
+                max: None,
+                readonly: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2025-05-26"))
+            .await
+            .unwrap();
+        let err = Date::clean_value(&field).unwrap_err();
+        assert!(matches!(
+            err,
+            FormFieldValidationError::MinimumValueNotMet { .. }
+        ));
+    }
+
+    #[cot::test]
+    async fn date_field_clean_above_max() {
+        let mut field = DateField::with_options(
+            FormFieldOptions {
+                id: "d".into(),
+                name: "d".into(),
+                required: true,
+            },
+            DateFieldOptions {
+                min: None,
+                max: Some(Date::new("2025-05-27").unwrap()),
+                readonly: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2025-05-28"))
+            .await
+            .unwrap();
+        let err = Date::clean_value(&field).unwrap_err();
+        assert!(matches!(
+            err,
+            FormFieldValidationError::MaximumValueExceeded { .. }
+        ));
     }
 }

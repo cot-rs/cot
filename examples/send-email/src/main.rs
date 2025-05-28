@@ -2,11 +2,11 @@ use cot::cli::CliMetadata;
 use cot::config::{DatabaseConfig, EmailBackendConfig, EmailBackendType, ProjectConfig};
 use cot::email::{EmailBackend, EmailMessage, SmtpTransportMode};
 use cot::form::Form;
+use cot::html::Html;
 use cot::project::RegisterAppsContext;
 use cot::request::{Request, RequestExt};
-use cot::response::{Response, ResponseExt};
 use cot::router::{Route, Router};
-use cot::{App, AppBuilder, Body, Project, StatusCode};
+use cot::{App, AppBuilder, Project};
 
 struct EmailApp;
 
@@ -23,9 +23,9 @@ impl App for EmailApp {
     }
 }
 
-async fn email_form(_request: Request) -> cot::Result<Response> {
-    let template = include_str!("../templates/index.html");
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
+async fn email_form(_request: Request) -> cot::Result<Html> {
+    let template = String::from(include_str!("../templates/index.html"));
+    Ok(Html::new(template))
 }
 #[derive(Debug, Form)]
 struct EmailForm {
@@ -34,7 +34,7 @@ struct EmailForm {
     subject: String,
     body: String,
 }
-async fn send_email(mut request: Request) -> cot::Result<Response> {
+async fn send_email(mut request: Request) -> cot::Result<Html> {
     let form = EmailForm::from_request(&mut request).await?.unwrap();
 
     let from = form.from;
@@ -53,16 +53,11 @@ async fn send_email(mut request: Request) -> cot::Result<Response> {
     };
     let _database = request.context().database();
     let email_backend = request.context().email_backend();
-    let backend_clone = email_backend.clone();
     {
-        let backend = &backend_clone;
-        let _x = backend.lock().unwrap().send_message(&email);
+        let _x = email_backend.lock().unwrap().send_message(&email);
     }
-    // let template = include_str!("../templates/sent.html");
-    // Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
-    let template = include_str!("../templates/sent.html");
-
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(template)))
+    let template = String::from(include_str!("../templates/sent.html"));
+    Ok(Html::new(template))
 }
 struct MyProject;
 impl Project for MyProject {
@@ -71,18 +66,6 @@ impl Project for MyProject {
     }
 
     fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
-        // Create the email backend
-        // let config = ProjectConfig::from_toml(
-        //     r#"
-        //     [database]
-        //     url = "sqlite::memory:"
-
-        //     [email_backend]
-        //     backend_type = "Smtp"
-        //     smtp_mode = "Localhost"
-        //     port = 1025
-        //     "#,
-        // )?;
         let mut email_config = EmailBackendConfig::builder();
         email_config.backend_type(EmailBackendType::Smtp);
         email_config.smtp_mode(SmtpTransportMode::Localhost);

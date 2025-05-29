@@ -72,7 +72,7 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 pub struct Password(String);
 
 impl Debug for Password {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Password").field(&"**********").finish()
     }
 }
@@ -650,7 +650,7 @@ impl DatabaseField for Email {
 
 /// A validated date and time without timezone information.
 ///
-/// This is a newtype wrapper around [`NaiveDateTime`](chrono::NaiveDateTime)
+/// This is a newtype wrapper around [`NaiveDateTime`](NaiveDateTime)
 /// that provides consistent parsing and integration with Cot's database system.
 /// It ensures date-time values are properly validated and formatted for use
 /// in forms and database operations.
@@ -670,12 +670,12 @@ impl DatabaseField for Email {
 /// let dt = DateTime::from_str("2025-05-27T13:03:00").unwrap();
 ///
 /// // Parse from HTML datetime-local format (no seconds)
-/// let dt = DateTime::from_datetime_local("2025-05-27T13:03").unwrap();
+/// let dt = DateTime::parse_without_seconds("2025-05-27T13:03").unwrap();
 ///
 /// // Convert using TryFrom
 /// let dt = DateTime::try_from("2025-05-27T13:03:00").unwrap();
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DateTime(NaiveDateTime);
 
 impl DateTime {
@@ -706,7 +706,7 @@ impl DateTime {
     ///
     /// This method allows parsing datetime strings in formats other than the
     /// default RFC 3339 format. The format string uses the same syntax as
-    /// [`chrono::NaiveDateTime::parse_from_str`].
+    /// [`NaiveDateTime::parse_from_str`].
     ///
     /// # Errors
     ///
@@ -744,17 +744,54 @@ impl DateTime {
     /// ```
     /// use cot::common_types::DateTime;
     ///
-    /// let dt = DateTime::from_datetime_local("2025-05-27T13:03").unwrap();
-    /// assert_eq!(dt.to_local_string(), "2025-05-27T13:03:00");
+    /// let dt = DateTime::parse_without_seconds("2025-05-27T13:03").unwrap();
+    /// assert_eq!(dt.to_string(), "2025-05-27 13:03:00");
     /// ```
-    pub fn from_datetime_local<S: AsRef<str>>(s: S) -> Result<Self, ParseError> {
-        // parse without seconds, then append ":00"
-        let mut buf = s.as_ref().to_string();
-        buf.push_str(":00");
-        Self::new(buf)
+    pub fn parse_without_seconds<S: AsRef<str>>(date_time: S) -> Result<Self, ParseError> {
+        Self::with_format(date_time.as_ref(), "%Y-%m-%dT%H:%M")
     }
 
-    /// Formats the datetime back to RFC 3339 local format.
+    /// Extracts the date component from this `DateTime`.
+    ///
+    /// Returns a [`Date`] instance representing just the date portion
+    /// (year, month, day) of this datetime value, discarding the time
+    /// component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::DateTime;
+    ///
+    /// let dt = DateTime::new("2025-05-27T13:03:00").unwrap();
+    /// let date = dt.date();
+    /// assert_eq!(date.to_string(), "2025-05-27");
+    /// ```
+    #[must_use]
+    pub fn date(&self) -> Date {
+        self.0.date().into()
+    }
+
+    /// Extracts the time component from this `DateTime`.
+    ///
+    /// Returns a [`Time`] instance representing just the time portion
+    /// (hour, minute, second) of this datetime value, discarding the date
+    /// component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::DateTime;
+    ///
+    /// let dt = DateTime::new("2025-05-27T13:03:00").unwrap();
+    /// let time = dt.time();
+    /// assert_eq!(time.to_string(), "13:03:00");
+    /// ```
+    #[must_use]
+    pub fn time(&self) -> Time {
+        self.0.time().into()
+    }
+
+    /// Formats the datetime back to the specified format.
     ///
     /// Returns a string in the format `YYYY-MM-DDTHH:MM:SS`, which is the
     /// same format expected by the [`new`](Self::new) method.
@@ -767,32 +804,11 @@ impl DateTime {
     /// use cot::common_types::DateTime;
     ///
     /// let dt = DateTime::from_str("2025-05-27T13:03:00").unwrap();
-    /// assert_eq!(dt.to_local_string(), "2025-05-27T13:03:00");
+    /// assert_eq!(dt.to_string(), "2025-05-27 13:03:00");
     /// ```
     #[must_use]
-    pub fn to_local_string(&self) -> String {
-        self.0.format("%Y-%m-%dT%H:%M:%S").to_string()
-    }
-
-    /// Returns a reference to the underlying `NaiveDateTime`.
-    ///
-    /// This provides access to the full chrono API for advanced date/time
-    /// operations like arithmetic, comparisons, and custom formatting.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::str::FromStr;
-    ///
-    /// use chrono::Duration;
-    /// use cot::common_types::DateTime;
-    ///
-    /// let dt = DateTime::from_str("2025-05-27T13:03:00").unwrap();
-    /// let tomorrow = *dt.inner() + Duration::days(1);
-    /// ```
-    #[must_use]
-    pub fn inner(&self) -> &NaiveDateTime {
-        &self.0
+    pub fn to_string_with_format(self, fmt: &str) -> String {
+        self.0.format(fmt).to_string()
     }
 }
 
@@ -848,18 +864,15 @@ impl TryFrom<String> for DateTime {
     }
 }
 
-/// Implements display formatting for `DateTime`.
-///
-/// Uses the same format as [`to_local_string`](Self::to_local_string).
 impl Display for DateTime {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_local_string())
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0.to_string())
     }
 }
 
 /// Defines the database field type for `DateTime`.
 ///
-/// DateTime values are stored using the database's native datetime type.
+/// `DateTime` values are stored using the database's native datetime type.
 #[cfg(feature = "db")]
 impl DatabaseField for DateTime {
     const TYPE: ColumnType = ColumnType::DateTime;
@@ -911,9 +924,9 @@ impl FromDbValue for DateTime {
     }
 }
 
-/// A validated time without date or timezone information.
+/// A Naive time without timezone information.
 ///
-/// This is a newtype wrapper around [`NaiveTime`](chrono::NaiveTime) that
+/// This is a newtype wrapper around [`NaiveTime`](NaiveTime) that
 /// provides consistent parsing and integration with Cot's database system.
 /// It ensures time values are properly validated and formatted for use in
 /// forms and database operations.
@@ -933,12 +946,12 @@ impl FromDbValue for DateTime {
 /// let time = Time::from_str("13:03:00").unwrap();
 ///
 /// // Parse from HTML time input format (no seconds)
-/// let time = Time::from_time_local("13:03").unwrap();
+/// let time = Time::parse_without_seconds("13:03").unwrap();
 ///
 /// // Convert using TryFrom
 /// let time = Time::try_from("13:03:00").unwrap();
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Time(NaiveTime);
 
 impl Time {
@@ -960,7 +973,7 @@ impl Time {
     /// let time = Time::new("13:03:00").unwrap();
     /// let midnight = Time::new("00:00:00").unwrap();
     /// assert!(Time::new("invalid").is_err());
-    /// assert!(Time::new("13:03").is_err()); // missing seconds
+    /// assert!(Time::new("13:03").is_err());
     /// ```
     pub fn new<T: AsRef<str>>(time: T) -> Result<Self, ParseError> {
         Self::with_format(time.as_ref(), "%H:%M:%S")
@@ -970,7 +983,7 @@ impl Time {
     ///
     /// This method allows parsing time strings in formats other than the
     /// default `HH:MM:SS` format. The format string uses the same syntax as
-    /// [`chrono::NaiveTime::parse_from_str`].
+    /// [`NaiveTime::parse_from_str`].
     ///
     /// # Errors
     ///
@@ -1008,19 +1021,15 @@ impl Time {
     /// ```
     /// use cot::common_types::Time;
     ///
-    /// let time = Time::from_time_local("13:03").unwrap();
-    /// assert_eq!(time.to_local_string(), "13:03:00");
+    /// let time = Time::parse_without_seconds("13:03").unwrap();
+    /// assert_eq!(time.to_string(), "13:03:00");
     /// ```
-    pub fn from_time_local<T: AsRef<str>>(time: T) -> Result<Self, ParseError> {
-        let mut buf = time.as_ref().to_string();
-        buf.push_str(":00");
-        Self::new(buf)
+    pub fn parse_without_seconds<T: AsRef<str>>(time: T) -> Result<Self, ParseError> {
+        Self::with_format(time.as_ref(), "%H:%M")
     }
 
-    /// Formats the time back to 24-hour format.
+    /// Formats the time back to the provided format.
     ///
-    /// Returns a string in the format `HH:MM:SS`, which is the same format
-    /// expected by the [`new`](Self::new) method.
     ///
     /// # Examples
     ///
@@ -1030,32 +1039,11 @@ impl Time {
     /// use cot::common_types::Time;
     ///
     /// let time = Time::from_str("13:03:00").unwrap();
-    /// assert_eq!(time.to_local_string(), "13:03:00");
+    /// assert_eq!(time.to_string_with_format("%H:%M:%S"), "13:03:00");
     /// ```
     #[must_use]
-    pub fn to_local_string(&self) -> String {
-        self.0.format("%H:%M:%S").to_string()
-    }
-
-    /// Returns a reference to the underlying `NaiveTime`.
-    ///
-    /// This provides access to the full chrono API for advanced time
-    /// operations like arithmetic, comparisons, and custom formatting.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::str::FromStr;
-    ///
-    /// use chrono::Duration;
-    /// use cot::common_types::Time;
-    ///
-    /// let time = Time::from_str("13:03:00").unwrap();
-    /// let later = *time.inner() + Duration::hours(2);
-    /// ```
-    #[must_use]
-    pub fn inner(&self) -> &NaiveTime {
-        &self.0
+    pub fn to_string_with_format(self, fmt: &str) -> String {
+        self.0.format(fmt).to_string()
     }
 }
 
@@ -1114,12 +1102,18 @@ impl TryFrom<String> for Time {
     }
 }
 
+impl From<NaiveTime> for Time {
+    fn from(value: NaiveTime) -> Self {
+        Self(value)
+    }
+}
+
 /// Implements display formatting for `Time`.
 ///
 /// Uses the same format as [`to_local_string`](Self::to_local_string).
 impl Display for Time {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_local_string())
+        f.write_str(&self.0.to_string())
     }
 }
 
@@ -1201,7 +1195,7 @@ impl DatabaseField for Time {
 /// // Convert using TryFrom
 /// let date = Date::try_from("2025-05-27").unwrap();
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Date(NaiveDate);
 
 impl Date {
@@ -1234,7 +1228,7 @@ impl Date {
     ///
     /// This method allows parsing date strings in formats other than the
     /// default ISO 8601 format. The format string uses the same syntax as
-    /// [`chrono::NaiveDate::parse_from_str`].
+    /// [`NaiveDate::parse_from_str`].
     ///
     /// # Errors
     ///
@@ -1259,11 +1253,8 @@ impl Date {
         NaiveDate::parse_from_str(date.as_ref(), fmt).map(Self)
     }
 
-    /// Formats the date back to ISO 8601 format.
+    /// Formats the date into a specified format.
     ///
-    /// Returns a string in the format `YYYY-MM-DD`, which is the same format
-    /// expected by the [`new`](Self::new) method and compatible with HTML5
-    /// date inputs.
     ///
     /// # Examples
     ///
@@ -1273,34 +1264,11 @@ impl Date {
     /// use cot::common_types::Date;
     ///
     /// let date = Date::from_str("2025-05-27").unwrap();
-    /// assert_eq!(date.to_local_string(), "2025-05-27");
+    /// assert_eq!(date.to_string_with_format("%Y-%m-%d"), "2025-05-27");
     /// ```
     #[must_use]
-    pub fn to_local_string(&self) -> String {
-        self.0.format("%Y-%m-%d").to_string()
-    }
-
-    /// Returns a reference to the underlying `NaiveDate`.
-    ///
-    /// This provides access to the full chrono API for advanced date
-    /// operations like arithmetic, comparisons, weekday calculations,
-    /// and custom formatting.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::str::FromStr;
-    ///
-    /// use chrono::{Duration, Weekday};
-    /// use cot::common_types::Date;
-    ///
-    /// let date = Date::from_str("2025-05-27").unwrap();
-    /// let next_week = *date.inner() + Duration::weeks(1);
-    /// let weekday = date.inner().weekday();
-    /// ```
-    #[must_use]
-    pub fn inner(&self) -> &NaiveDate {
-        &self.0
+    pub fn to_string_with_format(self, fmt: &str) -> String {
+        self.0.format(fmt).to_string()
     }
 }
 
@@ -1359,12 +1327,18 @@ impl TryFrom<String> for Date {
     }
 }
 
+impl From<NaiveDate> for Date {
+    fn from(value: NaiveDate) -> Self {
+        Self(value)
+    }
+}
+
 /// Implements display formatting for `Date`.
 ///
 /// Uses the same format as [`to_local_string`](Self::to_local_string).
 impl Display for Date {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_local_string())
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0.to_string())
     }
 }
 
@@ -1492,7 +1466,11 @@ mod tests {
     fn datetime_new_valid() {
         let s = "2025-05-27T13:03:00";
         let dt = DateTime::new(s).unwrap();
-        assert_eq!(dt.to_local_string(), s);
+        assert_eq!(dt.date(), Date::new("2025-05-27").unwrap());
+
+        assert_eq!(dt.time(), Time::new("13:03:00").unwrap());
+
+        assert_eq!(dt.to_string(), "2025-05-27 13:03:00");
     }
 
     #[test]
@@ -1505,14 +1483,23 @@ mod tests {
     fn datetime_with_format_custom() {
         let s = "05/27/2025 01:03:00 PM";
         let dt = DateTime::with_format(s, "%m/%d/%Y %I:%M:%S %p").unwrap();
-        assert_eq!(dt.to_local_string(), "2025-05-27T13:03:00");
+        assert_eq!(dt.to_string(), "2025-05-27 13:03:00");
     }
 
     #[test]
-    fn datetime_from_datetime_local_appends_seconds() {
+    fn date_time_to_string_with_format() {
+        let d = DateTime::new("2025-05-27T13:03:00").unwrap();
+        assert_eq!(
+            d.to_string_with_format("%m/%d/%Y %I:%M:%S %p"),
+            "05/27/2025 01:03:00 PM"
+        );
+    }
+
+    #[test]
+    fn datetime_parse_without_seconds() {
         let s_local = "2025-05-27T13:03";
-        let dt = DateTime::from_datetime_local(s_local).unwrap();
-        assert_eq!(dt.to_local_string(), "2025-05-27T13:03:00");
+        let dt = DateTime::parse_without_seconds(s_local).unwrap();
+        assert_eq!(dt.to_string(), "2025-05-27 13:03:00");
     }
 
     #[test]
@@ -1530,7 +1517,7 @@ mod tests {
     fn time_new_valid() {
         let s = "13:03:00";
         let t = Time::new(s).unwrap();
-        assert_eq!(t.to_local_string(), s);
+        assert_eq!(t.to_string(), s);
     }
 
     #[test]
@@ -1543,14 +1530,20 @@ mod tests {
     fn time_with_format_custom() {
         let s = "1:03:00 PM";
         let t = Time::with_format(s, "%I:%M:%S %p").unwrap();
-        assert_eq!(t.to_local_string(), "13:03:00");
+        assert_eq!(t.to_string(), "13:03:00");
     }
 
     #[test]
-    fn time_from_time_local() {
+    fn time_to_string_with_format() {
+        let d = Time::new("13:03:00").unwrap();
+        assert_eq!(d.to_string_with_format("%I:%M:%S %p"), "01:03:00 PM");
+    }
+
+    #[test]
+    fn time_parse_without_seconds() {
         let s_local = "13:03";
-        let t = Time::from_time_local(s_local).unwrap();
-        assert_eq!(t.to_local_string(), "13:03:00");
+        let t = Time::parse_without_seconds(s_local).unwrap();
+        assert_eq!(t.to_string(), "13:03:00");
     }
 
     #[test]
@@ -1568,7 +1561,7 @@ mod tests {
     fn date_new_valid() {
         let s = "2025-05-27";
         let d = Date::new(s).unwrap();
-        assert_eq!(d.to_local_string(), s);
+        assert_eq!(d.to_string(), s);
     }
 
     #[test]
@@ -1581,7 +1574,13 @@ mod tests {
     fn date_with_format_custom() {
         let s = "05/27/2025";
         let d = Date::with_format(s, "%m/%d/%Y").unwrap();
-        assert_eq!(d.to_local_string(), "2025-05-27");
+        assert_eq!(d.to_string(), "2025-05-27");
+    }
+
+    #[test]
+    fn date_to_string_with_format() {
+        let d = Date::new("2025-05-27").unwrap();
+        assert_eq!(d.to_string_with_format("%m/%d/%Y"), "05/27/2025");
     }
 
     #[test]
@@ -1627,7 +1626,7 @@ mod tests {
         fn datetime_to_db_value_contains_str() {
             let dt = DateTime::new("2025-05-27T13:03:00").unwrap();
             let dbv = dt.to_db_value();
-            let s = format!("{:?}", dbv);
+            let s = format!("{dbv:?}");
             assert!(s.contains("2025-05-27T13:03:00"));
         }
 
@@ -1638,7 +1637,7 @@ mod tests {
         fn time_to_db_field_value_contains_str() {
             let t = Time::new("13:03:00").unwrap();
             let dfv = t.to_db_field_value();
-            let s = format!("{:?}", dfv);
+            let s = format!("{dfv:?}");
             assert!(s.contains("13:03:00"));
         }
 
@@ -1649,7 +1648,7 @@ mod tests {
         fn date_to_db_value_contains_str() {
             let d = Date::new("2025-05-27").unwrap();
             let dbv = d.to_db_value();
-            let s = format!("{:?}", dbv);
+            let s = format!("{dbv:?}");
             assert!(s.contains("2025-05-27"));
         }
     }

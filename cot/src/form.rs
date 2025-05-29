@@ -227,7 +227,7 @@ impl From<email_address::Error> for FormFieldValidationError {
     }
 }
 
-impl From<chrono::ParseError> for FormFieldValidationError {
+impl From<ParseError> for FormFieldValidationError {
     fn from(error: ParseError) -> Self {
         FormFieldValidationError::from_string(error.to_string())
     }

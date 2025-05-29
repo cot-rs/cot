@@ -70,7 +70,7 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 pub struct Password(String);
 
 impl Debug for Password {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Password").field(&"**********").finish()
     }
 }

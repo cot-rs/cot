@@ -813,12 +813,17 @@ impl AsFormField for Url {
 impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
 use crate::common_types::{Date, DateTime, Time};
 
-#[derive(Debug, Default, Clone)]
+/// Custom options for [`DateTimeField`]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct DateTimeFieldOptions {
+    /// The maximum datetime value of the field used to set the `max` attribute
+    /// in the HTML input element.
     pub max: Option<DateTime>,
-
+    /// The minimum datetime value of the field used to set the `min` attribute
+    /// in the HTML input element.
     pub min: Option<DateTime>,
-
+    /// Whether the field should be read-only. When set to `true`, the user
+    /// cannot modify the field value through the HTML input element.
     pub readonly: Option<bool>,
 }
 
@@ -830,12 +835,17 @@ impl Display for DateTimeField {
         if self.options.required {
             tag.bool_attr("required");
         }
-        if let Some(max) = self.custom_options.max.clone() {
+        if let Some(max) = self.custom_options.max {
             tag.attr("max", max.to_string());
         }
-        if let Some(min) = self.custom_options.min.clone() {
+        if let Some(min) = self.custom_options.min {
             tag.attr("min", min.to_string());
         }
+
+        if let Some(readonly) = self.custom_options.readonly {
+            tag.attr("readonly", readonly.to_string());
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -852,12 +862,11 @@ impl AsFormField for DateTime {
         Self: Sized,
     {
         let value = check_required(field)?;
-        let date_time = DateTime::from_datetime_local(value).expect("invalid datetime");
+        let date_time = DateTime::parse_without_seconds(value).expect("invalid datetime");
         let opts = &field.custom_options;
 
         if let Some(min) = &opts.min {
-            // let min_date_time = DateTime::new(min).expect("invalid min datetime");
-            if date_time < min.clone() {
+            if date_time < *min {
                 return Err(FormFieldValidationError::MinimumValueNotMet {
                     min_value: min.to_string(),
                 });
@@ -865,14 +874,14 @@ impl AsFormField for DateTime {
         }
 
         if let Some(max) = &opts.max {
-            if date_time > max.clone() {
+            if date_time > *max {
                 return Err(FormFieldValidationError::MaximumValueExceeded {
                     max_value: max.to_string(),
                 });
             }
         }
 
-        Ok(date_time.to_local_string().parse()?)
+        Ok(date_time)
     }
 
     fn to_field_value(&self) -> String {
@@ -884,11 +893,18 @@ impl HtmlSafe for DateTimeField {}
 
 impl_form_field!(TimeField, TimeFieldOptions, "a time");
 
-#[derive(Debug, Default, Clone)]
+/// Custom options for [`TimeField`]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct TimeFieldOptions {
+    /// The maximum time value of the field used to set the `max` attribute
+    /// in the HTML input element.
     pub max: Option<Time>,
-
+    /// The minimum time value of the field used to set the `min` attribute
+    /// in the HTML input element.
     pub min: Option<Time>,
+    /// Whether the field should be read-only. When set to `true`, the user
+    /// cannot modify the field value through the HTML input element.
+    pub readonly: Option<bool>,
 }
 
 impl Display for TimeField {
@@ -899,14 +915,18 @@ impl Display for TimeField {
         if self.options.required {
             tag.bool_attr("required");
         }
-        if let Some(max) = self.custom_options.max.clone() {
+        if let Some(max) = self.custom_options.max {
             tag.attr("max", max.to_string());
         }
-        if let Some(min) = self.custom_options.min.clone() {
+        if let Some(min) = self.custom_options.min {
             tag.attr("min", min.to_string());
         }
         if let Some(value) = &self.value {
             tag.attr("value", value);
+        }
+
+        if let Some(readonly) = self.custom_options.readonly {
+            tag.attr("readonly", readonly.to_string());
         }
 
         write!(f, "{}", tag.render())
@@ -921,11 +941,11 @@ impl AsFormField for Time {
         Self: Sized,
     {
         let value = check_required(field)?;
-        let time = Time::from_time_local(value).expect("invalid datetime");
+        let time = Time::parse_without_seconds(value).expect("invalid datetime");
         let opts = &field.custom_options;
 
         if let Some(min) = &opts.min {
-            if time < min.clone() {
+            if time < *min {
                 return Err(FormFieldValidationError::MinimumValueNotMet {
                     min_value: min.to_string(),
                 });
@@ -933,14 +953,14 @@ impl AsFormField for Time {
         }
 
         if let Some(max) = &opts.max {
-            if time > max.clone() {
+            if time > *max {
                 return Err(FormFieldValidationError::MaximumValueExceeded {
                     max_value: max.to_string(),
                 });
             }
         }
 
-        Ok(time.to_local_string().parse()?)
+        Ok(time)
     }
 
     fn to_field_value(&self) -> String {
@@ -952,12 +972,17 @@ impl HtmlSafe for TimeField {}
 
 impl_form_field!(DateField, DateFieldOptions, "a date");
 
-#[derive(Debug, Default, Clone)]
+/// Custom options for [`DateField`]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct DateFieldOptions {
+    /// The maximum date value of the field used to set the `max` attribute
+    /// in the HTML input element.
     pub max: Option<Date>,
-
+    /// The minimum date value of the field used to set the `min` attribute
+    /// in the HTML input element.
     pub min: Option<Date>,
-
+    /// Whether the field should be read-only. When set to `true`, the user
+    /// cannot modify the field value through the HTML input element.
     pub readonly: Option<bool>,
 }
 
@@ -969,14 +994,18 @@ impl Display for DateField {
         if self.options.required {
             tag.bool_attr("required");
         }
-        if let Some(max) = self.custom_options.max.clone() {
+        if let Some(max) = self.custom_options.max {
             tag.attr("max", max.to_string());
         }
-        if let Some(min) = self.custom_options.min.clone() {
+        if let Some(min) = self.custom_options.min {
             tag.attr("min", min.to_string());
         }
         if let Some(value) = &self.value {
             tag.attr("value", value);
+        }
+
+        if let Some(readonly) = self.custom_options.readonly {
+            tag.attr("readonly", readonly.to_string());
         }
 
         write!(f, "{}", tag.render())
@@ -995,7 +1024,7 @@ impl AsFormField for Date {
         let opts = &field.custom_options;
 
         if let Some(min) = &opts.min {
-            if date < min.clone() {
+            if date < *min {
                 return Err(FormFieldValidationError::MinimumValueNotMet {
                     min_value: min.to_string(),
                 });
@@ -1003,14 +1032,14 @@ impl AsFormField for Date {
         }
 
         if let Some(max) = &opts.max {
-            if date > max.clone() {
+            if date > *max {
                 return Err(FormFieldValidationError::MaximumValueExceeded {
                     max_value: max.to_string(),
                 });
             }
         }
 
-        Ok(date.to_local_string().parse()?)
+        Ok(date)
     }
 
     fn to_field_value(&self) -> String {
@@ -1644,7 +1673,7 @@ mod tests {
             .await
             .unwrap();
         let dt = DateTime::clean_value(&field).unwrap();
-        assert_eq!(dt.to_local_string(), "2025-05-27T12:34:00");
+        assert_eq!(dt.to_string(), "2025-05-27 12:34:00");
     }
 
     #[cot::test]
@@ -1711,6 +1740,7 @@ mod tests {
             TimeFieldOptions {
                 min: Some(Time::new("09:00:00").unwrap()),
                 max: Some(Time::new("17:00:00").unwrap()),
+                readonly: Some(false),
             },
         );
         field
@@ -1718,7 +1748,7 @@ mod tests {
             .await
             .unwrap();
         let t = Time::clean_value(&field).unwrap();
-        assert_eq!(t.to_local_string(), "12:30:00");
+        assert_eq!(t.to_string(), "12:30:00");
     }
 
     #[cot::test]
@@ -1732,6 +1762,7 @@ mod tests {
             TimeFieldOptions {
                 min: Some(Time::new("09:00:00").unwrap()),
                 max: None,
+                readonly: Some(false),
             },
         );
         field
@@ -1756,6 +1787,7 @@ mod tests {
             TimeFieldOptions {
                 min: None,
                 max: Some(Time::new("17:00:00").unwrap()),
+                readonly: Some(false),
             },
         );
         field
@@ -1791,7 +1823,7 @@ mod tests {
             .await
             .unwrap();
         let d = Date::clean_value(&field).unwrap();
-        assert_eq!(d.to_local_string(), "2025-05-27");
+        assert_eq!(d.to_string(), "2025-05-27");
     }
 
     #[cot::test]

@@ -1,6 +1,6 @@
 [package]
 name = "cot"
-version = "0.3.0"
+version = "0.3.1"
 description = "The Rust web framework for lazy developers."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true
@@ -42,6 +42,7 @@ humantime.workspace = true
 indexmap.workspace = true
 lettre.workspace = true
 mime_guess.workspace = true
+multer.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
 pin-project-lite.workspace = true
 schemars = { workspace = true, optional = true }

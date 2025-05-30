@@ -92,7 +92,7 @@ impl RedisStore {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use cot::config::CacheUrl;
     /// use cot::session::store::redis::RedisStore;
     ///
@@ -116,7 +116,7 @@ impl RedisStore {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// use cot::config::CacheUrl;
     /// use cot::session::store::redis::RedisStore;
     ///
@@ -169,6 +169,7 @@ impl SessionStore for RedisStore {
         let key: String = session_record.id.to_string();
         let data: String =
             serde_json::to_string(&session_record).map_err(RedisStoreError::Serialize)?;
+
         let options = SetOptions::default()
             .conditional_set(ExistenceCheck::XX) // only update if the key exists.
             .with_expiration(SetExpiry::EX(get_expiry_as_u64(session_record.expiry_date)));
@@ -178,8 +179,9 @@ impl SessionStore for RedisStore {
             .map_err(RedisStoreError::Command)?;
         if !set_ok {
             let mut record = session_record.clone();
-            self.create(&mut record).await?
+            self.create(&mut record).await?;
         }
+
         Ok(())
     }
 
@@ -191,23 +193,25 @@ impl SessionStore for RedisStore {
             let rec =
                 serde_json::from_str::<Record>(&data).map_err(RedisStoreError::Deserialize)?;
             return Ok(Some(rec));
-        };
+        }
         Ok(None)
     }
 
     async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
         let mut conn = self.get_connection().await?;
         let key = session_id.to_string();
-        let _: () = conn.del(key).await.map_err(RedisStoreError::Command)?;
+        conn.del::<_, ()>(key)
+            .await
+            .map_err(RedisStoreError::Command)?;
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::env;
 
-    use redis::AsyncCommands;
     use time::{Duration, OffsetDateTime};
     use tower_sessions::session::{Id, Record};
 
@@ -218,14 +222,14 @@ mod tests {
             env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
         let url = CacheUrl::from(redis_url);
         let store = RedisStore::new(&url).expect("failed to create RedisStore");
-        let conn = store.get_connection().await.expect("get_connection failed");
+        store.get_connection().await.expect("get_connection failed");
         store
     }
 
     fn make_record() -> Record {
         Record {
             id: Id::default(),
-            data: Default::default(),
+            data: HashMap::default(),
             expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
         }
     }
@@ -290,14 +294,14 @@ mod tests {
 
         let mut r1 = Record {
             id: Id::default(),
-            data: Default::default(),
+            data: HashMap::default(),
             expiry_date: expiry,
         };
         store.create(&mut r1).await.unwrap();
 
         let mut r2 = Record {
             id: r1.id,
-            data: Default::default(),
+            data: HashMap::default(),
             expiry_date: expiry,
         };
         store.create(&mut r2).await.unwrap();

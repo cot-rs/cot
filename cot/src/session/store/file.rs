@@ -13,13 +13,13 @@
 //! let store = FileStore::new(PathBuf::from("/var/lib/cot/sessions"));
 //! ```
 use std::borrow::Cow;
-use std::fs::OpenOptions;
 use std::io;
 use std::path::Path;
 
 use async_trait::async_trait;
 use thiserror::Error;
-use tokio::fs::remove_file;
+use tokio::fs::{OpenOptions, remove_file};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
@@ -106,13 +106,19 @@ impl SessionStore for FileStore {
 
         loop {
             let file_path = self.dir_path.join(record.id.to_string());
-            match OpenOptions::new()
+            let file = OpenOptions::new()
                 .create_new(true)
                 .write(true)
                 .open(&file_path)
-            {
-                Ok(file) => {
-                    serde_json::to_writer(file, &record).map_err(FileStoreError::Serialize)?;
+                .await;
+
+            match file {
+                Ok(mut file) => {
+                    let json_data =
+                        serde_json::to_string(&record).map_err(FileStoreError::Serialize)?;
+                    file.write_all(json_data.as_bytes())
+                        .await
+                        .map_err(FileStoreError::Io)?;
                     break;
                 }
                 Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
@@ -129,13 +135,19 @@ impl SessionStore for FileStore {
     async fn save(&self, record: &Record) -> session_store::Result<()> {
         self.create_dir_if_not_exists().await?;
 
-        match OpenOptions::new()
+        let file = OpenOptions::new()
             .write(true)
             .truncate(true)
             .open(self.dir_path.join(record.id.to_string()))
-        {
-            Ok(file) => {
-                serde_json::to_writer(file, &record).map_err(FileStoreError::Serialize)?;
+            .await;
+
+        match file {
+            Ok(mut file) => {
+                let json_data =
+                    serde_json::to_string(&record).map_err(FileStoreError::Serialize)?;
+                file.write_all(json_data.as_bytes())
+                    .await
+                    .map_err(FileStoreError::Io)?;
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // create the file if it does not exist.
@@ -153,11 +165,17 @@ impl SessionStore for FileStore {
         if !path.is_file() {
             return Ok(None);
         }
-        let file = OpenOptions::new()
+        let mut file = OpenOptions::new()
             .read(true)
             .open(path)
+            .await
             .map_err(FileStoreError::Io)?;
-        let out = serde_json::from_reader(file).map_err(FileStoreError::Serialize)?;
+
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .await
+            .map_err(FileStoreError::Io)?;
+        let out = serde_json::from_str(&contents).map_err(FileStoreError::Serialize)?;
 
         Ok(out)
     }

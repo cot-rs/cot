@@ -10,7 +10,6 @@
 #[cfg(feature = "json")]
 pub mod file;
 pub mod memory;
-#[cfg(feature = "json")]
 #[cfg(feature = "redis")]
 pub mod redis;
 

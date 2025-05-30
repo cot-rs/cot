@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use time::{OffsetDateTime, UtcOffset};
 use tower_sessions::{MemoryStore, SessionStore};
+use thiserror::Error;
 use tower_sessions::{SessionStore, session_store};
 
 use crate::ProjectContext;
@@ -38,7 +39,7 @@ use crate::session::store::ToSessionStore;
 #[cfg(feature = "json")]
 use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
-#[cfg(all(feature = "json", feature = "redis"))]
+#[cfg(feature = "redis")]
 use crate::session::store::redis::RedisStore;
 
 /// The configuration for a project.
@@ -866,14 +867,14 @@ impl ToSessionStore for SessionStoreTypeConfig {
             #[cfg(feature = "json")]
             Self::File { path } => Ok(Box::new(FileStore::new(path))),
             #[cfg(feature = "cache")]
-            Self::Cache { ref uri } => match CacheType::from(uri.clone()) {
-                #[cfg(all(feature = "json", feature = "redis"))]
-                CacheType::Redis => Ok(Box::new(RedisStore::new(uri)?)),
-                CacheType::Unknown => Err(session_store::Error::Backend(format!(
-                    "Unsupported cache URI scheme: {}",
-                    uri.0.scheme()
-                ))),
-            },
+            Self::Cache { ref uri } => {
+                let cache_type = CacheType::try_from(uri.clone())
+                    .map_err(|e| session_store::Error::Backend(e.to_string()))?;
+                match cache_type {
+                    #[cfg(feature = "redis")]
+                    CacheType::Redis => Ok(Box::new(RedisStore::new(uri)?)),
+                }
+            }
             #[cfg(feature = "db")]
             Self::Database => {
                 unimplemented!();
@@ -1527,25 +1528,44 @@ impl Debug for DatabaseUrl {
     }
 }
 
+/// An error returned when parsing a `CacheType` from a string.
+#[derive(Debug, Error, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ParseCacheTypeError {
+    /// The input did not match any supported cache type.
+    #[error("unsupported cache type: `{0}`")]
+    Unsupported(String),
+}
+
 /// A structure that holds the type of Cache.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg(feature = "cache")]
+#[non_exhaustive]
 pub enum CacheType {
     /// A redis cache type.
-    #[cfg(all(feature = "redis", feature = "json"))]
+    #[cfg(feature = "redis")]
     Redis,
-    /// The cache type is not known or supported.
-    Unknown,
 }
 
 #[cfg(feature = "cache")]
-impl From<&str> for CacheType {
-    fn from(value: &str) -> Self {
+impl TryFrom<&str> for CacheType {
+    type Error = ParseCacheTypeError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            #[cfg(all(feature = "redis", feature = "json"))]
-            "redis" => Self::Redis,
-            _ => Self::Unknown,
+            #[cfg(feature = "redis")]
+            "redis" => Ok(CacheType::Redis),
+            other => Err(ParseCacheTypeError::Unsupported(other.to_owned())),
         }
+    }
+}
+
+#[cfg(feature = "cache")]
+impl std::str::FromStr for CacheType {
+    type Err = ParseCacheTypeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        CacheType::try_from(s)
     }
 }
 
@@ -1604,9 +1624,11 @@ impl From<&str> for CacheUrl {
 }
 
 #[cfg(feature = "cache")]
-impl From<CacheUrl> for CacheType {
-    fn from(url: CacheUrl) -> Self {
-        url.0.scheme().into()
+impl TryFrom<CacheUrl> for CacheType {
+    type Error = ParseCacheTypeError;
+
+    fn try_from(value: CacheUrl) -> Result<Self, Self::Error> {
+        CacheType::try_from(value.0.scheme())
     }
 }
 
@@ -1633,6 +1655,13 @@ fn conceal_url_parts(url: &url::Url) -> url::Url {
             .expect("set_password should succeed if password is present");
     }
     new_url
+}
+
+#[cfg(feature = "cache")]
+impl std::fmt::Display for CacheUrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.as_str())
+    }
 }
 
 #[cfg(test)]
@@ -1861,15 +1890,17 @@ mod tests {
     #[test]
     #[cfg(feature = "redis")]
     fn cache_type_from_str_redis() {
-        assert_eq!(CacheType::from("redis"), CacheType::Redis);
-        assert_eq!(CacheType::from("REDIS"), CacheType::Unknown);
+        assert_eq!(CacheType::try_from("redis").unwrap(), CacheType::Redis);
     }
 
     #[test]
     #[cfg(feature = "cache")]
     fn cache_type_from_str_unknown() {
-        for s in &["", "foo", "redis://foo"] {
-            assert_eq!(CacheType::from(*s), CacheType::Unknown);
+        for &s in &["", "foo", "redis://foo"] {
+            assert_eq!(
+                CacheType::try_from(s),
+                Err(ParseCacheTypeError::Unsupported(s.to_owned()))
+            );
         }
     }
 
@@ -1877,10 +1908,13 @@ mod tests {
     #[cfg(feature = "redis")]
     fn cache_type_from_cacheurl() {
         let url = CacheUrl::from("redis://localhost/");
-        assert_eq!(CacheType::from(url.clone()), CacheType::Redis);
+        assert_eq!(CacheType::try_from(url.clone()).unwrap(), CacheType::Redis);
 
         let other = CacheUrl::from("http://example.com/");
-        assert_eq!(CacheType::from(other), CacheType::Unknown);
+        assert_eq!(
+            CacheType::try_from(other),
+            Err(ParseCacheTypeError::Unsupported("http".to_string()))
+        );
     }
 
     #[test]

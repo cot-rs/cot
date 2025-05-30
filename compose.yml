@@ -29,6 +29,17 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:8-alpine
+    container_name: cot-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   webdriver:
     image: docker.io/selenium/standalone-firefox:4.31.0-20250414
     container_name: cot-webdriver

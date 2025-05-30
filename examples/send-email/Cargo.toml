@@ -1,0 +1,10 @@
+[package]
+name = "send-email"
+version = "0.1.0"
+publish = false
+description = "Send email - Cot example."
+edition = "2021"
+
+[dependencies]
+cot = { path = "../../cot" }
+lettre = { version = "0.11.15", features = ["native-tls"] }

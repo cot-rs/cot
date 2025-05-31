@@ -19,6 +19,8 @@ use std::time::Duration;
 
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
+#[cfg(not(miri))]
+use secure_string::SecureBytes;
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 
@@ -819,11 +821,12 @@ impl SessionMiddlewareConfigBuilder {
 ///
 /// # Security
 ///
-/// The implementation of the [`PartialEq`] trait for this type is constant-time
-/// to prevent timing attacks.
+/// The implementation of the [`PartialEq`] trait for this type uses
+/// constant-time comparison to prevent timing attacks.
 ///
-/// The implementation of the [`Debug`] trait for this type hides the secret key
-/// to prevent it from being leaked in logs or other debug output.
+/// The implementation of the [`Debug`] trait for this type is inherited from
+/// [`SecureBytes`], which hides the secret key to prevent it from being leaked
+/// in logs or other debug output.
 ///
 /// # Examples
 ///
@@ -834,9 +837,29 @@ impl SessionMiddlewareConfigBuilder {
 /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
 /// ```
 #[repr(transparent)]
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Deserialize, Debug)]
 #[serde(from = "String")]
+#[cfg(not(miri))]
+pub struct SecretKey(SecureBytes);
+
+/// A secret key - simplified version for Miri testing.
+///
+/// When running under Miri, we use a simple Box<[u8]> wrapper instead of
+/// SecureBytes to avoid the mlock system call that Miri doesn't support.
+#[repr(transparent)]
+#[derive(Clone, Deserialize, Debug)]
+#[serde(from = "String")]
+#[cfg(miri)]
 pub struct SecretKey(Box<[u8]>);
+
+impl Serialize for SecretKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.as_bytes())
+    }
+}
 
 impl SecretKey {
     /// Create a new [`SecretKey`] from a byte array.
@@ -850,6 +873,14 @@ impl SecretKey {
     /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
     /// ```
     #[must_use]
+    #[cfg(not(miri))]
+    pub fn new(hash: &[u8]) -> Self {
+        Self(SecureBytes::new(hash.to_vec()))
+    }
+
+    /// Create a new [`SecretKey`] from a byte array - Miri version.
+    #[must_use]
+    #[cfg(miri)]
     pub fn new(hash: &[u8]) -> Self {
         Self(Box::from(hash))
     }
@@ -865,6 +896,14 @@ impl SecretKey {
     /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
     /// ```
     #[must_use]
+    #[cfg(not(miri))]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.unsecure()
+    }
+
+    /// Get the byte array stored in the [`SecretKey`] - Miri version.
+    #[must_use]
+    #[cfg(miri)]
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -880,6 +919,15 @@ impl SecretKey {
     /// assert_eq!(key.into_bytes(), Box::from([1, 2, 3]));
     /// ```
     #[must_use]
+    #[cfg(not(miri))]
+    pub fn into_bytes(self) -> Box<[u8]> {
+        self.0.unsecure().to_vec().into_boxed_slice()
+    }
+
+    /// Consume the [`SecretKey`] and return the byte array stored in it - Miri
+    /// version.
+    #[must_use]
+    #[cfg(miri)]
     pub fn into_bytes(self) -> Box<[u8]> {
         self.0
     }
@@ -905,18 +953,11 @@ impl From<&str> for SecretKey {
 
 impl PartialEq for SecretKey {
     fn eq(&self, other: &Self) -> bool {
-        self.0.ct_eq(&other.0).into()
+        self.as_bytes().ct_eq(other.as_bytes()).into()
     }
 }
 
 impl Eq for SecretKey {}
-
-impl Debug for SecretKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write in single line, regardless whether alternate mode was used or not
-        write!(f, "SecretKey(\"**********\")")
-    }
-}
 
 impl Default for SecretKey {
     fn default() -> Self {
@@ -1004,6 +1045,8 @@ impl Debug for DatabaseUrl {
 
 #[cfg(test)]
 mod tests {
+    use serde_json;
+
     use super::*;
 
     #[test]
@@ -1077,5 +1120,13 @@ mod tests {
             config.static_files.rewrite,
             StaticFilesPathRewriteMode::QueryParam
         );
+    }
+
+    #[test]
+    fn secret_key_serialize_json() {
+        let key = SecretKey::from("abc123");
+        let serialized = serde_json::to_string(&key).unwrap();
+        // Should serialize as a byte array
+        assert_eq!(serialized, "[97,98,99,49,50,51]");
     }
 }

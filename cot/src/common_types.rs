@@ -8,6 +8,7 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
+use crate::error::url::UrlParseError;
 #[cfg(feature = "mysql")]
 use cot::db::impl_mysql::MySqlValueRef;
 #[cfg(feature = "postgres")]
@@ -130,6 +131,202 @@ impl From<&str> for Password {
 impl From<String> for Password {
     fn from(password: String) -> Self {
         Self::new(password)
+    }
+}
+/// A validated URL wrapper.
+///
+/// This structure ensures that the contained URL is correctly formatted and
+/// complies with standard URL syntax rules. It wraps [`url::Url`] to provide
+/// validation upon construction through methods like [`new`] and [`from_str`],
+/// and exposes useful methods for accessing URL components or converting the
+/// URL into different representations.
+///
+/// # Examples
+///
+/// ## Creating a Validated URL Using `new`
+///
+/// ```
+/// use cot::common_types::Url;
+///
+/// // Successful URL creation
+/// let url = Url::new("https://example.com").unwrap();
+///
+/// // Accessing the normalized URL string
+/// assert_eq!(url.as_str(), "https://example.com/");
+/// ```
+///
+/// ## Parsing a URL from a String Using `from_str`
+///
+/// ```
+/// use std::str::FromStr;
+///
+/// use cot::common_types::Url;
+///
+/// // Parse a valid URL string
+/// let url = Url::from_str("https://example.com").unwrap();
+///
+/// // Convert into owned string representation
+/// let url_string = url.into_string();
+/// assert_eq!(url_string, "https://example.com/");
+/// ```
+///
+/// # Behavior
+///
+/// - **Validation**: Both `new` and `from_str` ensure the input is a syntactically
+///   correct URL as defined by the WHATWG URL specification via the underlying
+///   [`url::Url`] parser.
+/// - **Normalization**: The internal URL is normalized (e.g., trailing slash added
+///   for HTTP URLs) during construction.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Url(url::Url);
+
+impl Url {
+    /// Creates a new `Url` by parsing the input string.
+    ///
+    /// # Parameters
+    /// - `s`: The input string to parse as a URL
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UrlParseError::InvalidUrl`] if the input string is not a valid URL.
+    ///
+    /// # Examples
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let valid_url = Url::new("https://example.com").unwrap();
+    /// ```
+    pub fn new<S: AsRef<str>>(s: S) -> Result<Url, UrlParseError> {
+        url::Url::from_str(s.as_ref())
+            .map(Self)
+            .map_err(UrlParseError::InvalidUrl)
+    }
+
+    /// Returns a string slice reference to the URL's string representation.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    /// Converts the `Url` into a owned `String` representation.
+    ///
+    /// # Examples
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com").unwrap();
+    /// let url_string = url.into_string();
+    /// assert_eq!(url_string, "https://example.com/");
+    /// ```
+    #[must_use]
+    pub fn into_string(self) -> String {
+        self.0.into()
+    }
+    /// Returns the URL scheme (e.g., "http", "https").
+    ///
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com").unwrap();
+    /// assert_eq!(url.scheme(), "https");
+    /// ```
+    #[must_use]
+    pub fn scheme(&self) -> &str {
+        self.0.scheme()
+    }
+
+    /// Returns the host part of the URL, if present.
+    ///
+    /// This typically includes the domain name or IP address.
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com/path").unwrap();
+    /// assert_eq!(url.host(), Some("example.com"));
+    /// ```
+    #[must_use]
+    pub fn host(&self) -> Option<&str> {
+        self.0.host_str()
+    }
+
+    /// Returns the path component of the URL.
+    ///
+    /// This includes everything after the host and before the query or fragment.
+    ///
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com/foo/bar").unwrap();
+    /// assert_eq!(url.path(), "/foo/bar");
+    /// ```
+    #[must_use]
+    pub fn path(&self) -> &str {
+        self.0.path()
+    }
+
+    /// Returns the query string of the URL, if present.
+    ///
+    /// The query is the part that follows the '?' character.
+    ///
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com?query=1").unwrap();
+    /// assert_eq!(url.query(), Some("query=1"));
+    /// ```
+    #[must_use]
+    pub fn query(&self) -> Option<&str> {
+        self.0.query()
+    }
+
+    /// Returns the fragment identifier of the URL, if present.
+    ///
+    /// The fragment is the part that follows the '#' character.
+    ///
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com#section-1").unwrap();
+    /// assert_eq!(url.fragment(), Some("section-1"));
+    /// ```
+    #[must_use]
+    pub fn fragment(&self) -> Option<&str> {
+        self.0.fragment()
+    }
+}
+
+/// Implements string parsing for `Url`.
+///
+/// This allows a string to be parsed directly into a validated [`Url`] instance.
+/// The parsing process ensures that the input string is a syntactically valid URL.
+///
+/// # Errors
+///
+/// Returns [`url::UrlParseError`] if the input string is not a valid URL format.
+///
+/// # Examples
+///
+/// ```
+/// use std::str::FromStr;
+/// use cot::common_types::Url;
+///
+/// // Parsing a valid URL string
+/// let url = Url::from_str("https://example.com").unwrap();
+/// assert_eq!(url.as_str(), "https://example.com/");
+///
+/// // Attempting to parse an invalid URL
+/// assert!(Url::from_str("not-a-url").is_err());
+/// ```
+impl FromStr for Url {
+    type Err = UrlParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Url::new(s)
     }
 }
 
@@ -418,6 +615,14 @@ mod tests {
     use std::convert::TryFrom;
 
     use super::*;
+
+    #[test]
+    fn test_url() {
+        let parse_url = Url::new("https://example.com/").unwrap();
+        assert_eq!(parse_url.as_str(), "https://example.com/");
+        assert_eq!(parse_url.scheme(), "https");
+        assert_eq!(parse_url.host(), Some("example.com"));
+    }
 
     #[test]
     fn password_debug() {

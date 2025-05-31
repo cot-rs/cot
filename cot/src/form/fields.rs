@@ -1343,7 +1343,10 @@ mod tests {
             },
             UrlFieldOptions,
         );
-        field.set_value(FormFieldValue::new_text("https://example.com")).await.unwrap();
+        field
+            .set_value(FormFieldValue::new_text("https://example.com"))
+            .await
+            .unwrap();
         let value = Url::clean_value(&field).unwrap();
         assert_eq!(
             value.as_str(),
@@ -1361,7 +1364,10 @@ mod tests {
             },
             UrlFieldOptions,
         );
-        field.set_value(FormFieldValue::new_text("http://example.com")).await.unwrap();
+        field
+            .set_value(FormFieldValue::new_text("http://example.com"))
+            .await
+            .unwrap();
         let html = field.to_string();
         assert!(html.contains("type=\"url\""));
         assert!(html.contains("required"));

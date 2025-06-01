@@ -17,6 +17,7 @@ use cot::db::impl_sqlite::SqliteValueRef;
 use email_address::EmailAddress;
 #[cfg(not(miri))]
 use secure_string::SecureString;
+use subtle::ConstantTimeEq;
 
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
@@ -48,13 +49,13 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///    equality comparison, which protects against timing attacks.
 ///
 /// 2. An alternative is to compare 2 instances of the [`Password`] type
-///    directly because this password struct implements the [`PartialEq`] trait.
-///    You can also use the [`Password::as_str`] method to compare the strings
-///    directly. This approach uses non-constant-time comparison, which is less
-///    secure but may be acceptable in certain legitimate use cases where the
-///    security tradeoff is understood, e.g., when you're creating a user
-///    registration form with the "retype your password" field, where both
-///    passwords come from the same source anyway.
+///    directly because this password struct implements the [`PartialEq`] trait
+///    which also uses constant-time comparison. Comparing 2 instances of the
+///    [`Password`] type is less secure than using [`PasswordHash::verify`], but
+///    may be acceptable in certain legitimate use cases where the security
+///    tradeoff is understood, e.g., when you're creating a user registration
+///    form with the "retype your password" field, in this case this approach
+///    might save on hashing costs.
 ///
 /// # Examples
 ///
@@ -73,7 +74,10 @@ pub struct Password(SecureString);
 
 impl PartialEq for Password {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        self.as_str()
+            .as_bytes()
+            .ct_eq(other.as_str().as_bytes())
+            .into()
     }
 }
 

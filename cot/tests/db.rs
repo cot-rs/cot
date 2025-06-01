@@ -12,6 +12,33 @@ use fake::rand::SeedableRng;
 use fake::rand::rngs::StdRng;
 use fake::{Dummy, Fake, Faker};
 
+struct WeekdaySetFaker;
+
+impl Dummy<WeekdaySetFaker> for chrono::WeekdaySet {
+    fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(_: &WeekdaySetFaker, rng: &mut R) -> Self {
+        use chrono::Weekday;
+
+        let mut set = chrono::WeekdaySet::EMPTY;
+        let weekdays = [
+            Weekday::Mon,
+            Weekday::Tue,
+            Weekday::Wed,
+            Weekday::Thu,
+            Weekday::Fri,
+            Weekday::Sat,
+            Weekday::Sun,
+        ];
+
+        for weekday in weekdays {
+            if rng.random_bool(0.5) {
+                set.insert(weekday);
+            }
+        }
+
+        set
+    }
+}
+
 #[derive(Debug, PartialEq)]
 #[model]
 struct TestModel {
@@ -194,6 +221,8 @@ struct AllFieldsModel {
     field_blob: Vec<u8>,
     field_option: Option<String>,
     field_limited_string: LimitedString<10>,
+    #[dummy(faker = "WeekdaySetFaker")]
+    field_weekday_set: chrono::WeekdaySet,
 }
 
 async fn migrate_all_fields_model(db: &Database) {
@@ -225,6 +254,7 @@ const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
         all_fields_migration_field!(blob, Vec<u8>),
         all_fields_migration_field!(option, Option<String>),
         all_fields_migration_field!(limited_string, LimitedString<10>),
+        all_fields_migration_field!(weekday_set, chrono::WeekdaySet),
     ])
     .build();
 
@@ -554,4 +584,140 @@ struct TestModelStringKey {
     #[model(primary_key)]
     id: String,
     name: String,
+}
+
+#[cot_macros::dbtest]
+async fn weekday_set_field_functionality(db: &mut TestDatabase) {
+    use chrono::Weekday;
+
+    #[derive(Debug, PartialEq)]
+    #[model]
+    struct WeekdaySetModel {
+        #[model(primary_key)]
+        id: Auto<i32>,
+        schedule: chrono::WeekdaySet,
+        optional_schedule: Option<chrono::WeekdaySet>,
+    }
+
+    const CREATE_WEEKDAY_SET_MODEL: Operation = Operation::create_model()
+        .table_name(Identifier::new("cot__weekday_set_model"))
+        .fields(&[
+            Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
+                .primary_key()
+                .auto(),
+            Field::new(
+                Identifier::new("schedule"),
+                <chrono::WeekdaySet as DatabaseField>::TYPE,
+            ),
+            Field::new(
+                Identifier::new("optional_schedule"),
+                <Option<chrono::WeekdaySet> as DatabaseField>::TYPE,
+            )
+            .set_null(<Option<chrono::WeekdaySet> as DatabaseField>::NULLABLE),
+        ])
+        .build();
+
+    run_migrations!(db, CREATE_WEEKDAY_SET_MODEL);
+
+    // Test empty WeekdaySet
+    let mut model1 = WeekdaySetModel {
+        id: Auto::auto(),
+        schedule: chrono::WeekdaySet::EMPTY,
+        optional_schedule: None,
+    };
+    model1.save(&**db).await.unwrap();
+
+    // Test WeekdaySet with all weekdays
+    let mut all_days = chrono::WeekdaySet::EMPTY;
+    for day in [
+        Weekday::Mon,
+        Weekday::Tue,
+        Weekday::Wed,
+        Weekday::Thu,
+        Weekday::Fri,
+        Weekday::Sat,
+        Weekday::Sun,
+    ] {
+        all_days.insert(day);
+    }
+    let mut model2 = WeekdaySetModel {
+        id: Auto::auto(),
+        schedule: all_days,
+        optional_schedule: Some(chrono::WeekdaySet::EMPTY),
+    };
+    model2.save(&**db).await.unwrap();
+
+    // Test WeekdaySet with specific weekdays (weekdays only)
+    let mut weekdays_only = chrono::WeekdaySet::EMPTY;
+    for day in [
+        Weekday::Mon,
+        Weekday::Tue,
+        Weekday::Wed,
+        Weekday::Thu,
+        Weekday::Fri,
+    ] {
+        weekdays_only.insert(day);
+    }
+    let mut model3 = WeekdaySetModel {
+        id: Auto::auto(),
+        schedule: weekdays_only,
+        optional_schedule: Some(weekdays_only),
+    };
+    model3.save(&**db).await.unwrap();
+
+    // Test WeekdaySet with weekend only
+    let mut weekend_only = chrono::WeekdaySet::EMPTY;
+    weekend_only.insert(Weekday::Sat);
+    weekend_only.insert(Weekday::Sun);
+    let mut model4 = WeekdaySetModel {
+        id: Auto::auto(),
+        schedule: weekend_only,
+        optional_schedule: Some(all_days),
+    };
+    model4.save(&**db).await.unwrap();
+
+    // Retrieve all models and verify they match
+    let models_from_db = WeekdaySetModel::objects().all(&**db).await.unwrap();
+    assert_eq!(models_from_db.len(), 4);
+
+    // Find and verify each model
+    let db_model1 = models_from_db.iter().find(|m| m.id == model1.id).unwrap();
+    assert_eq!(db_model1.schedule, chrono::WeekdaySet::EMPTY);
+    assert_eq!(db_model1.optional_schedule, None);
+
+    let db_model2 = models_from_db.iter().find(|m| m.id == model2.id).unwrap();
+    assert_eq!(db_model2.schedule, all_days);
+    assert_eq!(db_model2.optional_schedule, Some(chrono::WeekdaySet::EMPTY));
+
+    let db_model3 = models_from_db.iter().find(|m| m.id == model3.id).unwrap();
+    assert_eq!(db_model3.schedule, weekdays_only);
+    assert_eq!(db_model3.optional_schedule, Some(weekdays_only));
+
+    let db_model4 = models_from_db.iter().find(|m| m.id == model4.id).unwrap();
+    assert_eq!(db_model4.schedule, weekend_only);
+    assert_eq!(db_model4.optional_schedule, Some(all_days));
+
+    // Test querying by WeekdaySet
+    let weekend_models = query!(WeekdaySetModel, $schedule == weekend_only)
+        .all(&**db)
+        .await
+        .unwrap();
+    assert_eq!(weekend_models.len(), 1);
+    assert_eq!(weekend_models[0].id, model4.id);
+
+    // Test updating WeekdaySet
+    let mut model_to_update = models_from_db
+        .into_iter()
+        .find(|m| m.id == model1.id)
+        .unwrap();
+    model_to_update.schedule = weekdays_only;
+    model_to_update.optional_schedule = Some(weekend_only);
+    model_to_update.save(&**db).await.unwrap();
+
+    let updated_model = WeekdaySetModel::get_by_primary_key(&**db, model_to_update.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(updated_model.schedule, weekdays_only);
+    assert_eq!(updated_model.optional_schedule, Some(weekend_only));
 }

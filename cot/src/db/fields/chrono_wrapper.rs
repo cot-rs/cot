@@ -36,11 +36,10 @@ impl WeekdaySet {
 
     pub(crate) fn weekdays(&self) -> Vec<Weekday> {
         let mut weekdays = Vec::new();
-        for i in 0..7 {
+        for i in 0..=6 {
             if self.0 & (1 << i) != 0 {
                 weekdays.push(
-                    Weekday::try_from(i + 1)
-                        .expect("weekday can always be created from numbers 0-6"),
+                    Weekday::try_from(i).expect("weekday can always be created from numbers 0-6"),
                 );
             }
         }

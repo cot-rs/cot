@@ -7,6 +7,7 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
 
 use crate::auth::PasswordHash;
@@ -764,17 +765,16 @@ impl_float_as_form_field!(f32);
 impl_float_as_form_field!(f64);
 
 impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
-use crate::common_types::{Date, DateTime, Time};
 
 /// Custom options for [`DateTimeField`]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DateTimeFieldOptions {
     /// The maximum datetime value of the field used to set the `max` attribute
     /// in the HTML input element.
-    pub max: Option<DateTime>,
+    pub max: Option<NaiveDateTime>,
     /// The minimum datetime value of the field used to set the `min` attribute
     /// in the HTML input element.
-    pub min: Option<DateTime>,
+    pub min: Option<NaiveDateTime>,
     /// Whether the field should be read-only. When set to `true`, the user
     /// cannot modify the field value through the HTML input element.
     pub readonly: Option<bool>,
@@ -807,7 +807,7 @@ impl Display for DateTimeField {
     }
 }
 
-impl AsFormField for DateTime {
+impl AsFormField for NaiveDateTime {
     type Type = DateTimeField;
 
     fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
@@ -815,7 +815,8 @@ impl AsFormField for DateTime {
         Self: Sized,
     {
         let value = check_required(field)?;
-        let date_time = DateTime::parse_without_seconds(value).expect("invalid datetime");
+        let date_time = NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M")
+            .map_err(|err| FormFieldValidationError::from_string(err.to_string()))?;
         let opts = &field.custom_options;
 
         if let Some(min) = &opts.min {
@@ -851,10 +852,10 @@ impl_form_field!(TimeField, TimeFieldOptions, "a time");
 pub struct TimeFieldOptions {
     /// The maximum time value of the field used to set the `max` attribute
     /// in the HTML input element.
-    pub max: Option<Time>,
+    pub max: Option<NaiveTime>,
     /// The minimum time value of the field used to set the `min` attribute
     /// in the HTML input element.
-    pub min: Option<Time>,
+    pub min: Option<NaiveTime>,
     /// Whether the field should be read-only. When set to `true`, the user
     /// cannot modify the field value through the HTML input element.
     pub readonly: Option<bool>,
@@ -886,7 +887,7 @@ impl Display for TimeField {
     }
 }
 
-impl AsFormField for Time {
+impl AsFormField for NaiveTime {
     type Type = TimeField;
 
     fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
@@ -894,7 +895,8 @@ impl AsFormField for Time {
         Self: Sized,
     {
         let value = check_required(field)?;
-        let time = Time::parse_without_seconds(value).expect("invalid datetime");
+        let time = NaiveTime::parse_from_str(value, "%H:%M")
+            .map_err(|err| FormFieldValidationError::from_string(err.to_string()))?;
         let opts = &field.custom_options;
 
         if let Some(min) = &opts.min {
@@ -930,10 +932,10 @@ impl_form_field!(DateField, DateFieldOptions, "a date");
 pub struct DateFieldOptions {
     /// The maximum date value of the field used to set the `max` attribute
     /// in the HTML input element.
-    pub max: Option<Date>,
+    pub max: Option<NaiveDate>,
     /// The minimum date value of the field used to set the `min` attribute
     /// in the HTML input element.
-    pub min: Option<Date>,
+    pub min: Option<NaiveDate>,
     /// Whether the field should be read-only. When set to `true`, the user
     /// cannot modify the field value through the HTML input element.
     pub readonly: Option<bool>,
@@ -965,7 +967,7 @@ impl Display for DateField {
     }
 }
 
-impl AsFormField for Date {
+impl AsFormField for NaiveDate {
     type Type = DateField;
 
     fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError>
@@ -973,7 +975,8 @@ impl AsFormField for Date {
         Self: Sized,
     {
         let value = check_required(field)?;
-        let date = Date::new(value).expect("invalid datetime");
+        let date = NaiveDate::parse_from_str(value, "%Y-%m-%d")
+            .map_err(|err| FormFieldValidationError::from_string(err.to_string()))?;
         let opts = &field.custom_options;
 
         if let Some(min) = &opts.min {
@@ -1559,8 +1562,14 @@ mod tests {
                 required: true,
             },
             DateTimeFieldOptions {
-                min: Some(DateTime::new("2025-05-27T00:00:00").unwrap()),
-                max: Some(DateTime::new("2025-05-28T00:00:00").unwrap()),
+                min: Some(
+                    NaiveDateTime::parse_from_str("2025-05-27T00:00:00", "%Y-%m-%dT%H:%M:%S")
+                        .unwrap(),
+                ),
+                max: Some(
+                    NaiveDateTime::parse_from_str("2025-05-28T00:00:00", "%Y-%m-%dT%H:%M:%S")
+                        .unwrap(),
+                ),
                 readonly: None,
             },
         );
@@ -1568,7 +1577,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("2025-05-27T12:34"))
             .await
             .unwrap();
-        let dt = DateTime::clean_value(&field).unwrap();
+        let dt = NaiveDateTime::clean_value(&field).unwrap();
         assert_eq!(dt.to_string(), "2025-05-27 12:34:00");
     }
 
@@ -1581,7 +1590,10 @@ mod tests {
                 required: true,
             },
             DateTimeFieldOptions {
-                min: Some(DateTime::new("2025-05-27T10:00:00").unwrap()),
+                min: Some(
+                    NaiveDateTime::parse_from_str("2025-05-27T10:00:00", "%Y-%m-%dT%H:%M:%S")
+                        .unwrap(),
+                ),
                 max: None,
                 readonly: None,
             },
@@ -1590,7 +1602,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("2025-05-27T09:59"))
             .await
             .unwrap();
-        let err = DateTime::clean_value(&field).unwrap_err();
+        let err = NaiveDateTime::clean_value(&field).unwrap_err();
         assert!(matches!(
             err,
             FormFieldValidationError::MinimumValueNotMet { .. }
@@ -1607,7 +1619,10 @@ mod tests {
             },
             DateTimeFieldOptions {
                 min: None,
-                max: Some(DateTime::new("2025-05-27T10:00:00").unwrap()),
+                max: Some(
+                    NaiveDateTime::parse_from_str("2025-05-27T10:00:00", "%Y-%m-%dT%H:%M:%S")
+                        .unwrap(),
+                ),
                 readonly: None,
             },
         );
@@ -1615,7 +1630,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("2025-05-27T10:01"))
             .await
             .unwrap();
-        let err = DateTime::clean_value(&field).unwrap_err();
+        let err = NaiveDateTime::clean_value(&field).unwrap_err();
         assert!(matches!(
             err,
             FormFieldValidationError::MaximumValueExceeded { .. }
@@ -1634,8 +1649,8 @@ mod tests {
                 required: true,
             },
             TimeFieldOptions {
-                min: Some(Time::new("09:00:00").unwrap()),
-                max: Some(Time::new("17:00:00").unwrap()),
+                min: Some(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap()),
+                max: Some(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap()),
                 readonly: Some(false),
             },
         );
@@ -1643,7 +1658,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("12:30"))
             .await
             .unwrap();
-        let t = Time::clean_value(&field).unwrap();
+        let t = NaiveTime::clean_value(&field).unwrap();
         assert_eq!(t.to_string(), "12:30:00");
     }
 
@@ -1656,7 +1671,7 @@ mod tests {
                 required: true,
             },
             TimeFieldOptions {
-                min: Some(Time::new("09:00:00").unwrap()),
+                min: Some(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap()),
                 max: None,
                 readonly: Some(false),
             },
@@ -1665,7 +1680,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("08:59"))
             .await
             .unwrap();
-        let err = Time::clean_value(&field).unwrap_err();
+        let err = NaiveTime::clean_value(&field).unwrap_err();
         assert!(matches!(
             err,
             FormFieldValidationError::MinimumValueNotMet { .. }
@@ -1682,7 +1697,7 @@ mod tests {
             },
             TimeFieldOptions {
                 min: None,
-                max: Some(Time::new("17:00:00").unwrap()),
+                max: Some(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap()),
                 readonly: Some(false),
             },
         );
@@ -1690,7 +1705,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("17:01"))
             .await
             .unwrap();
-        let err = Time::clean_value(&field).unwrap_err();
+        let err = NaiveTime::clean_value(&field).unwrap_err();
         assert!(matches!(
             err,
             FormFieldValidationError::MaximumValueExceeded { .. }
@@ -1709,8 +1724,8 @@ mod tests {
                 required: true,
             },
             DateFieldOptions {
-                min: Some(Date::new("2025-05-27").unwrap()),
-                max: Some(Date::new("2025-05-28").unwrap()),
+                min: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
+                max: Some(NaiveDate::parse_from_str("2025-05-28", "%Y-%m-%d").unwrap()),
                 readonly: None,
             },
         );
@@ -1718,7 +1733,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("2025-05-27"))
             .await
             .unwrap();
-        let d = Date::clean_value(&field).unwrap();
+        let d = NaiveDate::clean_value(&field).unwrap();
         assert_eq!(d.to_string(), "2025-05-27");
     }
 
@@ -1731,7 +1746,7 @@ mod tests {
                 required: true,
             },
             DateFieldOptions {
-                min: Some(Date::new("2025-05-27").unwrap()),
+                min: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
                 max: None,
                 readonly: None,
             },
@@ -1740,7 +1755,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("2025-05-26"))
             .await
             .unwrap();
-        let err = Date::clean_value(&field).unwrap_err();
+        let err = NaiveDate::clean_value(&field).unwrap_err();
         assert!(matches!(
             err,
             FormFieldValidationError::MinimumValueNotMet { .. }
@@ -1757,7 +1772,7 @@ mod tests {
             },
             DateFieldOptions {
                 min: None,
-                max: Some(Date::new("2025-05-27").unwrap()),
+                max: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
                 readonly: None,
             },
         );
@@ -1765,7 +1780,7 @@ mod tests {
             .set_value(FormFieldValue::new_text("2025-05-28"))
             .await
             .unwrap();
-        let err = Date::clean_value(&field).unwrap_err();
+        let err = NaiveDate::clean_value(&field).unwrap_err();
         assert!(matches!(
             err,
             FormFieldValidationError::MaximumValueExceeded { .. }

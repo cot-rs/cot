@@ -87,21 +87,21 @@ impl FromDbValue for WeekdaySet {
     where
         Self: Sized,
     {
-        value.get::<u8>().map(|v| WeekdaySet::from(v)).into()
+        value.get::<u8>().map(WeekdaySet::from)
     }
 
     fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
     {
-        value.get::<i16>().map(|v| WeekdaySet::from(v as u8)).into()
+        value.get::<i16>().map(|v| WeekdaySet::from(v as u8))
     }
 
     fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
     {
-        value.get::<u8>().map(|v| WeekdaySet::from(v)).into()
+        value.get::<u8>().map(WeekdaySet::from)
     }
 }
 
@@ -110,10 +110,7 @@ impl FromDbValue for Option<WeekdaySet> {
     where
         Self: Sized,
     {
-        value
-            .get::<Option<u8>>()
-            .map(|v| v.map(|v| WeekdaySet::from(v)))
-            .into()
+        value.get::<Option<u8>>().map(|v| v.map(WeekdaySet::from))
     }
 
     fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
@@ -123,17 +120,13 @@ impl FromDbValue for Option<WeekdaySet> {
         value
             .get::<Option<i16>>()
             .map(|v| v.map(|v| WeekdaySet::from(v as u8)))
-            .into()
     }
 
     fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
     {
-        value
-            .get::<Option<u8>>()
-            .map(|v| v.map(|v| WeekdaySet::from(v)))
-            .into()
+        value.get::<Option<u8>>().map(|v| v.map(WeekdaySet::from))
     }
 }
 
@@ -157,19 +150,15 @@ impl FromDbValue for Weekday {
         value
             .get::<u8>()
             .and_then(|v| Weekday::try_from(v).map_err(|e| DatabaseError::ValueDecode(e.into())))
-            .into()
     }
 
     fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
     {
-        value
-            .get::<i16>()
-            .and_then(|v| {
-                Weekday::try_from(v as u8).map_err(|e| DatabaseError::ValueDecode(e.into()))
-            })
-            .into()
+        value.get::<i16>().and_then(|v| {
+            Weekday::try_from(v as u8).map_err(|e| DatabaseError::ValueDecode(e.into()))
+        })
     }
 
     fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
@@ -179,7 +168,6 @@ impl FromDbValue for Weekday {
         value
             .get::<u8>()
             .and_then(|v| Weekday::try_from(v).map_err(|e| DatabaseError::ValueDecode(e.into())))
-            .into()
     }
 }
 impl ToDbValue for Weekday {

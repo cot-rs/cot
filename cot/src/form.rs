@@ -226,6 +226,12 @@ impl From<email_address::Error> for FormFieldValidationError {
     }
 }
 
+impl From<crate::error::url::UrlParseError> for FormFieldValidationError {
+    fn from(error: crate::error::url::UrlParseError) -> Self {
+        FormFieldValidationError::from_string(error.to_string())
+    }
+}
+
 /// An enum indicating the target of a form validation error.
 #[derive(Debug)]
 pub enum FormErrorTarget<'a> {

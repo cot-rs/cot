@@ -22,7 +22,7 @@ impl WeekdaySet {
         }
     }
 
-    pub(crate) const fn contains(&self, day: Weekday) -> bool {
+    pub(crate) const fn contains(self, day: Weekday) -> bool {
         self.0 & Self::single(day).0 != 0
     }
 
@@ -34,7 +34,7 @@ impl WeekdaySet {
         true
     }
 
-    pub(crate) fn weekdays(&self) -> Vec<Weekday> {
+    pub(crate) fn weekdays(self) -> Vec<Weekday> {
         let mut weekdays = Vec::new();
         for weekday in [
             Weekday::Mon,
@@ -100,6 +100,7 @@ impl FromDbValue for WeekdaySet {
     where
         Self: Sized,
     {
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         value.get::<i16>().map(|v| WeekdaySet::from(v as u8))
     }
 
@@ -123,6 +124,7 @@ impl FromDbValue for Option<WeekdaySet> {
     where
         Self: Sized,
     {
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         value
             .get::<Option<i16>>()
             .map(|v| v.map(|v| WeekdaySet::from(v as u8)))
@@ -162,6 +164,7 @@ impl FromDbValue for Weekday {
     where
         Self: Sized,
     {
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         value.get::<i16>().and_then(|v| {
             Weekday::try_from(v as u8).map_err(|e| DatabaseError::ValueDecode(e.into()))
         })

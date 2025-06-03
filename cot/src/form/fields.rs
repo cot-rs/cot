@@ -9,7 +9,7 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{Duration, NaiveDate, NaiveDateTime, NaiveTime};
 pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
 pub(crate) use select::check_required_multiple;
 pub use select::{
@@ -814,6 +814,35 @@ impl AsFormField for Url {
 impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
 
 /// Custom options for [`DateTimeField`]
+///
+/// Specifies the HTML attributes applied to a datetime-local input.
+///
+/// # Example
+///
+/// ```rust
+/// use chrono::{Duration, NaiveDateTime};
+/// use cot::form::fields::{DateTimeField, DateTimeFieldOptions, Step};
+/// use cot::form::{FormField, FormFieldOptions};
+///
+/// let now = chrono::Local::now().naive_local();
+/// let in_two_days = now + Duration::hours(48);
+///
+/// let options = DateTimeFieldOptions {
+///     min: Some(now),
+///     max: Some(in_two_days),
+///     readonly: Some(true),
+///     step: Some(Step::Value(Duration::seconds(300))),
+/// };
+///
+/// let field = DateTimeField::with_options(
+///     FormFieldOptions {
+///         id: "event_time".into(),
+///         name: "event_time".into(),
+///         required: true,
+///     },
+///     options,
+/// );
+/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DateTimeFieldOptions {
     /// The maximum datetime value of the field used to set the `max` attribute
@@ -825,6 +854,14 @@ pub struct DateTimeFieldOptions {
     /// Whether the field should be read-only. When set to `true`, the user
     /// cannot modify the field value through the HTML input element.
     pub readonly: Option<bool>,
+    /// Granularity of the datetime input, in seconds.
+    ///
+    /// Corresponds to the `step` attribute on `<input type="datetime-local">`.
+    /// If `None`, the browser’s default (60 seconds) is used. To override, supply
+    /// `Step::Value(Duration)` where `Duration` specifies the number of seconds between steps.
+    ///
+    /// [`step` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/datetime-local#step
+    pub step: Option<Step<Duration>>,
 }
 
 impl Display for DateTimeField {
@@ -848,6 +885,14 @@ impl Display for DateTimeField {
 
         if let Some(value) = &self.value {
             tag.attr("value", value);
+        }
+
+        if let Some(step) = &self.custom_options.step {
+            let step_value = match step {
+                Step::Any => "any".to_string(),
+                Step::Value(v) => v.num_seconds().to_string(),
+            };
+            tag.attr("step", step_value);
         }
 
         write!(f, "{}", tag.render())
@@ -895,6 +940,32 @@ impl HtmlSafe for DateTimeField {}
 impl_form_field!(TimeField, TimeFieldOptions, "a time");
 
 /// Custom options for [`TimeField`]
+///
+/// Defines the HTML attributes applied to a time-only input.
+///
+/// # Example
+///
+/// ```rust
+/// use chrono::{Duration, NaiveTime};
+/// use cot::form::fields::{TimeField, TimeFieldOptions, Step};
+/// use cot::form::{FormField, FormFieldOptions};
+///
+/// let options = TimeFieldOptions {
+///     min: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
+///     max: Some(NaiveTime::from_hms_opt(17, 0, 0).unwrap()),
+///     readonly: Some(true),
+///     step: Some(Step::Value(Duration::seconds(900))),
+/// };
+///
+/// let field = TimeField::with_options(
+///     FormFieldOptions {
+///         id: "event_time".into(),
+///         name: "event_time".into(),
+///         required: true,
+///     },
+///     options,
+/// );
+/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TimeFieldOptions {
     /// The maximum time value of the field used to set the `max` attribute
@@ -906,6 +977,14 @@ pub struct TimeFieldOptions {
     /// Whether the field should be read-only. When set to `true`, the user
     /// cannot modify the field value through the HTML input element.
     pub readonly: Option<bool>,
+    /// The increment (in seconds) between valid time values.
+    ///
+    /// Corresponds to the `step` attribute on `<input type="time">`. If `None`, the browser’s
+    /// default (60 seconds) is used. To override, supply `Step::Value(Duration)` where `Duration`
+    /// is the number of seconds between ticks.
+    ///
+    /// [`step` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/time#step
+    pub step: Option<Step<Duration>>,
 }
 
 impl Display for TimeField {
@@ -928,6 +1007,14 @@ impl Display for TimeField {
 
         if let Some(readonly) = self.custom_options.readonly {
             tag.attr("readonly", readonly.to_string());
+        }
+
+        if let Some(step) = &self.custom_options.step {
+            let step_value = match step {
+                Step::Any => "any".to_string(),
+                Step::Value(v) => v.num_seconds().to_string(),
+            };
+            tag.attr("step", step_value);
         }
 
         write!(f, "{}", tag.render())
@@ -975,6 +1062,33 @@ impl HtmlSafe for TimeField {}
 impl_form_field!(DateField, DateFieldOptions, "a date");
 
 /// Custom options for [`DateField`]
+///
+/// Defines the HTML attributes for a date-only input: the allowable range,
+/// whether it is editable, and the day interval between selectable dates.
+///
+/// # Example
+///
+/// ```rust
+/// use chrono::{Duration, NaiveDate};
+/// use cot::form::fields::{DateField, DateFieldOptions, Step};
+/// use cot::form::{FormField, FormFieldOptions};
+///
+/// let options = DateFieldOptions {
+///     min: Some(NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
+///     max: Some(NaiveDate::from_ymd_opt(2025, 12, 31).unwrap()),
+///     readonly: None,
+///     step: Some(Step::Value(Duration::days(7))),
+/// };
+///
+/// let field = DateField::with_options(
+///     FormFieldOptions {
+///         id: "event_time".into(),
+///         name: "event_time".into(),
+///         required: true,
+///     },
+///     options,
+/// );
+/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DateFieldOptions {
     /// The maximum date value of the field used to set the `max` attribute
@@ -986,6 +1100,14 @@ pub struct DateFieldOptions {
     /// Whether the field should be read-only. When set to `true`, the user
     /// cannot modify the field value through the HTML input element.
     pub readonly: Option<bool>,
+    /// The increment (in days) between valid date values.
+    ///
+    /// Corresponds to the `step` attribute on `<input type="date">`. If `None`, the browser’s
+    /// default (1 day) is used. To override, supply `Step::Value(Duration)` where `Duration`
+    /// represents the number of days per step (e.g., `Duration::days(7)`).
+    ///
+    /// [`step` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#step
+    pub step: Option<Step<Duration>>,
 }
 
 impl Display for DateField {
@@ -1008,6 +1130,14 @@ impl Display for DateField {
 
         if let Some(readonly) = self.custom_options.readonly {
             tag.attr("readonly", readonly.to_string());
+        }
+
+        if let Some(step) = &self.custom_options.step {
+            let step_value = match step {
+                Step::Any => "any".to_string(),
+                Step::Value(v) => v.num_days().to_string(),
+            };
+            tag.attr("step", step_value);
         }
 
         write!(f, "{}", tag.render())
@@ -1657,6 +1787,36 @@ mod tests {
     // ------------------------
     // DateTimeField tests
     // ------------------------
+
+    #[test]
+    fn datetime_field_render() {
+        let field = DateTimeField::with_options(
+            FormFieldOptions {
+                id: "dt".into(),
+                name: "dt".into(),
+                required: true,
+            },
+            DateTimeFieldOptions {
+                min: Some(
+                    NaiveDateTime::parse_from_str("2025-05-27T00:00:00", "%Y-%m-%dT%H:%M:%S")
+                        .unwrap(),
+                ),
+                max: Some(
+                    NaiveDateTime::parse_from_str("2025-05-28T00:00:00", "%Y-%m-%dT%H:%M:%S")
+                        .unwrap(),
+                ),
+                readonly: None,
+                step: Some(Step::Value(Duration::seconds(60))),
+            },
+        );
+        let html = field.to_string();
+        println!("{html:?}");
+        assert!(html.contains("type=\"datetime-local\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"2025-05-27 00:00:00\""));
+        assert!(html.contains("max=\"2025-05-28 00:00:00\""));
+        assert!(html.contains("step=\"60\""));
+    }
     #[cot::test]
     async fn datetime_field_clean_valid() {
         let mut field = DateTimeField::with_options(
@@ -1675,6 +1835,7 @@ mod tests {
                         .unwrap(),
                 ),
                 readonly: None,
+                step: Some(Step::Value(Duration::seconds(60))),
             },
         );
         field
@@ -1700,6 +1861,7 @@ mod tests {
                 ),
                 max: None,
                 readonly: None,
+                step: Some(Step::Value(Duration::seconds(60))),
             },
         );
         field
@@ -1728,6 +1890,7 @@ mod tests {
                         .unwrap(),
                 ),
                 readonly: None,
+                step: Some(Step::Value(Duration::seconds(60))),
             },
         );
         field
@@ -1744,6 +1907,28 @@ mod tests {
     // ------------------------
     // TimeField tests
     // ------------------------
+    #[test]
+    fn time_field_render() {
+        let field = TimeField::with_options(
+            FormFieldOptions {
+                id: "t".into(),
+                name: "t".into(),
+                required: true,
+            },
+            TimeFieldOptions {
+                min: Some(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap()),
+                max: Some(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap()),
+                readonly: Some(false),
+                step: Some(Step::Value(Duration::seconds(60))),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"time\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"09:00:00\""));
+        assert!(html.contains("max=\"17:00:00\""));
+        assert!(html.contains("step=\"60\""));
+    }
     #[cot::test]
     async fn time_field_clean_valid() {
         let mut field = TimeField::with_options(
@@ -1756,6 +1941,7 @@ mod tests {
                 min: Some(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap()),
                 max: Some(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap()),
                 readonly: Some(false),
+                step: Some(Step::Value(Duration::seconds(60))),
             },
         );
         field
@@ -1778,6 +1964,7 @@ mod tests {
                 min: Some(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap()),
                 max: None,
                 readonly: Some(false),
+                step: Some(Step::Value(Duration::seconds(60))),
             },
         );
         field
@@ -1803,6 +1990,7 @@ mod tests {
                 min: None,
                 max: Some(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap()),
                 readonly: Some(false),
+                step: Some(Step::Value(Duration::seconds(60))),
             },
         );
         field
@@ -1819,6 +2007,29 @@ mod tests {
     // ------------------------
     // DateField tests
     // ------------------------
+
+    #[test]
+    fn date_field_render() {
+        let field = DateField::with_options(
+            FormFieldOptions {
+                id: "d".into(),
+                name: "d".into(),
+                required: true,
+            },
+            DateFieldOptions {
+                min: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
+                max: Some(NaiveDate::parse_from_str("2025-05-28", "%Y-%m-%d").unwrap()),
+                readonly: None,
+                step: Some(Step::Value(Duration::days(1))),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"date\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"2025-05-27\""));
+        assert!(html.contains("max=\"2025-05-28\""));
+        assert!(html.contains("step=\"1\""));
+    }
     #[cot::test]
     async fn date_field_clean_valid() {
         let mut field = DateField::with_options(
@@ -1831,6 +2042,7 @@ mod tests {
                 min: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
                 max: Some(NaiveDate::parse_from_str("2025-05-28", "%Y-%m-%d").unwrap()),
                 readonly: None,
+                step: Some(Step::Value(Duration::days(1))),
             },
         );
         field
@@ -1853,6 +2065,7 @@ mod tests {
                 min: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
                 max: None,
                 readonly: None,
+                step: Some(Step::Value(Duration::days(1))),
             },
         );
         field
@@ -1878,6 +2091,7 @@ mod tests {
                 min: None,
                 max: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
                 readonly: None,
+                step: Some(Step::Value(Duration::days(1))),
             },
         );
         field

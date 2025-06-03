@@ -6,10 +6,9 @@
 //! ensure consistent and safe processing of form data.
 
 use std::fmt;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime, ParseError};
 use cot::db;
 #[cfg(feature = "mysql")]
 use cot::db::impl_mysql::MySqlValueRef;
@@ -17,7 +16,6 @@ use cot::db::impl_mysql::MySqlValueRef;
 use cot::db::impl_postgres::PostgresValueRef;
 #[cfg(feature = "sqlite")]
 use cot::db::impl_sqlite::SqliteValueRef;
-use cot::db::{DbFieldValue, ToDbFieldValue};
 use email_address::EmailAddress;
 
 #[cfg(feature = "db")]

@@ -1,7 +1,10 @@
 use chrono::Weekday;
 
+#[cfg(feature = "mysql")]
 use crate::db::impl_mysql::MySqlValueRef;
+#[cfg(feature = "postgres")]
 use crate::db::impl_postgres::PostgresValueRef;
+#[cfg(feature = "sqlite")]
 use crate::db::impl_sqlite::SqliteValueRef;
 use crate::db::{DatabaseError, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
 
@@ -89,6 +92,7 @@ impl From<u8> for WeekdaySet {
 }
 
 impl FromDbValue for WeekdaySet {
+    #[cfg(feature = "sqlite")]
     fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -96,6 +100,7 @@ impl FromDbValue for WeekdaySet {
         value.get::<u8>().map(WeekdaySet::from)
     }
 
+    #[cfg(feature = "postgres")]
     fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -104,6 +109,7 @@ impl FromDbValue for WeekdaySet {
         value.get::<i16>().map(|v| WeekdaySet::from(v as u8))
     }
 
+    #[cfg(feature = "mysql")]
     fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -113,6 +119,7 @@ impl FromDbValue for WeekdaySet {
 }
 
 impl FromDbValue for Option<WeekdaySet> {
+    #[cfg(feature = "sqlite")]
     fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -120,6 +127,7 @@ impl FromDbValue for Option<WeekdaySet> {
         value.get::<Option<u8>>().map(|v| v.map(WeekdaySet::from))
     }
 
+    #[cfg(feature = "postgres")]
     fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -130,6 +138,7 @@ impl FromDbValue for Option<WeekdaySet> {
             .map(|v| v.map(|v| WeekdaySet::from(v as u8)))
     }
 
+    #[cfg(feature = "mysql")]
     fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -151,6 +160,7 @@ impl ToDbValue for Option<WeekdaySet> {
 }
 
 impl FromDbValue for Weekday {
+    #[cfg(feature = "sqlite")]
     fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -160,6 +170,7 @@ impl FromDbValue for Weekday {
             .and_then(|v| Weekday::try_from(v).map_err(|e| DatabaseError::ValueDecode(e.into())))
     }
 
+    #[cfg(feature = "postgres")]
     fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -170,6 +181,7 @@ impl FromDbValue for Weekday {
         })
     }
 
+    #[cfg(feature = "mysql")]
     fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,

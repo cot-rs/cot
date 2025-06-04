@@ -8,7 +8,6 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
-use cot::db;
 #[cfg(feature = "mysql")]
 use cot::db::impl_mysql::MySqlValueRef;
 #[cfg(feature = "postgres")]
@@ -70,7 +69,7 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 pub struct Password(String);
 
 impl Debug for Password {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Password").field(&"**********").finish()
     }
 }
@@ -658,27 +657,27 @@ impl ToDbValue for Email {
 #[cfg(feature = "db")]
 impl FromDbValue for Email {
     #[cfg(feature = "sqlite")]
-    fn from_sqlite(value: SqliteValueRef<'_>) -> db::Result<Self>
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
     }
 
     #[cfg(feature = "postgres")]
-    fn from_postgres(value: PostgresValueRef<'_>) -> db::Result<Self>
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
     }
 
     #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> db::Result<Self>
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
     {
-        Email::new(value.get::<String>()?).map_err(db::DatabaseError::value_decode)
+        Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
     }
 }
 

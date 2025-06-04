@@ -1149,7 +1149,7 @@ impl AsFormField for DateTime<FixedOffset> {
                     if prefer_latest { dt2 } else { dt1 }
                 } else {
                     return Err(FormFieldValidationError::from_string(
-                        "Ambiguous local datetime; specify is_dst to resolve.".into(),
+                        "Ambiguous local datetime".into(),
                     ));
                 }
             }

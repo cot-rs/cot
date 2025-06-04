@@ -844,7 +844,7 @@ impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use chrono::{Duration, NaiveDateTime};
 /// use cot::form::fields::{DateTimeField, DateTimeFieldOptions, Step};
 /// use cot::form::{FormField, FormFieldOptions};
@@ -939,8 +939,7 @@ impl AsFormField for NaiveDateTime {
         Self: Sized,
     {
         let value = check_required(field)?;
-        let date_time = parse_datetime_with_fallback(value)
-            .map_err(|err| FormFieldValidationError::from_string(err.to_string()))?;
+        let date_time = parse_datetime_with_fallback(value)?;
         let opts = &field.custom_options;
 
         if let Some(min) = &opts.min {
@@ -982,7 +981,7 @@ impl_form_field!(
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use chrono::{Duration, FixedOffset, NaiveDateTime};
 /// use cot::form::fields::{
 ///     DateTimeWithTimezoneField, DateTimeWithTimezoneFieldOptions, Step,
@@ -1135,8 +1134,7 @@ impl AsFormField for DateTime<FixedOffset> {
     {
         let value = check_required(field)?;
         // Browsers only support naive datetime.
-        let naive: NaiveDateTime = parse_datetime_with_fallback(value)
-            .map_err(|err| FormFieldValidationError::from_string(err.to_string()))?;
+        let naive: NaiveDateTime = parse_datetime_with_fallback(value)?;
         // default to UTC if offset(timezone) is not provided.
         let tz: FixedOffset = field.custom_options.timezone.unwrap_or_else(|| {
             FixedOffset::east_opt(0).expect("UTC is always valid as `FixedOffset`")
@@ -1196,7 +1194,7 @@ impl_form_field!(TimeField, TimeFieldOptions, "a time");
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use chrono::{Duration, NaiveTime};
 /// use cot::form::fields::{Step, TimeField, TimeFieldOptions};
 /// use cot::form::{FormField, FormFieldOptions};
@@ -1281,8 +1279,7 @@ impl AsFormField for NaiveTime {
         Self: Sized,
     {
         let value = check_required(field)?;
-        let time = parse_time_with_fallback(value)
-            .map_err(|err| FormFieldValidationError::from_string(err.to_string()))?;
+        let time = parse_time_with_fallback(value)?;
         let opts = &field.custom_options;
 
         if let Some(min) = &opts.min {
@@ -1320,7 +1317,7 @@ impl_form_field!(DateField, DateFieldOptions, "a date");
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use chrono::{Duration, NaiveDate};
 /// use cot::form::fields::{DateField, DateFieldOptions, Step};
 /// use cot::form::{FormField, FormFieldOptions};
@@ -1438,7 +1435,6 @@ impl HtmlSafe for DateField {}
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Duration, FixedOffset, NaiveDateTime};
-    use time::macros::datetime;
 
     use super::*;
     use crate::form::FormFieldValue;
@@ -2043,7 +2039,6 @@ mod tests {
     // ------------------------
     // DateTimeField tests
     // ------------------------
-
     #[test]
     fn datetime_field_render() {
         let field = DateTimeField::with_options(

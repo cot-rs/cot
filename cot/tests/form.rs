@@ -202,7 +202,6 @@ impl AsFormField for Priority {
     type Type = SelectField<Self>;
 
     fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
-        // Use the same logic as other select fields
         if let Some(value) = field.value() {
             if value.is_empty() {
                 return Err(FormFieldValidationError::Required);
@@ -267,7 +266,6 @@ async fn select_field_context_display() {
     let context = SimpleTaskForm::build_context(&mut request).await.unwrap();
     let form_rendered = context.to_string();
 
-    // Check that the select field is rendered with the correct options
     assert!(form_rendered.contains("<select"));
     assert!(form_rendered.contains("name=\"priority\""));
     assert!(form_rendered.contains("Low Priority"));

@@ -57,10 +57,6 @@ use derive_more::{Deref, Display, From};
 
 /// A type that represents HTML content as a string.
 ///
-/// This type can contain nested HTML elements and text nodes, providing a
-/// hierarchical structure for HTML content. It automatically handles HTML
-/// escaping for text content while preserving the structure of nested elements.
-///
 /// # Examples
 ///
 /// ```
@@ -110,86 +106,6 @@ impl AsRef<str> for Html {
     }
 }
 
-/// Represents a text node in HTML content.
-///
-/// Text nodes contain plain text that will be automatically escaped when
-/// rendered to prevent XSS attacks. This ensures that any special HTML
-/// characters in the text are properly encoded.
-///
-/// # Examples
-///
-/// ```
-/// use cot::html::HtmlText;
-///
-/// let text = HtmlText::new("Hello & welcome to <our> site!");
-/// assert_eq!(
-///     text.render().as_str(),
-///     "Hello &#38; welcome to &#60;our&#62; site!"
-/// );
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HtmlText {
-    content: String,
-}
-
-impl HtmlText {
-    /// Creates a new `HtmlText` instance.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::html::HtmlText;
-    ///
-    /// let text = HtmlText::new("Hello, world!");
-    /// assert_eq!(text.content(), "Hello, world!");
-    /// ```
-    #[must_use]
-    pub fn new<T: Into<String>>(content: T) -> Self {
-        Self {
-            content: content.into(),
-        }
-    }
-
-    /// Returns the text content.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::html::HtmlText;
-    ///
-    /// let text = HtmlText::new("Hello, world!");
-    /// assert_eq!(text.content(), "Hello, world!");
-    /// ```
-    #[must_use]
-    pub fn content(&self) -> &str {
-        &self.content
-    }
-
-    /// Renders the text node as escaped HTML.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the underlying string writer fails to write
-    /// the content.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::html::HtmlText;
-    ///
-    /// let text = HtmlText::new("Hello & <world>");
-    /// assert_eq!(text.render().as_str(), "Hello &#38; &#60;world&#62;");
-    /// ```
-    #[must_use]
-    pub fn render(&self) -> Html {
-        let mut result = String::new();
-        askama::filters::Html
-            .write_escaped_str(&mut result, &self.content)
-            .expect("Failed to escape HTML text");
-        Html(result)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HtmlNode {
     /// An HTML tag with attributes and potential children.
@@ -205,18 +121,6 @@ impl HtmlNode {
             HtmlNode::Tag(tag) => tag.render(),
             HtmlNode::Text(text) => text.render(),
         }
-    }
-}
-
-impl From<HtmlTag> for HtmlNode {
-    fn from(tag: HtmlTag) -> Self {
-        HtmlNode::Tag(tag)
-    }
-}
-
-impl From<HtmlText> for HtmlNode {
-    fn from(text: HtmlText) -> Self {
-        HtmlNode::Text(text)
     }
 }
 
@@ -353,9 +257,6 @@ impl HtmlTag {
 
     /// Adds a text child to the HTML tag.
     ///
-    /// This is a convenience method for adding text content without
-    /// manually creating an `HtmlText` and `HtmlNode`.
-    ///
     /// # Examples
     ///
     /// ```
@@ -370,9 +271,6 @@ impl HtmlTag {
     }
 
     /// Adds an HTML tag as a child to this tag.
-    ///
-    /// This is a convenience method for adding nested tags without
-    /// manually creating an `HtmlNode::Tag`.
     ///
     /// # Examples
     ///
@@ -448,6 +346,29 @@ impl From<&mut HtmlTag> for HtmlTag {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HtmlText {
+    content: String,
+}
+
+impl HtmlText {
+    #[must_use]
+    fn new<T: Into<String>>(content: T) -> Self {
+        Self {
+            content: content.into(),
+        }
+    }
+
+    #[must_use]
+    fn render(&self) -> Html {
+        let mut result = String::new();
+        askama::filters::Html
+            .write_escaped_str(&mut result, &self.content)
+            .expect("Failed to escape HTML text");
+        Html(result)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,12 +377,6 @@ mod tests {
     fn test_html_new() {
         let html = Html::new("<div>Hello</div>");
         assert_eq!(html.as_str(), "<div>Hello</div>");
-    }
-
-    #[test]
-    fn test_html_text_new() {
-        let text = HtmlText::new("Hello, world!");
-        assert_eq!(text.content(), "Hello, world!");
     }
 
     #[test]
@@ -489,20 +404,6 @@ mod tests {
     fn test_html_node_tag() {
         let tag = HtmlTag::new("div");
         let node = HtmlNode::Tag(tag);
-        assert_eq!(node.render().as_str(), "<div/>");
-    }
-
-    #[test]
-    fn test_html_node_from_text() {
-        let text = HtmlText::new("Hello");
-        let node: HtmlNode = text.into();
-        assert_eq!(node.render().as_str(), "Hello");
-    }
-
-    #[test]
-    fn test_html_node_from_tag() {
-        let tag = HtmlTag::new("div");
-        let node: HtmlNode = tag.into();
         assert_eq!(node.render().as_str(), "<div/>");
     }
 
@@ -632,24 +533,5 @@ mod tests {
             div.render().as_str(),
             "<div>Safe content &#38; &#60;unsafe&#62; content</div>"
         );
-    }
-
-    #[test]
-    fn test_self_closing_tags() {
-        // self-closing tags are not handled differently in this implementation
-        // to be conformant both with HTML and XHTML
-        let br = HtmlTag::new("br");
-        assert_eq!(br.render().as_str(), "<br/>");
-
-        let mut img = HtmlTag::new("img");
-        img.attr("src", "image.jpg").attr("alt", "An image");
-        assert_eq!(
-            img.render().as_str(),
-            "<img src=\"image.jpg\" alt=\"An image\"/>"
-        );
-
-        let mut input = HtmlTag::new("input");
-        input.attr("type", "text").bool_attr("required");
-        assert_eq!(input.render().as_str(), "<input type=\"text\" required/>");
     }
 }

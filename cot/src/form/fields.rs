@@ -892,7 +892,9 @@ impl Display for DateTimeField {
         }
 
         if let Some(readonly) = self.custom_options.readonly {
-            tag.attr("readonly", readonly.to_string());
+            if readonly {
+                tag.bool_attr("readonly");
+            }
         }
 
         if let Some(value) = &self.value {
@@ -1080,7 +1082,9 @@ impl Display for DateTimeWithTimezoneField {
         }
 
         if let Some(readonly) = self.custom_options.readonly {
-            dt_tag.attr("readonly", readonly.to_string());
+            if readonly {
+                dt_tag.bool_attr("readonly");
+            }
         }
 
         if let Some(value) = &self.value {
@@ -1235,7 +1239,9 @@ impl Display for TimeField {
         }
 
         if let Some(readonly) = self.custom_options.readonly {
-            tag.attr("readonly", readonly.to_string());
+            if readonly {
+                tag.bool_attr("readonly");
+            }
         }
 
         if let Some(step) = &self.custom_options.step {
@@ -1358,7 +1364,9 @@ impl Display for DateField {
         }
 
         if let Some(readonly) = self.custom_options.readonly {
-            tag.attr("readonly", readonly.to_string());
+            if readonly {
+                tag.bool_attr("readonly");
+            }
         }
 
         if let Some(step) = &self.custom_options.step {
@@ -1978,7 +1986,7 @@ mod tests {
                     NaiveDateTime::parse_from_str("2025-05-28T00:00:00", "%Y-%m-%dT%H:%M:%S")
                         .unwrap(),
                 ),
-                readonly: None,
+                readonly: Some(true),
                 step: Some(Step::Value(Duration::seconds(60))),
             },
         );
@@ -1987,6 +1995,7 @@ mod tests {
         assert!(html.contains("name=\"dt\""));
         assert!(html.contains("id=\"dt\""));
         assert!(html.contains("required"));
+        assert!(html.contains("readonly"));
         assert!(html.contains("min=\"2025-05-27T00:00\""));
         assert!(html.contains("max=\"2025-05-28T00:00\""));
         assert!(html.contains("step=\"60\""));
@@ -2096,15 +2105,16 @@ mod tests {
                     DateTime::parse_from_str("2025-05-28T00:00:00 +0000", "%Y-%m-%dT%H:%M:%S %z")
                         .unwrap(),
                 ),
-                readonly: None,
+                readonly: Some(true),
                 step: Some(Step::Value(Duration::seconds(60))),
                 timezone: None,
                 prefer_latest: None,
             },
         );
         let html = field.to_string();
+        println!("html: {html}");
         assert!(
-            html.contains("<input type=\"datetime-local\" name=\"dt\" id=\"dt\" max=\"2025-05-28T00:00\" min=\"2025-05-27T00:00\" step=\"60\" required />")
+            html.contains("<input type=\"datetime-local\" name=\"dt\" id=\"dt\" max=\"2025-05-28T00:00\" min=\"2025-05-27T00:00\" step=\"60\" required readonly />")
         );
         assert!(
             html.contains("<input type=\"hidden\" name=\"__dt_timezone\" id=\"__dt_timezone\" />")

@@ -3,11 +3,11 @@ use std::fmt::{Debug, Display, Formatter};
 use askama::filters::HtmlSafe;
 use indexmap::IndexSet;
 
+use crate::form::fields::impl_form_field;
 use crate::form::{
     FormField, FormFieldOptions, FormFieldValidationError, FormFieldValue, FormFieldValueError,
 };
 use crate::html::HtmlTag;
-use crate::impl_form_field;
 
 impl_form_field!(SelectField, SelectFieldOptions, "a dropdown list", T: SelectChoice + Send);
 

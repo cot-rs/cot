@@ -22,8 +22,6 @@ use crate::db::{Auto, ForeignKey, LimitedString, Model};
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
 use crate::html::HtmlTag;
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! impl_form_field {
     ($field_type_name:ident, $field_options_type_name:ident, $purpose:literal $(, $generic_param:ident $(: $generic_param_bound:ident $(+ $generic_param_bound_more:ident)*)?)?) => {
         #[derive(Debug)]
@@ -63,6 +61,7 @@ macro_rules! impl_form_field {
         }
     };
 }
+pub(crate) use impl_form_field;
 
 impl_form_field!(StringField, StringFieldOptions, "a string");
 

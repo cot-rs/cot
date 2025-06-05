@@ -587,6 +587,7 @@ struct TestModelStringKey {
 }
 
 #[cot_macros::dbtest]
+#[expect(clippy::too_many_lines)]
 async fn weekday_set_field_functionality(db: &mut TestDatabase) {
     use chrono::Weekday;
 

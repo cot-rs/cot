@@ -96,6 +96,7 @@ mime_guess = { version = "2", default-features = false }
 mockall = "0.13"
 multer = "3"
 password-auth = { version = "1", default-features = false }
+secure-string = "0.3.0"
 petgraph = { version = "0.8", default-features = false }
 pin-project-lite = "0.2"
 prettyplease = "0.2"

@@ -32,7 +32,7 @@
 //! ## Creating nested HTML elements
 //!
 //! ```
-//! use cot::html::{Html, HtmlTag, HtmlText};
+//! use cot::html::{Html, HtmlTag};
 //!
 //! let mut div = HtmlTag::new("div");
 //! div.attr("class", "container");
@@ -133,7 +133,7 @@ impl HtmlNode {
 /// # Examples
 ///
 /// ```
-/// use cot::html::{HtmlTag, HtmlText};
+/// use cot::html::HtmlTag;
 ///
 /// let mut tag = HtmlTag::new("div");
 /// tag.attr("class", "container");

@@ -352,7 +352,6 @@ impl TryFrom<&str> for Email {
 ///
 /// let email = Email::try_from(String::from("user@example.com")).unwrap();
 /// ```
-#[cfg(feature = "db")]
 impl TryFrom<String> for Email {
     type Error = email_address::Error;
 
@@ -419,6 +418,9 @@ mod tests {
 
     use super::*;
 
+    // ------------------------
+    // Password tests
+    // ------------------------
     #[test]
     fn password_debug() {
         let password = Password::new("password");
@@ -431,7 +433,9 @@ mod tests {
         assert_eq!(password.as_str(), "password");
         assert_eq!(password.into_string(), "password");
     }
-
+    // ------------------------
+    // Email tests
+    // ------------------------
     #[test]
     fn test_valid_email_creation() {
         let email = Email::new("user@example.com").unwrap();
@@ -461,7 +465,9 @@ mod tests {
     mod db_tests {
         use super::*;
         use crate::db::ToDbValue;
-
+        // ------------------------
+        // Email tests
+        // ------------------------
         #[test]
         fn test_to_db_value() {
             let email = Email::new("user@example.com").unwrap();

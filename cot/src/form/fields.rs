@@ -23,7 +23,11 @@ use crate::auth::PasswordHash;
 use crate::common_types::{Email, Password, Url};
 #[cfg(feature = "db")]
 use crate::db::{Auto, ForeignKey, LimitedString, Model};
-use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
+use crate::form::{
+    AsFormField, FormField, FormFieldOptions, FormFieldValidationError, FormFieldValue,
+    FormFieldValueError,
+    attrs::Step
+};
 use crate::html::HtmlTag;
 
 macro_rules! impl_form_field {
@@ -846,8 +850,9 @@ impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
 ///
 /// ```
 /// use chrono::{Duration, NaiveDateTime};
-/// use cot::form::fields::{DateTimeField, DateTimeFieldOptions, Step};
+/// use cot::form::fields::{DateTimeField, DateTimeFieldOptions};
 /// use cot::form::{FormField, FormFieldOptions};
+/// use cot::form::attrs::Step;
 ///
 /// let now = chrono::Local::now().naive_local();
 /// let in_two_days = now + Duration::hours(48);
@@ -1199,8 +1204,9 @@ impl_form_field!(TimeField, TimeFieldOptions, "a time");
 ///
 /// ```
 /// use chrono::{Duration, NaiveTime};
-/// use cot::form::fields::{Step, TimeField, TimeFieldOptions};
+/// use cot::form::fields::{TimeField, TimeFieldOptions};
 /// use cot::form::{FormField, FormFieldOptions};
+/// use cot::form::attrs::Step;
 ///
 /// let options = TimeFieldOptions {
 ///     min: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
@@ -1218,7 +1224,7 @@ impl_form_field!(TimeField, TimeFieldOptions, "a time");
 ///     options,
 /// );
 /// ```
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct TimeFieldOptions {
     /// The maximum time value of the field used to set the `max` attribute
     /// in the HTML input element.

@@ -77,7 +77,7 @@ impl Display for StringField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("text");
         tag.attr("name", self.id());
-        tag.attr("id", self.name().to_lowercase());
+        tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
         }
@@ -147,7 +147,7 @@ impl Display for PasswordField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("password");
         tag.attr("name", self.id());
-        tag.attr("id", self.name().to_lowercase());
+        tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
         }
@@ -224,7 +224,7 @@ pub struct EmailFieldOptions {
 impl Display for EmailField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("email");
-        tag.attr("name", self.name().to_lowercase());
+        tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
@@ -309,7 +309,7 @@ impl<T: Integer> Display for IntegerField<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("number");
         tag.attr("name", self.id());
-        tag.attr("id", self.name().to_lowercase());
+        tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
         }
@@ -467,7 +467,7 @@ pub struct BoolFieldOptions {
 impl Display for BoolField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut bool_input = HtmlTag::input("checkbox");
-        bool_input.attr("name", self.name().to_lowercase());
+        bool_input.attr("name", self.id());
         bool_input.attr("id", self.id());
         bool_input.attr("value", "1");
 
@@ -485,7 +485,7 @@ impl Display for BoolField {
         // Web browsers don't send anything when a checkbox is unchecked, so we
         // need to add a hidden input to send a "false" value.
         let mut hidden_input = HtmlTag::input("hidden");
-        hidden_input.attr("name", self.name().to_lowercase());
+        hidden_input.attr("name", self.id());
         hidden_input.attr("value", "0");
         let hidden = hidden_input.render();
 
@@ -665,7 +665,7 @@ impl<T: Float> Default for FloatFieldOptions<T> {
 impl<T: Float> Display for FloatField<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag: HtmlTag = HtmlTag::input("number");
-        tag.attr("name", self.name().to_lowercase());
+        tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
@@ -873,7 +873,7 @@ pub struct DateTimeFieldOptions {
 impl Display for DateTimeField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("datetime-local");
-        tag.attr("name", self.name().to_lowercase());
+        tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
@@ -1048,16 +1048,15 @@ pub struct DateTimeWithTimezoneFieldOptions {
 
 impl Display for DateTimeWithTimezoneField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let name_attr = self.name().to_lowercase();
         let mut hidden_tag = HtmlTag::input("hidden");
 
         // https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/datetime-local#setting_timezones
         hidden_tag
-            .attr("name", format!("__{name_attr}_timezone"))
+            .attr("name", format!("__{}_timezone", self.id()))
             .attr("id", format!("__{}_timezone", self.id()));
 
         let mut dt_tag = HtmlTag::input("datetime-local");
-        dt_tag.attr("name", name_attr);
+        dt_tag.attr("name", self.id());
         dt_tag.attr("id", self.id());
 
         if self.options.required {
@@ -1220,7 +1219,7 @@ pub struct TimeFieldOptions {
 impl Display for TimeField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("time");
-        tag.attr("name", self.name().to_lowercase());
+        tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
@@ -1343,7 +1342,7 @@ pub struct DateFieldOptions {
 impl Display for DateField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("date");
-        tag.attr("name", self.name().to_lowercase());
+        tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
@@ -1538,7 +1537,7 @@ mod tests {
         assert!(html.contains("required"));
         assert!(html.contains("minlength=\"10\""));
         assert!(html.contains("maxlength=\"50\""));
-        assert!(html.contains("name=\"test_name\""));
+        assert!(html.contains("name=\"test_id\""));
         assert!(html.contains("id=\"test_id\""));
     }
 
@@ -2104,14 +2103,12 @@ mod tests {
             },
         );
         let html = field.to_string();
-        assert!(html.contains("type=\"datetime-local\""));
-        assert!(html.contains("name=\"dt\""));
-        assert!(html.contains("id=\"dt\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("min=\"2025-05-27T00:00\""));
-        assert!(html.contains("max=\"2025-05-28T00:00\""));
-        assert!(html.contains("step=\"60\""));
-        assert!(html.contains("type=\"hidden\""));
+        assert!(
+            html.contains("<input type=\"datetime-local\" name=\"dt\" id=\"dt\" max=\"2025-05-28T00:00\" min=\"2025-05-27T00:00\" step=\"60\" required />")
+        );
+        assert!(
+            html.contains("<input type=\"hidden\" name=\"__dt_timezone\" id=\"__dt_timezone\" />")
+        );
     }
 
     #[cot::test]

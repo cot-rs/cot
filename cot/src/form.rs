@@ -521,6 +521,12 @@ pub trait FormField: Display {
     ///
     /// This method should convert the value to the appropriate type for the
     /// field, such as a number for a number field.
+    ///
+    /// Note that this method might be called multiple times. This will happen
+    /// when the field has appeared in the form data multiple times, such as
+    /// in the case of a `<select multiple>` HTML element. If the field
+    /// does not support storing multiple values, it should overwrite the
+    /// previous value.
     fn set_value(
         &mut self,
         field: FormFieldValue<'_>,

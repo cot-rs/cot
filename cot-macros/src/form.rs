@@ -6,6 +6,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 
 use crate::cot_ident;
+use crate::utils::PreservedStrExpr;
 
 pub(super) fn impl_form_for_struct(ast: &syn::DeriveInput) -> TokenStream {
     let opts = match FormOpts::from_derive_input(ast) {
@@ -70,7 +71,7 @@ impl FormOpts {
 struct Field {
     ident: Option<syn::Ident>,
     ty: syn::Type,
-    opt: Option<HashMap<syn::Ident, syn::Expr>>,
+    opt: Option<HashMap<syn::Ident, PreservedStrExpr>>,
 }
 
 #[derive(Debug)]
@@ -126,7 +127,9 @@ impl FormDeriveBuilder {
         self.fields_as_struct_fields_new.push({
             let custom_options_setters: Vec<_> = if let Some(opt) = opt {
                 opt.iter()
-                    .map(|(key, value)| quote!(custom_options.#key = Some(#value)))
+                    .map(|(key, value)| {
+                        quote!(custom_options.#key = ::core::option::Option::Some(#value))
+                    })
                     .collect()
             } else {
                 Vec::new()

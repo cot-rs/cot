@@ -11,11 +11,25 @@ use crate::db::{
     LimitedString, Model, PrimaryKey, Result, SqlxValueRef, ToDbFieldValue, ToDbValue,
 };
 
+mod chrono_wrapper;
+
 macro_rules! impl_from_sqlite_default {
     () => {
         #[cfg(feature = "sqlite")]
         fn from_sqlite(value: SqliteValueRef<'_>) -> Result<Self> {
             value.get::<Self>()
+        }
+    };
+    ($wrapper_ty:ty) => {
+        #[cfg(feature = "sqlite")]
+        fn from_sqlite(value: SqliteValueRef<'_>) -> Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_sqlite(value).map(|val| val.into())
+        }
+    };
+    ($wrapper_ty:ty, option) => {
+        #[cfg(feature = "sqlite")]
+        fn from_sqlite(value: SqliteValueRef<'_>) -> Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_sqlite(value).map(|val| val.map(|val| val.into()))
         }
     };
 }
@@ -27,6 +41,18 @@ macro_rules! impl_from_postgres_default {
             value.get::<Self>()
         }
     };
+    ($wrapper_ty:ty) => {
+        #[cfg(feature = "postgres")]
+        fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_postgres(value).map(|val| val.into())
+        }
+    };
+    ($wrapper_ty:ty, option) => {
+        #[cfg(feature = "postgres")]
+        fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_postgres(value).map(|val| val.map(|val| val.into()))
+        }
+    };
 }
 
 macro_rules! impl_from_mysql_default {
@@ -34,6 +60,18 @@ macro_rules! impl_from_mysql_default {
         #[cfg(feature = "mysql")]
         fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
             value.get::<Self>()
+        }
+    };
+    ($wrapper_ty:ty) => {
+        #[cfg(feature = "mysql")]
+        fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_mysql(value).map(|val| val.into())
+        }
+    };
+    ($wrapper_ty:ty, option) => {
+        #[cfg(feature = "mysql")]
+        fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_mysql(value).map(|val| val.map(|val| val.into()))
         }
     };
 }
@@ -49,6 +87,22 @@ macro_rules! impl_to_db_value_default {
         impl ToDbValue for Option<$ty> {
             fn to_db_value(&self) -> DbValue {
                 self.clone().into()
+            }
+        }
+    };
+
+    ($ty:ty, $wrapper_ty:ty) => {
+        impl ToDbValue for $ty {
+            fn to_db_value(&self) -> DbValue {
+                Into::<$wrapper_ty>::into(self.clone()).to_db_value()
+            }
+        }
+
+        impl ToDbValue for Option<$ty> {
+            fn to_db_value(&self) -> DbValue {
+                self.clone()
+                    .map(|val| Into::<$wrapper_ty>::into(val))
+                    .to_db_value()
             }
         }
     };
@@ -77,6 +131,29 @@ macro_rules! impl_db_field {
         }
 
         impl_to_db_value_default!($ty);
+    };
+    ($ty:ty, $column_type:ident, with $wrapper_ty:ty) => {
+        impl DatabaseField for $ty {
+            const TYPE: ColumnType = ColumnType::$column_type;
+        }
+
+        impl FromDbValue for $ty {
+            impl_from_sqlite_default!($wrapper_ty);
+
+            impl_from_postgres_default!($wrapper_ty);
+
+            impl_from_mysql_default!($wrapper_ty);
+        }
+
+        impl FromDbValue for Option<$ty> {
+            impl_from_sqlite_default!(Option<$wrapper_ty>, option);
+
+            impl_from_postgres_default!(Option<$wrapper_ty>, option);
+
+            impl_from_mysql_default!(Option<$wrapper_ty>, option);
+        }
+
+        impl_to_db_value_default!($ty, $wrapper_ty);
     };
 }
 
@@ -132,6 +209,11 @@ impl_db_field!(f64, Double);
 impl_db_field!(chrono::NaiveDate, Date);
 impl_db_field!(chrono::NaiveTime, Time);
 impl_db_field!(chrono::NaiveDateTime, DateTime);
+impl_db_field!(
+    chrono::WeekdaySet,
+    TinyUnsignedInteger,
+    with chrono_wrapper::WeekdaySet
+);
 impl_db_field!(String, Text);
 impl_db_field!(Vec<u8>, Blob);
 

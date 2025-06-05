@@ -4,6 +4,7 @@ mod form;
 mod main_fn;
 mod model;
 mod query;
+mod utils;
 
 use darling::Error;
 use darling::ast::NestedMeta;

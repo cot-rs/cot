@@ -1,4 +1,6 @@
+mod chrono;
 mod files;
+mod select;
 
 use std::fmt::{Debug, Display, Formatter};
 use std::num::{
@@ -8,15 +10,16 @@ use std::num::{
 
 use askama::filters::HtmlSafe;
 pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
+pub(crate) use select::check_required_multiple;
+pub use select::{
+    SelectChoice, SelectField, SelectFieldOptions, SelectMultipleField, SelectMultipleFieldOptions,
+};
 
 use crate::auth::PasswordHash;
 use crate::common_types::{Email, Password};
 #[cfg(feature = "db")]
 use crate::db::{Auto, ForeignKey, LimitedString, Model};
-use crate::form::{
-    AsFormField, FormField, FormFieldOptions, FormFieldValidationError, FormFieldValue,
-    FormFieldValueError,
-};
+use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
 use crate::html::HtmlTag;
 
 macro_rules! impl_form_field {
@@ -24,16 +27,16 @@ macro_rules! impl_form_field {
         #[derive(Debug)]
         #[doc = concat!("A form field for ", $purpose, ".")]
         pub struct $field_type_name $(<$generic_param>)? {
-            options: FormFieldOptions,
+            options: $crate::form::FormFieldOptions,
             custom_options: $field_options_type_name $(<$generic_param>)?,
             value: Option<String>,
         }
 
-        impl $(<$generic_param $(: $generic_param_bound $(+ $generic_param_bound_more)* )?>)? FormField for $field_type_name $(<$generic_param>)? {
+        impl $(<$generic_param $(: $generic_param_bound $(+ $generic_param_bound_more)* )?>)? $crate::form::FormField for $field_type_name $(<$generic_param>)? {
             type CustomOptions = $field_options_type_name $(<$generic_param>)?;
 
             fn with_options(
-                options: FormFieldOptions,
+                options: $crate::form::FormFieldOptions,
                 custom_options: Self::CustomOptions,
             ) -> Self {
                 Self {
@@ -43,7 +46,7 @@ macro_rules! impl_form_field {
                 }
             }
 
-            fn options(&self) -> &FormFieldOptions {
+            fn options(&self) -> &$crate::form::FormFieldOptions {
                 &self.options
             }
 
@@ -51,13 +54,14 @@ macro_rules! impl_form_field {
                 self.value.as_deref()
             }
 
-            async fn set_value(&mut self, field: FormFieldValue<'_>) -> std::result::Result<(), FormFieldValueError> {
+            async fn set_value(&mut self, field: $crate::form::FormFieldValue<'_>) -> std::result::Result<(), $crate::form::FormFieldValueError> {
                 self.value = Some(field.into_text().await?);
                 Ok(())
             }
         }
     };
 }
+pub(crate) use impl_form_field;
 
 impl_form_field!(StringField, StringFieldOptions, "a string");
 
@@ -220,7 +224,7 @@ pub struct EmailFieldOptions {
 impl Display for EmailField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("email");
-        tag.attr("name", self.name());
+        tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
@@ -624,7 +628,7 @@ where
     }
 }
 
-fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldValidationError> {
+pub(crate) fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldValidationError> {
     if let Some(value) = field.value() {
         if value.is_empty() {
             Err(FormFieldValidationError::Required)
@@ -661,7 +665,7 @@ impl<T: Float> Default for FloatFieldOptions<T> {
 impl<T: Float> Display for FloatField<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag: HtmlTag = HtmlTag::input("number");
-        tag.attr("name", self.name());
+        tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
@@ -766,6 +770,7 @@ impl_float_as_form_field!(f64);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::form::FormFieldValue;
 
     #[test]
     fn string_field_render() {
@@ -822,7 +827,7 @@ mod tests {
         assert!(html.contains("required"));
         assert!(html.contains("minlength=\"10\""));
         assert!(html.contains("maxlength=\"50\""));
-        assert!(html.contains("name=\"test_name\""));
+        assert!(html.contains("name=\"test_id\""));
         assert!(html.contains("id=\"test_id\""));
     }
 

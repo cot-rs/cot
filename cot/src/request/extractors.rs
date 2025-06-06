@@ -537,6 +537,41 @@ impl FromRequestParts for Auth {
     }
 }
 
+/// A derive macro that automatically implements the [`FromRequestParts`] trait
+/// for structs.
+///
+/// This macro generates code to extract each field of the struct from HTTP
+/// request parts, making it easy to create composite extractors that combine
+/// multiple data sources from an incoming request.
+///
+/// The macro works by calling [`FromRequestParts::from_request_parts`] on each
+/// field's type, allowing you to compose extractors seamlessly. All fields must
+/// implement the [`FromRequestParts`] trait for the derivation to work.
+///
+/// # Requirements
+///
+/// - The target struct must have all fields implement [`FromRequestParts`]
+/// - Works with named fields, unnamed fields (tuple structs), and unit structs
+/// - The struct must be accessible where the macro is used
+///
+/// # Examples
+///
+/// ## Named Fields
+///
+/// ```no_run
+/// use cot::request::extractors::{Path, StaticFiles, UrlQuery};
+/// use cot::router::Urls;
+/// use cot_macros::FromRequestParts;
+/// use serde::Deserialize;
+///
+/// #[derive(Debug, FromRequestParts)]
+/// pub struct BaseContext {
+///     urls: Urls,
+///     static_files: StaticFiles,
+/// }
+/// ```
+pub use cot_macros::FromRequestParts;
+
 #[cfg(test)]
 mod tests {
     use serde::Deserialize;

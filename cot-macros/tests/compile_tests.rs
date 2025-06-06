@@ -50,3 +50,12 @@ fn attr_main() {
     t.pass("tests/ui/attr_main.rs");
     t.compile_fail("tests/ui/attr_main_args.rs");
 }
+
+#[rustversion::attr(not(nightly), ignore)]
+#[test]
+#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+fn derive_from_struct() {
+    let t = trybuild::TestCases::new();
+    t.pass("tests/ui/derive_from_request_parts.rs");
+    t.compile_fail("tests/ui/derive_from_request_parts_enum.rs");
+}

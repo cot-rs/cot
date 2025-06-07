@@ -23,7 +23,6 @@
 mod field_value;
 /// Built-in form fields that can be used in a form.
 pub mod fields;
-pub mod attrs;
 
 use std::borrow::Cow;
 use std::fmt::Display;

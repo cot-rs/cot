@@ -45,7 +45,7 @@ use crate::config::{AuthBackendConfig, ProjectConfig};
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
-use crate::error::ErrorRepr;
+use crate::error::ErrorKind;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
 use crate::html::Html;
@@ -991,7 +991,7 @@ fn read_config(config: &str) -> cot::Result<ProjectConfig> {
     };
 
     let config_content = result.map_err(|err| {
-        Error::new(ErrorRepr::LoadConfig {
+        Error::from_repr(ErrorKind::LoadConfig {
             config: config.to_owned(),
             source: err,
         })
@@ -1705,7 +1705,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
 pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> cot::Result<()> {
     let listener = tokio::net::TcpListener::bind(address_str)
         .await
-        .map_err(|e| ErrorRepr::StartServer { source: e })?;
+        .map_err(|e| ErrorKind::StartServer { source: e })?;
 
     run_at(bootstrapper, listener).await
 }
@@ -1828,7 +1828,7 @@ pub async fn run_at_with_shutdown(
         "Starting the server at http://{}",
         listener
             .local_addr()
-            .map_err(|e| ErrorRepr::StartServer { source: e })?
+            .map_err(|e| ErrorKind::StartServer { source: e })?
     );
 
     if register_panic_hook {
@@ -1842,7 +1842,7 @@ pub async fn run_at_with_shutdown(
     axum::serve(listener, handler.into_make_service())
         .with_graceful_shutdown(shutdown_signal)
         .await
-        .map_err(|e| ErrorRepr::StartServer { source: e })?;
+        .map_err(|e| ErrorKind::StartServer { source: e })?;
     if register_panic_hook {
         let _ = std::panic::take_hook();
     }

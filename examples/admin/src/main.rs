@@ -73,9 +73,9 @@ impl App for HelloApp {
         Ok(())
     }
 
-    fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
-        cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
-    }
+    // fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+    //     cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
+    // }
 
     fn admin_model_managers(&self) -> Vec<Box<dyn AdminModelManager>> {
         vec![Box::new(DefaultAdminModelManager::<TodoItem>::new())]
@@ -128,9 +128,9 @@ impl Project for AdminProject {
         context: &MiddlewareContext,
     ) -> BoxedHandler {
         handler
-            .middleware(StaticFilesMiddleware::from_context(context))
-            .middleware(AuthMiddleware::new())
-            .middleware(SessionMiddleware::from_context(context))
+            // .middleware(StaticFilesMiddleware::from_context(context))
+            // .middleware(AuthMiddleware::new())
+            // .middleware(SessionMiddleware::from_context(context))
             .middleware(LiveReloadMiddleware::new())
             .build()
     }

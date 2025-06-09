@@ -68,6 +68,7 @@ url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 async-stream.workspace = true
+divan = "0.1.21"
 fake.workspace = true
 fantoccini.workspace = true
 futures.workspace = true
@@ -75,6 +76,10 @@ mockall.workspace = true
 tempfile.workspace = true
 tracing-test.workspace = true
 trybuild.workspace = true
+
+[[bench]]
+name = "example"
+harness = false
 
 [build-dependencies]
 ahash.workspace = true

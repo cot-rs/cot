@@ -4,7 +4,7 @@ use cot::response::Response;
 use cot::{Body, Error, StatusCode};
 use http;
 
-use crate::error::ErrorRepr;
+use crate::error::ErrorKind;
 #[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
@@ -358,7 +358,7 @@ impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {
         let mut buf = Vec::with_capacity(DEFAULT_JSON_SIZE);
         let mut serializer = serde_json::Serializer::new(&mut buf);
         serde_path_to_error::serialize(&self.0, &mut serializer)
-            .map_err(|error| Error::new(ErrorRepr::Json(error)))?;
+            .map_err(|error| Error::from_repr(ErrorKind::Json(error)))?;
         let data = String::from_utf8(buf).expect("JSON serialization always returns valid UTF-8");
 
         data.with_content_type(JSON_CONTENT_TYPE).into_response()
@@ -381,7 +381,7 @@ mod tests {
     use http::{self, HeaderMap, HeaderValue};
 
     use super::*;
-    use crate::error::ErrorRepr;
+    use crate::error::ErrorKind;
     use crate::html::Html;
 
     #[cot::test]
@@ -409,7 +409,7 @@ mod tests {
 
     #[cot::test]
     async fn test_result_err_into_response() {
-        let err = Error::new(ErrorRepr::NotFound {
+        let err = Error::from_repr(ErrorKind::NotFound {
             message: Some("test".to_string()),
         });
         let res: Result<&'static str, Error> = Err(err);

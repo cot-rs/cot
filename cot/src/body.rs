@@ -8,7 +8,7 @@ use http_body::{Frame, SizeHint};
 use http_body_util::combinators::BoxBody;
 use sync_wrapper::SyncWrapper;
 
-use crate::error::ErrorRepr;
+use crate::error::ErrorKind;
 use crate::{Error, Result};
 
 /// A type that represents an HTTP request or response body.
@@ -161,7 +161,7 @@ impl Body {
             .collect()
             .await
             .map(http_body_util::Collected::to_bytes)
-            .map_err(|source| ErrorRepr::ReadRequestBody { source })?)
+            .map_err(|source| ErrorKind::ReadRequestBody { source })?)
     }
 
     #[must_use]
@@ -209,7 +209,7 @@ impl http_body::Body for Body {
             BodyInner::Axum(ref mut axum_body) => {
                 let axum_body = axum_body.get_mut();
                 Pin::new(axum_body).poll_frame(cx).map_err(|error| {
-                    ErrorRepr::ReadRequestBody {
+                    ErrorKind::ReadRequestBody {
                         source: Box::new(error),
                     }
                     .into()
@@ -217,7 +217,7 @@ impl http_body::Body for Body {
             }
             BodyInner::Wrapper(ref mut http_body) => {
                 Pin::new(http_body).poll_frame(cx).map_err(|error| {
-                    ErrorRepr::ReadRequestBody {
+                    ErrorKind::ReadRequestBody {
                         source: Box::new(error),
                     }
                     .into()

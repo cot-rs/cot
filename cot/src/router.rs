@@ -31,7 +31,7 @@ use derive_more::with_trait::Debug;
 use http::request::Parts;
 use tracing::debug;
 
-use crate::error::ErrorRepr;
+use crate::error::ErrorKind;
 use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
 use crate::request::{AppName, PathParams, Request, RequestExt, RouteName};
 use crate::response::{Response, not_found_response};
@@ -237,7 +237,7 @@ impl Router {
     ) -> Result<String> {
         Ok(self
             .reverse_option(app_name, name, params)?
-            .ok_or_else(|| ErrorRepr::NoViewToReverse {
+            .ok_or_else(|| ErrorKind::NoViewToReverse {
                 app_name: app_name.map(ToOwned::to_owned),
                 view_name: name.to_owned(),
             })?)
@@ -281,14 +281,14 @@ impl Router {
             .get(&RouteName(String::from(name)))
             .map(|matcher| matcher.reverse(params));
         if let Some(url) = url {
-            return Ok(Some(url.map_err(ErrorRepr::from)?));
+            return Ok(Some(url.map_err(ErrorKind::from)?));
         }
 
         for route in &self.urls {
             if let RouteInner::Router(router) = &route.view {
                 if let Some(url) = router.reverse_option(app_name, name, params)? {
                     return Ok(Some(
-                        route.url.reverse(params).map_err(ErrorRepr::from)? + &url,
+                        route.url.reverse(params).map_err(ErrorKind::from)? + &url,
                     ));
                 }
             }
@@ -782,8 +782,8 @@ where
 
         match response {
             Ok(response) => Ok(response),
-            Err(error) => match error.inner {
-                ErrorRepr::NotFound { message } => not_found_response(message),
+            Err(error) => match error.kind {
+                ErrorKind::NotFound { message } => not_found_response(message),
                 _ => Err(error),
             },
         }

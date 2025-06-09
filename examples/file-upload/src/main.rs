@@ -5,11 +5,11 @@ use cot::config::ProjectConfig;
 use cot::form::fields::InMemoryUploadedFile;
 use cot::form::{Form, FormContext};
 use cot::html::Html;
-use cot::project::{MiddlewareContext, RegisterAppsContext};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::extractors::RequestForm;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project};
+use cot::{App, AppBuilder, Project};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
@@ -95,7 +95,7 @@ impl Project for FileUploadProject {
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .build()

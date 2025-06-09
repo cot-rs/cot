@@ -62,6 +62,8 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub debug: bool,
+    // TODO docs
+    // pub error_pages: bool,
     /// Whether to register a panic hook.
     ///
     /// The panic hook is used to display information about panics in the Cot

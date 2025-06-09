@@ -11,13 +11,13 @@ use cot::form::Form;
 use cot::form::fields::Step;
 use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
-use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::request::Request;
 use cot::request::extractors::{RequestDb, RequestForm, StaticFiles};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
-use cot::{App, AppBuilder, BoxedHandler, Project, reverse_redirect, static_files};
+use cot::{App, AppBuilder, Project, reverse_redirect, static_files};
 
 #[derive(Debug, Clone)]
 #[model]
@@ -147,11 +147,7 @@ impl Project for FormsProject {
         apps.register_with_views(FormsApp, "");
     }
 
-    fn middlewares(
-        &self,
-        handler: RootHandlerBuilder,
-        context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    fn middlewares(&self, handler: RootHandlerBuilder, context: &MiddlewareContext) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .middleware(AuthMiddleware::new())

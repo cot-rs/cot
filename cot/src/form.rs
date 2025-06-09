@@ -31,7 +31,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::NaiveDateTime;
 use chrono_tz::Tz;
-use cot::error::ErrorRepr;
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
 /// This macro will generate an implementation of the [`Form`] trait for the
@@ -62,6 +61,7 @@ pub use field_value::{FormFieldValue, FormFieldValueError};
 use http_body_util::BodyExt;
 use thiserror::Error;
 
+use crate::error::ErrorKind;
 use crate::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
 use crate::request::{Request, RequestExt};
 
@@ -370,7 +370,7 @@ async fn urlencoded_form_data(request: &mut Request) -> Result<Bytes, FormError>
             .map_err(|e| FormError::RequestError { error: Box::new(e) })?
     } else {
         return Err(FormError::RequestError {
-            error: Box::new(crate::Error::new(ErrorRepr::ExpectedForm)),
+            error: Box::new(crate::Error::from_kind(ErrorKind::ExpectedForm)),
         });
     };
 

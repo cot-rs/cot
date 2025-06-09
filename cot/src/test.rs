@@ -7,7 +7,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use cot::project::run_at_with_shutdown;
 use derive_more::Debug;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -25,7 +24,7 @@ use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
 use crate::handler::BoxedHandler;
-use crate::project::prepare_request;
+use crate::project::{build_request_for_error_handler, prepare_request, run_at_with_shutdown};
 use crate::request::Request;
 use crate::response::Response;
 use crate::router::Router;
@@ -40,6 +39,7 @@ use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
 pub struct Client {
     context: Arc<ProjectContext>,
     handler: BoxedHandler,
+    error_handler: BoxedHandler,
 }
 
 impl Client {
@@ -85,10 +85,11 @@ impl Client {
             .await
             .expect("Could not boot project");
 
-        let (context, handler) = bootstrapper.into_context_and_handler();
+        let bootstrapped_project = bootstrapper.into_context_and_handler();
         Self {
-            context: Arc::new(context),
-            handler,
+            context: Arc::new(bootstrapped_project.context),
+            handler: bootstrapped_project.handler,
+            error_handler: bootstrapped_project.error_handler,
         }
     }
 
@@ -162,7 +163,15 @@ impl Client {
         prepare_request(&mut request, self.context.clone());
 
         poll_fn(|cx| self.handler.poll_ready(cx)).await?;
-        self.handler.call(request).await
+        match self.handler.call(request).await {
+            Ok(result) => Ok(result),
+            Err(error) => {
+                let request = build_request_for_error_handler(self.context.clone(), error);
+
+                poll_fn(|cx| self.error_handler.poll_ready(cx)).await?;
+                self.error_handler.call(request).await
+            }
+        }
     }
 }
 

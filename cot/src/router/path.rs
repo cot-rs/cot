@@ -272,6 +272,7 @@ macro_rules! reverse_param_map {
 pub enum ReverseError {
     /// A parameter is missing for the reverse operation.
     #[error("Missing parameter for reverse: `{0}`")]
+    #[non_exhaustive]
     MissingParam(String),
 }
 

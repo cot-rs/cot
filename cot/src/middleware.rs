@@ -21,7 +21,7 @@ use tower_sessions::{SessionManagerLayer, SessionStore};
 #[cfg(feature = "cache")]
 use crate::config::CacheType;
 use crate::config::{Expiry, SameSite, SessionStoreTypeConfig};
-use crate::error::ErrorRepr;
+use crate::error::ErrorKind;
 use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
@@ -51,9 +51,9 @@ pub use live_reload::LiveReloadMiddleware;
 /// # Examples
 ///
 /// ```
+/// use cot::Project;
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -61,7 +61,7 @@ pub use live_reload::LiveReloadMiddleware;
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler
 ///             // IntoCotResponseLayer used internally in middleware()
 ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -164,9 +164,9 @@ where
 /// # Examples
 ///
 /// ```
+/// use cot::Project;
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -174,7 +174,7 @@ where
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler
 ///             // IntoCotErrorLayer used internally in middleware()
 ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -260,9 +260,12 @@ fn map_err<E>(error: E) -> Error
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    Error::new(ErrorRepr::MiddlewareWrapped {
-        source: Box::new(error),
-    })
+    #[expect(trivial_casts)]
+    let boxed = Box::new(error) as Box<dyn std::error::Error + Send + Sync>;
+    boxed
+        .downcast::<Error>()
+        .map(|e| *e)
+        .unwrap_or_else(|boxed| Error::from_kind(ErrorKind::MiddlewareWrapped { source: boxed }))
 }
 
 type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;
@@ -289,9 +292,9 @@ impl SessionMiddleware {
     /// # Examples
     ///
     /// ```
+    /// use cot::Project;
     /// use cot::middleware::SessionMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -299,7 +302,7 @@ impl SessionMiddleware {
     ///         &self,
     ///         handler: RootHandlerBuilder,
     ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
+    ///     ) -> RootHandler {
     ///         handler
     ///             .middleware(SessionMiddleware::from_context(context))
     ///             .build()
@@ -622,8 +625,8 @@ where
 ///
 /// ```
 /// use cot::middleware::AuthMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+/// use cot::{Project, ProjectContext};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -631,7 +634,7 @@ where
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler.middleware(AuthMiddleware::new()).build()
 ///     }
 /// }

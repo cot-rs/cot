@@ -21,7 +21,7 @@ use indexmap::IndexMap;
 
 #[cfg(feature = "db")]
 use crate::db::Database;
-use crate::error::ErrorRepr;
+use crate::error::ErrorKind;
 use crate::request::extractors::FromRequestParts;
 use crate::router::Router;
 use crate::{Body, Result};
@@ -249,7 +249,7 @@ pub trait RequestExt: private::Sealed {
         if content_type == expected {
             Ok(())
         } else {
-            Err(ErrorRepr::InvalidContentType {
+            Err(ErrorKind::InvalidContentType {
                 expected,
                 actual: content_type.into_owned(),
             }

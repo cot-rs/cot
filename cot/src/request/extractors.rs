@@ -52,7 +52,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 use cot::Error;
-use cot::error::ErrorRepr;
+use cot::error::ErrorKind;
 use cot::request::{PathParams, Request};
 use http::request::Parts;
 use serde::de::DeserializeOwned;
@@ -105,7 +105,16 @@ pub trait FromRequestParts: Sized {
     ///
     /// Throws an error if the extractor fails to extract the data from the
     /// request parts.
-    fn from_request_parts(parts: &mut Parts) -> impl Future<Output = cot::Result<Self>> + Send;
+    fn from_request_parts(parts: &mut Parts) -> impl Future<Output = crate::Result<Self>> + Send;
+}
+
+impl<T> FromRequestParts for crate::Result<T>
+where
+    T: FromRequestParts,
+{
+    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+        Ok(T::from_request_parts(parts).await)
+    }
 }
 
 impl FromRequestParts for Urls {
@@ -165,7 +174,7 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
             .get::<PathParams>()
             .expect("PathParams extension missing")
             .parse()
-            .map_err(|error| Error::new(ErrorRepr::PathParametersParse(error)))?;
+            .map_err(|error| Error::from_kind(ErrorKind::PathParametersParse(error)))?;
         Ok(Self(params))
     }
 }
@@ -224,7 +233,7 @@ where
             serde_html_form::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
 
         let value = serde_path_to_error::deserialize(deserializer)
-            .map_err(|error| Error::new(ErrorRepr::QueryParametersParse(error)))?;
+            .map_err(|error| Error::from_kind(ErrorKind::QueryParametersParse(error)))?;
 
         Ok(UrlQuery(value))
     }
@@ -290,7 +299,7 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 
         let deserializer = &mut serde_json::Deserializer::from_slice(&bytes);
         let result = serde_path_to_error::deserialize(deserializer)
-            .map_err(|error| Error::new(ErrorRepr::Json(error)))?;
+            .map_err(|error| Error::from_kind(ErrorKind::Json(error)))?;
 
         Ok(Self(result))
     }
@@ -474,6 +483,7 @@ impl StaticFiles {
 pub enum StaticFilesGetError {
     /// The requested static file was not found.
     #[error("static file `{path}` not found")]
+    #[non_exhaustive]
     NotFound {
         /// The path of the static file that was not found.
         path: String,

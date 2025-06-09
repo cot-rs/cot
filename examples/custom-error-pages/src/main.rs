@@ -1,7 +1,12 @@
+use std::error::Error;
+
+use askama::Template;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
+use cot::error::handler::DynErrorPageHandler;
+use cot::error::not_found::NotFound;
 use cot::html::Html;
-use cot::project::{ErrorPageHandler, RegisterAppsContext};
+use cot::project::RegisterAppsContext;
 use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router};
 use cot::{App, AppBuilder, Project, StatusCode};
@@ -40,31 +45,23 @@ impl Project for HelloProject {
         apps.register_with_views(HelloApp, "");
     }
 
-    fn server_error_handler(&self) -> Box<dyn ErrorPageHandler> {
-        Box::new(CustomServerError)
-    }
-
-    fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-        Box::new(CustomNotFound)
+    fn server_error_handler(&self) -> DynErrorPageHandler {
+        DynErrorPageHandler::new(error_page_handler)
     }
 }
 
-struct CustomServerError;
-impl ErrorPageHandler for CustomServerError {
-    fn handle(&self) -> cot::Result<Response> {
-        Html::new(include_str!("500.html"))
-            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
-            .into_response()
+async fn error_page_handler(error: cot::Error) -> cot::Result<impl IntoResponse> {
+    #[derive(Debug, Template)]
+    #[template(path = "error.html")]
+    struct ErrorTemplate {
+        error: cot::Error,
     }
-}
 
-struct CustomNotFound;
-impl ErrorPageHandler for CustomNotFound {
-    fn handle(&self) -> cot::Result<Response> {
-        Html::new(include_str!("404.html"))
-            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
-            .into_response()
-    }
+    let status_code = error.status_code();
+    let error_template = ErrorTemplate { error };
+    let rendered = error_template.render()?;
+
+    Ok(Html::new(rendered).with_status(status_code))
 }
 
 #[cot::main]

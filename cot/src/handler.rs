@@ -35,7 +35,8 @@ use crate::{Error, Result};
     note = "make sure the function is marked `async`",
     note = "make sure all parameters implement `FromRequest` or `FromRequestParts`",
     note = "make sure there is at most one parameter implementing `FromRequest`",
-    note = "make sure the function takes no more than 10 parameters"
+    note = "make sure the function takes no more than 10 parameters",
+    note = "make sure the function returns a type that implements `IntoResponse`"
 )]
 pub trait RequestHandler<T = ()> {
     /// Handle the request and returns a response.
@@ -229,6 +230,8 @@ macro_rules! handle_all_parameters_from_request {
     };
 }
 
+pub(crate) use handle_all_parameters;
+
 handle_all_parameters!(impl_request_handler);
 handle_all_parameters_from_request!(impl_request_handler_from_request);
 
@@ -239,29 +242,17 @@ handle_all_parameters_from_request!(impl_request_handler_from_request);
 /// [`Bootstrapper::into_context_and_handler`](cot::Bootstrapper::into_context_and_handler).
 /// Typically, you don't need to interact with this type directly, except for
 /// creating it in [`Project::middlewares`](cot::Project::middlewares) through
-/// the [`RootHandlerBuilder::build`](cot::project::RootHandlerBuilder::build).
+/// the [`RootHandlerBuilder::build`](cot::project::RootHandlerBuilder::build)
 /// method.
 ///
 /// # Examples
 ///
 /// ```
 /// use cot::config::ProjectConfig;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::static_files::StaticFilesMiddleware;
-/// use cot::{Bootstrapper, BoxedHandler, Project, ProjectContext};
+/// use cot::{Bootstrapper, BoxedHandler, Project};
 ///
 /// struct MyProject;
-/// impl Project for MyProject {
-///     fn middlewares(
-///         &self,
-///         handler: RootHandlerBuilder,
-///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
-///         handler
-///             .middleware(StaticFilesMiddleware::from_context(context))
-///             .build()
-///     }
-/// }
+/// impl Project for MyProject {}
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
@@ -269,7 +260,7 @@ handle_all_parameters_from_request!(impl_request_handler_from_request);
 ///     .with_config(ProjectConfig::default())
 ///     .boot()
 ///     .await?;
-/// let (context, handler) = bootstrapper.into_context_and_handler();
+/// let handler: BoxedHandler = bootstrapper.into_context_and_handler().handler;
 /// # Ok(())
 /// # }
 /// ```

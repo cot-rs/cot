@@ -425,9 +425,8 @@ impl Display for DatabaseUser {
 /// This struct is used to authenticate a user stored in the database. It
 /// contains the username and password of the user.
 ///
-/// Can be passed to
-/// [`AuthRequestExt::authenticate`](crate::auth::AuthRequestExt::authenticate)
-/// to authenticate a user when using the [`DatabaseUserBackend`].
+/// Can be passed to [`Auth::authenticate`](crate::auth::Auth::authenticate) to
+/// authenticate a user when using the [`DatabaseUserBackend`].
 #[derive(Debug, Clone)]
 pub struct DatabaseUserCredentials {
     username: String,

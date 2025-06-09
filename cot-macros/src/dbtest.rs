@@ -16,7 +16,7 @@ pub(super) fn fn_to_dbtest(test_function_decl: ItemFn) -> syn::Result<TokenStrea
     }
 
     let result = quote! {
-        #[::tokio::test]
+        #[::cot::test]
         #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
         async fn #sqlite_ident() {
             let mut database = cot::test::TestDatabase::new_sqlite().await.unwrap();
@@ -29,7 +29,7 @@ pub(super) fn fn_to_dbtest(test_function_decl: ItemFn) -> syn::Result<TokenStrea
         }
 
         #[ignore = "Tests that use PostgreSQL are ignored by default"]
-        #[::tokio::test]
+        #[::cot::test]
         async fn #postgres_ident() {
             let mut database = cot::test::TestDatabase::new_postgres(stringify!(#test_fn))
                 .await
@@ -43,7 +43,7 @@ pub(super) fn fn_to_dbtest(test_function_decl: ItemFn) -> syn::Result<TokenStrea
         }
 
         #[ignore = "Tests that use MySQL are ignored by default"]
-        #[::tokio::test]
+        #[::cot::test]
         async fn #mysql_ident() {
             let mut database = cot::test::TestDatabase::new_mysql(stringify!(#test_fn))
                 .await

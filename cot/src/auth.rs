@@ -77,10 +77,9 @@ pub type Result<T> = std::result::Result<T, AuthError>;
 ///
 /// This trait is used to represent a user object that can be authenticated and
 /// is a core of the authentication system. A `User` object is returned by
-/// [`AuthRequestExt::user()`] and is used to check if a user is authenticated
-/// and to access user data. If there is no active user session, the `User`
-/// object returned by [`AuthRequestExt::user()`] is an [`AnonymousUser`]
-/// object.
+/// [`Auth::user()`] and is used to check if a user is authenticated and to
+/// access user data. If there is no active user session, the `User` object
+/// returned by [`Auth::user()`] is an [`AnonymousUser`] object.
 ///
 /// A concrete instance of a `User` object is returned by a backend that
 /// implements the [`AuthBackend`] trait. The default backend is the
@@ -312,8 +311,7 @@ impl Debug for UserWrapper {
 /// An anonymous, unauthenticated user.
 ///
 /// This is used to represent a user that is not authenticated. It is returned
-/// by the [`AuthRequestExt::user()`] method when there is no active user
-/// session.
+/// by the [`Auth::user()`] method when there is no active user session.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct AnonymousUser;
 

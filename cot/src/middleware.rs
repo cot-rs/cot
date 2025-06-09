@@ -273,8 +273,8 @@ pub struct SessionMiddleware {
 impl SessionMiddleware {
     /// Crates a new instance of [`SessionMiddleware`].
     #[must_use]
-    pub fn new(store: Arc<dyn SessionStore + Send + Sync>) -> Self {
-        let layer = SessionManagerLayer::new(SessionStoreWrapper::new(store));
+    pub fn new<S: SessionStore + Send + Sync + 'static>(store: S) -> Self {
+        let layer = SessionManagerLayer::new(SessionStoreWrapper::new(Arc::new(store)));
         SessionMiddleware { inner: layer }
     }
 
@@ -312,9 +312,11 @@ impl SessionMiddleware {
             .store
             .store_type
             .clone()
-            .to_session_store(context);
-        let arc_store: Arc<dyn SessionStore + Send + Sync> = Arc::from(boxed_store);
-        let mut middleware = Self::new(arc_store)
+            .to_session_store(context)
+            .expect("session store not supported");
+        let arc_store = Arc::from(boxed_store);
+        let layer = SessionManagerLayer::new(SessionStoreWrapper::new(arc_store));
+        let mut middleware = SessionMiddleware { inner: layer }
             .secure(session_cfg.secure)
             .path(session_cfg.path.clone())
             .name(session_cfg.name.clone())
@@ -339,7 +341,7 @@ impl SessionMiddleware {
     /// use cot::middleware::SessionMiddleware;
     /// use cot::session::store::memory::MemoryStore;
     ///
-    /// let store = Arc::new(MemoryStore::new());
+    /// let store = MemoryStore::new();
     /// let middleware = SessionMiddleware::new(store).secure(false);
     /// ```
     #[must_use]
@@ -472,7 +474,7 @@ impl SessionMiddleware {
 
 impl Default for SessionMiddleware {
     fn default() -> Self {
-        let memory_store = Arc::new(MemoryStore::default());
+        let memory_store = MemoryStore::default();
         Self::new(memory_store)
     }
 }
@@ -839,7 +841,7 @@ mod tests {
             assert!(req.extensions().get::<Session>().is_some());
             Ok::<_, Error>(Response::new(Body::empty()))
         });
-        let store = Arc::new(MemoryStore::default());
+        let store = MemoryStore::default();
         let mut svc = SessionMiddleware::new(store).layer(svc);
 
         let request = TestRequestBuilder::get("/").build();
@@ -886,7 +888,7 @@ mod tests {
             Ok::<_, Error>(Response::new(Body::empty()))
         });
 
-        let store = Arc::new(MemoryStore::default());
+        let store = MemoryStore::default();
         let mut svc = SessionMiddleware::new(store).secure(false).layer(svc);
 
         let request = TestRequestBuilder::get("/").build();

@@ -15,6 +15,3 @@ cache_timeout = "1year"
 
 [middlewares.session]
 secure = false
-
-[middlewares.session.store]
-type = "memory"

@@ -14,7 +14,7 @@
 use std::error::Error;
 
 use async_trait::async_trait;
-use deadpool_redis::{Config, CreatePoolError, Pool as RedisPool, Runtime};
+use deadpool_redis::{Config, Pool as RedisPool, Runtime};
 use redis::{AsyncCommands, ExistenceCheck, SetExpiry, SetOptions};
 use thiserror::Error;
 use time::OffsetDateTime;

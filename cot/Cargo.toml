@@ -60,7 +60,7 @@ swagger-ui-redist = { workspace = true, optional = true }
 sync_wrapper.workspace = true
 thiserror.workspace = true
 time.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs", "io-util"] }
 toml = { workspace = true, features = ["parse"] }
 tower = { workspace = true, features = ["util"] }
 tower-livereload = { workspace = true, optional = true }

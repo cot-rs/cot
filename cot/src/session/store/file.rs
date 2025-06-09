@@ -13,6 +13,7 @@
 //! let store = FileStore::new(PathBuf::from("/var/lib/cot/sessions"));
 //! ```
 use std::borrow::Cow;
+use std::error::Error;
 use std::io;
 use std::path::Path;
 
@@ -29,13 +30,13 @@ use tower_sessions::{SessionStore, session_store};
 pub enum FileStoreError {
     /// An error occurred during an I/O operation.
     #[error(transparent)]
-    Io(#[from] io::Error),
+    Io(#[from] Box<dyn Error + Send + Sync>),
     /// An error occurred during JSON serialization.
     #[error("JSON serialization error: {0}")]
-    Serialize(serde_json::Error),
+    Serialize(Box<dyn Error + Send + Sync>),
     /// An error occurred during JSON deserialization.
     #[error("JSON serialization error: {0}")]
-    Deserialize(serde_json::Error),
+    Deserialize(Box<dyn Error + Send + Sync>),
 }
 
 impl From<FileStoreError> for session_store::Error {
@@ -95,7 +96,7 @@ impl FileStore {
     async fn create_dir_if_not_exists(&self) -> Result<(), FileStoreError> {
         tokio::fs::create_dir_all(&self.dir_path)
             .await
-            .map_err(FileStoreError::Io)
+            .map_err(|err| FileStoreError::Io(Box::new(err)))
     }
 }
 
@@ -114,18 +115,18 @@ impl SessionStore for FileStore {
 
             match file {
                 Ok(mut file) => {
-                    let json_data =
-                        serde_json::to_string(&record).map_err(FileStoreError::Serialize)?;
+                    let json_data = serde_json::to_string(&record)
+                        .map_err(|err| FileStoreError::Serialize(Box::new(err)))?;
                     file.write_all(json_data.as_bytes())
                         .await
-                        .map_err(FileStoreError::Io)?;
+                        .map_err(|err| FileStoreError::Io(Box::new(err)))?;
                     break;
                 }
                 Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
                     // On collision, recycle the ID and try again.
                     record.id = Id::default();
                 }
-                Err(err) => return Err(FileStoreError::Io(err))?,
+                Err(err) => return Err(FileStoreError::Io(Box::new(err)))?,
             }
         }
 
@@ -143,18 +144,18 @@ impl SessionStore for FileStore {
 
         match file {
             Ok(mut file) => {
-                let json_data =
-                    serde_json::to_string(&record).map_err(FileStoreError::Serialize)?;
+                let json_data = serde_json::to_string(&record)
+                    .map_err(|err| FileStoreError::Serialize(Box::new(err)))?;
                 file.write_all(json_data.as_bytes())
                     .await
-                    .map_err(FileStoreError::Io)?;
+                    .map_err(|err| FileStoreError::Io(Box::new(err)))?;
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // create the file if it does not exist.
                 let mut record = record.clone();
                 self.create(&mut record).await?;
             }
-            Err(err) => Err(FileStoreError::Io(err))?,
+            Err(err) => Err(FileStoreError::Io(Box::new(err)))?,
         }
 
         Ok(())
@@ -169,13 +170,14 @@ impl SessionStore for FileStore {
             .read(true)
             .open(path)
             .await
-            .map_err(FileStoreError::Io)?;
+            .map_err(|err| FileStoreError::Io(Box::new(err)))?;
 
         let mut contents = String::new();
         file.read_to_string(&mut contents)
             .await
-            .map_err(FileStoreError::Io)?;
-        let out = serde_json::from_str(&contents).map_err(FileStoreError::Serialize)?;
+            .map_err(|err| FileStoreError::Io(Box::new(err)))?;
+        let out = serde_json::from_str(&contents)
+            .map_err(|err| FileStoreError::Serialize(Box::new(err)))?;
 
         Ok(out)
     }
@@ -184,7 +186,7 @@ impl SessionStore for FileStore {
         let res = remove_file(self.dir_path.join(session_id.to_string())).await;
         if let Err(e) = res {
             if e.kind() != io::ErrorKind::NotFound {
-                return Err(FileStoreError::Io(e))?;
+                return Err(FileStoreError::Io(Box::new(e)))?;
             }
         }
         Ok(())

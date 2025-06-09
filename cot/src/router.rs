@@ -820,21 +820,21 @@ where
 /// # Examples
 ///
 /// ```
+/// use cot::html::Html;
 /// use cot::project::RegisterAppsContext;
 /// use cot::request::Request;
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
-/// use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
+/// use cot::{App, AppBuilder, Project, StatusCode, reverse};
 ///
-/// async fn home(request: Request) -> cot::Result<Response> {
+/// async fn home(request: Request) -> cot::Result<Html> {
 ///     // any of below two lines returns the same:
 ///     let url = reverse!(request, "home")?;
 ///     let url = reverse!(request, "my_custom_app:home")?;
 ///
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed(format!("Hello! The URL for this view is: {}", url)),
-///     ))
+///     Ok(Html::new(format!(
+///         "Hello! The URL for this view is: {}",
+///         url
+///     )))
 /// }
 ///
 /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -923,18 +923,19 @@ impl Urls {
     /// # Examples
     ///
     /// ```
+    /// use cot::html::Html;
     /// use cot::request::Request;
     /// use cot::response::{Response, ResponseExt};
     /// use cot::router::Urls;
     /// use cot::{Body, StatusCode, reverse};
     ///
-    /// async fn my_handler(request: Request) -> cot::Result<Response> {
+    /// async fn my_handler(request: Request) -> cot::Result<Html> {
     ///     let urls = Urls::from_request(&request);
     ///     let url = reverse!(urls, "home")?;
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed(format!("Hello! The URL for this view is: {}", url)),
-    ///     ))
+    ///     Ok(Html::new(format!(
+    ///         "Hello! The URL for this view is: {}",
+    ///         url
+    ///     )))
     /// }
     /// ```
     pub fn from_request(request: &Request) -> Self {

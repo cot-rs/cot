@@ -13,7 +13,6 @@
 //! ```
 
 use crate::error_page::ErrorPageTrigger;
-use crate::headers::HTML_CONTENT_TYPE;
 use crate::html::Html;
 use crate::{Body, StatusCode};
 
@@ -22,9 +21,6 @@ mod into_response;
 pub use into_response::{
     IntoResponse, WithBody, WithContentType, WithExtension, WithHeader, WithStatus,
 };
-
-#[cfg(feature = "json")]
-use crate::json::Json;
 
 const RESPONSE_BUILD_FAILURE: &str = "Failed to build response";
 
@@ -59,56 +55,6 @@ pub trait ResponseExt: Sized + private::Sealed {
     #[must_use]
     fn builder() -> http::response::Builder;
 
-    /// Create a new HTML response.
-    ///
-    /// This creates a new [`Response`] object with a content type of
-    /// `text/html; charset=utf-8` and given status code and body.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, StatusCode};
-    ///
-    /// let response = Response::new_html(StatusCode::OK, Body::fixed("Hello world!"));
-    /// ```
-    #[must_use]
-    #[deprecated(since = "0.3.0", note = "Use `Html::new` instead")]
-    fn new_html(status: StatusCode, body: Body) -> Self;
-
-    /// Create a new JSON response.
-    ///
-    /// This function will create a new response with a content type of
-    /// `application/json` and a body that is the JSON-serialized version of the
-    /// provided instance of a type implementing `serde::Serialize`.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the data could not be serialized
-    /// to JSON.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, StatusCode};
-    /// use serde::Serialize;
-    ///
-    /// #[derive(Serialize)]
-    /// struct MyData {
-    ///     hello: String,
-    /// }
-    ///
-    /// let data = MyData {
-    ///     hello: String::from("world"),
-    /// };
-    /// let response = Response::new_json(StatusCode::OK, &data)?;
-    /// # Ok::<(), cot::Error>(())
-    /// ```
-    #[cfg(feature = "json")]
-    #[deprecated(since = "0.3.0", note = "Use `Json::into_response()` instead")]
-    fn new_json<T: ?Sized + serde::Serialize>(status: StatusCode, data: &T) -> crate::Result<Self>;
-
     /// Create a new redirect response.
     ///
     /// This creates a new [`Response`] object with a status code of
@@ -139,19 +85,6 @@ impl ResponseExt for Response {
         http::Response::builder()
     }
 
-    fn new_html(status: StatusCode, body: Body) -> Self {
-        http::Response::builder()
-            .status(status)
-            .header(http::header::CONTENT_TYPE, HTML_CONTENT_TYPE)
-            .body(body)
-            .expect(RESPONSE_BUILD_FAILURE)
-    }
-
-    #[cfg(feature = "json")]
-    fn new_json<T: ?Sized + serde::Serialize>(status: StatusCode, data: &T) -> crate::Result<Self> {
-        Json(data).with_status(status).into_response()
-    }
-
     fn new_redirect<T: Into<String>>(location: T) -> Self {
         http::Response::builder()
             .status(StatusCode::SEE_OTHER)
@@ -172,20 +105,8 @@ pub(crate) fn not_found_response(message: Option<String>) -> crate::Result<Respo
 mod tests {
     use super::*;
     use crate::body::BodyInner;
-    use crate::headers::{HTML_CONTENT_TYPE, JSON_CONTENT_TYPE};
+    use crate::headers::JSON_CONTENT_TYPE;
     use crate::response::{Response, ResponseExt};
-
-    #[test]
-    fn response_new_html() {
-        let body = Body::fixed("<html></html>");
-        #[allow(deprecated)]
-        let response = Response::new_html(StatusCode::OK, body);
-        assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(
-            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            HTML_CONTENT_TYPE
-        );
-    }
 
     #[test]
     #[cfg(feature = "json")]
@@ -198,7 +119,7 @@ mod tests {
         let data = MyData {
             hello: String::from("world"),
         };
-        let response = Json(data).into_response().unwrap();
+        let response = crate::json::Json(data).into_response().unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             response.headers().get(http::header::CONTENT_TYPE).unwrap(),

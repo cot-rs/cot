@@ -14,18 +14,14 @@
 //! For example, the [`Path`] extractor is used to extract path parameters:
 //!
 //! ```
+//! use cot::html::Html;
 //! use cot::request::extractors::{FromRequest, Path};
 //! use cot::request::{Request, RequestExt};
-//! use cot::response::{Response, ResponseExt};
 //! use cot::router::{Route, Router};
 //! use cot::test::TestRequestBuilder;
-//! use cot::{Body, RequestHandler};
 //!
-//! async fn my_handler(Path(my_param): Path<String>) -> cot::Result<Response> {
-//!     Ok(Response::new_html(
-//!         cot::StatusCode::OK,
-//!         Body::fixed(format!("Hello {my_param}!")),
-//!     ))
+//! async fn my_handler(Path(my_param): Path<String>) -> Html {
+//!     Html::new(format!("Hello {my_param}!"))
 //! }
 //!
 //! # #[tokio::main]
@@ -126,18 +122,14 @@ impl FromRequestParts for Urls {
 /// # Examples
 ///
 /// ```
+/// use cot::html::Html;
 /// use cot::request::extractors::{FromRequest, Path};
 /// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
 ///
-/// async fn my_handler(Path(my_param): Path<String>) -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {my_param}!")),
-///     ))
+/// async fn my_handler(Path(my_param): Path<String>) -> Html {
+///     Html::new(format!("Hello {my_param}!"))
 /// }
 ///
 /// # #[tokio::main]

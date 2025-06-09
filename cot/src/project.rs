@@ -736,9 +736,10 @@ pub trait ErrorPageHandler: Send + Sync {
     /// # Examples
     ///
     /// ```
+    /// use cot::html::Html;
     /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, Project, StatusCode};
+    /// use cot::response::{IntoResponse, Response};
+    /// use cot::{Project, StatusCode};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -750,10 +751,9 @@ pub trait ErrorPageHandler: Send + Sync {
     /// struct MyHandler;
     /// impl ErrorPageHandler for MyHandler {
     ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Ok(Response::new_html(
-    ///             StatusCode::NOT_FOUND,
-    ///             Body::fixed("Not Found"),
-    ///         ))
+    ///         Ok(Html::new("Not Found")
+    ///             .with_status(StatusCode::NOT_FOUND)
+    ///             .into_response()?)
     ///     }
     /// }
     /// ```

@@ -55,7 +55,7 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 /// # Examples
 ///
 /// ```
-/// use cot::auth::Password;
+/// use cot::common_types::Password;
 ///
 /// let password = Password::new("pass");
 /// assert_eq!(&format!("{:?}", password), "Password(\"**********\")");

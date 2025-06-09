@@ -31,24 +31,17 @@ use crate::{Body, Method, RequestHandler};
 /// # Examples
 ///
 /// ```
-/// use cot::response::{Response, ResponseExt};
+/// use cot::html::Html;
 /// use cot::router::method::{MethodRouter, get};
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, Method, StatusCode};
 ///
-/// async fn get_handler() -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed("GET response"),
-///     ))
+/// async fn get_handler() -> Html {
+///     Html::new("GET response")
 /// }
 ///
-/// async fn post_handler() -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed("POST response"),
-///     ))
+/// async fn post_handler() -> Html {
+///     Html::new("POST response")
 /// }
 ///
 /// # #[tokio::main]
@@ -98,12 +91,11 @@ macro_rules! define_method {
         /// # Examples
         ///
         /// ```
-        /// use cot::response::{Response, ResponseExt};
+        /// use cot::html::Html;
         /// use cot::router::method::MethodRouter;
-        /// use cot::{Body, StatusCode};
         ///
-        /// async fn test_handler() -> cot::Result<Response> {
-        ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+        /// async fn test_handler() -> Html {
+        ///     Html::new("test")
         /// }
         ///
         /// # #[tokio::main]
@@ -164,17 +156,13 @@ impl MethodRouter {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::html::Html;
     /// use cot::router::method::MethodRouter;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn test_handler() -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("GET response"),
-    ///     ))
+    /// async fn test_handler() -> Html {
+    ///     Html::new("GET response")
     /// }
     ///
     /// # #[tokio::main]
@@ -372,12 +360,11 @@ macro_rules! define_method_router {
         /// # Examples
         ///
         /// ```
-        /// use cot::response::{Response, ResponseExt};
+        /// use cot::html::Html;
         #[doc = concat!("use cot::router::method::", stringify!($name), ";")]
-        /// use cot::{Body, StatusCode};
         ///
-        /// async fn test_handler() -> cot::Result<Response> {
-        ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+        /// async fn test_handler() -> cot::Result<Html> {
+        ///     Ok(Html::new("test"))
         /// }
         ///
         /// # #[tokio::main]

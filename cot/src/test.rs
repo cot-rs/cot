@@ -274,19 +274,14 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::Body;
+    /// use cot::html::Html;
     /// use cot::request::Request;
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::test::TestRequestBuilder;
-    /// use http::StatusCode;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("Hello world!"),
-    ///     ))
+    ///     Html::new("Hello world!")
     /// }
     ///
     /// let request = TestRequestBuilder::get("/").build();
@@ -308,27 +303,20 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::Body;
+    /// use cot::html::Html;
     /// use cot::request::Request;
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::test::TestRequestBuilder;
-    /// use http::StatusCode;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("Hello world!"),
-    ///     ))
+    ///
+    /// async fn index(request: Request) -> Html {
+    ///     Html::new("Hello world!")
     /// }
     ///
     /// let request = TestRequestBuilder::post("/").build();
     ///
-    /// assert_eq!(
-    ///     index(request).await?.into_body().into_bytes().await?,
-    ///     "Hello world!"
-    /// );
+    /// assert_eq!(index(request).await, Html::new("Hello world!"));
     /// # Ok(())
     /// # }
     /// ```
@@ -397,27 +385,19 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::Body;
+    /// use cot::html::Html;
     /// use cot::request::Request;
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::test::TestRequestBuilder;
-    /// use http::StatusCode;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("Hello world!"),
-    ///     ))
+    /// async fn index(request: Request) -> Html {
+    ///     Html::new("Hello world!")
     /// }
     ///
     /// let request = TestRequestBuilder::get("/").with_default_config().build();
     ///
-    /// assert_eq!(
-    ///     index(request).await?.into_body().into_bytes().await?,
-    ///     "Hello world!"
-    /// );
+    /// assert_eq!(index(request).await, Html::new("Hello world!"));
     /// # Ok(())
     /// # }
     /// ```
@@ -702,19 +682,14 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::Body;
+    /// use cot::html::Html;
     /// use cot::request::Request;
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::test::TestRequestBuilder;
-    /// use http::StatusCode;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("Hello world!"),
-    ///     ))
+    /// async fn index(request: Request) -> Html {
+    ///     Html::new("Hello world!")
     /// }
     ///
     /// let request = TestRequestBuilder::get("/").build();

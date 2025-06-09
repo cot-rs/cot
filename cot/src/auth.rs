@@ -14,8 +14,6 @@ use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 /// backwards compatible shim for form Password type.
-#[deprecated(since = "0.3.0", note = "use `cot::common_types::Password` instead")]
-pub type Password = crate::common_types::Password;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 use derive_more::with_trait::Debug;
@@ -176,7 +174,8 @@ pub trait User {
     /// ```
     /// use std::borrow::Cow;
     ///
-    /// use cot::auth::{Password, SessionAuthHash, User, UserId};
+    /// use cot::auth::{SessionAuthHash, User, UserId};
+    /// use cot::common_types::Password;
     /// use cot::config::SecretKey;
     /// use hmac::{Hmac, Mac};
     /// use sha2::Sha512;
@@ -345,7 +344,8 @@ impl User for AnonymousUser {}
 /// ```
 /// use std::borrow::Cow;
 ///
-/// use cot::auth::{Password, SessionAuthHash, User, UserId};
+/// use cot::auth::{SessionAuthHash, User, UserId};
+/// use cot::common_types::Password;
 /// use cot::config::SecretKey;
 /// use hmac::{Hmac, Mac};
 /// use sha2::Sha512;
@@ -486,7 +486,8 @@ impl PasswordHash {
     /// # Examples
     ///
     /// ```
-    /// use cot::auth::{Password, PasswordHash};
+    /// use cot::auth::PasswordHash;
+    /// use cot::common_types::Password;
     ///
     /// let hash = PasswordHash::from_password(&Password::new("password"));
     /// let stored_hash = hash.into_string();

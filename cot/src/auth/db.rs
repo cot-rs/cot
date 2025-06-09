@@ -76,13 +76,12 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::Password;
     /// use cot::auth::db::DatabaseUser;
+    /// use cot::common_types::Password;
+    /// use cot::html::Html;
     /// use cot::request::{Request, RequestExt};
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn view(request: &Request) -> cot::Result<Response> {
+    /// async fn view(request: &Request) -> cot::Result<Html> {
     ///     let user = DatabaseUser::create_user(
     ///         request.db(),
     ///         "testuser".to_string(),
@@ -90,10 +89,7 @@ impl DatabaseUser {
     ///     )
     ///     .await?;
     ///
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("User created!"),
-    ///     ))
+    ///     Ok(Html::new("User created!"))
     /// }
     ///
     /// # #[tokio::main]
@@ -141,13 +137,13 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
+    /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
-    /// use cot::auth::{Password, UserId};
+    /// use cot::common_types::Password;
+    /// use cot::html::Html;
     /// use cot::request::{Request, RequestExt};
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn view(request: &Request) -> cot::Result<Response> {
+    /// async fn view(request: &Request) -> cot::Result<Html> {
     ///     let user = DatabaseUser::create_user(
     ///         request.db(),
     ///         "testuser".to_string(),
@@ -157,10 +153,7 @@ impl DatabaseUser {
     ///
     ///     let user_from_db = DatabaseUser::get_by_id(request.db(), user.id()).await?;
     ///
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("User created!"),
-    ///     ))
+    ///     Ok(Html::new("User created!"))
     /// }
     ///
     /// # #[tokio::main]
@@ -298,13 +291,13 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
+    /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
-    /// use cot::auth::{Password, UserId};
+    /// use cot::common_types::Password;
+    /// use cot::html::Html;
     /// use cot::request::{Request, RequestExt};
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn view(request: &Request) -> cot::Result<Response> {
+    /// async fn view(request: &Request) -> cot::Result<Html> {
     ///     let user = DatabaseUser::create_user(
     ///         request.db(),
     ///         "testuser".to_string(),
@@ -312,10 +305,7 @@ impl DatabaseUser {
     ///     )
     ///     .await?;
     ///
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed(format!("User ID: {}", user.id())),
-    ///     ))
+    ///     Ok(Html::new(format!("User ID: {}", user.id())))
     /// }
     ///
     /// # #[tokio::main]
@@ -440,8 +430,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::Password;
     /// use cot::auth::db::DatabaseUserCredentials;
+    /// use cot::common_types::Password;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));
@@ -456,8 +446,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::Password;
     /// use cot::auth::db::DatabaseUserCredentials;
+    /// use cot::common_types::Password;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));
@@ -473,8 +463,8 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::Password;
     /// use cot::auth::db::DatabaseUserCredentials;
+    /// use cot::common_types::Password;
     ///
     /// let credentials =
     ///     DatabaseUserCredentials::new(String::from("testuser"), Password::new("password123"));

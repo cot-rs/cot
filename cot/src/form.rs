@@ -29,7 +29,7 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use cot::error::ErrorRepr;
+use cot::error::ErrorKind;
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
 /// This macro will generate an implementation of the [`Form`] trait for the
@@ -70,6 +70,7 @@ pub enum FormError {
     /// An error occurred while processing the request, before validating the
     /// form data.
     #[error("Request error: {error}")]
+    #[non_exhaustive]
     RequestError {
         /// The error that occurred while processing the request.
         #[from]
@@ -77,6 +78,7 @@ pub enum FormError {
     },
     /// An error occurred while processing a multipart form.
     #[error("Multipart error: {error}")]
+    #[non_exhaustive]
     MultipartError {
         /// The error that occurred while processing the multipart form.
         #[from]
@@ -340,7 +342,7 @@ async fn urlencoded_form_data(request: &mut Request) -> Result<Bytes, FormError>
             .map_err(|e| FormError::RequestError { error: Box::new(e) })?
     } else {
         return Err(FormError::RequestError {
-            error: Box::new(crate::Error::new(ErrorRepr::ExpectedForm)),
+            error: Box::new(crate::Error::from_repr(ErrorKind::ExpectedForm)),
         });
     };
 

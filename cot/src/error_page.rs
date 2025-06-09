@@ -7,7 +7,7 @@ use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace};
-use crate::error::{Error, ErrorRepr};
+use crate::error::{Error, ErrorKind};
 use crate::router::Router;
 use crate::{Result, StatusCode};
 
@@ -209,7 +209,7 @@ impl ErrorPageTemplateBuilder {
             project_config: self.project_config.clone(),
         }
         .render()
-        .map_err(ErrorRepr::from)?)
+        .map_err(ErrorKind::from)?)
     }
 }
 
@@ -403,7 +403,7 @@ pub(super) fn error_page_panic_hook(info: &PanicHookInfo<'_>) {
 fn log_error(error: &Error, request_data: Option<&RequestData>) {
     let span = tracing::span!(Level::ERROR,
         "request_error",
-        error_type = %error.inner,
+        error_type = %error.kind,
         error_message = %error
     );
     let _enter = span.enter();
@@ -471,7 +471,7 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_log_error() {
-        let error = Error::custom("Test Error!");
+        let error = Error::new("Test Error!");
         let request_data = Some(create_test_request_data());
 
         log_error(&error, request_data.as_ref());
@@ -511,7 +511,7 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_log_error_without_request() {
-        let error = Error::custom("Test error");
+        let error = Error::new("Test error");
         log_error(&error, None);
 
         assert!(logs_contain("Error occurred without request context"));
@@ -522,7 +522,7 @@ mod tests {
     #[traced_test]
     fn test_handle_response_error_logging() {
         let diagnostics = create_diagnostics();
-        let error = Error::custom("Test handler error");
+        let error = Error::new("Test handler error");
 
         let response = handle_response_error(&error, &diagnostics);
 
@@ -575,7 +575,7 @@ mod tests {
     #[test]
     fn test_handle_response_error() {
         let diagnostics = create_diagnostics();
-        let error = Error::new(ErrorRepr::NoViewToReverse {
+        let error = Error::from_repr(ErrorKind::NoViewToReverse {
             app_name: None,
             view_name: "error occurred".to_string(),
         });

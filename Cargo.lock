@@ -618,6 +618,7 @@ dependencies = [
  "schemars",
  "sea-query",
  "sea-query-binder",
+ "secure-string",
  "serde",
  "serde_html_form",
  "serde_json",
@@ -2571,6 +2572,16 @@ dependencies = [
  "chrono",
  "sea-query",
  "sqlx",
+]
+
+[[package]]
+name = "secure-string"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "548ba8c9ff631f7bb3a64de1e8ad73fe20f6d04090724f2b496ed45314ad7488"
+dependencies = [
+ "libc",
+ "zeroize",
 ]
 
 [[package]]

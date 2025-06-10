@@ -23,16 +23,6 @@ use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
-use tower_sessions::{SessionStore, session_store};
-
-use crate::ProjectContext;
-use crate::project::WithDatabase;
-use crate::session::store::ToSessionStore;
-#[cfg(feature = "json")]
-use crate::session::store::file::FileStore;
-use crate::session::store::memory::MemoryStore;
-#[cfg(feature = "redis")]
-use crate::session::store::redis::RedisStore;
 
 /// The configuration for a project.
 ///
@@ -846,33 +836,6 @@ pub enum SessionStoreTypeConfig {
         /// The URI to the cache service.
         uri: CacheUrl,
     },
-}
-
-impl ToSessionStore for SessionStoreTypeConfig {
-    #[expect(unused_variables)]
-    fn to_session_store(
-        self,
-        context: &ProjectContext<WithDatabase>,
-    ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error> {
-        match self {
-            Self::Memory => Ok(Box::new(MemoryStore::new())),
-            #[cfg(feature = "json")]
-            Self::File { path } => Ok(Box::new(FileStore::new(path))),
-            #[cfg(feature = "cache")]
-            Self::Cache { ref uri } => {
-                let cache_type = CacheType::try_from(uri.clone())
-                    .map_err(|e| session_store::Error::Backend(e.to_string()))?;
-                match cache_type {
-                    #[cfg(feature = "redis")]
-                    CacheType::Redis => Ok(Box::new(RedisStore::new(uri)?)),
-                }
-            }
-            #[cfg(feature = "db")]
-            Self::Database => {
-                unimplemented!();
-            }
-        }
-    }
 }
 
 /// The configuration for the session store.

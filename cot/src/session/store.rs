@@ -17,60 +17,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tower_sessions::session::{Id, Record};
-use tower_sessions::session_store;
-
-use crate::ProjectContext;
-use crate::middleware::SessionStore;
-use crate::project::WithDatabase;
-
-/// A trait for types that can be converted into a session store.
-///
-/// This trait enables configuration options to be transformed into concrete
-/// session store implementations that can be used by the framework.
-/// Implementing this trait allows a configuration type to be used directly with
-/// Cot's session middleware system.
-///
-/// # Examples
-///
-/// ```
-/// use cot::ProjectContext;
-/// use cot::middleware::SessionStore;
-/// use cot::project::WithDatabase;
-/// use cot::session::store::ToSessionStore;
-/// use tower_sessions::session_store;
-///
-/// enum MyStoreConfig {
-///     InMemory,
-///     // Other variants...
-/// }
-///
-/// impl ToSessionStore for MyStoreConfig {
-///     fn to_session_store(
-///         self,
-///         context: &ProjectContext<WithDatabase>,
-///     ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error> {
-///         match self {
-///             MyStoreConfig::InMemory => {
-///                 Ok(Box::new(cot::session::store::memory::MemoryStore::new()))
-///             } // Handle other variants...
-///         }
-///     }
-/// }
-/// ```
-pub trait ToSessionStore {
-    /// Converts self into a boxed session store implementation.
-    ///
-    /// This method creates a concrete session store from the configuration
-    /// that can be used by the session middleware.
-    ///
-    /// # Errors
-    ///
-    /// will return `Err` if the conversion fails.
-    fn to_session_store(
-        self,
-        context: &ProjectContext<WithDatabase>,
-    ) -> Result<Box<dyn SessionStore + Send + Sync>, session_store::Error>;
-}
+use tower_sessions::{SessionStore, session_store};
 
 /// A wrapper that provides a concrete type for
 /// [`tower_session::SessionManagerLayer`] while delegating to a boxed

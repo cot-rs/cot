@@ -240,7 +240,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_create_and_load() {
         let store = make_store().await;
@@ -251,7 +251,7 @@ mod tests {
         assert_eq!(Some(rec.clone()), loaded);
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_save_overwrites() {
         let store = make_store().await;
@@ -266,7 +266,7 @@ mod tests {
         assert_eq!(rec2.data, loaded.data);
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_save_creates_if_missing() {
         let store = make_store().await;
@@ -278,7 +278,7 @@ mod tests {
         assert_eq!(Some(rec), loaded);
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_delete() {
         let store = make_store().await;
@@ -292,7 +292,7 @@ mod tests {
         store.delete(&rec.id).await.expect("second delete");
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_create_id_collision() {
         let store = make_store().await;

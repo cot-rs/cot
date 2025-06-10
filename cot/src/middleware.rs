@@ -24,10 +24,23 @@ use http_body_util::BodyExt;
 use http_body_util::combinators::BoxBody;
 
 use tower::Service;
-use tower_sessions::SessionManagerLayer;
 use tower_sessions::service::PlaintextCookie;
-pub use tower_sessions::{MemoryStore, SessionStore};
+use tower_sessions::{SessionManagerLayer, SessionStore};
 
+#[cfg(feature = "cache")]
+use crate::config::CacheType;
+use crate::config::SessionStoreTypeConfig;
+use crate::error::ErrorRepr;
+use crate::project::MiddlewareContext;
+use crate::request::Request;
+use crate::response::Response;
+use crate::session::store::SessionStoreWrapper;
+#[cfg(feature = "json")]
+use crate::session::store::file::FileStore;
+use crate::session::store::memory::MemoryStore;
+#[cfg(feature = "redis")]
+use crate::session::store::redis::RedisStore;
+use crate::{Body, Error};
 use crate::config::{Expiry, SameSite};
 
 use crate::session::store::{SessionStoreWrapper, ToSessionStore};
@@ -308,12 +321,8 @@ impl SessionMiddleware {
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let session_cfg = &context.config().middlewares.session;
-        let boxed_store = session_cfg
-            .store
-            .store_type
-            .clone()
-            .to_session_store(context)
-            .expect("session store not supported");
+        let store_type = session_cfg.store.store_type.clone();
+        let boxed_store = Self::config_to_session_store(store_type);
         let arc_store = Arc::from(boxed_store);
         let layer = SessionManagerLayer::new(SessionStoreWrapper::new(arc_store));
         let mut middleware = SessionMiddleware { inner: layer }
@@ -468,6 +477,33 @@ impl SessionMiddleware {
     pub fn expiry(self, expiry: Expiry) -> Self {
         Self {
             inner: self.inner.with_expiry(expiry.into()),
+        }
+    }
+
+    /// Convert a [`SessionStoreTypeConfig`] variant into a valid
+    /// [`SessionStore`]
+    fn config_to_session_store(
+        config: SessionStoreTypeConfig,
+    ) -> Box<dyn SessionStore + Send + Sync> {
+        match config {
+            SessionStoreTypeConfig::Memory => Box::new(MemoryStore::new()),
+            #[cfg(feature = "json")]
+            SessionStoreTypeConfig::File { path } => Box::new(FileStore::new(path)),
+            #[cfg(feature = "cache")]
+            SessionStoreTypeConfig::Cache { ref uri } => {
+                let cache_type = CacheType::try_from(uri.clone())
+                    .unwrap_or_else(|e| panic!("could not convert cache URI `{}`: {}", uri, e));
+                match cache_type {
+                    #[cfg(feature = "redis")]
+                    CacheType::Redis => Box::new(RedisStore::new(uri).unwrap_or_else(|e| {
+                        panic!("could not connect to Redis at `{}`: {}", uri, e)
+                    })),
+                }
+            }
+            #[cfg(feature = "db")]
+            SessionStoreTypeConfig::Database => {
+                unimplemented!();
+            }
         }
     }
 }

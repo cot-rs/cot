@@ -89,7 +89,7 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_create() {
         let store = MemoryStore::default();
         let mut record = Record {
@@ -100,7 +100,7 @@ mod tests {
         assert!(store.create(&mut record).await.is_ok());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_save() {
         let store = MemoryStore::default();
         let record = Record {
@@ -111,7 +111,7 @@ mod tests {
         assert!(store.save(&record).await.is_ok());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_load() {
         let store = MemoryStore::default();
         let mut record = Record {
@@ -124,7 +124,7 @@ mod tests {
         assert_eq!(Some(record), loaded_record);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_delete() {
         let store = MemoryStore::default();
         let mut record = Record {
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(None, store.load(&record.id).await.unwrap());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_create_id_collision() {
         let store = MemoryStore::default();
         let expiry_date = OffsetDateTime::now_utc() + Duration::minutes(30);

@@ -218,7 +218,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_create_and_load() {
         let store = make_store();
         let mut rec = make_record();
@@ -230,7 +230,7 @@ mod tests {
         assert_eq!(Some(rec.clone()), loaded);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_save_overwrites() {
         let store = make_store();
         let mut rec = make_record();
@@ -244,7 +244,7 @@ mod tests {
         assert_eq!(rec2.data, loaded.data);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_save_creates_if_missing() {
         let store = make_store();
         let rec = make_record();
@@ -254,7 +254,7 @@ mod tests {
         assert!(path.is_file());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_save_creates_directory() {
         let dir = tempdir().expect("failed to make tempdir");
         let dir_path = dir.path().to_path_buf();
@@ -289,7 +289,7 @@ mod tests {
         fs::remove_dir_all(&dir_path).await.expect("cleanup failed");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_load_with_nonexistent_directory() {
         let dir = tempdir().expect("failed to make tempdir");
         let dir_path = PathBuf::from("non/existent/path");
@@ -314,7 +314,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_delete() {
         let store = make_store();
         let mut rec = make_record();
@@ -327,7 +327,7 @@ mod tests {
         store.delete(&rec.id).await.unwrap();
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_delete_with_nonexistent_directory() {
         let dir = tempdir().expect("failed to make tempdir");
         let dir_path = dir.path().to_path_buf();
@@ -348,7 +348,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_create_id_collision() {
         let store = make_store();
         let expiry = OffsetDateTime::now_utc() + Duration::minutes(30);

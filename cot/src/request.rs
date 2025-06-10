@@ -771,7 +771,7 @@ mod tests {
         assert!(request.expect_content_type("application/json").is_err());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn request_ext_extract_parts() {
         async fn handler(mut request: Request) -> Result<Response> {
             let Path(id): Path<String> = request.extract_parts().await?;
@@ -839,7 +839,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn parts_extract_parts() {
         let (mut parts, _) = Request::new(Body::empty()).into_parts();
 

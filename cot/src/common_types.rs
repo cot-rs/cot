@@ -29,7 +29,7 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 /// the password value.
 ///
 /// For persisting passwords in the database, and verifying passwords against
-/// the hash, use [`PasswordHash`].
+/// the hash, use [`PasswordHash`](crate::auth::PasswordHash).
 ///
 /// # Security
 ///
@@ -40,10 +40,12 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///
 /// When comparing passwords, there are two recommended approaches:
 ///
-/// 1. The most secure approach is to use [`PasswordHash::from_password`] to
-///    create a hash from one password, and then use [`PasswordHash::verify`] to
-///    compare it with the other password. This method uses constant-time
-///    equality comparison, which protects against timing attacks.
+/// 1. The most secure approach is to use
+///    [`PasswordHash::from_password`](crate::auth::PasswordHash::from_password)
+///    to create a hash from one password, and then use
+///    [`PasswordHash::verify`](crate::auth::PasswordHash::verify) to compare it
+///    with the other password. This method uses constant-time equality
+///    comparison, which protects against timing attacks.
 ///
 /// 2. An alternative is to use the [`Password::as_str`] method and compare the
 ///    strings directly. This approach uses non-constant-time comparison, which
@@ -135,9 +137,8 @@ impl From<String> for Password {
 
 /// A validated email address.
 ///
-/// This is a newtype wrapper around
-/// [`EmailAddress`](email_address::EmailAddress) that provides validation and
-/// integration with Cot's database system. It ensures email addresses
+/// This is a newtype wrapper around [`EmailAddress`] that provides validation
+/// and integration with Cot's database system. It ensures email addresses
 /// comply with RFC 5321/5322 standards.
 ///
 /// # Examples

@@ -178,12 +178,11 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
 /// # Example
 ///
 /// ```
+/// use cot::RequestHandler;
+/// use cot::html::Html;
 /// use cot::request::extractors::{FromRequest, UrlQuery};
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
 /// use serde::Deserialize;
 ///
 /// #[derive(Deserialize)]
@@ -191,11 +190,8 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(UrlQuery(query): UrlQuery<MyQuery>) -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {}!", query.hello)),
-///     ))
+/// async fn my_handler(UrlQuery(query): UrlQuery<MyQuery>) -> Html {
+///     Html::new(format!("Hello {}!", query.hello))
 /// }
 ///
 /// # #[tokio::main]
@@ -252,8 +248,6 @@ where
 /// ```
 /// use cot::RequestHandler;
 /// use cot::json::Json;
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::test::TestRequestBuilder;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -262,8 +256,8 @@ where
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(Json(data): Json<MyData>) -> cot::Result<Response> {
-///     Ok(Response::new_json(cot::StatusCode::OK, &data)?)
+/// async fn my_handler(Json(data): Json<MyData>) -> Json<MyData> {
+///     Json(data)
 /// }
 ///
 /// # #[tokio::main]
@@ -319,19 +313,16 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 ///
 /// ```
 /// use cot::form::{Form, FormResult};
+/// use cot::html::Html;
 /// use cot::request::extractors::RequestForm;
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
-/// use serde::Deserialize;
 ///
 /// #[derive(Form)]
 /// struct MyForm {
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(RequestForm(form): RequestForm<MyForm>) -> cot::Result<Response> {
+/// async fn my_handler(RequestForm(form): RequestForm<MyForm>) -> Html {
 ///     let form = match form {
 ///         FormResult::Ok(form) => form,
 ///         FormResult::ValidationError(error) => {
@@ -339,14 +330,12 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 ///         }
 ///     };
 ///
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {}!", form.hello)),
-///     ))
+///     Html::new(format!("Hello {}!", form.hello))
 /// }
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
+/// # use cot::RequestHandler;
 /// # let request = TestRequestBuilder::post("/").form_data(&[("hello", "world")]).build();
 /// # my_handler.handle(request).await?;
 /// # Ok(())
@@ -367,7 +356,6 @@ impl<F: Form> FromRequest for RequestForm<F> {
 ///
 /// ```
 /// use cot::html::Html;
-/// use cot::request::Request;
 /// use cot::request::extractors::RequestDb;
 ///
 /// async fn my_handler(RequestDb(db): RequestDb) -> Html {

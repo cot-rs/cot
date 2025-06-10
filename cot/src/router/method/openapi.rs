@@ -138,7 +138,7 @@ macro_rules! define_method {
         /// #         .into_body()
         /// #         .into_bytes()
         /// #         .await?,
-        /// #     "test"
+        /// #     "null"
         /// # );
         /// # Ok(())
         /// # }
@@ -176,18 +176,14 @@ impl ApiMethodRouter {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::json::Json;
     /// use cot::router::method::MethodRouter;
     /// use cot::router::method::openapi::ApiMethodRouter;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn test_handler() -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("GET response"),
-    ///     ))
+    /// async fn test_handler() -> Json<()> {
+    ///     Json(())
     /// }
     ///
     /// # #[tokio::main]
@@ -204,7 +200,7 @@ impl ApiMethodRouter {
     ///         .into_body()
     ///         .into_bytes()
     ///         .await?,
-    ///     "GET response"
+    ///     "null"
     /// );
     /// # Ok(())
     /// # }
@@ -438,7 +434,7 @@ macro_rules! define_method_router {
         /// #         .into_body()
         /// #         .into_bytes()
         /// #         .await?,
-        /// #     "test"
+        /// #     "null"
         /// # );
         /// # Ok(())
         /// # }

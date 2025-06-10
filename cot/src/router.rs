@@ -880,18 +880,14 @@ macro_rules! reverse {
 /// # Examples
 ///
 /// ```
-/// use cot::request::Request;
-/// use cot::response::{Response, ResponseExt};
+/// use cot::html::Html;
 /// use cot::router::{Route, Router, Urls};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler, StatusCode, reverse};
+/// use cot::{RequestHandler, reverse};
 ///
-/// async fn my_handler(urls: Urls) -> cot::Result<Response> {
+/// async fn my_handler(urls: Urls) -> cot::Result<Html> {
 ///     let url = reverse!(urls, "home")?;
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed(format!("{url}")),
-///     ))
+///     Ok(Html::new(format!("{url}")))
 /// }
 ///
 /// # #[tokio::main]

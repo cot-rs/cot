@@ -205,14 +205,15 @@ impl MethodRouter {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::StatusCode;
+    /// use cot::html::Html;
+    /// use cot::response::IntoResponse;
     /// use cot::router::method::MethodRouter;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn fallback_handler() -> cot::Result<Response> {
-    ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("fallback")))
+    /// async fn fallback_handler() -> impl IntoResponse {
+    ///     Html::new("Method Not Allowed").with_status(StatusCode::METHOD_NOT_ALLOWED)
     /// }
     ///
     /// # #[tokio::main]
@@ -229,7 +230,7 @@ impl MethodRouter {
     ///         .into_body()
     ///         .into_bytes()
     ///         .await?,
-    ///     "fallback"
+    ///     "Method Not Allowed"
     /// );
     /// # Ok(())
     /// # }

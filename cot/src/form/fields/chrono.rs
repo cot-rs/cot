@@ -289,7 +289,13 @@ impl_form_field!(
     "a datetime with timezone"
 );
 
-/// Custom options for [`crate::form::fields::DateTimeWithTimezoneField`]
+impl From<ParseError> for FormFieldValidationError {
+    fn from(error: ParseError) -> Self {
+        FormFieldValidationError::from_string(error.to_string())
+    }
+}
+
+/// Custom options for [`DateTimeWithTimezoneField`]
 ///
 /// Specifies the HTML attributes applied to a `datetime‐local` input, plus
 /// a user‐specified offset and DST‐disambiguation policy.

@@ -23,8 +23,6 @@ use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use time::{OffsetDateTime, UtcOffset};
-use tower_sessions::Expiry as TowerExpiry;
-use tower_sessions::cookie::SameSite as TowerSameSite;
 
 /// The configuration for a project.
 ///
@@ -773,7 +771,7 @@ pub enum SameSite {
     None,
 }
 
-impl From<SameSite> for TowerSameSite {
+impl From<SameSite> for tower_sessions::cookie::SameSite {
     fn from(value: SameSite) -> Self {
         match value {
             SameSite::Strict => Self::Strict,
@@ -844,7 +842,7 @@ pub enum Expiry {
     AtDateTime(DateTime<FixedOffset>),
 }
 
-impl From<Expiry> for TowerExpiry {
+impl From<Expiry> for tower_sessions::Expiry {
     fn from(value: Expiry) -> Self {
         match value {
             Expiry::OnSessionEnd => Self::OnSessionEnd,
@@ -885,8 +883,8 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
-    /// The `HttpOnly` of the cookie used for the session. It is set to `true` by
-    /// default.
+    /// The `HttpOnly` of the cookie used for the session. It is set to `true`
+    /// by default.
     ///
     ///  # Examples
     ///

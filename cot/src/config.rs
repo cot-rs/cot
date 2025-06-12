@@ -1024,7 +1024,7 @@ pub struct SessionMiddlewareConfig {
     /// [session]
     /// expiry = "2h"
     /// "#,
-    /// )?;
+    /// );
     ///
     /// // TOML configuration for datetime-based expiry
     /// let config = ProjectConfig::from_toml(
@@ -1032,7 +1032,7 @@ pub struct SessionMiddlewareConfig {
     /// [session]
     /// expiry = "2025-12-31 23:59:59 +0000"
     /// "#,
-    /// )?;
+    /// );
     /// ```
     #[serde(with = "crate::serializers::session_expiry_time")]
     pub expiry: Expiry,

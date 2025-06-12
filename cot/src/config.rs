@@ -851,8 +851,7 @@ impl From<Expiry> for TowerExpiry {
             Expiry::OnInactivity(duration) => {
                 Self::OnInactivity(time::Duration::try_from(duration).unwrap_or_else(|e| {
                     panic!(
-                        "could not convert {:?} into a valid time::Duration: {:?}",
-                        duration, e
+                        "could not convert {duration:?} into a valid time::Duration: {e:?}",
                     )
                 }))
             }
@@ -888,7 +887,7 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
-    /// The HttpOnly of the cookie used for the session. It is set to `true` by
+    /// The `HttpOnly` of the cookie used for the session. It is set to `true` by
     /// default.
     ///
     ///  # Examples
@@ -1335,7 +1334,7 @@ mod tests {
         assert_eq!(config.middlewares.session.same_site, SameSite::Lax);
         assert!(config.middlewares.session.always_save);
         assert_eq!(config.middlewares.session.name, String::from("some.sid"));
-        assert_eq!(config.middlewares.session.path, String::from("/some/path"))
+        assert_eq!(config.middlewares.session.path, String::from("/some/path"));
     }
 
     macro_rules! session_expiry_toml_test {
@@ -1343,10 +1342,10 @@ mod tests {
             #[test]
             fn $name() {
                 let toml_content = format!(
-                    r#"
+                    r"
                 [middlewares.session]
                 expiry = {expiry}
-            "#,
+            ",
                     expiry = $expiry_value
                 );
 

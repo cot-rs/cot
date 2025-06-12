@@ -35,7 +35,7 @@ pub(crate) mod humantime {
 
 pub(crate) mod session_expiry_time {
     use chrono::DateTime;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     use crate::config::Expiry;
 
@@ -67,8 +67,7 @@ pub(crate) mod session_expiry_time {
                             .map(Expiry::AtDateTime)
                             .map_err(|e| {
                                 serde::de::Error::custom(format!(
-                                    "expiry must be a humantime duration or RFC3339 timestamp; got {:?}: {}",
-                                    value, e
+                                    "expiry must be a humantime duration or RFC3339 timestamp; got {value:?}: {e:?}"
                                 ))
                             })
                     })

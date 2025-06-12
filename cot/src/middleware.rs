@@ -12,7 +12,6 @@ use futures_core::future::BoxFuture;
 use futures_util::TryFutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::BoxBody;
-use serde::Serialize;
 use tower::Service;
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 
@@ -299,12 +298,12 @@ impl SessionMiddleware {
             .name(session_cfg.name.clone())
             .http_only(session_cfg.http_only)
             .always_save(session_cfg.always_save)
-            .same_site(session_cfg.same_site.clone())
+            .same_site(session_cfg.same_site)
             .expiry(session_cfg.expiry);
 
         if let Some(domain) = session_cfg.domain.as_ref() {
             middleware = middleware.domain(domain.clone());
-        };
+        }
         middleware
     }
 

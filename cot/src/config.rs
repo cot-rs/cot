@@ -850,9 +850,7 @@ impl From<Expiry> for TowerExpiry {
             Expiry::OnSessionEnd => Self::OnSessionEnd,
             Expiry::OnInactivity(duration) => {
                 Self::OnInactivity(time::Duration::try_from(duration).unwrap_or_else(|e| {
-                    panic!(
-                        "could not convert {duration:?} into a valid time::Duration: {e:?}",
-                    )
+                    panic!("could not convert {duration:?} into a valid time::Duration: {e:?}",)
                 }))
             }
             Expiry::AtDateTime(time) => {

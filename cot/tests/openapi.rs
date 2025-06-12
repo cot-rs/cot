@@ -51,9 +51,15 @@ async fn api_route_integration() {
     ]);
 
     // Test the OpenAPI data
-    let aide::openapi::Paths {
-        paths: api_spec, ..
-    } = router.as_api();
+    let aide::openapi::OpenApi {
+        paths: Some(aide::openapi::Paths {
+            paths: api_spec, ..
+        }),
+        ..
+    } = router.as_api()
+    else {
+        panic!("Expected OpenAPI data");
+    };
 
     assert!(api_spec.contains_key("/test"));
     assert!(api_spec.contains_key("/json"));
@@ -120,14 +126,54 @@ fn api_router_nested() {
     let nested_router = Router::with_urls(vec![Route::with_router("/b", router)]);
     let root_router = Router::with_urls(vec![Route::with_router("/a", nested_router)]);
 
-    let aide::openapi::Paths {
-        paths: api_spec, ..
-    } = root_router.as_api();
+    if let aide::openapi::OpenApi {
+        paths: Some(aide::openapi::Paths {
+            paths: api_spec, ..
+        }),
+        ..
+    } = root_router.as_api()
+    {
+        assert!(matches!(
+            api_spec.get("/a/b/test"),
+            Some(ReferenceOr::Item(PathItem { get: Some(_), .. }))
+        ));
+    } else {
+        panic!("Expected OpenAPI data");
+    }
+}
 
-    assert!(matches!(
-        api_spec.get("/a/b/test"),
-        Some(ReferenceOr::Item(PathItem { get: Some(_), .. }))
-    ));
+#[test]
+fn api_router_cycle() {
+    #[derive(Deserialize, Serialize, schemars::JsonSchema)]
+    struct NestedData {
+        nested: Option<Box<Self>>,
+    }
+
+    async fn test_handler(_data: Json<NestedData>) -> cot::Result<Response> {
+        unimplemented!()
+    }
+
+    let router = Router::with_urls([Route::with_api_handler(
+        "/test",
+        ApiMethodRouter::new().get(test_handler),
+    )]);
+
+    let openapi = router.as_api();
+
+    // cycled objects should be put into components.schemas
+    let schemas = openapi.components.unwrap().schemas;
+    let nested_schema = schemas.get("NestedData").unwrap();
+    let nested_object = nested_schema.json_schema.clone().into_object().object;
+    let reference = nested_object
+        .unwrap()
+        .properties
+        .get("nested")
+        .unwrap()
+        .clone()
+        .into_object()
+        .reference;
+
+    assert_eq!(reference.unwrap(), "#/components/schemas/NestedData");
 }
 
 #[test]

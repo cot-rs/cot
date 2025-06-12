@@ -6,6 +6,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 
 use crate::cot_ident;
+use crate::utils::PreservedStrExpr;
 
 pub(super) fn impl_form_for_struct(ast: &syn::DeriveInput) -> TokenStream {
     let opts = match FormOpts::from_derive_input(ast) {
@@ -70,7 +71,7 @@ impl FormOpts {
 struct Field {
     ident: Option<syn::Ident>,
     ty: syn::Type,
-    opt: Option<HashMap<syn::Ident, syn::Expr>>,
+    opt: Option<HashMap<syn::Ident, PreservedStrExpr>>,
 }
 
 #[derive(Debug)]
@@ -126,7 +127,9 @@ impl FormDeriveBuilder {
         self.fields_as_struct_fields_new.push({
             let custom_options_setters: Vec<_> = if let Some(opt) = opt {
                 opt.iter()
-                    .map(|(key, value)| quote!(custom_options.#key = Some(#value)))
+                    .map(|(key, value)| {
+                        quote!(custom_options.#key = ::core::option::Option::Some(#value))
+                    })
                     .collect()
             } else {
                 Vec::new()
@@ -147,7 +150,7 @@ impl FormDeriveBuilder {
 
         self.fields_as_context_from_request
             .push(quote!(stringify!(#field_ident) => {
-                #crate_ident::form::FormField::set_value(&mut self.#field_ident, value)
+                #crate_ident::form::FormField::set_value(&mut self.#field_ident, value).await?
             }));
 
         let val_ident = format_ident!("val_{}", field_ident);
@@ -160,7 +163,7 @@ impl FormDeriveBuilder {
             quote!(#field_ident: #val_ident.expect("Errors should have been returned by now")),
         );
         self.fields_as_to_context
-            .push(quote!(context.#field_ident.set_value(::std::borrow::Cow::Owned(self.#field_ident.to_field_value()))));
+            .push(quote!(context.#field_ident.set_value(#crate_ident::form::FormFieldValue::new_text(self.#field_ident.to_field_value())).await.expect("Setting value from text should never fail")));
 
         self.fields_as_errors
             .push(quote!(#field_ident: Vec<#crate_ident::form::FormFieldValidationError>));
@@ -215,7 +218,7 @@ impl FormDeriveBuilder {
                     }
                 }
 
-                fn to_context(
+                async fn to_context(
                     &self
                 ) -> Self::Context {
                     use #crate_ident::form::FormContext;
@@ -272,6 +275,7 @@ impl FormDeriveBuilder {
                 #( #fields_as_struct_fields, )*
             }
 
+            #[#crate_ident::__private::async_trait]
             #[automatically_derived]
             impl #crate_ident::form::FormContext for #context_struct_name {
                 fn new() -> Self {
@@ -289,10 +293,10 @@ impl FormDeriveBuilder {
                     Box::new([#( #fields_as_dyn_field_ref, )*].into_iter())
                 }
 
-                fn set_value(
+                async fn set_value(
                     &mut self,
                     field_id: &str,
-                    value: ::std::borrow::Cow<str>,
+                    value: #crate_ident::form::FormFieldValue<'_>,
                 ) -> ::core::result::Result<(), #crate_ident::form::FormFieldValidationError> {
                     match field_id {
                         #( #fields_as_context_from_request, )*

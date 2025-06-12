@@ -347,12 +347,35 @@ impl Router {
     /// specs.
     #[cfg(feature = "openapi")]
     #[must_use]
-    pub fn as_api(&self) -> aide::openapi::Paths {
+    pub fn as_api(&self) -> aide::openapi::OpenApi {
         let mut paths = aide::openapi::Paths::default();
-        let mut schema_generator = schemars::SchemaGenerator::default();
+        let mut schema_generator =
+            schemars::SchemaGenerator::new(schemars::r#gen::SchemaSettings::openapi3());
 
         self.as_openapi_impl("", &[], &mut paths, &mut schema_generator);
-        paths
+
+        let component_schemas = schema_generator
+            .take_definitions()
+            .into_iter()
+            .map(|(name, json_schema)| {
+                (
+                    name,
+                    aide::openapi::SchemaObject {
+                        json_schema,
+                        example: None,
+                        external_docs: None,
+                    },
+                )
+            })
+            .collect();
+        aide::openapi::OpenApi {
+            paths: Some(paths),
+            components: Some(aide::openapi::Components {
+                schemas: component_schemas,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
     }
 
     #[cfg(feature = "openapi")]
@@ -797,21 +820,21 @@ where
 /// # Examples
 ///
 /// ```
+/// use cot::html::Html;
 /// use cot::project::RegisterAppsContext;
 /// use cot::request::Request;
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
-/// use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
+/// use cot::{App, AppBuilder, Project, StatusCode, reverse};
 ///
-/// async fn home(request: Request) -> cot::Result<Response> {
+/// async fn home(request: Request) -> cot::Result<Html> {
 ///     // any of below two lines returns the same:
 ///     let url = reverse!(request, "home")?;
 ///     let url = reverse!(request, "my_custom_app:home")?;
 ///
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed(format!("Hello! The URL for this view is: {}", url)),
-///     ))
+///     Ok(Html::new(format!(
+///         "Hello! The URL for this view is: {}",
+///         url
+///     )))
 /// }
 ///
 /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -857,18 +880,14 @@ macro_rules! reverse {
 /// # Examples
 ///
 /// ```
-/// use cot::request::Request;
-/// use cot::response::{Response, ResponseExt};
+/// use cot::html::Html;
 /// use cot::router::{Route, Router, Urls};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler, StatusCode, reverse};
+/// use cot::{RequestHandler, reverse};
 ///
-/// async fn my_handler(urls: Urls) -> cot::Result<Response> {
+/// async fn my_handler(urls: Urls) -> cot::Result<Html> {
 ///     let url = reverse!(urls, "home")?;
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed(format!("{url}")),
-///     ))
+///     Ok(Html::new(format!("{url}")))
 /// }
 ///
 /// # #[tokio::main]
@@ -900,18 +919,19 @@ impl Urls {
     /// # Examples
     ///
     /// ```
+    /// use cot::html::Html;
     /// use cot::request::Request;
     /// use cot::response::{Response, ResponseExt};
     /// use cot::router::Urls;
     /// use cot::{Body, StatusCode, reverse};
     ///
-    /// async fn my_handler(request: Request) -> cot::Result<Response> {
+    /// async fn my_handler(request: Request) -> cot::Result<Html> {
     ///     let urls = Urls::from_request(&request);
     ///     let url = reverse!(urls, "home")?;
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed(format!("Hello! The URL for this view is: {}", url)),
-    ///     ))
+    ///     Ok(Html::new(format!(
+    ///         "Hello! The URL for this view is: {}",
+    ///         url
+    ///     )))
     /// }
     /// ```
     pub fn from_request(request: &Request) -> Self {

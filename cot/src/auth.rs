@@ -14,8 +14,6 @@ use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 /// backwards compatible shim for form Password type.
-#[deprecated(since = "0.3.0", note = "use `cot::common_types::Password` instead")]
-pub type Password = crate::common_types::Password;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 use derive_more::with_trait::Debug;
@@ -77,10 +75,9 @@ pub type Result<T> = std::result::Result<T, AuthError>;
 ///
 /// This trait is used to represent a user object that can be authenticated and
 /// is a core of the authentication system. A `User` object is returned by
-/// [`AuthRequestExt::user()`] and is used to check if a user is authenticated
-/// and to access user data. If there is no active user session, the `User`
-/// object returned by [`AuthRequestExt::user()`] is an [`AnonymousUser`]
-/// object.
+/// [`Auth::user()`] and is used to check if a user is authenticated and to
+/// access user data. If there is no active user session, the `User` object
+/// returned by [`Auth::user()`] is an [`AnonymousUser`] object.
 ///
 /// A concrete instance of a `User` object is returned by a backend that
 /// implements the [`AuthBackend`] trait. The default backend is the
@@ -176,7 +173,8 @@ pub trait User {
     /// ```
     /// use std::borrow::Cow;
     ///
-    /// use cot::auth::{Password, SessionAuthHash, User, UserId};
+    /// use cot::auth::{SessionAuthHash, User, UserId};
+    /// use cot::common_types::Password;
     /// use cot::config::SecretKey;
     /// use hmac::{Hmac, Mac};
     /// use sha2::Sha512;
@@ -312,8 +310,7 @@ impl Debug for UserWrapper {
 /// An anonymous, unauthenticated user.
 ///
 /// This is used to represent a user that is not authenticated. It is returned
-/// by the [`AuthRequestExt::user()`] method when there is no active user
-/// session.
+/// by the [`Auth::user()`] method when there is no active user session.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct AnonymousUser;
 
@@ -345,7 +342,8 @@ impl User for AnonymousUser {}
 /// ```
 /// use std::borrow::Cow;
 ///
-/// use cot::auth::{Password, SessionAuthHash, User, UserId};
+/// use cot::auth::{SessionAuthHash, User, UserId};
+/// use cot::common_types::Password;
 /// use cot::config::SecretKey;
 /// use hmac::{Hmac, Mac};
 /// use sha2::Sha512;
@@ -486,7 +484,8 @@ impl PasswordHash {
     /// # Examples
     ///
     /// ```
-    /// use cot::auth::{Password, PasswordHash};
+    /// use cot::auth::PasswordHash;
+    /// use cot::common_types::Password;
     ///
     /// let hash = PasswordHash::from_password(&Password::new("password"));
     /// let stored_hash = hash.into_string();

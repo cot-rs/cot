@@ -109,16 +109,12 @@ pub trait App: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::App;
+    /// use cot::html::Html;
     /// use cot::router::{Route, Router};
-    /// use cot::{App, Body, StatusCode};
     ///
-    /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("Hello world!"),
-    ///     ))
+    /// async fn index() -> Html {
+    ///     Html::new("Hello world!")
     /// }
     ///
     /// struct MyApp;
@@ -405,9 +401,10 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
+    /// use cot::html::Html;
     /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, Project, StatusCode};
+    /// use cot::response::{IntoResponse, Response};
+    /// use cot::{Project, StatusCode};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -419,10 +416,9 @@ pub trait Project {
     /// struct MyHandler;
     /// impl ErrorPageHandler for MyHandler {
     ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Ok(Response::new_html(
-    ///             StatusCode::INTERNAL_SERVER_ERROR,
-    ///             Body::fixed("Internal Server Error"),
-    ///         ))
+    ///         Html::new("Internal Server Error")
+    ///             .with_status(StatusCode::INTERNAL_SERVER_ERROR)
+    ///             .into_response()
     ///     }
     /// }
     /// ```
@@ -450,9 +446,10 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
+    /// use cot::html::Html;
     /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, Project, StatusCode};
+    /// use cot::response::{IntoResponse, Response};
+    /// use cot::{Project, StatusCode};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -464,10 +461,9 @@ pub trait Project {
     /// struct MyHandler;
     /// impl ErrorPageHandler for MyHandler {
     ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Ok(Response::new_html(
-    ///             StatusCode::NOT_FOUND,
-    ///             Body::fixed("Not Found"),
-    ///         ))
+    ///         Html::new("Not Found")
+    ///             .with_status(StatusCode::NOT_FOUND)
+    ///             .into_response()
     ///     }
     /// }
     /// ```
@@ -703,9 +699,10 @@ impl AppBuilder {
 /// # Examples
 ///
 /// ```
+/// use cot::html::Html;
 /// use cot::project::ErrorPageHandler;
-/// use cot::response::{Response, ResponseExt};
-/// use cot::{Body, Project, StatusCode};
+/// use cot::response::{IntoResponse, Response};
+/// use cot::{Project, StatusCode};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -717,10 +714,9 @@ impl AppBuilder {
 /// struct MyHandler;
 /// impl ErrorPageHandler for MyHandler {
 ///     fn handle(&self) -> cot::Result<Response> {
-///         Ok(Response::new_html(
-///             StatusCode::NOT_FOUND,
-///             Body::fixed("Not Found"),
-///         ))
+///         Html::new("Not Found")
+///             .with_status(StatusCode::NOT_FOUND)
+///             .into_response()
 ///     }
 /// }
 /// ```
@@ -736,9 +732,10 @@ pub trait ErrorPageHandler: Send + Sync {
     /// # Examples
     ///
     /// ```
+    /// use cot::html::Html;
     /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{Response, ResponseExt};
-    /// use cot::{Body, Project, StatusCode};
+    /// use cot::response::{IntoResponse, Response};
+    /// use cot::{Project, StatusCode};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -750,10 +747,9 @@ pub trait ErrorPageHandler: Send + Sync {
     /// struct MyHandler;
     /// impl ErrorPageHandler for MyHandler {
     ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Ok(Response::new_html(
-    ///             StatusCode::NOT_FOUND,
-    ///             Body::fixed("Not Found"),
-    ///         ))
+    ///         Ok(Html::new("Not Found")
+    ///             .with_status(StatusCode::NOT_FOUND)
+    ///             .into_response()?)
     ///     }
     /// }
     /// ```

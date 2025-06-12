@@ -47,11 +47,9 @@ use crate::router::method::InnerMethodRouter;
 ///
 /// ```
 /// use cot::json::Json;
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::method::openapi::api_post;
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, Method, StatusCode};
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Serialize, Deserialize, schemars::JsonSchema)]
@@ -65,13 +63,10 @@ use crate::router::method::InnerMethodRouter;
 ///     result: i32,
 /// }
 ///
-/// async fn add(Json(add_request): Json<AddRequest>) -> cot::Result<Response> {
-///     Response::new_json(
-///         StatusCode::OK,
-///         &AddResponse {
-///             result: add_request.a + add_request.b,
-///         },
-///     )
+/// async fn add(Json(add_request): Json<AddRequest>) -> Json<AddResponse> {
+///     Json(AddResponse {
+///         result: add_request.a + add_request.b,
+///     })
 /// }
 ///
 /// # #[tokio::main]
@@ -110,12 +105,11 @@ macro_rules! define_method {
         /// # Examples
         ///
         /// ```
-        /// use cot::response::{Response, ResponseExt};
+        /// use cot::json::Json;
         /// use cot::router::method::openapi::ApiMethodRouter;
-        /// use cot::{Body, StatusCode};
         ///
-        /// async fn test_handler() -> cot::Result<Response> {
-        ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+        /// async fn test_handler() -> Json<()> {
+        ///     Json(())
         /// }
         ///
         /// # #[tokio::main]
@@ -144,7 +138,7 @@ macro_rules! define_method {
         /// #         .into_body()
         /// #         .into_bytes()
         /// #         .await?,
-        /// #     "test"
+        /// #     "null"
         /// # );
         /// # Ok(())
         /// # }
@@ -182,18 +176,14 @@ impl ApiMethodRouter {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::json::Json;
     /// use cot::router::method::MethodRouter;
     /// use cot::router::method::openapi::ApiMethodRouter;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn test_handler() -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("GET response"),
-    ///     ))
+    /// async fn test_handler() -> Json<()> {
+    ///     Json(())
     /// }
     ///
     /// # #[tokio::main]
@@ -210,7 +200,7 @@ impl ApiMethodRouter {
     ///         .into_body()
     ///         .into_bytes()
     ///         .await?,
-    ///     "GET response"
+    ///     "null"
     /// );
     /// # Ok(())
     /// # }
@@ -241,12 +231,11 @@ impl ApiMethodRouter {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::json::Json;
     /// use cot::router::method::openapi::ApiMethodRouter;
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn test_handler() -> cot::Result<Response> {
-    ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+    /// async fn test_handler() -> Json<()> {
+    ///     Json(())
     /// }
     ///
     /// # #[tokio::main]
@@ -267,7 +256,7 @@ impl ApiMethodRouter {
     /// #         .into_body()
     /// #         .into_bytes()
     /// #         .await?,
-    /// #     "test"
+    /// #     "null"
     /// # );
     /// # Ok(())
     /// # }
@@ -286,14 +275,14 @@ impl ApiMethodRouter {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::html::Html;
     /// use cot::router::method::openapi::ApiMethodRouter;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
     /// use cot::{Body, StatusCode};
     ///
-    /// async fn fallback_handler() -> cot::Result<Response> {
-    ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("fallback")))
+    /// async fn fallback_handler() -> Html {
+    ///     Html::new("fallback")
     /// }
     ///
     /// # #[tokio::main]
@@ -416,12 +405,11 @@ macro_rules! define_method_router {
         /// # Examples
         ///
         /// ```
-        /// use cot::response::{Response, ResponseExt};
+        /// use cot::json::Json;
         #[doc = concat!("use cot::router::method::openapi::", stringify!($func_name), ";")]
-        /// use cot::{Body, StatusCode};
         ///
-        /// async fn test_handler() -> cot::Result<Response> {
-        ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+        /// async fn test_handler() -> Json<()> {
+        ///     Json(())
         /// }
         ///
         /// # #[tokio::main]
@@ -446,7 +434,7 @@ macro_rules! define_method_router {
         /// #         .into_body()
         /// #         .into_bytes()
         /// #         .await?,
-        /// #     "test"
+        /// #     "null"
         /// # );
         /// # Ok(())
         /// # }
@@ -488,12 +476,12 @@ define_method_router!(api_trace, trace => TRACE);
 /// # Examples
 ///
 /// ```
-/// use cot::response::{Response, ResponseExt};
+/// use cot::html::Html;
 /// use cot::router::method::openapi::api_connect;
 /// use cot::{Body, StatusCode};
 ///
-/// async fn test_handler() -> cot::Result<Response> {
-///     Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+/// async fn test_handler() -> Html {
+///     Html::new("test")
 /// }
 ///
 /// # #[tokio::main]

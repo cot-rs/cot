@@ -808,7 +808,7 @@ mod tests {
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
 
-    #[tokio::test]
+    #[cot::test]
     async fn session_middleware_adds_session() {
         let svc = tower::service_fn(|req: Request<Body>| async move {
             assert!(req.extensions().get::<Session>().is_some());
@@ -822,7 +822,7 @@ mod tests {
         svc.ready().await.unwrap().call(request).await.unwrap();
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn session_middleware_adds_cookie() {
         let svc = tower::service_fn(|req: Request<Body>| async move {
             let session = req.extensions().get::<Session>().unwrap();
@@ -850,7 +850,7 @@ mod tests {
         assert!(cookie_value.contains("Path=/"));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn session_middleware_adds_cookie_not_secure() {
         let svc = tower::service_fn(|req: Request<Body>| async move {
             let session = req.extensions().get::<Session>().unwrap();
@@ -873,7 +873,7 @@ mod tests {
         assert!(!cookie_value.contains("Secure;"));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn auth_middleware_adds_auth() {
         let svc = tower::service_fn(|req: Request<Body>| async move {
             let auth = req
@@ -893,7 +893,7 @@ mod tests {
         svc.ready().await.unwrap().call(request).await.unwrap();
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[should_panic(
         expected = "Session extension missing. Did you forget to add the SessionMiddleware?"
     )]
@@ -910,7 +910,7 @@ mod tests {
         let _result = svc.ready().await.unwrap().call(request).await;
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn auth_service_cloning() {
         let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter_clone = counter.clone();

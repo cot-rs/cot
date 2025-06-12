@@ -14,18 +14,14 @@
 //! For example, the [`Path`] extractor is used to extract path parameters:
 //!
 //! ```
+//! use cot::html::Html;
 //! use cot::request::extractors::{FromRequest, Path};
 //! use cot::request::{Request, RequestExt};
-//! use cot::response::{Response, ResponseExt};
 //! use cot::router::{Route, Router};
 //! use cot::test::TestRequestBuilder;
-//! use cot::{Body, RequestHandler};
 //!
-//! async fn my_handler(Path(my_param): Path<String>) -> cot::Result<Response> {
-//!     Ok(Response::new_html(
-//!         cot::StatusCode::OK,
-//!         Body::fixed(format!("Hello {my_param}!")),
-//!     ))
+//! async fn my_handler(Path(my_param): Path<String>) -> Html {
+//!     Html::new(format!("Hello {my_param}!"))
 //! }
 //!
 //! # #[tokio::main]
@@ -126,18 +122,14 @@ impl FromRequestParts for Urls {
 /// # Examples
 ///
 /// ```
+/// use cot::html::Html;
 /// use cot::request::extractors::{FromRequest, Path};
 /// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
 ///
-/// async fn my_handler(Path(my_param): Path<String>) -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {my_param}!")),
-///     ))
+/// async fn my_handler(Path(my_param): Path<String>) -> Html {
+///     Html::new(format!("Hello {my_param}!"))
 /// }
 ///
 /// # #[tokio::main]
@@ -186,12 +178,11 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
 /// # Example
 ///
 /// ```
+/// use cot::RequestHandler;
+/// use cot::html::Html;
 /// use cot::request::extractors::{FromRequest, UrlQuery};
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
 /// use serde::Deserialize;
 ///
 /// #[derive(Deserialize)]
@@ -199,11 +190,8 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(UrlQuery(query): UrlQuery<MyQuery>) -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {}!", query.hello)),
-///     ))
+/// async fn my_handler(UrlQuery(query): UrlQuery<MyQuery>) -> Html {
+///     Html::new(format!("Hello {}!", query.hello))
 /// }
 ///
 /// # #[tokio::main]
@@ -260,8 +248,6 @@ where
 /// ```
 /// use cot::RequestHandler;
 /// use cot::json::Json;
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::test::TestRequestBuilder;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -270,8 +256,8 @@ where
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(Json(data): Json<MyData>) -> cot::Result<Response> {
-///     Ok(Response::new_json(cot::StatusCode::OK, &data)?)
+/// async fn my_handler(Json(data): Json<MyData>) -> Json<MyData> {
+///     Json(data)
 /// }
 ///
 /// # #[tokio::main]
@@ -327,19 +313,16 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 ///
 /// ```
 /// use cot::form::{Form, FormResult};
+/// use cot::html::Html;
 /// use cot::request::extractors::RequestForm;
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
-/// use serde::Deserialize;
 ///
 /// #[derive(Form)]
 /// struct MyForm {
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(RequestForm(form): RequestForm<MyForm>) -> cot::Result<Response> {
+/// async fn my_handler(RequestForm(form): RequestForm<MyForm>) -> Html {
 ///     let form = match form {
 ///         FormResult::Ok(form) => form,
 ///         FormResult::ValidationError(error) => {
@@ -347,14 +330,12 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 ///         }
 ///     };
 ///
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {}!", form.hello)),
-///     ))
+///     Html::new(format!("Hello {}!", form.hello))
 /// }
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
+/// # use cot::RequestHandler;
 /// # let request = TestRequestBuilder::post("/").form_data(&[("hello", "world")]).build();
 /// # my_handler.handle(request).await?;
 /// # Ok(())
@@ -375,7 +356,6 @@ impl<F: Form> FromRequest for RequestForm<F> {
 ///
 /// ```
 /// use cot::html::Html;
-/// use cot::request::Request;
 /// use cot::request::extractors::RequestDb;
 ///
 /// async fn my_handler(RequestDb(db): RequestDb) -> Html {
@@ -536,6 +516,41 @@ impl FromRequestParts for Auth {
         Ok(auth)
     }
 }
+
+/// A derive macro that automatically implements the [`FromRequestParts`] trait
+/// for structs.
+///
+/// This macro generates code to extract each field of the struct from HTTP
+/// request parts, making it easy to create composite extractors that combine
+/// multiple data sources from an incoming request.
+///
+/// The macro works by calling [`FromRequestParts::from_request_parts`] on each
+/// field's type, allowing you to compose extractors seamlessly. All fields must
+/// implement the [`FromRequestParts`] trait for the derivation to work.
+///
+/// # Requirements
+///
+/// - The target struct must have all fields implement [`FromRequestParts`]
+/// - Works with named fields, unnamed fields (tuple structs), and unit structs
+/// - The struct must be accessible where the macro is used
+///
+/// # Examples
+///
+/// ## Named Fields
+///
+/// ```no_run
+/// use cot::request::extractors::{Path, StaticFiles, UrlQuery};
+/// use cot::router::Urls;
+/// use cot_macros::FromRequestParts;
+/// use serde::Deserialize;
+///
+/// #[derive(Debug, FromRequestParts)]
+/// pub struct BaseContext {
+///     urls: Urls,
+///     static_files: StaticFiles,
+/// }
+/// ```
+pub use cot_macros::FromRequestParts;
 
 #[cfg(test)]
 mod tests {

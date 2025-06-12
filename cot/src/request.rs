@@ -12,11 +12,9 @@
 //! use cot::request::RequestExt;
 //! ```
 
-use std::borrow::Cow;
 use std::future::Future;
 use std::sync::Arc;
 
-use bytes::Bytes;
 use http::Extensions;
 use http::request::Parts;
 use indexmap::IndexMap;
@@ -645,10 +643,6 @@ pub struct PathParamsDeserializerError(
     #[source] serde_path_to_error::Error<path_params_deserializer::PathParamsDeserializerError>,
 );
 
-pub(crate) fn query_pairs(bytes: &Bytes) -> impl Iterator<Item = (Cow<'_, str>, Cow<'_, str>)> {
-    form_urlencoded::parse(bytes.as_ref())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -685,19 +679,6 @@ mod tests {
                 hello: "world".to_string(),
                 foo: "bar".to_string(),
             }
-        );
-    }
-
-    #[test]
-    fn create_query_pairs() {
-        let bytes = Bytes::from_static(b"hello=world&foo=bar");
-        let pairs: Vec<_> = query_pairs(&bytes).collect();
-        assert_eq!(
-            pairs,
-            vec![
-                (Cow::from("hello"), Cow::from("world")),
-                (Cow::from("foo"), Cow::from("bar"))
-            ]
         );
     }
 
@@ -790,7 +771,7 @@ mod tests {
         assert!(request.expect_content_type("application/json").is_err());
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn request_ext_extract_parts() {
         async fn handler(mut request: Request) -> Result<Response> {
             let Path(id): Path<String> = request.extract_parts().await?;
@@ -858,7 +839,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn parts_extract_parts() {
         let (mut parts, _) = Request::new(Body::empty()).into_parts();
 

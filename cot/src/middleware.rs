@@ -12,10 +12,11 @@ use futures_core::future::BoxFuture;
 use futures_util::TryFutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::BoxBody;
+use serde::Serialize;
 use tower::Service;
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 
-use crate::config::SameSite;
+use crate::config::{Expiry, SameSite};
 use crate::error::ErrorRepr;
 use crate::project::MiddlewareContext;
 use crate::request::Request;
@@ -292,13 +293,19 @@ impl SessionMiddleware {
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let session_cfg = &context.config().middlewares.session;
-        Self::new()
+        let mut middleware = Self::new()
             .secure(session_cfg.secure)
             .path(session_cfg.path.clone())
             .name(session_cfg.name.clone())
             .http_only(session_cfg.http_only)
             .always_save(session_cfg.always_save)
             .same_site(session_cfg.same_site.clone())
+            .expiry(session_cfg.expiry);
+
+        if let Some(domain) = session_cfg.domain.as_ref() {
+            middleware = middleware.domain(domain.clone());
+        };
+        middleware
     }
 
     /// Sets the secure flag for the session middleware.
@@ -415,6 +422,26 @@ impl SessionMiddleware {
     pub fn always_save(self, always_save: bool) -> Self {
         Self {
             inner: self.inner.with_always_save(always_save),
+        }
+    }
+
+    /// Sets the expiry behavior for the session cookie.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::Expiry;
+    /// use cot::middleware::SessionMiddleware;
+    ///
+    /// let middleware =
+    ///     SessionMiddleware::new().expiry(Expiry::OnInactivity(Duration::from_secs(3600)));
+    /// ```
+    #[must_use]
+    pub fn expiry(self, expiry: Expiry) -> Self {
+        Self {
+            inner: self.inner.with_expiry(expiry.into()),
         }
     }
 }

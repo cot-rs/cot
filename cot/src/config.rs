@@ -17,10 +17,14 @@
 
 use std::time::Duration;
 
+use chrono::{DateTime, FixedOffset};
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
+use time::{OffsetDateTime, UtcOffset};
+use tower_sessions::Expiry as TowerExpiry;
+use tower_sessions::cookie::SameSite as TowerSameSite;
 
 /// The configuration for a project.
 ///
@@ -756,7 +760,6 @@ impl LiveReloadMiddlewareConfigBuilder {
 /// - `None`: Cookie is sent on all requests, including third-party contexts
 ///   (least restrictive).
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum SameSite {
     /// Only send cookie for same-site requests.
@@ -770,14 +773,92 @@ pub enum SameSite {
     None,
 }
 
-use tower_sessions::cookie::SameSite as TowerSameSite;
-
 impl From<SameSite> for TowerSameSite {
     fn from(value: SameSite) -> Self {
         match value {
             SameSite::Strict => Self::Strict,
             SameSite::Lax => Self::Lax,
             SameSite::None => Self::None,
+        }
+    }
+}
+
+fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDateTime {
+    let offset = UtcOffset::from_whole_seconds(dt.offset().local_minus_utc())
+        .expect("offset within valid range");
+    OffsetDateTime::from_unix_timestamp(dt.timestamp())
+        .expect("timestamp in valid range")
+        .to_offset(offset)
+}
+
+/// Session expiry configuration.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::time::Duration;
+///
+/// use chrono::DateTime;
+/// use cot::config::Expiry;
+///
+/// // Expires when the session ends.
+/// let expiry = Expiry::OnSessionEnd;
+///
+/// // Expires 5 mins after inactivity.
+/// let expiry = Expiry::OnInactivity(Duration::from_secs(5 * 60));
+///
+/// // Expires at the given timestamp.
+/// let expired_at =
+///     DateTime::parse_from_str("2025-05-27 13:03:00 -0200", "%Y-%m-%d %H:%M:%S %z").unwrap();
+/// let expiry = Expiry::AtDateTime(expired_at);
+/// ```
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Expiry {
+    /// The cookie expires when the browser session ends.
+    ///
+    /// This is equivalent to not setting the `max-age` or `expires` attributes
+    /// in the cookie header, making it a session cookie. The cookie will be
+    /// deleted when the user closes their browser or when the browser decides
+    /// to end the session.
+    ///
+    /// This is the most secure option as it ensures sessions don't persist
+    /// beyond the browser session, but it may require users to log in more
+    /// frequently.
+    #[default]
+    OnSessionEnd,
+    /// The cookie expires after the specified duration of inactivity.
+    ///
+    /// The session will remain valid as long as the user continues to make
+    /// requests within the specified time window. Each request resets the
+    /// inactivity timer, extending the session lifetime.
+    ///
+    /// This provides a balance between security and user convenience, as
+    /// active users won't be logged out unexpectedly, but inactive sessions
+    /// will eventually expire.
+    OnInactivity(Duration),
+    /// The cookie expires at the specified date and time.
+    ///
+    /// The session will remain valid until the exact datetime specified,
+    /// regardless of user activity.
+    AtDateTime(DateTime<FixedOffset>),
+}
+
+impl From<Expiry> for TowerExpiry {
+    fn from(value: Expiry) -> Self {
+        match value {
+            Expiry::OnSessionEnd => Self::OnSessionEnd,
+            Expiry::OnInactivity(duration) => {
+                Self::OnInactivity(time::Duration::try_from(duration).unwrap_or_else(|e| {
+                    panic!(
+                        "could not convert {:?} into a valid time::Duration: {:?}",
+                        duration, e
+                    )
+                }))
+            }
+            Expiry::AtDateTime(time) => {
+                Self::AtDateTime(chrono_datetime_to_time_offsetdatetime(time))
+            }
         }
     }
 }
@@ -885,6 +966,81 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().always_save(true).build();
     /// ```
     pub always_save: bool,
+    /// The expiry behavior for session cookies.
+    ///
+    /// This controls when the session cookie expires and how long it remains
+    /// valid. The expiry behavior affects how the cookie's `max-age` and
+    /// `expires` attributes are set in the HTTP response.
+    ///
+    /// The available expiry modes are:
+    /// - `OnSessionEnd`: The cookie expires when the browser session ends. This
+    ///   is equivalent to not adding or removing the `max-age`/`expires` field
+    ///   in the cookie header, making it a session cookie.
+    /// - `OnInactivity`: The cookie expires after the specified duration of
+    ///   inactivity. The cookie will be refreshed on each request.
+    /// - `AtDateTime`: The cookie expires at the given timestamp, regardless of
+    ///   user activity.
+    ///
+    /// The default value is [`Expiry::OnSessionEnd`] when not specified.
+    ///
+    /// # TOML
+    ///
+    /// In TOML configuration, the expiry can be specified in two formats:
+    /// - For `OnInactivity`: Use the "humantime" format (e.g., `"1h"`, `"30m"`,
+    ///   `"7d"`). Please refer to the [`humantime::parse_duration`]
+    ///   documentation for supported formats.
+    /// - For `AtDateTime`: Use a valid RFC 3339/ISO 8601 formatted timestamp
+    ///   (e.g., `"2025-12-31T23:59:59+00:00"`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use chrono::DateTime;
+    /// use cot::config::{Expiry, SessionMiddlewareConfig};
+    ///
+    /// // Session expires when browser session ends (default)
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::OnSessionEnd)
+    ///     .build();
+    ///
+    /// // Session expires after 1 hour of inactivity
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::OnInactivity(Duration::from_secs(3600)))
+    ///     .build();
+    ///
+    /// // Session expires at specific datetime
+    /// let expire_at =
+    ///     DateTime::parse_from_str("2025-12-31 23:59:59 +0000", "%Y-%m-%d %H:%M:%S %z").unwrap();
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::AtDateTime(expire_at))
+    ///     .build();
+    /// ```
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::ProjectConfig;
+    ///
+    /// // TOML configuration for inactivity-based expiry
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [session]
+    /// expiry = "2h"
+    /// "#,
+    /// )?;
+    ///
+    /// // TOML configuration for datetime-based expiry
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [session]
+    /// expiry = "2025-12-31 23:59:59 +0000"
+    /// "#,
+    /// )?;
+    /// ```
+    #[serde(with = "crate::serializers::session_expiry_time")]
+    pub expiry: Expiry,
 }
 
 impl SessionMiddlewareConfig {
@@ -921,9 +1077,10 @@ impl SessionMiddlewareConfigBuilder {
             http_only: self.http_only.unwrap_or(true),
             same_site: self.same_site.unwrap_or_default(),
             domain: self.domain.clone().unwrap_or_default(),
-            name: self.name.clone().unwrap_or("String".to_string()),
+            name: self.name.clone().unwrap_or("id".to_string()),
             path: self.path.clone().unwrap_or(String::from("/")),
             always_save: self.always_save.unwrap_or(false),
+            expiry: self.expiry.unwrap_or_default(),
         }
     }
 }
@@ -1180,6 +1337,36 @@ mod tests {
         assert_eq!(config.middlewares.session.name, String::from("some.sid"));
         assert_eq!(config.middlewares.session.path, String::from("/some/path"))
     }
+
+    macro_rules! session_expiry_toml_test {
+        ($name:ident, $expiry_value:expr, $expected:expr) => {
+            #[test]
+            fn $name() {
+                let toml_content = format!(
+                    r#"
+                [middlewares.session]
+                expiry = {expiry}
+            "#,
+                    expiry = $expiry_value
+                );
+
+                let config = ProjectConfig::from_toml(&toml_content).unwrap();
+                assert_eq!(config.middlewares.session.expiry, $expected);
+            }
+        };
+    }
+
+    session_expiry_toml_test!(
+        expiry_duration,
+        r#""2h""#,
+        Expiry::OnInactivity(Duration::from_secs(7200))
+    );
+
+    session_expiry_toml_test!(
+        expiry_timestamp,
+        r#""2025-12-31T23:59:59+00:00""#,
+        Expiry::AtDateTime(DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap())
+    );
 
     #[test]
     fn from_toml_invalid() {

@@ -32,3 +32,47 @@ pub(crate) mod humantime {
         }
     }
 }
+
+pub(crate) mod session_expiry_time {
+    use chrono::DateTime;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use crate::config::Expiry;
+
+    #[allow(clippy::ref_option)]
+    pub(crate) fn serialize<S>(expiry: &Expiry, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match expiry {
+            Expiry::OnSessionEnd => serializer.serialize_none(),
+            Expiry::OnInactivity(time) => super::humantime::serialize(&Some(*time), serializer),
+            Expiry::AtDateTime(time) => serializer.serialize_str(&time.to_string()),
+        }
+    }
+
+    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Expiry, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = Option::<String>::deserialize(deserializer)?;
+        match s {
+            None => Ok(Expiry::OnSessionEnd),
+            Some(value) => {
+                humantime::parse_duration(&value)
+                    .map(Expiry::OnInactivity)
+                    // On failure, fall back to RFC3339 date-time
+                    .or_else(|_| {
+                        DateTime::parse_from_rfc3339(&value)
+                            .map(Expiry::AtDateTime)
+                            .map_err(|e| {
+                                serde::de::Error::custom(format!(
+                                    "expiry must be a humantime duration or RFC3339 timestamp; got {:?}: {}",
+                                    value, e
+                                ))
+                            })
+                    })
+            }
+        }
+    }
+}

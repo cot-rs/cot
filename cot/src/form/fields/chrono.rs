@@ -2,9 +2,10 @@ use std::fmt::{Display, Formatter};
 
 use askama::filters::HtmlSafe;
 use chrono::{
-    DateTime, Duration, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, ParseError,
-    TimeZone, Weekday, WeekdaySet,
+    DateTime, Duration, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset,
+    ParseError, TimeZone, Weekday, WeekdaySet,
 };
+use chrono_tz::Tz;
 use cot::form::FormField;
 use cot::form::fields::impl_form_field;
 use cot::html::{Html, HtmlTag};
@@ -134,19 +135,13 @@ const BROWSER_TIME_FMT: &str = "%H:%M:%S";
 const BROWSER_TIME_WITHOUT_SEC_FMT: &str = "%H:%M";
 
 fn parse_datetime_with_fallback(value: &str) -> Result<NaiveDateTime, ParseError> {
-    let date_time = match NaiveDateTime::parse_from_str(value, BROWSER_DATETIME_FMT) {
-        Ok(date_time) => date_time,
-        Err(_) => NaiveDateTime::parse_from_str(value, BROWSER_DATETIME_WITHOUT_SEC_FMT)?,
-    };
-    Ok(date_time)
+    NaiveDateTime::parse_from_str(value, BROWSER_DATETIME_FMT)
+        .or_else(|_| NaiveDateTime::parse_from_str(value, BROWSER_DATETIME_WITHOUT_SEC_FMT))
 }
 
 fn parse_time_with_fallback(value: &str) -> Result<NaiveTime, ParseError> {
-    let time = match NaiveTime::parse_from_str(value, BROWSER_TIME_FMT) {
-        Ok(time) => time,
-        Err(_) => NaiveTime::parse_from_str(value, BROWSER_TIME_WITHOUT_SEC_FMT)?,
-    };
-    Ok(time)
+    NaiveTime::parse_from_str(value, BROWSER_TIME_FMT)
+        .or_else(|_| NaiveTime::parse_from_str(value, BROWSER_TIME_WITHOUT_SEC_FMT))
 }
 
 impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
@@ -298,31 +293,29 @@ impl From<ParseError> for FormFieldValidationError {
 /// Custom options for [`DateTimeWithTimezoneField`]
 ///
 /// Specifies the HTML attributes applied to a `datetime‐local` input, plus
-/// a user‐specified offset and DST‐disambiguation policy.
+/// a user‐specified timezone and DST‐disambiguation policy.
 ///
 /// # Example
 ///
 /// ```
-/// use chrono::{Duration, FixedOffset, NaiveDateTime};
+/// use chrono::Duration;
+/// use chrono_tz::Tz;
 /// use cot::form::fields::{
 ///     DateTimeWithTimezoneField, DateTimeWithTimezoneFieldOptions, Step,
 /// };
 /// use cot::form::{FormField, FormFieldOptions};
 ///
-/// // Suppose we want UTC+05:30 as the “base” offset, and if there’s a DST fold,
+/// // Suppose we want America/New_York timezone with DST handling, and if there's a DST fold,
 /// // we choose the later offset (i.e. `prefer_latest = true`).
-/// let tz_offset = FixedOffset::east_opt(5 * 3600 + 30 * 60).unwrap();
+/// let tz: Tz = "America/New_York".parse().unwrap();
 ///
 /// let options = DateTimeWithTimezoneFieldOptions {
 ///     min: None,
 ///     max: None,
 ///     readonly: Some(false),
 ///     step: Some(Step::Value(Duration::seconds(60))),
-///
-///     // Use UTC+05:30 when parsing datetime from the browser.
-///     timezone: Some(tz_offset),
-///
-///     // If a given local time is ambiguous (DST fall‐back), pick the later of the two possibilities.
+///     timezone: Some(tz),
+///     // If the given local time is ambiguous (DST fall‐back), pick the later of the two possibilities.
 ///     prefer_latest: Some(true),
 /// };
 ///
@@ -368,13 +361,14 @@ pub struct DateTimeWithTimezoneFieldOptions {
     /// [`step` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/datetime-local#step
     pub step: Option<Step<Duration>>,
 
-    /// The timezone offset to use when parsing the browser‐supplied string.
+    /// The timezone to use when parsing the browser‐supplied string.
     ///
-    /// Browsers send a naive “YYYY-MM-DDThh:mm” (no offset). If `timezone` is
-    /// `Some(offset)`, we convert that naive time into a
-    /// `DateTime<FixedOffset>` using `offset.from_local_datetime(...)`. If
-    /// `None`, defaults to UTC.
-    pub timezone: Option<FixedOffset>,
+    /// Browsers send a naive "YYYY-MM-DDThh:mm" (no offset). If `timezone` is
+    /// `Some(tz)`, we convert that naive time into a `DateTime<FixedOffset>`
+    /// using `tz.from_local_datetime(...)`. The timezone should be a
+    /// [`Tz`] which is capable of handling true DST transitions and
+    /// timezone rules. If `None`, defaults to UTC.
+    pub timezone: Option<Tz>,
 
     /// Choose how to handle ambiguous local time conversion (e.g. during a DST
     /// fall-back).
@@ -456,11 +450,9 @@ impl AsFormField for DateTime<FixedOffset> {
     {
         let value = check_required(field)?;
         // Browsers only support naive datetime.
-        let naive: NaiveDateTime = parse_datetime_with_fallback(value)?;
+        let naive = parse_datetime_with_fallback(value)?;
         // default to UTC if offset(timezone) is not provided.
-        let tz: FixedOffset = field.custom_options.timezone.unwrap_or_else(|| {
-            FixedOffset::east_opt(0).expect("UTC is always valid as `FixedOffset`")
-        });
+        let tz = field.custom_options.timezone.unwrap_or(Tz::UTC);
 
         let date_time = match tz.from_local_datetime(&naive) {
             LocalResult::Single(dt) => dt,
@@ -468,19 +460,21 @@ impl AsFormField for DateTime<FixedOffset> {
                 if let Some(prefer_latest) = field.custom_options.prefer_latest {
                     if prefer_latest { dt2 } else { dt1 }
                 } else {
-                    return Err(FormFieldValidationError::from_string(
-                        "Ambiguous local datetime".into(),
-                    ));
+                    return Err(FormFieldValidationError::from_string(format!(
+                        "Ambiguous local datetime `{naive:?}`. set the `prefer_latest` option to resolve datetime."
+                    )));
                 }
             }
             LocalResult::None => {
-                return Err(FormFieldValidationError::from_string(
-                    "Invalid local datetime for given timezone".into(),
-                ));
+                return Err(FormFieldValidationError::from_string(format!(
+                    "Local datetime `{naive:?}`  does not exist for given timezone(`{tz:?}`)"
+                )));
             }
         };
-        // let date_time = tz.from_local_datetime(&naive).unwrap();
+
         let opts = &field.custom_options;
+        // transform the timezone into a fixed offset.
+        let date_time = date_time.with_timezone(&date_time.offset().fix());
 
         if let Some(min) = &opts.min {
             if date_time < *min {
@@ -1364,7 +1358,7 @@ mod tests {
 
     #[cot::test]
     async fn datetime_with_tz_clean_valid_custom_offset() {
-        let offset = FixedOffset::east_opt(2 * 3600).unwrap();
+        let offset = Tz::America__New_York;
         let mut field = DateTimeWithTimezoneField::with_options(
             FormFieldOptions {
                 id: "dt".into(),
@@ -1386,7 +1380,120 @@ mod tests {
             .unwrap();
 
         let dt = DateTime::<FixedOffset>::clean_value(&field).unwrap();
-        assert_eq!(dt.to_rfc3339(), "2025-05-27T01:23:00+02:00");
+        assert_eq!(dt.to_rfc3339(), "2025-05-27T01:23:00-04:00");
+    }
+
+    #[cot::test]
+    async fn datetime_with_tz_clean_ambiguous_time_prefer_earliest() {
+        let offset = Tz::America__New_York;
+        let mut field = DateTimeWithTimezoneField::with_options(
+            FormFieldOptions {
+                id: "dt".into(),
+                name: "dt".into(),
+                required: true,
+            },
+            DateTimeWithTimezoneFieldOptions {
+                min: None,
+                max: None,
+                readonly: None,
+                step: None,
+                timezone: Some(offset),
+                prefer_latest: Some(false),
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2024-11-03T01:30"))
+            .await
+            .unwrap();
+
+        let dt = DateTime::<FixedOffset>::clean_value(&field).unwrap();
+        assert_eq!(dt.to_rfc3339(), "2024-11-03T01:30:00-04:00");
+    }
+
+    #[cot::test]
+    async fn datetime_with_tz_clean_ambiguous_time_prefer_latest() {
+        let offset = Tz::America__New_York;
+        let mut field = DateTimeWithTimezoneField::with_options(
+            FormFieldOptions {
+                id: "dt".into(),
+                name: "dt".into(),
+                required: true,
+            },
+            DateTimeWithTimezoneFieldOptions {
+                min: None,
+                max: None,
+                readonly: None,
+                step: None,
+                timezone: Some(offset),
+                prefer_latest: Some(true),
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2024-11-03T01:30"))
+            .await
+            .unwrap();
+
+        let dt = DateTime::<FixedOffset>::clean_value(&field).unwrap();
+        assert_eq!(dt.to_rfc3339(), "2024-11-03T01:30:00-05:00");
+    }
+
+    #[cot::test]
+    async fn datetime_with_tz_clean_ambiguous_time_unhandled() {
+        let offset = Tz::America__New_York;
+        let mut field = DateTimeWithTimezoneField::with_options(
+            FormFieldOptions {
+                id: "dt".into(),
+                name: "dt".into(),
+                required: true,
+            },
+            DateTimeWithTimezoneFieldOptions {
+                min: None,
+                max: None,
+                readonly: None,
+                step: None,
+                timezone: Some(offset),
+                prefer_latest: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2024-03-10T02:30"))
+            .await
+            .unwrap();
+
+        let dt = DateTime::<FixedOffset>::clean_value(&field);
+        assert_eq!(
+            dt,
+            Err(FormFieldValidationError::from_string(
+                r#"Local datetime `2024-03-10T02:30:00`  does not exist for given timezone(`America/New_York`)"#
+                    .into()
+            ))
+        );
+    }
+    #[cot::test]
+    async fn datetime_with_tz_clean_non_existent_local_time() {
+        let offset = Tz::America__New_York;
+        let mut field = DateTimeWithTimezoneField::with_options(
+            FormFieldOptions {
+                id: "dt".into(),
+                name: "dt".into(),
+                required: true,
+            },
+            DateTimeWithTimezoneFieldOptions {
+                min: None,
+                max: None,
+                readonly: None,
+                step: None,
+                timezone: Some(offset),
+                prefer_latest: None,
+            },
+        );
+        field
+            .set_value(FormFieldValue::new_text("2024-03-10T02:30"))
+            .await
+            .unwrap();
+
+        let dt = DateTime::<FixedOffset>::clean_value(&field);
+        assert_eq!(dt, Err(FormFieldValidationError::from_string(r#"Local datetime `2024-03-10T02:30:00`  does not exist for given timezone(`America/New_York`)"#.into())));
     }
 
     #[cot::test]

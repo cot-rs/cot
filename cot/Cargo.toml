@@ -23,6 +23,7 @@ axum = { workspace = true, features = ["http1", "tokio"] }
 backtrace.workspace = true
 bytes.workspace = true
 chrono = { workspace = true, features = ["alloc","serde"] }
+chrono-tz.workspace = true
 clap.workspace = true
 cot_macros.workspace = true
 deadpool-redis = { workspace = true, features = ["tokio-comp", "rt_tokio_1"], optional = true }

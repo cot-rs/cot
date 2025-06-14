@@ -90,9 +90,11 @@ impl Project for SessionsProject {
     fn middlewares(
         &self,
         handler: cot::project::RootHandlerBuilder,
-        _context: &MiddlewareContext,
+        context: &MiddlewareContext,
     ) -> BoxedHandler {
-        handler.middleware(SessionMiddleware::new()).build()
+        handler
+            .middleware(SessionMiddleware::from_context(context))
+            .build()
     }
 }
 

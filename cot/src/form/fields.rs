@@ -1,3 +1,4 @@
+mod attrs;
 mod chrono;
 mod files;
 mod select;
@@ -9,6 +10,11 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
+pub use attrs::Step;
+pub use chrono::{
+    DateField, DateFieldOptions, DateTimeField, DateTimeFieldOptions, DateTimeWithTimezoneField,
+    DateTimeWithTimezoneFieldOptions, TimeField, TimeFieldOptions,
+};
 pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
 pub(crate) use select::check_required_multiple;
 pub use select::{
@@ -815,6 +821,10 @@ mod tests {
     use super::*;
     use crate::form::FormFieldValue;
 
+    // ------------------------
+    // StringField tests
+    // ------------------------
+
     #[test]
     fn string_field_render() {
         let field = StringField::with_options(
@@ -831,122 +841,6 @@ mod tests {
         assert!(html.contains("type=\"text\""));
         assert!(html.contains("required"));
         assert!(html.contains("maxlength=\"10\""));
-    }
-
-    #[test]
-    fn password_field_render() {
-        let field = PasswordField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            PasswordFieldOptions {
-                max_length: Some(10),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"password\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("maxlength=\"10\""));
-    }
-
-    #[test]
-    fn email_field_render() {
-        let field = EmailField::with_options(
-            FormFieldOptions {
-                id: "test_id".to_owned(),
-                name: "test_name".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(10),
-                max_length: Some(50),
-            },
-        );
-
-        let html = field.to_string();
-        assert!(html.contains("type=\"email\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("minlength=\"10\""));
-        assert!(html.contains("maxlength=\"50\""));
-        assert!(html.contains("name=\"test_id\""));
-        assert!(html.contains("id=\"test_id\""));
-    }
-
-    #[test]
-    fn integer_field_render() {
-        let field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            IntegerFieldOptions {
-                min: Some(1),
-                max: Some(10),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"number\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("min=\"1\""));
-        assert!(html.contains("max=\"10\""));
-    }
-
-    #[test]
-    fn float_field_render() {
-        let field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FloatFieldOptions {
-                min: Some(1.5),
-                max: Some(10.7),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"number\""));
-        assert!(html.contains("required"));
-        assert!(html.contains("min=\"1.5\""));
-        assert!(html.contains("max=\"10.7\""));
-    }
-    #[test]
-    fn bool_field_render() {
-        let field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            BoolFieldOptions {
-                must_be_true: Some(false),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"checkbox\""));
-        assert!(html.contains("type=\"hidden\""));
-        assert!(!html.contains("required"));
-    }
-
-    #[test]
-    fn bool_field_render_must_be_true() {
-        let field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            BoolFieldOptions {
-                must_be_true: Some(true),
-            },
-        );
-        let html = field.to_string();
-        assert!(html.contains("type=\"checkbox\""));
-        assert!(!html.contains("type=\"hidden\""));
-        assert!(html.contains("required"));
     }
 
     #[cot::test]
@@ -985,7 +879,27 @@ mod tests {
         let value = String::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }
+    // ------------------------
+    // PasswordField tests
+    // ------------------------
 
+    #[test]
+    fn password_field_render() {
+        let field = PasswordField::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            PasswordFieldOptions {
+                max_length: Some(10),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"password\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("maxlength=\"10\""));
+    }
     #[cot::test]
     async fn password_field_clean_value() {
         let mut field = PasswordField::with_options(
@@ -1004,6 +918,31 @@ mod tests {
             .unwrap();
         let value = Password::clean_value(&field).unwrap();
         assert_eq!(value.as_str(), "password");
+    }
+    // ------------------------
+    // EmailField tests
+    // ------------------------
+    #[test]
+    fn email_field_render() {
+        let field = EmailField::with_options(
+            FormFieldOptions {
+                id: "test_id".to_owned(),
+                name: "test_name".to_owned(),
+                required: true,
+            },
+            EmailFieldOptions {
+                min_length: Some(10),
+                max_length: Some(50),
+            },
+        );
+
+        let html = field.to_string();
+        assert!(html.contains("type=\"email\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("minlength=\"10\""));
+        assert!(html.contains("maxlength=\"50\""));
+        assert!(html.contains("name=\"test_id\""));
+        assert!(html.contains("id=\"test_id\""));
     }
 
     #[cot::test]
@@ -1130,6 +1069,29 @@ mod tests {
             assert!(msg.contains("min_length") && msg.contains("exceeds max_length"));
         }
     }
+    // ------------------------
+    // IntegerField tests
+    // ------------------------
+
+    #[test]
+    fn integer_field_render() {
+        let field = IntegerField::<i32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            IntegerFieldOptions {
+                min: Some(1),
+                max: Some(10),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"number\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"1\""));
+        assert!(html.contains("max=\"10\""));
+    }
 
     #[cot::test]
     async fn integer_field_clean_value() {
@@ -1199,6 +1161,45 @@ mod tests {
             Err(FormFieldValidationError::MaximumValueExceeded { max_value: _ })
         ));
     }
+    // ------------------------
+    // BoolField tests
+    // ------------------------
+
+    #[test]
+    fn bool_field_render() {
+        let field = BoolField::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            BoolFieldOptions {
+                must_be_true: Some(false),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"checkbox\""));
+        assert!(html.contains("type=\"hidden\""));
+        assert!(!html.contains("required"));
+    }
+
+    #[test]
+    fn bool_field_render_must_be_true() {
+        let field = BoolField::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            BoolFieldOptions {
+                must_be_true: Some(true),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"checkbox\""));
+        assert!(!html.contains("type=\"hidden\""));
+        assert!(html.contains("required"));
+    }
 
     #[cot::test]
     async fn bool_field_clean_value() {
@@ -1218,6 +1219,29 @@ mod tests {
             .unwrap();
         let value = bool::clean_value(&field).unwrap();
         assert!(value);
+    }
+    // ------------------------
+    // FloatField tests
+    // ------------------------
+
+    #[test]
+    fn float_field_render() {
+        let field = FloatField::<f32>::with_options(
+            FormFieldOptions {
+                id: "test".to_owned(),
+                name: "test".to_owned(),
+                required: true,
+            },
+            FloatFieldOptions {
+                min: Some(1.5),
+                max: Some(10.7),
+            },
+        );
+        let html = field.to_string();
+        assert!(html.contains("type=\"number\""));
+        assert!(html.contains("required"));
+        assert!(html.contains("min=\"1.5\""));
+        assert!(html.contains("max=\"10.7\""));
     }
 
     #[cot::test]

@@ -345,8 +345,6 @@ impl SessionMiddleware {
     /// # Examples
     ///
     /// ```
-    /// use std::sync::Arc;
-    ///
     /// use cot::middleware::SessionMiddleware;
     /// use cot::session::store::memory::MemoryStore;
     ///

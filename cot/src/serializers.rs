@@ -39,7 +39,6 @@ pub(crate) mod session_expiry_time {
 
     use crate::config::Expiry;
 
-    #[allow(clippy::ref_option)]
     pub(crate) fn serialize<S>(expiry: &Expiry, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -61,7 +60,7 @@ pub(crate) mod session_expiry_time {
             Some(value) => {
                 humantime::parse_duration(&value)
                     .map(Expiry::OnInactivity)
-                    // On failure, fall back to RFC3339 date-time
+                    // On failure, fall back to RFC3339 format
                     .or_else(|_| {
                         DateTime::parse_from_rfc3339(&value)
                             .map(Expiry::AtDateTime)

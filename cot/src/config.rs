@@ -1333,35 +1333,69 @@ mod tests {
         assert_eq!(config.middlewares.session.path, String::from("/some/path"));
     }
 
-    macro_rules! session_expiry_toml_test {
-        ($name:ident, $expiry_value:expr, $expected:expr) => {
-            #[test]
-            fn $name() {
-                let toml_content = format!(
-                    r"
-                [middlewares.session]
-                expiry = {expiry}
-            ",
-                    expiry = $expiry_value
-                );
-
-                let config = ProjectConfig::from_toml(&toml_content).unwrap();
-                assert_eq!(config.middlewares.session.expiry, $expected);
-            }
-        };
+    #[test]
+    fn same_site_from_valid_toml() {
+        let same_site_options = [
+            ("none", SameSite::None),
+            ("lax", SameSite::Lax),
+            ("strict", SameSite::Strict),
+        ];
+        for (value, expected) in same_site_options {
+            let toml_content = format!(
+                r#"
+            [middlewares.session]
+            same_site = "{value}"
+        "#
+            );
+            let config = ProjectConfig::from_toml(&toml_content).unwrap();
+            assert_eq!(config.middlewares.session.same_site, expected);
+        }
     }
 
-    session_expiry_toml_test!(
-        expiry_duration,
-        r#""2h""#,
-        Expiry::OnInactivity(Duration::from_secs(7200))
-    );
+    #[test]
+    fn expiry_from_valid_toml() {
+        let expiry_opts = [
+            (
+                "2h",
+                Expiry::OnInactivity(Duration::from_secs(7200)),
+                tower_sessions::Expiry::OnInactivity(time::Duration::seconds(7200)),
+            ),
+            (
+                "2025-12-31T23:59:59+00:00",
+                Expiry::AtDateTime(
+                    DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap(),
+                ),
+                tower_sessions::Expiry::AtDateTime(OffsetDateTime::new_utc(
+                    time::Date::from_calendar_date(2025, time::Month::December, 31).unwrap(),
+                    time::Time::from_hms(23, 59, 59).unwrap(),
+                )),
+            ),
+        ];
+        for (value, expected, tower_session_expected) in expiry_opts {
+            let toml_content = format!(
+                r#"
+            [middlewares.session]
+            expiry = "{value}"
+        "#
+            );
+            let config = ProjectConfig::from_toml(&toml_content).unwrap();
+            let actual = config.middlewares.session.expiry;
+            assert_eq!(actual, expected);
+            assert_eq!(tower_sessions::Expiry::from(actual), tower_session_expected);
+        }
+    }
 
-    session_expiry_toml_test!(
-        expiry_timestamp,
-        r#""2025-12-31T23:59:59+00:00""#,
-        Expiry::AtDateTime(DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap())
-    );
+    #[test]
+    fn expiry_from_invalid_toml() {
+        let toml_content = r#"
+            [middlewares.session]
+            expiry = "invalid time"
+        "#
+        .to_string();
+
+        let config = ProjectConfig::from_toml(&toml_content);
+        assert!(config.is_err());
+    }
 
     #[test]
     fn from_toml_invalid() {

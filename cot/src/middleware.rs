@@ -843,7 +843,6 @@ mod tests {
             .to_str()
             .unwrap();
 
-        println!("cookie value: {cookie_value:?}");
         assert!(cookie_value.contains("id="));
         assert!(cookie_value.contains("HttpOnly;"));
         assert!(cookie_value.contains("SameSite=Strict;"));

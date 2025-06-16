@@ -74,3 +74,49 @@ pub(crate) mod session_expiry_time {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use chrono::DateTime;
+    use serde::Serialize;
+
+    use crate::config::Expiry;
+
+    #[derive(Serialize)]
+    struct Wrapper {
+        #[serde(with = "crate::serializers::session_expiry_time")]
+        expiry: Expiry,
+    }
+    #[test]
+    fn json_serialize_session_expiry_time() {
+        let opts = [
+            (
+                Wrapper {
+                    expiry: Expiry::OnSessionEnd,
+                },
+                r#"{"expiry":null}"#,
+            ),
+            (
+                Wrapper {
+                    expiry: Expiry::OnInactivity(Duration::from_secs(3600)),
+                },
+                r#"{"expiry":"1h"}"#,
+            ),
+            (
+                Wrapper {
+                    expiry: Expiry::AtDateTime(
+                        DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap(),
+                    ),
+                },
+                r#"{"expiry":"2025-12-31 23:59:59 +00:00"}"#,
+            ),
+        ];
+
+        for (wrapper, expected) in opts {
+            let json = serde_json::to_string(&wrapper).unwrap();
+            assert_eq!(json, expected);
+        }
+    }
+}

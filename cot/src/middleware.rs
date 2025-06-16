@@ -830,7 +830,7 @@ mod tests {
             Ok::<_, Error>(Response::new(Body::empty()))
         });
 
-        let mut svc = SessionMiddleware::new().layer(svc);
+        let mut svc = SessionMiddleware::new().domain("example.com").layer(svc);
 
         let request = TestRequestBuilder::get("/").build();
 
@@ -842,11 +842,14 @@ mod tests {
             .unwrap()
             .to_str()
             .unwrap();
+
+        println!("cookie value: {cookie_value:?}");
         assert!(cookie_value.contains("id="));
         assert!(cookie_value.contains("HttpOnly;"));
         assert!(cookie_value.contains("SameSite=Strict;"));
         assert!(cookie_value.contains("Secure;"));
         assert!(cookie_value.contains("Path=/"));
+        assert!(cookie_value.contains("Domain=example.com"));
     }
 
     #[cot::test]

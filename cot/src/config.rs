@@ -1296,7 +1296,6 @@ mod tests {
             secure = false
             http_only = false
             domain = "localhost"
-            same_site = "lax"
             path = "/some/path"
             always_save = true
             name = "some.sid"
@@ -1327,7 +1326,6 @@ mod tests {
             config.middlewares.session.domain,
             Some(String::from("localhost"))
         );
-        assert_eq!(config.middlewares.session.same_site, SameSite::Lax);
         assert!(config.middlewares.session.always_save);
         assert_eq!(config.middlewares.session.name, String::from("some.sid"));
         assert_eq!(config.middlewares.session.path, String::from("/some/path"));
@@ -1336,11 +1334,19 @@ mod tests {
     #[test]
     fn same_site_from_valid_toml() {
         let same_site_options = [
-            ("none", SameSite::None),
-            ("lax", SameSite::Lax),
-            ("strict", SameSite::Strict),
+            (
+                "none",
+                SameSite::None,
+                tower_sessions::cookie::SameSite::None,
+            ),
+            ("lax", SameSite::Lax, tower_sessions::cookie::SameSite::Lax),
+            (
+                "strict",
+                SameSite::Strict,
+                tower_sessions::cookie::SameSite::Strict,
+            ),
         ];
-        for (value, expected) in same_site_options {
+        for (value, expected, tower_sessions_expected) in same_site_options {
             let toml_content = format!(
                 r#"
             [middlewares.session]
@@ -1348,7 +1354,12 @@ mod tests {
         "#
             );
             let config = ProjectConfig::from_toml(&toml_content).unwrap();
-            assert_eq!(config.middlewares.session.same_site, expected);
+            let actual = config.middlewares.session.same_site;
+            assert_eq!(actual, expected);
+            assert_eq!(
+                tower_sessions::cookie::SameSite::from(actual),
+                tower_sessions_expected
+            );
         }
     }
 

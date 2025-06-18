@@ -64,13 +64,14 @@ impl SessionStore for MemoryStore {
     }
 
     async fn load(&self, session_id: &Id) -> session_store::Result<Option<Record>> {
-        Ok(self
+        let record = self
             .0
             .lock()
             .await
             .get(session_id)
             .filter(|Record { expiry_date, .. }| is_active(*expiry_date))
-            .cloned())
+            .cloned();
+        Ok(record)
     }
 
     async fn delete(&self, session_id: &Id) -> session_store::Result<()> {

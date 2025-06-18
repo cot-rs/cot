@@ -298,6 +298,8 @@ pub struct EmailFieldOptions {
 impl Display for EmailField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("email");
+        let mut data_list: Option<HtmlTag> = None;
+
         tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
@@ -333,8 +335,7 @@ impl Display for EmailField {
             let list_id = format!("__{}_datalist", self.id());
             tag.attr("list", &list_id);
 
-            let data_list = HtmlTag::data_list(list.clone(), &list_id);
-            tag.push_tag(data_list);
+            data_list = Some(HtmlTag::data_list(list.clone(), &list_id));
         }
         if let Some(multiple) = self.custom_options.multiple {
             if multiple {
@@ -346,6 +347,14 @@ impl Display for EmailField {
             tag.attr("value", value);
         }
 
+        if let Some(data_list) = data_list {
+            let mut wrapper = HtmlTag::new("div");
+            wrapper
+                .attr("id", format!("__{}_datalist_wrapper", self.id()))
+                .push_tag(tag)
+                .push_tag(data_list);
+            return write!(f, "{}", wrapper.render());
+        }
         write!(f, "{}", tag.render())
     }
 }
@@ -1098,7 +1107,7 @@ mod tests {
         assert!(html.contains("autocomplete=\"foo bar\""));
         assert!(html.contains("dirname=\"dir\""));
         assert!(html.contains("list=\"__test_id_datalist\""));
-        assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com"/><option value="baz@example.com"/></datalist>"#));
+        assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com">foo@example.com</option><option value="baz@example.com">baz@example.com</option></datalist>"#));
     }
 
     #[test]

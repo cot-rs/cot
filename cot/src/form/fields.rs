@@ -444,7 +444,7 @@ impl<T: Integer + Display> Display for IntegerField<T> {
             tag.attr("placeholder", placeholder);
         }
         if let Some(readonly) = self.custom_options.readonly {
-            if readonly{
+            if readonly {
                 tag.bool_attr("readonly");
             }
         }
@@ -823,7 +823,7 @@ impl<T: Float + Display> Display for FloatField<T> {
             tag.attr("placeholder", placeholder);
         }
         if let Some(readonly) = self.custom_options.readonly {
-            if readonly{
+            if readonly {
                 tag.bool_attr("readonly");
             }
         }

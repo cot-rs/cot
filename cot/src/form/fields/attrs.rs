@@ -74,9 +74,9 @@ pub enum AutoCapitalize {
 impl AutoCapitalize {
     fn as_str(self) -> &'static str {
         match self {
-            AutoCapitalize::Off        => "off",
-            AutoCapitalize::On         => "on",
-            AutoCapitalize::Words      => "words",
+            AutoCapitalize::Off => "off",
+            AutoCapitalize::On => "on",
+            AutoCapitalize::Words => "words",
             AutoCapitalize::Characters => "characters",
         }
     }

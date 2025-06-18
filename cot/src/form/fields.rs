@@ -10,7 +10,7 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
-pub use attrs::Step;
+pub use attrs::{AutoCapitalize, AutoComplete, List, Step};
 pub use chrono::{
     DateField, DateFieldOptions, DateTimeField, DateTimeFieldOptions, DateTimeWithTimezoneField,
     DateTimeWithTimezoneFieldOptions, TimeField, TimeFieldOptions,
@@ -72,11 +72,19 @@ pub(crate) use impl_form_field;
 impl_form_field!(StringField, StringFieldOptions, "a string");
 
 /// Custom options for a [`StringField`].
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct StringFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
     pub max_length: Option<u32>,
+    pub min_length: Option<u32>,
+    pub size: Option<u32>,
+    pub autocapitalize: Option<AutoCapitalize>,
+    pub autocomplete: Option<AutoComplete>,
+    pub dirname: Option<String>,
+    pub list: Option<List>,
+    pub placeholder: Option<String>,
+    pub readonly: Option<bool>,
 }
 
 impl Display for StringField {
@@ -90,6 +98,38 @@ impl Display for StringField {
         if let Some(max_length) = self.custom_options.max_length {
             tag.attr("maxlength", max_length.to_string());
         }
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", min_length.to_string());
+        }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly {
+            if readonly {
+                tag.bool_attr("readonly");
+            }
+        }
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
+        if let Some(dirname) = &self.custom_options.dirname {
+            tag.attr("dirname", dirname);
+        }
+
+        if let Some(list) = &self.custom_options.list {
+            let list_id = format!("__{}_datalist", self.id());
+            tag.attr("list", &list_id);
+
+            let data_list = HtmlTag::data_list(list.clone(), &list_id);
+            tag.push_tag(data_list);
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -142,11 +182,16 @@ impl<const LEN: u32> AsFormField for LimitedString<LEN> {
 impl_form_field!(PasswordField, PasswordFieldOptions, "a password");
 
 /// Custom options for a [`PasswordField`].
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct PasswordFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
     pub max_length: Option<u32>,
+    pub min_length: Option<u32>,
+    pub size: Option<u32>,
+    pub autocomplete: Option<AutoComplete>,
+    pub placeholder: Option<String>,
+    pub readonly: Option<bool>,
 }
 
 impl Display for PasswordField {
@@ -160,6 +205,26 @@ impl Display for PasswordField {
         if let Some(max_length) = self.custom_options.max_length {
             tag.attr("maxlength", max_length.to_string());
         }
+
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", min_length.to_string());
+        }
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly {
+            if readonly {
+                tag.bool_attr("readonly");
+            }
+        }
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
         // we don't set the value attribute for password fields
         // to avoid leaking the password in the HTML
 
@@ -217,7 +282,7 @@ impl AsFormField for PasswordHash {
 impl_form_field!(EmailField, EmailFieldOptions, "an email");
 
 /// Custom options for [`EmailField`]
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct EmailFieldOptions {
     /// The maximum length of the field used to set the `maxlength` attribute
     /// in the HTML input element.
@@ -225,6 +290,13 @@ pub struct EmailFieldOptions {
     /// The minimum length of the field used to set the `minlength` attribute
     /// in the HTML input element.
     pub min_length: Option<u32>,
+    pub size: Option<u32>,
+    pub autocomplete: Option<AutoComplete>,
+    pub dirname: Option<String>,
+    pub list: Option<List>,
+    pub multiple: Option<bool>,
+    pub placeholder: Option<String>,
+    pub readonly: Option<bool>,
 }
 
 impl Display for EmailField {
@@ -241,6 +313,39 @@ impl Display for EmailField {
         if let Some(min_length) = self.custom_options.min_length {
             tag.attr("minlength", min_length.to_string());
         }
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly {
+            if readonly {
+                tag.bool_attr("readonly");
+            }
+        }
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
+        if let Some(dirname) = &self.custom_options.dirname {
+            tag.attr("dirname", dirname);
+        }
+
+        if let Some(list) = &self.custom_options.list {
+            let list_id = format!("__{}_datalist", self.id());
+            tag.attr("list", &list_id);
+
+            let data_list = HtmlTag::data_list(list.clone(), &list_id);
+            tag.push_tag(data_list);
+        }
+        if let Some(multiple) = self.custom_options.multiple {
+            if multiple {
+                tag.bool_attr("multiple");
+            }
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -289,10 +394,10 @@ impl AsFormField for Email {
 
 impl HtmlSafe for EmailField {}
 
-impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer);
+impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer + Display);
 
 /// Custom options for a [`IntegerField`].
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct IntegerFieldOptions<T> {
     /// The minimum value of the field. Used to set the `min` attribute in the
     /// HTML input element.
@@ -300,6 +405,12 @@ pub struct IntegerFieldOptions<T> {
     /// The maximum value of the field. Used to set the `max` attribute in the
     /// HTML input element.
     pub max: Option<T>,
+
+    pub placeholder: Option<String>,
+
+    pub readonly: Option<bool>,
+
+    pub step: Option<Step<T>>,
 }
 
 impl<T: Integer> Default for IntegerFieldOptions<T> {
@@ -307,11 +418,14 @@ impl<T: Integer> Default for IntegerFieldOptions<T> {
         Self {
             min: T::MIN,
             max: T::MAX,
+            placeholder: None,
+            readonly: None,
+            step: None,
         }
     }
 }
 
-impl<T: Integer> Display for IntegerField<T> {
+impl<T: Integer + Display> Display for IntegerField<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("number");
         tag.attr("name", self.id());
@@ -325,6 +439,19 @@ impl<T: Integer> Display for IntegerField<T> {
         if let Some(max) = &self.custom_options.max {
             tag.attr("max", max.to_string());
         }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly {
+            if readonly{
+                tag.bool_attr("readonly");
+            }
+        }
+        if let Some(step) = &self.custom_options.step {
+            tag.attr("step", step.to_string());
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -333,7 +460,7 @@ impl<T: Integer> Display for IntegerField<T> {
     }
 }
 
-impl<T: Integer> HtmlSafe for IntegerField<T> {}
+impl<T: Integer + Display> HtmlSafe for IntegerField<T> {}
 
 /// A trait for numerical types that optionally have minimum and maximum values.
 ///
@@ -646,10 +773,10 @@ pub(crate) fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldV
     }
 }
 
-impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float);
+impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float + Display);
 
 /// Custom options for a [`FloatField`].
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct FloatFieldOptions<T> {
     /// The minimum value of the field. Used to set the `min` attribute in the
     /// HTML input element.
@@ -657,6 +784,12 @@ pub struct FloatFieldOptions<T> {
     /// The maximum value of the field. Used to set the `max` attribute in the
     /// HTML input element.
     pub max: Option<T>,
+
+    pub placeholder: Option<String>,
+
+    pub readonly: Option<bool>,
+
+    pub step: Option<Step<T>>,
 }
 
 impl<T: Float> Default for FloatFieldOptions<T> {
@@ -664,11 +797,14 @@ impl<T: Float> Default for FloatFieldOptions<T> {
         Self {
             min: T::MIN,
             max: T::MAX,
+            placeholder: None,
+            readonly: None,
+            step: None,
         }
     }
 }
 
-impl<T: Float> Display for FloatField<T> {
+impl<T: Float + Display> Display for FloatField<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag: HtmlTag = HtmlTag::input("number");
         tag.attr("name", self.id());
@@ -683,6 +819,17 @@ impl<T: Float> Display for FloatField<T> {
         if let Some(max) = &self.custom_options.max {
             tag.attr("max", max.to_string());
         }
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly {
+            if readonly{
+                tag.bool_attr("readonly");
+            }
+        }
+        if let Some(step) = &self.custom_options.step {
+            tag.attr("step", step.to_string());
+        }
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -691,7 +838,7 @@ impl<T: Float> Display for FloatField<T> {
     }
 }
 
-impl<T: Float> HtmlSafe for FloatField<T> {}
+impl<T: Float + Display> HtmlSafe for FloatField<T> {}
 
 /// A trait for types that can be represented as a float.
 ///
@@ -776,18 +923,58 @@ impl_float_as_form_field!(f64);
 impl_form_field!(UrlField, UrlFieldOptions, "a URL");
 
 /// Custom options for a [`UrlField`].
-#[derive(Debug, Default, Copy, Clone)]
-pub struct UrlFieldOptions;
+#[derive(Debug, Default, Clone)]
+pub struct UrlFieldOptions {
+    pub max_length: Option<u32>,
+    pub min_length: Option<u32>,
+    pub size: Option<u32>,
+    pub list: Option<List>,
+    pub dirname: Option<String>,
+    pub autocomplete: Option<AutoComplete>,
+    pub placeholder: Option<String>,
+    pub readonly: Option<bool>,
+}
 
 impl Display for UrlField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // no custom options
-        let _ = self.custom_options;
         let mut tag = HtmlTag::input("url");
         tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
+        }
+        if let Some(max_length) = self.custom_options.max_length {
+            tag.attr("maxlength", max_length.to_string());
+        }
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", min_length.to_string());
+        }
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly {
+            if readonly {
+                tag.bool_attr("readonly");
+            }
+        }
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
+        if let Some(dirname) = &self.custom_options.dirname {
+            tag.attr("dirname", dirname);
+        }
+
+        if let Some(list) = &self.custom_options.list {
+            let list_id = format!("__{}_datalist", self.id());
+            tag.attr("list", &list_id);
+
+            let data_list = HtmlTag::data_list(list.clone(), &list_id);
+            tag.push_tag(data_list);
         }
         if let Some(value) = &self.value {
             tag.attr("value", value);
@@ -831,12 +1018,28 @@ mod tests {
             },
             StringFieldOptions {
                 max_length: Some(10),
+                min_length: Some(5),
+                size: Some(15),
+                autocapitalize: Some(AutoCapitalize::Words),
+                autocomplete: Some(AutoComplete::Value("foo bar".to_string())),
+                dirname: Some("dir".to_string()),
+                list: Some(List::new(["bar", "baz"])),
+                placeholder: Some("Enter text".to_string()),
+                readonly: Some(true),
             },
         );
         let html = field.to_string();
         assert!(html.contains("type=\"text\""));
+        assert!(html.contains("name=\"test\""));
+        assert!(html.contains("id=\"test\""));
         assert!(html.contains("required"));
         assert!(html.contains("maxlength=\"10\""));
+        assert!(html.contains("minlength=\"5\""));
+        assert!(html.contains("size=\"15\""));
+        assert!(html.contains("autocomplete=\"foo bar\""));
+        assert!(html.contains("dirname=\"dir\""));
+        assert!(html.contains("placeholder=\"Enter text\""));
+        assert!(html.contains("readonly"));
     }
 
     #[cot::test]
@@ -849,6 +1052,7 @@ mod tests {
             },
             StringFieldOptions {
                 max_length: Some(10),
+                ..Default::default()
             },
         );
         field
@@ -869,6 +1073,7 @@ mod tests {
             },
             StringFieldOptions {
                 max_length: Some(10),
+                ..Default::default()
             },
         );
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
@@ -903,6 +1108,7 @@ mod tests {
             },
             PasswordFieldOptions {
                 max_length: Some(10),
+                ..Default::default()
             },
         );
         field
@@ -947,6 +1153,7 @@ mod tests {
             EmailFieldOptions {
                 min_length: Some(10),
                 max_length: Some(50),
+                ..Default::default()
             },
         );
 
@@ -970,6 +1177,7 @@ mod tests {
             EmailFieldOptions {
                 min_length: Some(10),
                 max_length: Some(50),
+                ..Default::default()
             },
         );
 
@@ -993,6 +1201,7 @@ mod tests {
             EmailFieldOptions {
                 min_length: Some(5),
                 max_length: Some(10),
+                ..Default::default()
             },
         );
 
@@ -1019,6 +1228,7 @@ mod tests {
             EmailFieldOptions {
                 min_length: Some(5),
                 max_length: Some(10),
+                ..Default::default()
             },
         );
 
@@ -1045,6 +1255,7 @@ mod tests {
             EmailFieldOptions {
                 min_length: Some(50),
                 max_length: Some(10),
+                ..Default::default()
             },
         );
 
@@ -1092,6 +1303,7 @@ mod tests {
             IntegerFieldOptions {
                 min: Some(1),
                 max: Some(10),
+                ..Default::default()
             },
         );
         field
@@ -1113,6 +1325,7 @@ mod tests {
             IntegerFieldOptions {
                 min: Some(10),
                 max: Some(50),
+                ..Default::default()
             },
         );
         field
@@ -1137,6 +1350,7 @@ mod tests {
             IntegerFieldOptions {
                 min: Some(10),
                 max: Some(50),
+                ..Default::default()
             },
         );
         field
@@ -1238,6 +1452,7 @@ mod tests {
             FloatFieldOptions {
                 min: Some(1.0),
                 max: Some(10.0),
+                ..Default::default()
             },
         );
         field
@@ -1259,6 +1474,7 @@ mod tests {
             FloatFieldOptions {
                 min: Some(5.0),
                 max: Some(10.0),
+                ..Default::default()
             },
         );
         field
@@ -1283,6 +1499,7 @@ mod tests {
             FloatFieldOptions {
                 min: Some(5.0),
                 max: Some(10.0),
+                ..Default::default()
             },
         );
         field
@@ -1307,6 +1524,7 @@ mod tests {
             FloatFieldOptions {
                 min: Some(1.0),
                 max: Some(10.0),
+                ..Default::default()
             },
         );
         let bad_inputs = ["NaN", "inf"];
@@ -1337,6 +1555,7 @@ mod tests {
             FloatFieldOptions {
                 min: Some(1.0),
                 max: Some(10.0),
+                ..Default::default()
             },
         );
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
@@ -1352,12 +1571,23 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            UrlFieldOptions,
+            UrlFieldOptions {
+                max_length: Some(100),
+                min_length: Some(5),
+                size: Some(30),
+                list: Some(List::new(["https://example.com"])),
+                dirname: Some("dir".to_owned()),
+                autocomplete: Some(AutoComplete::Value("url".to_owned())),
+                placeholder: Some("Enter URL".to_owned()),
+                readonly: Some(true),
+            },
         );
+
         field
             .set_value(FormFieldValue::new_text("https://example.com"))
             .await
             .unwrap();
+
         let value = Url::clean_value(&field).unwrap();
         assert_eq!(
             value.as_str(),
@@ -1373,16 +1603,38 @@ mod tests {
                 name: "url".to_owned(),
                 required: true,
             },
-            UrlFieldOptions,
+            UrlFieldOptions {
+                max_length: Some(120),
+                min_length: Some(10),
+                size: Some(40),
+                list: Some(List::new(["https://one.com", "https://two.com"])),
+                dirname: Some("lang".to_owned()),
+                autocomplete: Some(AutoComplete::Value("url".to_owned())),
+                placeholder: Some("Paste link".to_owned()),
+                readonly: Some(true),
+            },
         );
+
         field
             .set_value(FormFieldValue::new_text("http://example.com"))
             .await
             .unwrap();
+
         let html = field.to_string();
+
         assert!(html.contains("type=\"url\""));
+        assert!(html.contains("id=\"id_url\""));
+        assert!(html.contains("name=\"id_url\""));
         assert!(html.contains("required"));
         assert!(html.contains("value=\"http://example.com\""));
+        assert!(html.contains("maxlength=\"120\""));
+        assert!(html.contains("minlength=\"10\""));
+        assert!(html.contains("size=\"40\""));
+        assert!(html.contains("placeholder=\"Paste link\""));
+        assert!(html.contains("autocomplete=\"url\""));
+        assert!(html.contains("dirname=\"lang\""));
+        assert!(html.contains("readonly"));
+        assert!(html.contains("<datalist"));
     }
 
     #[cot::test]
@@ -1393,9 +1645,20 @@ mod tests {
                 name: "url".to_owned(),
                 required: true,
             },
-            UrlFieldOptions,
+            UrlFieldOptions {
+                max_length: Some(50),
+                min_length: Some(5),
+                size: Some(20),
+                list: None,
+                dirname: Some("rtl".to_owned()),
+                autocomplete: Some(AutoComplete::Off),
+                placeholder: Some("Enter a link".to_owned()),
+                readonly: Some(false),
+            },
         );
+
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
+
         let value = Url::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }

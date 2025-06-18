@@ -189,6 +189,22 @@ impl HtmlTag {
         input
     }
 
+    pub fn data_list<L: Into<Vec<String>>>(list: L, id: &str) -> Self {
+        let mut data_list = Self::new("datalist");
+        data_list.attr("id", id);
+
+        let mut options: Vec<HtmlNode> = Vec::new();
+
+        for l in list.into() {
+            let mut option = HtmlTag::new("option");
+            option.attr("value", l);
+            options.push(HtmlNode::Tag(option));
+        }
+
+        data_list.children = options;
+        data_list
+    }
+
     /// Adds an attribute to the HTML tag.
     ///
     /// # Safety

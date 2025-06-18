@@ -197,7 +197,8 @@ impl HtmlTag {
 
         for l in list.into() {
             let mut option = HtmlTag::new("option");
-            option.attr("value", l);
+            option.attr("value", &l);
+            option.push_str(&l);
             options.push(HtmlNode::Tag(option));
         }
 

@@ -54,13 +54,18 @@ pub enum AutoComplete {
     Value(String),
 }
 
+impl AutoComplete {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Off => "off",
+            Self::On => "on",
+            Self::Value(value) => value.as_str(),
+        }
+    }
+}
 impl Display for AutoComplete {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Off => f.write_str("off"),
-            Self::On => f.write_str("on"),
-            Self::Value(value) => f.write_str(&value),
-        }
+        f.write_str(self.as_str())
     }
 }
 #[derive(Debug, Clone, Copy)]
@@ -92,4 +97,43 @@ impl Display for AutoCapitalize {
 pub enum Dir {
     Rtl,
     Ltr,
+}
+
+impl Dir {
+    pub fn as_str(&self) -> &'static str {
+        match self{
+            Self::Rtl => "rtl",
+            Self::Ltr => "ltr"
+        }
+    }
+}
+
+impl Display for Dir {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+
+
+#[derive(Debug, Clone, Copy)]
+pub enum Capture {
+    User,
+    Environment
+}
+
+
+impl Capture{
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Environment => "environment"
+        }
+    }
+}
+
+impl Display for Capture {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }

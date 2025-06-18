@@ -294,7 +294,6 @@ pub struct EmailFieldOptions {
     pub autocomplete: Option<AutoComplete>,
     pub dirname: Option<String>,
     pub list: Option<List>,
-    pub multiple: Option<bool>,
     pub placeholder: Option<String>,
     pub readonly: Option<bool>,
 }
@@ -340,11 +339,6 @@ impl Display for EmailField {
             tag.attr("list", &list_id);
 
             data_list = Some(HtmlTag::data_list(list.clone(), &list_id));
-        }
-        if let Some(multiple) = self.custom_options.multiple {
-            if multiple {
-                tag.bool_attr("multiple");
-            }
         }
 
         if let Some(value) = &self.value {

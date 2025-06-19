@@ -72,10 +72,6 @@ pub struct FileStore {
 impl FileStore {
     /// Creates a new `FileStore` pointing at the given directory.
     ///
-    /// Note that this does *not* immediately create the directory on disk.
-    /// The directory (and any needed parent directories) will be created
-    /// lazily the first time any session is read or written.
-    ///
     /// # Errors
     ///
     /// Returns [`FileStoreError::Io`] if it fails to create the directory.

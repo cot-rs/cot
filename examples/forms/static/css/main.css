@@ -1,0 +1,33 @@
+.root-container {
+    display: flex;
+    justify-content: center;
+    padding: 2rem 20%;
+    flex-direction: column;
+}
+
+.form-container form {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-container form > * {
+    margin-bottom: 0.75rem;
+}
+
+.form-container form > button {
+    margin-bottom: 0;
+    padding: 0.6rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.form-container input,
+.form-container button {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.results-container {
+    display: flex;
+    flex-direction: column;
+}

@@ -821,10 +821,6 @@ mod tests {
     use super::*;
     use crate::form::FormFieldValue;
 
-    // ------------------------
-    // StringField tests
-    // ------------------------
-
     #[test]
     fn string_field_render() {
         let field = StringField::with_options(
@@ -879,9 +875,6 @@ mod tests {
         let value = String::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }
-    // ------------------------
-    // PasswordField tests
-    // ------------------------
 
     #[test]
     fn password_field_render() {
@@ -919,9 +912,7 @@ mod tests {
         let value = Password::clean_value(&field).unwrap();
         assert_eq!(value.as_str(), "password");
     }
-    // ------------------------
-    // EmailField tests
-    // ------------------------
+
     #[test]
     fn email_field_render() {
         let field = EmailField::with_options(
@@ -1069,9 +1060,6 @@ mod tests {
             assert!(msg.contains("min_length") && msg.contains("exceeds max_length"));
         }
     }
-    // ------------------------
-    // IntegerField tests
-    // ------------------------
 
     #[test]
     fn integer_field_render() {
@@ -1161,9 +1149,6 @@ mod tests {
             Err(FormFieldValidationError::MaximumValueExceeded { max_value: _ })
         ));
     }
-    // ------------------------
-    // BoolField tests
-    // ------------------------
 
     #[test]
     fn bool_field_render() {
@@ -1220,9 +1205,6 @@ mod tests {
         let value = bool::clean_value(&field).unwrap();
         assert!(value);
     }
-    // ------------------------
-    // FloatField tests
-    // ------------------------
 
     #[test]
     fn float_field_render() {

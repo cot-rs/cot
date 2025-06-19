@@ -93,6 +93,11 @@ impl RedisStore {
     /// connection overhead at startup but still fails fast if your URL is
     /// invalid.
     ///
+    ///  # Errors
+    ///
+    ///  Returns [`RedisStoreError::PoolCreation`] if it fails to create a redis
+    /// connection.
+    ///
     /// # Examples
     ///
     /// ```

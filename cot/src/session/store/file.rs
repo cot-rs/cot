@@ -76,6 +76,10 @@ impl FileStore {
     /// The directory (and any needed parent directories) will be created
     /// lazily the first time any session is read or written.
     ///
+    /// # Errors
+    ///
+    /// Returns [`FileStoreError::Io`] if it fails to create the directory.
+    ///
     /// # Examples
     ///
     /// ```
@@ -84,13 +88,15 @@ impl FileStore {
     ///
     /// use cot::session::store::file::FileStore;
     ///
-    /// let store = FileStore::new(Cow::Borrowed(Path::new("/tmp/sessions")));
+    /// let store = FileStore::new(Cow::Borrowed(Path::new("/tmp/sessions")))
+    ///     .expect("failed to create file store");
     /// ```
-    #[must_use]
-    pub fn new(dir_path: impl Into<Cow<'static, Path>>) -> Self {
-        Self {
-            dir_path: dir_path.into(),
-        }
+    pub fn new(dir_path: impl Into<Cow<'static, Path>>) -> Result<Self, FileStoreError> {
+        let dir_path = dir_path.into();
+        std::fs::create_dir_all(&dir_path).map_err(|err| FileStoreError::Io(Box::new(err)))?;
+
+        let file_store = Self { dir_path };
+        Ok(file_store)
     }
 
     async fn create_dir_if_not_exists(&self) -> Result<(), FileStoreError> {
@@ -103,8 +109,6 @@ impl FileStore {
 #[async_trait]
 impl SessionStore for FileStore {
     async fn create(&self, record: &mut Record) -> session_store::Result<()> {
-        self.create_dir_if_not_exists().await?;
-
         loop {
             let file_path = self.dir_path.join(record.id.to_string());
             let file = OpenOptions::new()
@@ -126,6 +130,9 @@ impl SessionStore for FileStore {
                     // On collision, recycle the ID and try again.
                     record.id = Id::default();
                 }
+                Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                    self.create_dir_if_not_exists().await?;
+                }
                 Err(err) => return Err(FileStoreError::Io(Box::new(err)))?,
             }
         }
@@ -134,8 +141,6 @@ impl SessionStore for FileStore {
     }
 
     async fn save(&self, record: &Record) -> session_store::Result<()> {
-        self.create_dir_if_not_exists().await?;
-
         let file = OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -196,7 +201,6 @@ impl SessionStore for FileStore {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::path::PathBuf;
 
     use tempfile::tempdir;
     use time::{Duration, OffsetDateTime};
@@ -207,7 +211,7 @@ mod tests {
 
     fn make_store() -> FileStore {
         let dir = tempdir().expect("failed to make tempdir");
-        FileStore::new(dir.into_path())
+        FileStore::new(dir.into_path()).expect("could not create file store")
     }
 
     fn make_record() -> Record {
@@ -262,7 +266,7 @@ mod tests {
         dir.close().expect("failed to remove tempdir");
         assert!(!dir_path.exists());
 
-        let store = FileStore::new(dir_path.clone());
+        let store = FileStore::new(dir_path.clone()).expect("could not create file store");
         let rec = make_record();
         store
             .save(&rec)
@@ -292,10 +296,10 @@ mod tests {
     #[cot::test]
     async fn test_load_with_nonexistent_directory() {
         let dir = tempdir().expect("failed to make tempdir");
-        let dir_path = PathBuf::from("non/existent/path");
-        dir.close().expect("failed to remove tempdir");
+        let dir_path = dir.path().to_path_buf();
 
-        let store = FileStore::new(dir_path.clone());
+        let store = FileStore::new(dir_path.clone()).expect("could not create file store");
+        dir.close().expect("failed to remove tempdir");
 
         let id = Id::default();
         let result = store.load(&id).await;
@@ -331,8 +335,8 @@ mod tests {
     async fn test_delete_with_nonexistent_directory() {
         let dir = tempdir().expect("failed to make tempdir");
         let dir_path = dir.path().to_path_buf();
+        let store = FileStore::new(dir_path.clone()).expect("could not create file store");
         dir.close().expect("failed to remove tempdir");
-        let store = FileStore::new(dir_path.clone());
 
         // Delete should work with non-existent directory
         let id = Id::default();

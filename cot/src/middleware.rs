@@ -486,16 +486,21 @@ impl SessionMiddleware {
         match config {
             SessionStoreTypeConfig::Memory => Box::new(MemoryStore::new()),
             #[cfg(feature = "json")]
-            SessionStoreTypeConfig::File { path } => Box::new(FileStore::new(path)),
+            SessionStoreTypeConfig::File { path } => Box::new(
+                FileStore::new(path)
+                    .unwrap_or_else(|err| panic!("could not create File store: {err}")),
+            ),
             #[cfg(feature = "cache")]
             SessionStoreTypeConfig::Cache { ref uri } => {
                 let cache_type = CacheType::try_from(uri.clone())
-                    .unwrap_or_else(|e| panic!("could not convert cache URI `{}`: {}", uri, e));
+                    .unwrap_or_else(|e| panic!("could not convert cache URI `{uri}`: {e}"));
                 match cache_type {
                     #[cfg(feature = "redis")]
-                    CacheType::Redis => Box::new(RedisStore::new(uri).unwrap_or_else(|e| {
-                        panic!("could not connect to Redis at `{}`: {}", uri, e)
-                    })),
+                    CacheType::Redis => {
+                        Box::new(RedisStore::new(uri).unwrap_or_else(|e| {
+                            panic!("could not connect to Redis at `{uri}`: {e}")
+                        }))
+                    }
                 }
             }
             #[cfg(feature = "db")]

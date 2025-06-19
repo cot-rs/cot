@@ -1176,9 +1176,6 @@ mod tests {
         assert!(html.contains("Sunday"));
     }
 
-    // ------------------------
-    // DateTimeField tests
-    // ------------------------
     #[test]
     fn datetime_field_render() {
         let field = DateTimeField::with_options(
@@ -1295,9 +1292,6 @@ mod tests {
         }
     }
 
-    // ------------------------
-    // DateTimeWithTimezoneField tests
-    // ------------------------
     #[test]
     fn datetime_with_tz_field_render() {
         let field = DateTimeWithTimezoneField::with_options(
@@ -1605,9 +1599,6 @@ mod tests {
         assert_eq!(result, Err(FormFieldValidationError::Required));
     }
 
-    // ------------------------
-    // TimeField tests
-    // ------------------------
     #[test]
     fn time_field_render() {
         let field = TimeField::with_options(

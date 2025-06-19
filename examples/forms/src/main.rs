@@ -37,8 +37,9 @@ struct ExampleForm {
     datetime: NaiveDateTime,
     #[form(
         opt(
-            timezone=Tz::MET,
-            step=Step::Value(Duration::seconds(70))
+            timezone=Tz::America__New_York,
+            step=Step::Value(Duration::seconds(70)),
+            prefer_latest = true
         )
     )]
     datetime_tz: DateTime<FixedOffset>,
@@ -50,6 +51,13 @@ struct ExampleForm {
         )
     )]
     time: NaiveTime,
+    #[form(
+        opt(
+            min = NaiveDate::parse_from_str("2025-01-01", "%Y-%m-%d").unwrap(),
+            max = NaiveDate::parse_from_str("2025-12-31", "%Y-%m-%d").unwrap(),
+            step = Step::Value(Duration::days(7))
+        )
+    )]
     date: NaiveDate,
 }
 

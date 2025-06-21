@@ -906,8 +906,10 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().http_only(true).build();
     /// ```
     pub http_only: bool,
-    /// The `SameSite` attribute of the cookie used for the session.
+    /// The [`SameSite`] attribute of the cookie used for the session.
     /// The default value is [`SameSite::Strict`]
+    ///
+    /// [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
     ///
     /// # Examples
     ///
@@ -940,6 +942,7 @@ pub struct SessionMiddlewareConfig {
     /// `/` by default.
     ///
     /// [`Path`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
+    ///
     /// # Examples
     ///
     /// ```

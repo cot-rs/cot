@@ -5,7 +5,7 @@
 //! general-purpose newtype wrappers and associated trait implementations to
 //! ensure consistent and safe processing of form data.
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 
 #[cfg(feature = "mysql")]
@@ -335,6 +335,12 @@ impl FromStr for Url {
     }
 }
 
+impl Display for Url {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// A type that represents an error that occurs when parsing a URL.
 ///
 /// This is returned by [`Url::new`] and [`Url::from_str`] when the input string
@@ -348,6 +354,45 @@ impl From<UrlParseError> for FormFieldValidationError {
     fn from(error: UrlParseError) -> Self {
         FormFieldValidationError::from_string(error.to_string())
     }
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for Url {
+    fn to_db_value(&self) -> DbValue {
+        self.0.clone().to_string().into()
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for Url {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        Url::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        Url::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        Url::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
+#[cfg(feature = "db")]
+impl DatabaseField for Url {
+    const TYPE: ColumnType = ColumnType::Text;
 }
 
 /// A validated email address.
@@ -570,7 +615,6 @@ impl TryFrom<&str> for Email {
 ///
 /// let email = Email::try_from(String::from("user@example.com")).unwrap();
 /// ```
-#[cfg(feature = "db")]
 impl TryFrom<String> for Email {
     type Error = EmailParseError;
 
@@ -645,9 +689,17 @@ impl DatabaseField for Email {
     const TYPE: ColumnType = ColumnType::String(MAX_EMAIL_LENGTH);
 }
 
+impl Display for Email {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryFrom;
+
+    use askama::Template;
 
     use super::*;
 
@@ -655,6 +707,7 @@ mod tests {
     fn url_new() {
         let parse_url = Url::new("https://example.com/").unwrap();
         assert_eq!(parse_url.as_str(), "https://example.com/");
+        assert_eq!(parse_url.to_string(), "https://example.com/");
         assert_eq!(parse_url.scheme(), "https");
         assert_eq!(parse_url.host(), Some("example.com"));
     }
@@ -663,6 +716,20 @@ mod tests {
     fn url_new_normalize() {
         let parse_url = Url::new("https://example.com").unwrap();
         assert_eq!(parse_url.as_str(), "https://example.com/"); // Normalizes to add trailing slash
+    }
+
+    #[test]
+    fn askama_renders_url_field() {
+        #[derive(Template)]
+        #[template(source = "{{ url }}", ext = "html")]
+        struct UrlTestTemplate {
+            url: Url,
+        }
+
+        let url = Url::new("https://example.com").unwrap();
+        let tpl = UrlTestTemplate { url };
+        let rendered = tpl.render().expect("template failed to render");
+        assert_eq!(rendered, "https://example.com/");
     }
 
     #[test]
@@ -682,6 +749,7 @@ mod tests {
     fn test_valid_email_creation() {
         let email = Email::new("user@example.com").unwrap();
         assert_eq!(email.as_str(), "user@example.com");
+        assert_eq!(email.to_string(), "user@example.com");
         assert_eq!(email.domain(), "example.com");
     }
 
@@ -703,13 +771,27 @@ mod tests {
         assert_eq!(email.as_str(), "user@example.com");
     }
 
+    #[test]
+    fn askama_renders_email_field() {
+        #[derive(Template)]
+        #[template(source = "{{ email }}", ext = "html")]
+        struct EmailTestTemplate {
+            email: Email,
+        }
+
+        let email = Email::new("foo@example.com").unwrap();
+        let tpl = EmailTestTemplate { email };
+        let rendered = tpl.render().expect("template failed to render");
+        assert_eq!(rendered, "foo@example.com");
+    }
+
     #[cfg(feature = "db")]
     mod db_tests {
         use super::*;
         use crate::db::ToDbValue;
 
         #[test]
-        fn test_to_db_value() {
+        fn test_email_to_db_value() {
             let email = Email::new("user@example.com").unwrap();
             let db_value = email.to_db_value();
 
@@ -719,7 +801,7 @@ mod tests {
         }
 
         #[test]
-        fn test_to_db_value_is_normalized() {
+        fn test_email_to_db_value_is_normalized() {
             let with_display = Email::new("John Doe <user@example.com>").unwrap();
             let bare = Email::new("user@example.com").unwrap();
 
@@ -727,6 +809,16 @@ mod tests {
             let db2 = bare.to_db_value();
 
             assert_eq!(db1, db2);
+        }
+
+        #[test]
+        fn test_url_to_db_value() {
+            let url = Url::new("https://example.com/").unwrap();
+            let db_value = url.to_db_value();
+
+            let url_str = url.as_str();
+            let db_value_str = format!("{db_value:?}");
+            assert!(db_value_str.contains(url_str));
         }
     }
 }

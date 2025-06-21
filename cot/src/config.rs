@@ -750,13 +750,17 @@ impl LiveReloadMiddlewareConfigBuilder {
     }
 }
 
-/// How strictly browsers send cookies on cross-site requests.
+/// The [`SameSite`] attribute of a cookie determines how strictly browsers send
+/// cookies on cross-site requests. When not explicitly configured, it defaults
+/// to `Strict`, which provides the most restrictive security posture.
 ///
 /// - `Strict`: Cookie is only sent for same-site requests (most restrictive).
 /// - `Lax`: Cookie is sent for same-site requests and top-level navigations (a
 ///   reasonable default).
 /// - `None`: Cookie is sent on all requests, including third-party contexts
 ///   (least restrictive).
+///
+///  [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SameSite {
@@ -790,10 +794,14 @@ fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDa
 }
 
 /// Session expiry configuration.
+/// The [`Expiry`] attribute of a cookie determines its lifetime. When not
+/// explicitly configured, cookies default to `OnSessionEnd` behavior.
+///
+/// [`Expiry`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use std::time::Duration;
 ///
 /// use chrono::DateTime;
@@ -873,8 +881,10 @@ impl From<Expiry> for tower_sessions::Expiry {
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct SessionMiddlewareConfig {
-    /// Whether the session middleware is secure.
+    /// The [`Secure`] of the cookie determines whether the session middleware
+    /// is secure.
     ///
+    ///  [`Secure`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies
     /// # Examples
     ///
     /// ```
@@ -883,8 +893,10 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
-    /// The `HttpOnly` of the cookie used for the session. It is set to `true`
+    /// The [`HttpOnly`] of the cookie used for the session. It is set to `true`
     /// by default.
+    ///
+    /// [`HttpOnly`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies
     ///
     ///  # Examples
     ///
@@ -908,8 +920,10 @@ pub struct SessionMiddlewareConfig {
     /// ```
     pub same_site: SameSite,
 
-    /// The Domain attribute of the cookie used for the session. This is set to
-    /// None by default.
+    /// The [`Domain`] attribute of the cookie used for the session. When not
+    /// explicitly configured, it is set to `None` by default.
+    ///
+    /// [`Domain`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
     ///
     /// # Examples
     ///
@@ -922,9 +936,10 @@ pub struct SessionMiddlewareConfig {
     /// ```
     #[builder(setter(strip_option), default)]
     pub domain: Option<String>,
-    /// The "Path" attribute of the cookie used for the session. It is set to
-    /// "/" by default.
+    /// The [`Path`] attribute of the cookie used for the session. It is set to
+    /// `/` by default.
     ///
+    /// [`Path`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
     /// # Examples
     ///
     /// ```
@@ -961,7 +976,7 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().always_save(true).build();
     /// ```
     pub always_save: bool,
-    /// The expiry behavior for session cookies.
+    /// The [`Expiry`] behavior for session cookies.
     ///
     /// This controls when the session cookie expires and how long it remains
     /// valid. The expiry behavior affects how the cookie's `max-age` and
@@ -986,6 +1001,8 @@ pub struct SessionMiddlewareConfig {
     ///   documentation for supported formats.
     /// - For `AtDateTime`: Use a valid RFC 3339/ISO 8601 formatted timestamp
     ///   (e.g., `"2025-12-31T23:59:59+00:00"`).
+    ///
+    /// [`Expiry`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie
     ///
     /// # Examples
     ///

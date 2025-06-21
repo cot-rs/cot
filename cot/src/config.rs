@@ -17,10 +17,12 @@
 
 use std::time::Duration;
 
+use chrono::{DateTime, FixedOffset};
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
+use time::{OffsetDateTime, UtcOffset};
 
 /// The configuration for a project.
 ///
@@ -748,6 +750,122 @@ impl LiveReloadMiddlewareConfigBuilder {
     }
 }
 
+/// The [`SameSite`] attribute of a cookie determines how strictly browsers send
+/// cookies on cross-site requests. When not explicitly configured, it defaults
+/// to `Strict`, which provides the most restrictive security posture.
+///
+/// - `Strict`: Cookie is only sent for same-site requests (most restrictive).
+/// - `Lax`: Cookie is sent for same-site requests and top-level navigations (a
+///   reasonable default).
+/// - `None`: Cookie is sent on all requests, including third-party contexts
+///   (least restrictive).
+///
+///  [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SameSite {
+    /// Only send cookie for same-site requests.
+    #[default]
+    Strict,
+
+    /// Send cookie on same-site requests and top-level cross-site navigations.
+    Lax,
+
+    /// Send cookie on all requests, including third-party.
+    None,
+}
+
+impl From<SameSite> for tower_sessions::cookie::SameSite {
+    fn from(value: SameSite) -> Self {
+        match value {
+            SameSite::Strict => Self::Strict,
+            SameSite::Lax => Self::Lax,
+            SameSite::None => Self::None,
+        }
+    }
+}
+
+fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDateTime {
+    let offset = UtcOffset::from_whole_seconds(dt.offset().local_minus_utc())
+        .expect("offset within valid range");
+    OffsetDateTime::from_unix_timestamp(dt.timestamp())
+        .expect("timestamp in valid range")
+        .to_offset(offset)
+}
+
+/// Session expiry configuration.
+/// The [`Expiry`] attribute of a cookie determines its lifetime. When not
+/// explicitly configured, cookies default to `OnSessionEnd` behavior.
+///
+/// [`Expiry`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use chrono::DateTime;
+/// use cot::config::Expiry;
+///
+/// // Expires when the session ends.
+/// let expiry = Expiry::OnSessionEnd;
+///
+/// // Expires 5 mins after inactivity.
+/// let expiry = Expiry::OnInactivity(Duration::from_secs(5 * 60));
+///
+/// // Expires at the given timestamp.
+/// let expired_at =
+///     DateTime::parse_from_str("2025-05-27 13:03:00 -0200", "%Y-%m-%d %H:%M:%S %z").unwrap();
+/// let expiry = Expiry::AtDateTime(expired_at);
+/// ```
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Expiry {
+    /// The cookie expires when the browser session ends.
+    ///
+    /// This is equivalent to not setting the `max-age` or `expires` attributes
+    /// in the cookie header, making it a session cookie. The cookie will be
+    /// deleted when the user closes their browser or when the browser decides
+    /// to end the session.
+    ///
+    /// This is the most secure option as it ensures sessions don't persist
+    /// beyond the browser session, but it may require users to log in more
+    /// frequently.
+    #[default]
+    OnSessionEnd,
+    /// The cookie expires after the specified duration of inactivity.
+    ///
+    /// The session will remain valid as long as the user continues to make
+    /// requests within the specified time window. Each request resets the
+    /// inactivity timer, extending the session lifetime.
+    ///
+    /// This provides a balance between security and user convenience, as
+    /// active users won't be logged out unexpectedly, but inactive sessions
+    /// will eventually expire.
+    OnInactivity(Duration),
+    /// The cookie expires at the specified date and time.
+    ///
+    /// The session will remain valid until the exact datetime specified,
+    /// regardless of user activity.
+    AtDateTime(DateTime<FixedOffset>),
+}
+
+impl From<Expiry> for tower_sessions::Expiry {
+    fn from(value: Expiry) -> Self {
+        match value {
+            Expiry::OnSessionEnd => Self::OnSessionEnd,
+            Expiry::OnInactivity(duration) => {
+                Self::OnInactivity(time::Duration::try_from(duration).unwrap_or_else(|e| {
+                    panic!("could not convert {duration:?} into a valid time::Duration: {e:?}",)
+                }))
+            }
+            Expiry::AtDateTime(time) => {
+                Self::AtDateTime(chrono_datetime_to_time_offsetdatetime(time))
+            }
+        }
+    }
+}
+
 /// The configuration for the session middleware.
 ///
 /// This is used as part of the [`MiddlewareConfig`] struct.
@@ -763,8 +881,10 @@ impl LiveReloadMiddlewareConfigBuilder {
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct SessionMiddlewareConfig {
-    /// Whether the session middleware is secure.
+    /// The [`Secure`] of the cookie determines whether the session middleware
+    /// is secure.
     ///
+    ///  [`Secure`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies
     /// # Examples
     ///
     /// ```
@@ -773,6 +893,166 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
+    /// The [`HttpOnly`] of the cookie used for the session. It is set to `true`
+    /// by default.
+    ///
+    /// [`HttpOnly`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies
+    ///
+    ///  # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().http_only(true).build();
+    /// ```
+    pub http_only: bool,
+    /// The `SameSite` attribute of the cookie used for the session.
+    /// The default value is [`SameSite::Strict`]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{SameSite, SessionMiddlewareConfig};
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .same_site(SameSite::None)
+    ///     .build();
+    /// ```
+    pub same_site: SameSite,
+
+    /// The [`Domain`] attribute of the cookie used for the session. When not
+    /// explicitly configured, it is set to `None` by default.
+    ///
+    /// [`Domain`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .domain("localhost".to_string())
+    ///     .build();
+    /// ```
+    #[builder(setter(strip_option), default)]
+    pub domain: Option<String>,
+    /// The [`Path`] attribute of the cookie used for the session. It is set to
+    /// `/` by default.
+    ///
+    /// [`Path`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    ///
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .path(String::from("/random/path"))
+    ///     .build();
+    /// ```
+    pub path: String,
+    /// The name of the cookie used for the session. It is set to "id" by
+    /// default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .name("some.id".to_string())
+    ///     .build();
+    /// ```
+    pub name: String,
+    /// Whether the unmodified session should be saved on read or not.
+    /// If set to `true`, the session will be saved even if it was not modified.
+    /// It is set to `false` by default.
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().always_save(true).build();
+    /// ```
+    pub always_save: bool,
+    /// The [`Expiry`] behavior for session cookies.
+    ///
+    /// This controls when the session cookie expires and how long it remains
+    /// valid. The expiry behavior affects how the cookie's `max-age` and
+    /// `expires` attributes are set in the HTTP response.
+    ///
+    /// The available expiry modes are:
+    /// - `OnSessionEnd`: The cookie expires when the browser session ends. This
+    ///   is equivalent to not adding or removing the `max-age`/`expires` field
+    ///   in the cookie header, making it a session cookie.
+    /// - `OnInactivity`: The cookie expires after the specified duration of
+    ///   inactivity. The cookie will be refreshed on each request.
+    /// - `AtDateTime`: The cookie expires at the given timestamp, regardless of
+    ///   user activity.
+    ///
+    /// The default value is [`Expiry::OnSessionEnd`] when not specified.
+    ///
+    /// # TOML
+    ///
+    /// In TOML configuration, the expiry can be specified in two formats:
+    /// - For `OnInactivity`: Use the "humantime" format (e.g., `"1h"`, `"30m"`,
+    ///   `"7d"`). Please refer to the [`humantime::parse_duration`]
+    ///   documentation for supported formats.
+    /// - For `AtDateTime`: Use a valid RFC 3339/ISO 8601 formatted timestamp
+    ///   (e.g., `"2025-12-31T23:59:59+00:00"`).
+    ///
+    /// [`Expiry`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use chrono::DateTime;
+    /// use cot::config::{Expiry, SessionMiddlewareConfig};
+    ///
+    /// // Session expires when browser session ends (default)
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::OnSessionEnd)
+    ///     .build();
+    ///
+    /// // Session expires after 1 hour of inactivity
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::OnInactivity(Duration::from_secs(3600)))
+    ///     .build();
+    ///
+    /// // Session expires at specific datetime
+    /// let expire_at =
+    ///     DateTime::parse_from_str("2025-12-31 23:59:59 +0000", "%Y-%m-%d %H:%M:%S %z").unwrap();
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::AtDateTime(expire_at))
+    ///     .build();
+    /// ```
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::ProjectConfig;
+    ///
+    /// // TOML configuration for inactivity-based expiry
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [session]
+    /// expiry = "2h"
+    /// "#,
+    /// );
+    ///
+    /// // TOML configuration for datetime-based expiry
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [session]
+    /// expiry = "2025-12-31 23:59:59 +0000"
+    /// "#,
+    /// );
+    /// ```
+    #[serde(with = "crate::serializers::session_expiry_time")]
+    pub expiry: Expiry,
 }
 
 impl SessionMiddlewareConfig {
@@ -806,6 +1086,13 @@ impl SessionMiddlewareConfigBuilder {
     pub fn build(&self) -> SessionMiddlewareConfig {
         SessionMiddlewareConfig {
             secure: self.secure.unwrap_or(true),
+            http_only: self.http_only.unwrap_or(true),
+            same_site: self.same_site.unwrap_or_default(),
+            domain: self.domain.clone().unwrap_or_default(),
+            name: self.name.clone().unwrap_or("id".to_string()),
+            path: self.path.clone().unwrap_or(String::from("/")),
+            always_save: self.always_save.unwrap_or(false),
+            expiry: self.expiry.unwrap_or_default(),
         }
     }
 }
@@ -1024,6 +1311,11 @@ mod tests {
             live_reload.enabled = true
             [middlewares.session]
             secure = false
+            http_only = false
+            domain = "localhost"
+            path = "/some/path"
+            always_save = true
+            name = "some.sid"
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
@@ -1046,6 +1338,91 @@ mod tests {
         );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
+        assert!(!config.middlewares.session.http_only);
+        assert_eq!(
+            config.middlewares.session.domain,
+            Some(String::from("localhost"))
+        );
+        assert!(config.middlewares.session.always_save);
+        assert_eq!(config.middlewares.session.name, String::from("some.sid"));
+        assert_eq!(config.middlewares.session.path, String::from("/some/path"));
+    }
+
+    #[test]
+    fn same_site_from_valid_toml() {
+        let same_site_options = [
+            (
+                "none",
+                SameSite::None,
+                tower_sessions::cookie::SameSite::None,
+            ),
+            ("lax", SameSite::Lax, tower_sessions::cookie::SameSite::Lax),
+            (
+                "strict",
+                SameSite::Strict,
+                tower_sessions::cookie::SameSite::Strict,
+            ),
+        ];
+        for (value, expected, tower_sessions_expected) in same_site_options {
+            let toml_content = format!(
+                r#"
+            [middlewares.session]
+            same_site = "{value}"
+        "#
+            );
+            let config = ProjectConfig::from_toml(&toml_content).unwrap();
+            let actual = config.middlewares.session.same_site;
+            assert_eq!(actual, expected);
+            assert_eq!(
+                tower_sessions::cookie::SameSite::from(actual),
+                tower_sessions_expected
+            );
+        }
+    }
+
+    #[test]
+    fn expiry_from_valid_toml() {
+        let expiry_opts = [
+            (
+                "2h",
+                Expiry::OnInactivity(Duration::from_secs(7200)),
+                tower_sessions::Expiry::OnInactivity(time::Duration::seconds(7200)),
+            ),
+            (
+                "2025-12-31T23:59:59+00:00",
+                Expiry::AtDateTime(
+                    DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap(),
+                ),
+                tower_sessions::Expiry::AtDateTime(OffsetDateTime::new_utc(
+                    time::Date::from_calendar_date(2025, time::Month::December, 31).unwrap(),
+                    time::Time::from_hms(23, 59, 59).unwrap(),
+                )),
+            ),
+        ];
+        for (value, expected, tower_session_expected) in expiry_opts {
+            let toml_content = format!(
+                r#"
+            [middlewares.session]
+            expiry = "{value}"
+        "#
+            );
+            let config = ProjectConfig::from_toml(&toml_content).unwrap();
+            let actual = config.middlewares.session.expiry;
+            assert_eq!(actual, expected);
+            assert_eq!(tower_sessions::Expiry::from(actual), tower_session_expected);
+        }
+    }
+
+    #[test]
+    fn expiry_from_invalid_toml() {
+        let toml_content = r#"
+            [middlewares.session]
+            expiry = "invalid time"
+        "#
+        .to_string();
+
+        let config = ProjectConfig::from_toml(&toml_content);
+        assert!(config.is_err());
     }
 
     #[test]

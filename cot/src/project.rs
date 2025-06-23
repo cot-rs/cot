@@ -23,7 +23,7 @@
 use std::future::poll_fn;
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
@@ -40,11 +40,12 @@ use crate::auth::{AuthBackend, NoAuthBackend};
 use crate::cli::Cli;
 #[cfg(feature = "db")]
 use crate::config::DatabaseConfig;
-use crate::config::{AuthBackendConfig, ProjectConfig};
+use crate::config::{AuthBackendConfig, EmailBackendConfig, EmailBackendType, ProjectConfig};
 #[cfg(feature = "db")]
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
+use crate::email::{EmailBackend, SmtpConfig, SmtpEmailBackend};
 use crate::error::ErrorRepr;
 use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
@@ -1233,7 +1234,10 @@ impl Bootstrapper<WithDatabase> {
         let handler = self.project.middlewares(handler, &self.context);
 
         let auth_backend = self.project.auth_backend(&self.context);
-        let context = self.context.with_auth(auth_backend);
+        let email_backend = Self::init_email_backend(&self.context.config.email_backend).await;
+        let context = self
+            .context
+            .with_auth_and_email(auth_backend, email_backend);
 
         Ok(Bootstrapper {
             project: self.project,
@@ -1241,8 +1245,26 @@ impl Bootstrapper<WithDatabase> {
             handler,
         })
     }
-}
 
+    async fn init_email_backend(
+        config: &EmailBackendConfig,
+    ) -> Option<Arc<Mutex<SmtpEmailBackend>>> {
+        match &config.backend_type {
+            EmailBackendType::None => None,
+            EmailBackendType::Smtp => {
+                let smtp_config = SmtpConfig {
+                    mode: config.smtp_mode.clone(),
+                    port: config.port,
+                    username: config.username.clone(),
+                    password: config.password.clone(),
+                    timeout: config.timeout,
+                };
+                let backend = SmtpEmailBackend::new(smtp_config);
+                Some(Arc::new(Mutex::new(backend)))
+            }
+        }
+    }
+}
 impl Bootstrapper<Initialized> {
     /// Returns the context and handler of the bootstrapper.
     ///
@@ -1288,7 +1310,8 @@ mod sealed {
 /// 2. [`WithConfig`]
 /// 3. [`WithApps`]
 /// 4. [`WithDatabase`]
-/// 5. [`Initialized`]
+/// 5. [`WithEmail`]
+/// 6. [`Initialized`]
 ///
 /// # Sealed
 ///
@@ -1335,6 +1358,8 @@ pub trait BootstrapPhase: sealed::Sealed {
     type Database: Debug;
     /// The type of the auth backend.
     type AuthBackend;
+    /// The type of the email backend.
+    type EmailBackend: Debug;
 }
 
 /// First phase of bootstrapping a Cot project, the uninitialized phase.
@@ -1355,6 +1380,7 @@ impl BootstrapPhase for Uninitialized {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    type EmailBackend = ();
 }
 
 /// Second phase of bootstrapping a Cot project, the with-config phase.
@@ -1375,6 +1401,7 @@ impl BootstrapPhase for WithConfig {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    type EmailBackend = ();
 }
 
 /// Third phase of bootstrapping a Cot project, the with-apps phase.
@@ -1395,6 +1422,7 @@ impl BootstrapPhase for WithApps {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    type EmailBackend = ();
 }
 
 /// Fourth phase of bootstrapping a Cot project, the with-database phase.
@@ -1415,6 +1443,7 @@ impl BootstrapPhase for WithDatabase {
     #[cfg(feature = "db")]
     type Database = Option<Arc<Database>>;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
+    type EmailBackend = <WithApps as BootstrapPhase>::EmailBackend;
 }
 
 /// The final phase of bootstrapping a Cot project, the initialized phase.
@@ -1435,6 +1464,7 @@ impl BootstrapPhase for Initialized {
     #[cfg(feature = "db")]
     type Database = <WithDatabase as BootstrapPhase>::Database;
     type AuthBackend = Arc<dyn AuthBackend>;
+    type EmailBackend = Option<Arc<Mutex<SmtpEmailBackend>>>;
 }
 
 /// Shared context and configs for all apps. Used in conjunction with the
@@ -1449,6 +1479,8 @@ pub struct ProjectContext<S: BootstrapPhase = Initialized> {
     database: S::Database,
     #[debug("..")]
     auth_backend: S::AuthBackend,
+    #[debug("..")]
+    email_backend: S::EmailBackend,
 }
 
 impl ProjectContext<Uninitialized> {
@@ -1461,6 +1493,7 @@ impl ProjectContext<Uninitialized> {
             #[cfg(feature = "db")]
             database: (),
             auth_backend: (),
+            email_backend: (),
         }
     }
 
@@ -1472,6 +1505,7 @@ impl ProjectContext<Uninitialized> {
             #[cfg(feature = "db")]
             database: self.database,
             auth_backend: self.auth_backend,
+            email_backend: self.email_backend,
         }
     }
 }
@@ -1512,6 +1546,7 @@ impl ProjectContext<WithConfig> {
             #[cfg(feature = "db")]
             database: self.database,
             auth_backend: self.auth_backend,
+            email_backend: self.email_backend,
         }
     }
 }
@@ -1551,13 +1586,18 @@ impl ProjectContext<WithApps> {
             #[cfg(feature = "db")]
             database,
             auth_backend: self.auth_backend,
+            email_backend: self.email_backend,
         }
     }
 }
 
 impl ProjectContext<WithDatabase> {
     #[must_use]
-    fn with_auth(self, auth_backend: Arc<dyn AuthBackend>) -> ProjectContext<Initialized> {
+    fn with_auth_and_email(
+        self,
+        auth_backend: Arc<dyn AuthBackend>,
+        email_backend: Option<Arc<Mutex<SmtpEmailBackend>>>,
+    ) -> ProjectContext<Initialized> {
         ProjectContext {
             config: self.config,
             apps: self.apps,
@@ -1565,10 +1605,10 @@ impl ProjectContext<WithDatabase> {
             auth_backend,
             #[cfg(feature = "db")]
             database: self.database,
+            email_backend,
         }
     }
 }
-
 impl ProjectContext<Initialized> {
     #[cfg(feature = "test")]
     pub(crate) fn initialized(
@@ -1577,6 +1617,7 @@ impl ProjectContext<Initialized> {
         router: <Initialized as BootstrapPhase>::Router,
         auth_backend: <Initialized as BootstrapPhase>::AuthBackend,
         #[cfg(feature = "db")] database: <Initialized as BootstrapPhase>::Database,
+        email_backend: <Initialized as BootstrapPhase>::EmailBackend,
     ) -> Self {
         Self {
             config,
@@ -1585,6 +1626,7 @@ impl ProjectContext<Initialized> {
             #[cfg(feature = "db")]
             database,
             auth_backend,
+            email_backend,
         }
     }
 }
@@ -1688,6 +1730,38 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     pub fn database(&self) -> &Arc<Database> {
         self.try_database().expect(
             "Database missing. Did you forget to add the database when configuring CotProject?",
+        )
+    }
+}
+impl<S: BootstrapPhase<EmailBackend = Option<Arc<Mutex<SmtpEmailBackend>>>>> ProjectContext<S> {
+    /// Returns the email backend for the project, if it is enabled.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn index(request: Request) -> cot::Result<Response> {
+    ///     let email_backend = request.context().try_email_backend();
+    ///     if let Some(email_backend) = email_backend {
+    ///         // do something with the email backend
+    ///     } else {
+    ///         // email backend is not enabled
+    ///     }
+    /// #    todo!()
+    /// }
+    /// ```
+    #[must_use]
+    pub fn try_email_backend(&self) -> Option<&Arc<Mutex<SmtpEmailBackend>>> {
+        self.email_backend.as_ref()
+    }
+    /// Returns the email backend for the project, if it is enabled.
+    #[must_use]
+    #[track_caller]
+    pub fn email_backend(&self) -> &Arc<Mutex<SmtpEmailBackend>> {
+        self.try_email_backend().expect(
+            "Email backend missing. Did you forget to add the email backend when configuring CotProject?",
         )
     }
 }

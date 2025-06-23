@@ -738,6 +738,7 @@ impl TestRequestBuilder {
             auth_backend,
             #[cfg(feature = "db")]
             self.database.clone(),
+            None,
         );
         prepare_request(&mut request, Arc::new(context));
 

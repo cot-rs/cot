@@ -18,19 +18,13 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
-use cot::db::Database;
-use cot::session::store::db::DbStore;
-use cot::session::store::redis::RedisStore;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
-
 use subtle::ConstantTimeEq;
-use time::{OffsetDateTime, UtcOffset};
-use tower_sessions::{MemoryStore, SessionStore};
 use thiserror::Error;
+use time::{OffsetDateTime, UtcOffset};
 
 /// The configuration for a project.
 ///

@@ -31,6 +31,7 @@ use time::{OffsetDateTime, UtcOffset};
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct ProjectConfig {
     /// Debug mode flag.
     ///
@@ -329,8 +330,8 @@ impl ProjectConfigBuilder {
 /// let config = AuthBackendConfig::Database;
 /// ```
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[non_exhaustive]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum AuthBackendConfig {
     /// No authentication backend.
     ///
@@ -362,6 +363,7 @@ pub enum AuthBackendConfig {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct DatabaseConfig {
     /// The URL of the database, possibly with username, password, and other
     /// options.
@@ -463,6 +465,7 @@ impl DatabaseConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct StaticFilesConfig {
     /// The URL prefix for the static files to be served at (which should
     /// typically end with a slash). The default is `/static/`.
@@ -559,8 +562,8 @@ pub struct StaticFilesConfig {
 ///
 /// This is used as part of the [`StaticFilesConfig`] struct.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum StaticFilesPathRewriteMode {
     /// No rewriting. The path to the static files is returned as is (with the
     /// URL prefix, if any).
@@ -642,6 +645,7 @@ impl StaticFilesConfig {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct MiddlewareConfig {
     /// The configuration for the live reload middleware.
     pub live_reload: LiveReloadMiddlewareConfig,
@@ -702,6 +706,7 @@ impl MiddlewareConfigBuilder {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct LiveReloadMiddlewareConfig {
     /// Whether the live reload middleware is enabled.
     ///
@@ -763,6 +768,7 @@ impl LiveReloadMiddlewareConfigBuilder {
 ///  [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum SameSite {
     /// Only send cookie for same-site requests.
     #[default]
@@ -820,6 +826,7 @@ fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDa
 /// ```
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Expiry {
     /// The cookie expires when the browser session ends.
     ///
@@ -880,6 +887,7 @@ impl From<Expiry> for tower_sessions::Expiry {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct SessionMiddlewareConfig {
     /// The [`Secure`] of the cookie determines whether the session middleware
     /// is secure.

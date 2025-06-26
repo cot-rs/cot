@@ -704,7 +704,7 @@ impl AsFormField for NaiveDate {
 
         if let Some(min) = &opts.min {
             if date < *min {
-                return Err(FormFieldValidationError::maximum_value_exceeded(min));
+                return Err(FormFieldValidationError::minimum_value_not_met(min));
             }
         }
 
@@ -1428,7 +1428,7 @@ mod tests {
         assert_eq!(
             dt,
             Err(FormFieldValidationError::from_string(
-                "Local datetime `2024-03-10T02:30:00`  does not exist for given timezone(`America/New_York`)"
+                "Local datetime `2024-03-10T02:30:00` does not exist for given timezone(`America/New_York`)"
                     .into()
             ))
         );
@@ -1457,7 +1457,7 @@ mod tests {
             .unwrap();
 
         let dt = DateTime::<FixedOffset>::clean_value(&field);
-        assert_eq!(dt, Err(FormFieldValidationError::from_string("Local datetime `2024-03-10T02:30:00`  does not exist for given timezone(`America/New_York`)".into())));
+        assert_eq!(dt, Err(FormFieldValidationError::from_string("Local datetime `2024-03-10T02:30:00` does not exist for given timezone(`America/New_York`)".into())));
     }
 
     #[cot::test]

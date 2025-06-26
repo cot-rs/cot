@@ -11,13 +11,13 @@
 <body>
 
 <div class="root-container">
-        <h1>Form Examples</h1>
-        <div class="form-container">
-            <form id="example-form" action="{{ cot::reverse!(urls, "add")? }}" method="post">
-            {{ form }}
-            <button type="submit">Add form</button>
-            </form>
-        </div>
+    <h1>Form Examples</h1>
+    <div class="form-container">
+        <form id="example-form" action="{{ cot::reverse!(urls, "add")? }}" method="post">
+        {{ form }}
+        <button type="submit">Add form</button>
+        </form>
+    </div>
 
     <div class="results-container">
         <ul>

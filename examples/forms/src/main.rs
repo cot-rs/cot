@@ -4,6 +4,7 @@ use askama::Template;
 use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
 use chrono_tz::Tz;
 use cot::cli::CliMetadata;
+use cot::config::ProjectConfig;
 use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model};
 use cot::form::Form;
@@ -136,6 +137,10 @@ struct FormsProject;
 impl Project for FormsProject {
     fn cli_metadata(&self) -> CliMetadata {
         cot::cli::metadata!()
+    }
+
+    fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
+        Ok(ProjectConfig::dev_default())
     }
 
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {

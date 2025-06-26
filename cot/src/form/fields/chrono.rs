@@ -8,7 +8,7 @@ use chrono::{
 use chrono_tz::Tz;
 use cot::form::FormField;
 use cot::form::fields::impl_form_field;
-use cot::html::{Html, HtmlTag};
+use cot::html::HtmlTag;
 
 use crate::form::fields::{
     SelectChoice, SelectField, SelectMultipleField, Step, check_required, check_required_multiple,
@@ -254,17 +254,13 @@ impl AsFormField for NaiveDateTime {
 
         if let Some(min) = &opts.min {
             if date_time < *min {
-                return Err(FormFieldValidationError::MinimumValueNotMet {
-                    min_value: min.to_string(),
-                });
+                return Err(FormFieldValidationError::minimum_value_not_met(min));
             }
         }
 
         if let Some(max) = &opts.max {
             if date_time > *max {
-                return Err(FormFieldValidationError::MaximumValueExceeded {
-                    max_value: max.to_string(),
-                });
+                return Err(FormFieldValidationError::maximum_value_exceeded(max));
             }
         }
 
@@ -383,22 +379,15 @@ pub struct DateTimeWithTimezoneFieldOptions {
 
 impl Display for DateTimeWithTimezoneField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut hidden_tag = HtmlTag::input("hidden");
-
-        // https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/datetime-local#setting_timezones
-        hidden_tag
-            .attr("name", format!("__{}_timezone", self.id()))
-            .attr("id", format!("__{}_timezone", self.id()));
-
-        let mut dt_tag = HtmlTag::input("datetime-local");
-        dt_tag.attr("name", self.id());
-        dt_tag.attr("id", self.id());
+        let mut tag = HtmlTag::input("datetime-local");
+        tag.attr("name", self.id());
+        tag.attr("id", self.id());
 
         if self.options.required {
-            dt_tag.bool_attr("required");
+            tag.bool_attr("required");
         }
         if let Some(max) = self.custom_options.max {
-            dt_tag.attr(
+            tag.attr(
                 "max",
                 max.naive_local()
                     .format(BROWSER_DATETIME_WITHOUT_SEC_FMT)
@@ -406,7 +395,7 @@ impl Display for DateTimeWithTimezoneField {
             );
         }
         if let Some(min) = self.custom_options.min {
-            dt_tag.attr(
+            tag.attr(
                 "min",
                 min.naive_local()
                     .format(BROWSER_DATETIME_WITHOUT_SEC_FMT)
@@ -416,16 +405,12 @@ impl Display for DateTimeWithTimezoneField {
 
         if let Some(readonly) = self.custom_options.readonly {
             if readonly {
-                dt_tag.bool_attr("readonly");
+                tag.bool_attr("readonly");
             }
         }
 
         if let Some(value) = &self.value {
-            dt_tag.attr("value", value);
-            let tz = DateTime::parse_from_str(value, "%Y-%m-%dT%H:%M %z")
-                .expect("invalid datetime")
-                .timezone();
-            hidden_tag.attr("value", tz.to_string());
+            tag.attr("value", value);
         }
 
         if let Some(step) = &self.custom_options.step {
@@ -433,11 +418,10 @@ impl Display for DateTimeWithTimezoneField {
                 Step::Any => "any".to_string(),
                 Step::Value(v) => v.num_seconds().to_string(),
             };
-            dt_tag.attr("step", step_value);
+            tag.attr("step", step_value);
         }
-        let tag = Html::new(format!("{}{}", hidden_tag.render(), dt_tag.render()));
 
-        write!(f, "{}", tag.as_str())
+        write!(f, "{}", tag.render())
     }
 }
 
@@ -467,7 +451,7 @@ impl AsFormField for DateTime<FixedOffset> {
             }
             LocalResult::None => {
                 return Err(FormFieldValidationError::from_string(format!(
-                    "Local datetime `{naive:?}`  does not exist for given timezone(`{tz:?}`)"
+                    "Local datetime `{naive:?}` does not exist for given timezone(`{tz:?}`)"
                 )));
             }
         };
@@ -478,17 +462,13 @@ impl AsFormField for DateTime<FixedOffset> {
 
         if let Some(min) = &opts.min {
             if date_time < *min {
-                return Err(FormFieldValidationError::MinimumValueNotMet {
-                    min_value: min.to_string(),
-                });
+                return Err(FormFieldValidationError::minimum_value_not_met(min));
             }
         }
 
         if let Some(max) = &opts.max {
             if date_time > *max {
-                return Err(FormFieldValidationError::MaximumValueExceeded {
-                    max_value: max.to_string(),
-                });
+                return Err(FormFieldValidationError::maximum_value_exceeded(max));
             }
         }
 
@@ -602,17 +582,13 @@ impl AsFormField for NaiveTime {
 
         if let Some(min) = &opts.min {
             if time < *min {
-                return Err(FormFieldValidationError::MinimumValueNotMet {
-                    min_value: min.to_string(),
-                });
+                return Err(FormFieldValidationError::minimum_value_not_met(min));
             }
         }
 
         if let Some(max) = &opts.max {
             if time > *max {
-                return Err(FormFieldValidationError::MaximumValueExceeded {
-                    max_value: max.to_string(),
-                });
+                return Err(FormFieldValidationError::maximum_value_exceeded(max));
             }
         }
 
@@ -728,17 +704,13 @@ impl AsFormField for NaiveDate {
 
         if let Some(min) = &opts.min {
             if date < *min {
-                return Err(FormFieldValidationError::MinimumValueNotMet {
-                    min_value: min.to_string(),
-                });
+                return Err(FormFieldValidationError::maximum_value_exceeded(min));
             }
         }
 
         if let Some(max) = &opts.max {
             if date > *max {
-                return Err(FormFieldValidationError::MaximumValueExceeded {
-                    max_value: max.to_string(),
-                });
+                return Err(FormFieldValidationError::maximum_value_exceeded(max));
             }
         }
 
@@ -1316,11 +1288,9 @@ mod tests {
             },
         );
         let html = field.to_string();
-        assert!(
-            html.contains("<input type=\"datetime-local\" name=\"dt\" id=\"dt\" max=\"2025-05-28T00:00\" min=\"2025-05-27T00:00\" step=\"60\" required readonly/>")
-        );
-        assert!(
-            html.contains("<input type=\"hidden\" name=\"__dt_timezone\" id=\"__dt_timezone\"/>")
+        assert_eq!(
+            html,
+            "<input type=\"datetime-local\" name=\"dt\" id=\"dt\" max=\"2025-05-28T00:00\" min=\"2025-05-27T00:00\" step=\"60\" required readonly/>"
         );
     }
 

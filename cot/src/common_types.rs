@@ -5,7 +5,7 @@
 //! general-purpose newtype wrappers and associated trait implementations to
 //! ensure consistent and safe processing of form data.
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 
 #[cfg(feature = "mysql")]

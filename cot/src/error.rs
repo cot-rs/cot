@@ -1,4 +1,5 @@
 pub(crate) mod backtrace;
+mod handler;
 
 use std::error::Error as StdError;
 use std::fmt::Display;

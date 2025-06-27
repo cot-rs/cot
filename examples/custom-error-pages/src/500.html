@@ -28,10 +28,8 @@
     <body>
         <h1>500</h1>
         <p>A server error occurred. Note that there is a panic displayed in the logs.</p>
-        {# djlint:off J018 #}
         <p>
-            Do you want to see <a href="/some-random-url">the 404 page</a>?
+            <!-- djlint:off J018 -->Do you want to see <a href="/some-random-url">the 404 page</a>?<!-- djlint:on -->
         </p>
-        {# djlint:on #}
     </body>
 </html>

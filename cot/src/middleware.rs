@@ -260,14 +260,12 @@ fn map_err<E>(error: E) -> Error
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    dbg!(&error);
-
     #[expect(trivial_casts)]
     let boxed = Box::new(error) as Box<dyn std::error::Error + Send + Sync>;
     boxed
         .downcast::<Error>()
         .map(|e| *e)
-        .unwrap_or_else(|boxed| Error::from_repr(ErrorKind::MiddlewareWrapped { source: boxed }))
+        .unwrap_or_else(|boxed| Error::from_kind(ErrorKind::MiddlewareWrapped { source: boxed }))
 }
 
 type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;

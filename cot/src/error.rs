@@ -1,9 +1,12 @@
 pub(crate) mod backtrace;
+pub mod handler;
+pub mod not_found;
+pub mod uncaught_panic;
 
 use std::error::Error as StdError;
 use std::fmt::Display;
 
-use derive_more::Debug;
+use derive_more::with_trait::Debug;
 use thiserror::Error;
 
 use crate::StatusCode;
@@ -12,19 +15,19 @@ use crate::StatusCode;
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace as CotBacktrace};
 
 /// An error that can occur while using Cot.
-#[derive(Debug)]
 pub struct Error {
-    pub(crate) kind: ErrorKind,
-    #[debug(skip)]
-    backtrace: CotBacktrace,
+    inner: Box<ErrorImpl>,
 }
 
 impl Error {
     #[must_use]
-    pub(crate) fn from_repr(inner: ErrorKind) -> Self {
-        Self {
+    pub(crate) fn from_kind(inner: ErrorKind) -> Self {
+        let inner = ErrorImpl {
             kind: inner,
             backtrace: __cot_create_backtrace(),
+        };
+        Self {
+            inner: Box::new(inner),
         }
     }
 
@@ -54,7 +57,7 @@ impl Error {
     where
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
-        Self::from_repr(ErrorKind::Custom {
+        Self::from_kind(ErrorKind::Custom {
             inner: error.into(),
             status_code,
         })
@@ -78,7 +81,7 @@ impl Error {
     where
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
-        Self::from_repr(ErrorKind::AdminError(error.into()))
+        Self::from_kind(ErrorKind::AdminError(error.into()))
     }
 
     /// Create a new "404 Not Found" error without a message.
@@ -91,8 +94,12 @@ impl Error {
     /// let error = Error::not_found();
     /// ```
     #[must_use]
+    #[deprecated(
+        note = "Use `cot::Error::from(cot::error::not_found::NotFound::new())` instead",
+        since = "0.4.0"
+    )]
     pub fn not_found() -> Self {
-        Self::from_repr(ErrorKind::NotFound { message: None })
+        Self::from(not_found::NotFound::new())
     }
 
     /// Create a new "404 Not Found" error with a message.
@@ -109,15 +116,27 @@ impl Error {
     /// let error = Error::not_found_message(format!("User with id={id} not found"));
     /// ```
     #[must_use]
+    #[deprecated(
+        note = "Use `cot::Error::from(cot::error::not_found::NotFound::with_message())` instead",
+        since = "0.4.0"
+    )]
     pub fn not_found_message(message: String) -> Self {
-        Self::from_repr(ErrorKind::NotFound {
-            message: Some(message),
-        })
+        Self::from(not_found::NotFound::with_message(message))
+    }
+
+    #[must_use]
+    pub fn status_code(&self) -> StatusCode {
+        self.inner.kind.status_code()
+    }
+
+    #[must_use]
+    pub(crate) fn kind(&self) -> &ErrorKind {
+        &self.inner.kind
     }
 
     #[must_use]
     pub(crate) fn backtrace(&self) -> &CotBacktrace {
-        &self.backtrace
+        &self.inner.backtrace
     }
 
     /// If the error is a custom error, returns a reference to the inner
@@ -125,7 +144,7 @@ impl Error {
     /// error, returns a reference to itself.
     #[must_use]
     pub fn inner(&self) -> Option<&Self> {
-        match &self.kind {
+        match &self.kind() {
             ErrorKind::Custom { .. } | ErrorKind::MiddlewareWrapped { .. } => {
                 let mut error = self as &(dyn StdError + 'static);
                 while let Some(inner) = self.source() {
@@ -142,22 +161,36 @@ impl Error {
     }
 }
 
+impl Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.inner, f)
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.kind, f)
+        Display::fmt(self.kind(), f)
     }
 }
 
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.kind.source()
+        self.kind().source()
     }
 }
 
 impl From<ErrorKind> for Error {
     fn from(value: ErrorKind) -> Self {
-        Self::from_repr(value)
+        Self::from_kind(value)
     }
+}
+
+#[derive(Debug)]
+struct ErrorImpl {
+    pub(crate) kind: ErrorKind,
+    #[debug(skip)]
+    backtrace: CotBacktrace,
+    // todo panic location
 }
 
 macro_rules! impl_error_from_repr {
@@ -178,6 +211,8 @@ impl From<Error> for askama::Error {
 
 impl_error_from_repr!(toml::de::Error);
 impl_error_from_repr!(askama::Error);
+impl_error_from_repr!(not_found::NotFound);
+impl_error_from_repr!(uncaught_panic::UncaughtPanic);
 impl_error_from_repr!(crate::router::path::ReverseError);
 #[cfg(feature = "db")]
 impl_error_from_repr!(crate::db::DatabaseError);
@@ -235,8 +270,10 @@ pub(crate) enum ErrorKind {
     )]
     ExpectedForm,
     /// Could not find a route for the request.
-    #[error("Not found: {message:?}")]
-    NotFound { message: Option<String> },
+    #[error("{0}")]
+    NotFound(#[from] not_found::NotFound),
+    #[error("An unexpected error occurred")]
+    UncaughtPanic(#[from] uncaught_panic::UncaughtPanic),
     /// Could not create a response object.
     #[error("Could not create a response object: {0}")]
     ResponseBuilder(#[from] http::Error),
@@ -284,12 +321,20 @@ pub(crate) enum ErrorKind {
     /// An error occurred while trying to parse query parameters.
     #[error("Could not parse query parameters: {0}")]
     QueryParametersParse(serde_path_to_error::Error<serde::de::value::Error>),
-    /// An error occured in an [`AdminModel`](crate::admin::AdminModel).
+    /// An error occurred in an [`AdminModel`](crate::admin::AdminModel).
     #[error("Admin error: {0}")]
     AdminError(#[source] Box<dyn StdError + Send + Sync>),
     /// An error occurred while getting a URL for a static files.
     #[error("Could not get URL for a static file: {0}")]
     StaticFilesGetError(#[from] crate::request::extractors::StaticFilesGetError),
+}
+
+fn not_found_message(message: &Option<String>) -> String {
+    if let Some(msg) = message {
+        format!("Not found: {msg}")
+    } else {
+        "Not found".to_string()
+    }
 }
 
 impl ErrorKind {
@@ -304,15 +349,18 @@ impl ErrorKind {
             ErrorKind::InvalidContentType { .. } => StatusCode::BAD_REQUEST,
             ErrorKind::ExpectedForm => StatusCode::BAD_REQUEST,
             ErrorKind::NotFound { .. } => StatusCode::NOT_FOUND,
+            ErrorKind::UncaughtPanic { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::ResponseBuilder(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::NoViewToReverse { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::ReverseRoute(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::TemplateRender(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            #[cfg(feature = "db")]
             ErrorKind::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::SessionAccess(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::Form(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::FormFieldValueError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::Authentication(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            #[cfg(feature = "json")]
             ErrorKind::Json(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::MiddlewareWrapped { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::PathParametersParse(_) => StatusCode::BAD_REQUEST,
@@ -335,7 +383,7 @@ mod tests {
             source: io::Error::other("server error"),
         };
 
-        let error = Error::from_repr(inner);
+        let error = Error::from_kind(inner);
 
         assert!(StdError::source(&error).is_some());
     }
@@ -346,7 +394,7 @@ mod tests {
             expected: "application/json",
             actual: "text/html".to_string(),
         };
-        let error = Error::from_repr(inner);
+        let error = Error::from_kind(inner);
 
         let display = format!("{error}");
 

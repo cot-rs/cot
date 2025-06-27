@@ -1,8 +1,8 @@
-[ ] Error struct wrapper (so that it's always 8 bytes)
+[x] Error struct wrapper (so that it's always 8 bytes)
 [ ] Proper status codes
-[ ] New trait for ErrorRequestHandler extractors
-[ ] Error extractor
-[ ] ErrorRequestHandler trait
+[x] New trait for ErrorRequestHandler extractors
+[x] Error extractor
+[x] ErrorRequestHandler trait
 [ ] cot-site impl
 [ ] chombo-gen impl
 [ ] Only display error pages when `Allow` header contains HTML?

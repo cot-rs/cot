@@ -229,6 +229,8 @@ macro_rules! handle_all_parameters_from_request {
     };
 }
 
+pub(crate) use handle_all_parameters;
+
 handle_all_parameters!(impl_request_handler);
 handle_all_parameters_from_request!(impl_request_handler_from_request);
 
@@ -239,7 +241,7 @@ handle_all_parameters_from_request!(impl_request_handler_from_request);
 /// [`Bootstrapper::into_context_and_handler`](cot::Bootstrapper::into_context_and_handler).
 /// Typically, you don't need to interact with this type directly, except for
 /// creating it in [`Project::middlewares`](cot::Project::middlewares) through
-/// the [`RootHandlerBuilder::build`](cot::project::RootHandlerBuilder::build).
+/// the [`RootHandlerBuilder::build`](cot::project::RootHandlerBuilder::build)
 /// method.
 ///
 /// # Examples

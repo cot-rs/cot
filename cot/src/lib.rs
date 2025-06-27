@@ -55,7 +55,7 @@ extern crate self as cot;
 
 #[cfg(feature = "db")]
 pub mod db;
-mod error;
+pub mod error;
 pub mod form;
 mod headers;
 // Not public API. Referenced by macro-generated code.

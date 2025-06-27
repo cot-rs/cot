@@ -370,7 +370,7 @@ async fn urlencoded_form_data(request: &mut Request) -> Result<Bytes, FormError>
             .map_err(|e| FormError::RequestError { error: Box::new(e) })?
     } else {
         return Err(FormError::RequestError {
-            error: Box::new(crate::Error::from_repr(ErrorKind::ExpectedForm)),
+            error: Box::new(crate::Error::from_kind(ErrorKind::ExpectedForm)),
         });
     };
 

@@ -174,7 +174,7 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
             .get::<PathParams>()
             .expect("PathParams extension missing")
             .parse()
-            .map_err(|error| Error::from_repr(ErrorKind::PathParametersParse(error)))?;
+            .map_err(|error| Error::from_kind(ErrorKind::PathParametersParse(error)))?;
         Ok(Self(params))
     }
 }
@@ -233,7 +233,7 @@ where
             serde_html_form::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
 
         let value = serde_path_to_error::deserialize(deserializer)
-            .map_err(|error| Error::from_repr(ErrorKind::QueryParametersParse(error)))?;
+            .map_err(|error| Error::from_kind(ErrorKind::QueryParametersParse(error)))?;
 
         Ok(UrlQuery(value))
     }
@@ -299,7 +299,7 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 
         let deserializer = &mut serde_json::Deserializer::from_slice(&bytes);
         let result = serde_path_to_error::deserialize(deserializer)
-            .map_err(|error| Error::from_repr(ErrorKind::Json(error)))?;
+            .map_err(|error| Error::from_kind(ErrorKind::Json(error)))?;
 
         Ok(Self(result))
     }

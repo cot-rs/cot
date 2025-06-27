@@ -12,7 +12,6 @@
 //! use cot::response::ResponseExt;
 //! ```
 
-use crate::error_page::ErrorPageTrigger;
 use crate::html::Html;
 use crate::{Body, StatusCode};
 
@@ -95,10 +94,12 @@ impl ResponseExt for Response {
 }
 
 pub(crate) fn not_found_response(message: Option<String>) -> crate::Result<Response> {
-    Html::new("404 Not Found")
-        .with_status(StatusCode::NOT_FOUND)
-        .with_extension(ErrorPageTrigger::NotFound { message })
-        .into_response()
+    let response = if let Some(message) = message {
+        crate::Error::not_found_message(message)
+    } else {
+        crate::Error::not_found()
+    };
+    Err(response)
 }
 
 #[cfg(test)]

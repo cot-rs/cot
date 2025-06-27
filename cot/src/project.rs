@@ -46,7 +46,11 @@ use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error::ErrorKind;
-use crate::error_page::{Diagnostics, ErrorPageTrigger};
+use crate::error::handler::{
+    BoxErrorPageHandler, DynErrorPageHandler, ErrorPageHandler, RequestError,
+};
+use crate::error::uncaught_panic::UncaughtPanic;
+use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
@@ -422,53 +426,8 @@ pub trait Project {
     ///     }
     /// }
     /// ```
-    fn server_error_handler(&self) -> Box<dyn ErrorPageHandler> {
-        Box::new(DefaultServerErrorHandler)
-    }
-
-    /// Returns the 404 Not Found handler for the project.
-    ///
-    /// The default handler returns a simple, static page.
-    ///
-    /// # Errors
-    ///
-    /// This method may return an error if the handler fails to build a
-    /// response. In this case, the error will be logged and a generic
-    /// error page will be returned to the user.
-    ///
-    /// # Panics
-    ///
-    /// Note that this handler is exempt of the typical panic handling
-    /// machinery in Cot. This means that if this handler panics, no
-    /// response will be sent to a user. Because of that, you should
-    /// avoid panicking here and return [`Err`] instead.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::html::Html;
-    /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{IntoResponse, Response};
-    /// use cot::{Project, StatusCode};
-    ///
-    /// struct MyProject;
-    /// impl Project for MyProject {
-    ///     fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-    ///         Box::new(MyHandler)
-    ///     }
-    /// }
-    ///
-    /// struct MyHandler;
-    /// impl ErrorPageHandler for MyHandler {
-    ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Html::new("Not Found")
-    ///             .with_status(StatusCode::NOT_FOUND)
-    ///             .into_response()
-    ///     }
-    /// }
-    /// ```
-    fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-        Box::new(DefaultNotFoundHandler)
+    fn server_error_handler(&self) -> DynErrorPageHandler {
+        DynErrorPageHandler::new(default_server_error_handler)
     }
 }
 
@@ -691,87 +650,76 @@ impl AppBuilder {
     }
 }
 
-/// A trait for defining custom error page handlers.
-///
-/// This is useful with [`Project::server_error_handler`] and
-/// [`Project::not_found_handler`].
-///
-/// # Examples
-///
-/// ```
-/// use cot::html::Html;
-/// use cot::project::ErrorPageHandler;
-/// use cot::response::{IntoResponse, Response};
-/// use cot::{Project, StatusCode};
-///
-/// struct MyProject;
-/// impl Project for MyProject {
-///     fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-///         Box::new(MyHandler)
-///     }
-/// }
-///
-/// struct MyHandler;
-/// impl ErrorPageHandler for MyHandler {
-///     fn handle(&self) -> cot::Result<Response> {
-///         Html::new("Not Found")
-///             .with_status(StatusCode::NOT_FOUND)
-///             .into_response()
-///     }
-/// }
-/// ```
-pub trait ErrorPageHandler: Send + Sync {
-    /// Returns the error response.
-    ///
-    /// # Errors
-    ///
-    /// This method may return an error if the handler fails to build a
-    /// response. In this case, the error will be logged and a generic
-    /// error page will be returned to the user.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::html::Html;
-    /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{IntoResponse, Response};
-    /// use cot::{Project, StatusCode};
-    ///
-    /// struct MyProject;
-    /// impl Project for MyProject {
-    ///     fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-    ///         Box::new(MyHandler)
-    ///     }
-    /// }
-    ///
-    /// struct MyHandler;
-    /// impl ErrorPageHandler for MyHandler {
-    ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Ok(Html::new("Not Found")
-    ///             .with_status(StatusCode::NOT_FOUND)
-    ///             .into_response()?)
-    ///     }
-    /// }
-    /// ```
-    fn handle(&self) -> crate::Result<Response>;
-}
+// todo reuse
+// /// A trait for defining custom error page handlers.
+// ///
+// /// This is useful with [`Project::server_error_handler`] and
+// /// [`Project::not_found_handler`].
+// ///
+// /// # Examples
+// ///
+// /// ```
+// /// use cot::html::Html;
+// /// use cot::project::ErrorPageHandler;
+// /// use cot::response::{IntoResponse, Response};
+// /// use cot::{Project, StatusCode};
+// ///
+// /// struct MyProject;
+// /// impl Project for MyProject {
+// ///     fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
+// ///         Box::new(MyHandler)
+// ///     }
+// /// }
+// ///
+// /// struct MyHandler;
+// /// impl ErrorPageHandler for MyHandler {
+// ///     fn handle(&self) -> cot::Result<Response> {
+// ///         Html::new("Not Found")
+// ///             .with_status(StatusCode::NOT_FOUND)
+// ///             .into_response()
+// ///     }
+// /// }
+// /// ```
+// pub trait ErrorPageHandler: Send + Sync {
+//     /// Returns the error response.
+//     ///
+//     /// # Errors
+//     ///
+//     /// This method may return an error if the handler fails to build a
+//     /// response. In this case, the error will be logged and a generic
+//     /// error page will be returned to the user.
+//     ///
+//     /// # Examples
+//     ///
+//     /// ```
+//     /// use cot::html::Html;
+//     /// use cot::project::ErrorPageHandler;
+//     /// use cot::response::{IntoResponse, Response};
+//     /// use cot::{Project, StatusCode};
+//     ///
+//     /// struct MyProject;
+//     /// impl Project for MyProject {
+//     ///     fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
+//     ///         Box::new(MyHandler)
+//     ///     }
+//     /// }
+//     ///
+//     /// struct MyHandler;
+//     /// impl ErrorPageHandler for MyHandler {
+//     ///     fn handle(&self) -> cot::Result<Response> {
+//     ///         Ok(Html::new("Not Found")
+//     ///             .with_status(StatusCode::NOT_FOUND)
+//     ///             .into_response()?)
+//     ///     }
+//     /// }
+//     /// ```
+//     fn handle(&self) -> crate::Result<Response>;
+// }
 
-struct DefaultNotFoundHandler;
-impl ErrorPageHandler for DefaultNotFoundHandler {
-    fn handle(&self) -> crate::Result<Response> {
-        Html::new(include_str!("../templates/404.html"))
-            .with_status(StatusCode::NOT_FOUND)
-            .into_response()
-    }
-}
-
-struct DefaultServerErrorHandler;
-impl ErrorPageHandler for DefaultServerErrorHandler {
-    fn handle(&self) -> crate::Result<Response> {
-        Html::new(include_str!("../templates/500.html"))
-            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
-            .into_response()
-    }
+async fn default_server_error_handler(error: Error) -> impl IntoResponse {
+    Html::new(include_str!("../templates/500.html"))
+        .with_status(error.status_code())
+        .into_response()
 }
 
 /// The main struct for bootstrapping the project.
@@ -857,6 +805,7 @@ impl<S: BootstrapPhase> Bootstrapper<S> {
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let bootstrapper = Bootstrapper::new(MyProject);
+    /// let project = bootstrapper.project();
     /// # Ok(())
     /// # }
     /// ```
@@ -991,7 +940,7 @@ fn read_config(config: &str) -> cot::Result<ProjectConfig> {
     };
 
     let config_content = result.map_err(|err| {
-        Error::from_repr(ErrorKind::LoadConfig {
+        Error::from_kind(ErrorKind::LoadConfig {
             config: config.to_owned(),
             source: err,
         })
@@ -1700,8 +1649,10 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-// Send not needed; Bootstrapper/CLI is run async in a single thread
-#[expect(clippy::future_not_send)]
+#[expect(
+    clippy::future_not_send,
+    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
+)]
 pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> cot::Result<()> {
     let listener = tokio::net::TcpListener::bind(address_str)
         .await
@@ -1723,8 +1674,10 @@ pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> 
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-// Send not needed; Bootstrapper/CLI is run async in a single thread
-#[expect(clippy::future_not_send)]
+#[expect(
+    clippy::future_not_send,
+    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
+)]
 pub async fn run_at(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
@@ -1745,17 +1698,20 @@ pub async fn run_at(
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-// Send not needed; Bootstrapper/CLI is run async in a single thread
-#[expect(clippy::future_not_send)]
+#[expect(
+    clippy::future_not_send,
+    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
+)]
 pub async fn run_at_with_shutdown(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> cot::Result<()> {
-    let not_found_handler: Arc<dyn ErrorPageHandler> =
-        bootstrapper.project().not_found_handler().into();
-    let server_error_handler: Arc<dyn ErrorPageHandler> =
-        bootstrapper.project().server_error_handler().into();
+    let server_error_handler: Arc<dyn BoxErrorPageHandler> = bootstrapper
+        .project()
+        .server_error_handler()
+        .into_handler()
+        .into();
     let (mut context, mut project_handler) = bootstrapper.into_context_and_handler();
 
     #[cfg(feature = "db")]
@@ -1792,13 +1748,8 @@ pub async fn run_at_with_shutdown(
 
         let response: Result<axum::response::Response, ErrorResponse> = match catch_unwind_response
         {
-            Ok(response) => match response {
-                Ok(response) => match response.extensions().get::<ErrorPageTrigger>() {
-                    Some(trigger) => Err(ErrorResponse::ErrorPageTrigger(trigger.clone())),
-                    None => Ok(response),
-                },
-                Err(error) => Err(ErrorResponse::ErrorReturned(error)),
-            },
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(error)) => Err(ErrorResponse::ErrorReturned(error)),
             Err(error) => Err(ErrorResponse::Panic(error)),
         };
 
@@ -1815,10 +1766,11 @@ pub async fn run_at_with_shutdown(
                     build_cot_error_page(error_response, &diagnostics)
                 } else {
                     build_custom_error_page(
-                        &not_found_handler,
                         &server_error_handler,
-                        &error_response,
+                        error_response,
+                        Arc::clone(&context),
                     )
+                    .await
                 }
             }
         }
@@ -1855,7 +1807,6 @@ pub async fn run_at_with_shutdown(
 }
 
 enum ErrorResponse {
-    ErrorPageTrigger(ErrorPageTrigger),
     ErrorReturned(Error),
     Panic(Box<dyn std::any::Any + Send>),
 }
@@ -1865,11 +1816,6 @@ fn build_cot_error_page(
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     match error_response {
-        ErrorResponse::ErrorPageTrigger(trigger) => match trigger {
-            ErrorPageTrigger::NotFound { message } => {
-                error_page::handle_not_found(message, diagnostics)
-            }
-        },
         ErrorResponse::ErrorReturned(error) => {
             error_page::handle_response_error(&error, diagnostics)
         }
@@ -1877,38 +1823,33 @@ fn build_cot_error_page(
     }
 }
 
-fn build_custom_error_page(
-    not_found_handler: &Arc<dyn ErrorPageHandler>,
-    server_error_handler: &Arc<dyn ErrorPageHandler>,
-    error_response: &ErrorResponse,
+async fn build_custom_error_page(
+    server_error_handler: &Arc<dyn BoxErrorPageHandler>,
+    error_response: ErrorResponse,
+    context: Arc<ProjectContext>,
 ) -> axum::response::Response {
-    match error_response {
-        ErrorResponse::ErrorPageTrigger(ErrorPageTrigger::NotFound { .. }) => {
-            not_found_handler.handle().map_or_else(
-                |error| {
-                    error!(
-                        ?error,
-                        "Error occurred while running custom 404 Not Found handler"
-                    );
-                    error_page::build_cot_not_found_page()
-                },
-                response_cot_to_axum,
-            )
-        }
-        ErrorResponse::ErrorReturned(_) | ErrorResponse::Panic(_) => {
-            server_error_handler.handle().map_or_else(
-                |error| {
-                    error!(
-                        ?error,
-                        "Error occurred while running custom 500 Internal Server Error handler"
-                    );
+    let mut request = Request::default();
+    prepare_request(&mut request, context);
 
-                    error_page::build_cot_server_error_page()
-                },
-                response_cot_to_axum,
-            )
-        }
-    }
+    let error = match error_response {
+        ErrorResponse::ErrorReturned(error) => error,
+        ErrorResponse::Panic(payload) => crate::Error::from(UncaughtPanic::new(payload)),
+    };
+    request.extensions_mut().insert(RequestError::new(error));
+
+    let response = server_error_handler.handle(request).await;
+    response.map_or_else(
+        |error| {
+            error!(
+                ?error,
+                "Error occurred while running custom 500 Internal Server Error handler"
+            );
+            // todo where logowanie??????????
+
+            error_page::build_cot_server_error_page()
+        },
+        response_cot_to_axum,
+    )
 }
 
 /// Runs the CLI for the given project.

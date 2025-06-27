@@ -306,7 +306,7 @@ impl CliTask for RunServer {
 
 impl RunServer {
     fn get_user_friendly_error(error: &Error, addr_port: &str) -> Option<String> {
-        match &error.kind {
+        match error.kind() {
             ErrorKind::StartServer { source } => match source.kind() {
                 std::io::ErrorKind::AddrInUse => {
                     let exec = std::env::args()
@@ -360,7 +360,7 @@ impl CliTask for CollectStatic {
         let bootstrapper = bootstrapper.with_apps().with_database().await?;
         StaticFiles::from(bootstrapper.context())
             .collect_into(dir)
-            .map_err(|e| Error::from_repr(ErrorKind::CollectStatic { source: e }))?;
+            .map_err(|e| Error::from_kind(ErrorKind::CollectStatic { source: e }))?;
 
         Ok(())
     }
@@ -570,7 +570,7 @@ mod tests {
     #[test]
     fn get_user_friendly_error_addr_in_use() {
         let source = std::io::Error::new(std::io::ErrorKind::AddrInUse, "error");
-        let error = Error::from_repr(ErrorKind::StartServer { source });
+        let error = Error::from_kind(ErrorKind::StartServer { source });
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
 
@@ -583,7 +583,7 @@ mod tests {
     #[test]
     fn get_user_friendly_error_io_error_other() {
         let source = std::io::Error::other("error");
-        let error = Error::from_repr(ErrorKind::StartServer { source });
+        let error = Error::from_kind(ErrorKind::StartServer { source });
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
 
@@ -592,7 +592,7 @@ mod tests {
 
     #[test]
     fn get_user_friendly_error_unsupported_error() {
-        let error = Error::from_repr(ErrorKind::NoViewToReverse {
+        let error = Error::from_kind(ErrorKind::NoViewToReverse {
             app_name: None,
             view_name: "test".to_string(),
         });

@@ -51,10 +51,7 @@ pub enum RedisStoreError {
 impl From<RedisStoreError> for session_store::Error {
     fn from(err: RedisStoreError) -> session_store::Error {
         match err {
-            RedisStoreError::PoolConnection(inner) => {
-                session_store::Error::Backend(inner.to_string())
-            }
-            RedisStoreError::PoolCreation(inner) => {
+            RedisStoreError::PoolCreation(inner) | RedisStoreError::PoolConnection(inner) => {
                 session_store::Error::Backend(inner.to_string())
             }
             RedisStoreError::Command(inner) => session_store::Error::Backend(inner.to_string()),
@@ -122,6 +119,11 @@ impl RedisStore {
     /// The returned `Connection` implements
     /// `AsyncCommands` so you can run Redis commands directly.
     ///
+    ///  # Errors
+    ///
+    ///  Returns [`RedisStoreError::PoolConnection`] if it fails to get a valid
+    /// redis connection from the connection pool.
+    ///
     /// # Examples
     ///
     /// ```ignore
@@ -140,6 +142,7 @@ impl RedisStore {
     }
 }
 
+#[allow(clippy::cast_sign_loss)]
 fn get_expiry_as_u64(expiry: OffsetDateTime) -> u64 {
     let now = OffsetDateTime::now_utc();
     expiry

@@ -1,0 +1,11 @@
+[package]
+name = "forms"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+edition = "2024"
+
+[dependencies]
+askama = "0.14"
+cot = { path = "../../cot" , features = ["full"]}
+chrono = "0.4.41"
+chrono-tz = "0.10.3"

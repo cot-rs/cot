@@ -4,7 +4,10 @@ use std::path::PathBuf;
 use cot_cli::new_project::{CotSource, new_project};
 
 #[test]
-#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
 fn new_project_compile_test() {
     let temp_dir = tempfile::tempdir().unwrap();
     let project_path = temp_dir.path().join("my_project");

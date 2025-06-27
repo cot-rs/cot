@@ -18,7 +18,10 @@ async fn parameterized(request: Request) -> Html {
 }
 
 #[cot::test]
-#[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+)]
 async fn test_index() {
     let client = Client::new(project());
 
@@ -31,7 +34,10 @@ async fn test_index() {
 }
 
 #[cot::test]
-#[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+)]
 async fn path_params() {
     let client = Client::new(project());
 

@@ -743,8 +743,10 @@ mod tests {
 
     #[cfg(feature = "db")]
     #[cot::test]
-    // unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`
-    #[cfg_attr(miri, ignore)]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`"
+    )]
     async fn request_db() {
         let db = crate::test::TestDatabase::new_sqlite().await.unwrap();
         let mut test_request = TestRequestBuilder::get("/").database(db.database()).build();

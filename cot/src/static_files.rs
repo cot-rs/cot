@@ -402,7 +402,10 @@ mod tests {
     use crate::{App, AppBuilder, Bootstrapper, Project};
 
     #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     fn static_files_add_and_get_file() {
         let mut static_files = StaticFiles::new(&StaticFilesConfig::default());
         static_files.add_file(StaticFile::new("test.txt", "This is a test file"));
@@ -522,7 +525,10 @@ mod tests {
     }
 
     #[cot::test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     async fn static_files_middleware_from_context() {
         struct App1;
         impl App for App1 {

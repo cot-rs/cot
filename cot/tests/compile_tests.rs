@@ -1,5 +1,8 @@
 #[test]
-#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
 fn diagnostic_on_unimplemented() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/ui/unimplemented_db_model.rs");

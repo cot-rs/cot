@@ -95,3 +95,12 @@ fn derive_from_struct() {
     t.pass("tests/ui/derive_from_request_parts.rs");
     t.compile_fail("tests/ui/derive_from_request_parts_enum.rs");
 }
+
+#[rustversion::attr(not(nightly), ignore)]
+#[test]
+#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+fn derive_select_choice() {
+    let t = trybuild::TestCases::new();
+    t.pass("tests/ui/derive_select_choice.rs");
+    t.compile_fail("tests/ui/derive_select_choice_fail.rs");
+}

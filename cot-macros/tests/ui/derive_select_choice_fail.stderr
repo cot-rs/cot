@@ -1,0 +1,75 @@
+error: SelectChoice can only be derived for enums
+  --> tests/ui/derive_select_choice_fail.rs:10:10
+   |
+10 | #[derive(SelectChoice)]
+   |          ^^^^^^^^^^^^
+   |
+   = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: SelectChoice cannot be derived for empty enums
+  --> tests/ui/derive_select_choice_fail.rs:16:10
+   |
+16 | #[derive(SelectChoice)]
+   |          ^^^^^^^^^^^^
+   |
+   = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+ --> tests/ui/derive_select_choice_fail.rs:3:10
+  |
+3 | #[derive(SelectChoice)]
+  |          ^^^^^^^^^^^^ expected `EnumWithData`, found enum constructor
+4 | enum EnumWithData {
+5 |     Foo(u32),
+  |     --- `Foo` defines an enum variant constructor here, which should be called
+  |
+  = note:          expected enum `EnumWithData`
+          found enum constructor `fn(u32) -> EnumWithData {EnumWithData::Foo}`
+  = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0533]: expected value, found struct variant `Self::Bar`
+ --> tests/ui/derive_select_choice_fail.rs:3:10
+  |
+3 | #[derive(SelectChoice)]
+  |          ^^^^^^^^^^^^ not a value
+  |
+  = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+ --> tests/ui/derive_select_choice_fail.rs:3:10
+  |
+3 | #[derive(SelectChoice)]
+  |          ^^^^^^^^^^^^
+  |          |
+  |          expected `EnumWithData`, found enum constructor
+  |          arguments to this enum variant are incorrect
+4 | enum EnumWithData {
+5 |     Foo(u32),
+  |     --- `Foo` defines an enum variant constructor here, which should be called
+  |
+  = note:          expected enum `EnumWithData`
+          found enum constructor `fn(u32) -> EnumWithData {EnumWithData::Foo}`
+help: the type constructed contains `fn(u32) -> EnumWithData {EnumWithData::Foo}` due to the type of the argument passed
+ --> tests/ui/derive_select_choice_fail.rs:3:10
+  |
+3 | #[derive(SelectChoice)]
+  |          ^^^^^^^^^^^^ this argument influences the type of `Ok`
+note: tuple variant defined here
+ --> $RUST/core/src/result.rs
+  = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0533]: expected unit struct, unit variant or constant, found tuple variant `Self::Foo`
+ --> tests/ui/derive_select_choice_fail.rs:3:10
+  |
+3 | #[derive(SelectChoice)]
+  |          ^^^^^^^^^^^^ not a unit struct, unit variant or constant
+  |
+  = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0533]: expected unit struct, unit variant or constant, found struct variant `Self::Bar`
+ --> tests/ui/derive_select_choice_fail.rs:3:10
+  |
+3 | #[derive(SelectChoice)]
+  |          ^^^^^^^^^^^^ not a unit struct, unit variant or constant
+  |
+  = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.3.1...cot-cli-v0.4.0) - 2025-06-27
+
+### <!-- 1 -->New features
+
+- support multiple session stores ([#277](https://github.com/cot-rs/cot/pull/277))
+- [**breaking**] add `SelectField`; support more chrono form fields ([#345](https://github.com/cot-rs/cot/pull/345))
+
+### <!-- 3 -->Other
+
+- fix clippy warnings on Rust 1.88 ([#355](https://github.com/cot-rs/cot/pull/355))
+
 ## [0.3.1](https://github.com/cot-rs/cot/compare/cot-cli-v0.3.0...cot-cli-v0.3.1) - 2025-05-16
 
 ### <!-- 1 -->New features

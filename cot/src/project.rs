@@ -2128,7 +2128,10 @@ mod tests {
     }
 
     #[cot::test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     async fn bootstrapper() {
         struct TestProject;
         impl Project for TestProject {

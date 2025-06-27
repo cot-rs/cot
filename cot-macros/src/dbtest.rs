@@ -17,7 +17,7 @@ pub(super) fn fn_to_dbtest(test_function_decl: ItemFn) -> syn::Result<TokenStrea
 
     let result = quote! {
         #[::cot::test]
-        #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+        #[cfg_attr(miri, ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`")]
         async fn #sqlite_ident() {
             let mut database = cot::test::TestDatabase::new_sqlite().await.unwrap();
 

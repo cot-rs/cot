@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/cot-rs/cot/compare/cot-v0.3.1...cot-v0.4.0) - 2025-06-27
+
+### <!-- 1 -->New features
+
+- support multiple session stores ([#277](https://github.com/cot-rs/cot/pull/277))
+- more Session config knobs ([#337](https://github.com/cot-rs/cot/pull/337))
+- `ToDbValue` for `Url` and bug fixes for `Url` and `Email` ([#353](https://github.com/cot-rs/cot/pull/353))
+- add validated `Url` type ([#339](https://github.com/cot-rs/cot/pull/339))
+- FromRequestParts derive macro ([#336](https://github.com/cot-rs/cot/pull/336))
+- [**breaking**] add `SelectField`; support more chrono form fields ([#345](https://github.com/cot-rs/cot/pull/345))
+- support more chrono datatypes in the framework ([#332](https://github.com/cot-rs/cot/pull/332))
+- add simple `AsFormField` impl for `ForeignKey`s ([#335](https://github.com/cot-rs/cot/pull/335))
+- [**breaking**] add support for file fields in forms ([#334](https://github.com/cot-rs/cot/pull/334))
+
+### <!-- 2 -->Fixes
+
+- clippy warning in the latest nightly ([#346](https://github.com/cot-rs/cot/pull/346))
+- [**breaking**] OpenAPI specs with item references ([#333](https://github.com/cot-rs/cot/pull/333))
+
+### <!-- 3 -->Other
+
+- fix clippy warnings on Rust 1.88 ([#355](https://github.com/cot-rs/cot/pull/355))
+- [**breaking**] add `#[non_exhaustive]` to config structs ([#354](https://github.com/cot-rs/cot/pull/354))
+- [**breaking**] remove deprecated items ([#349](https://github.com/cot-rs/cot/pull/349))
+- tiny doc and code consistency fixes ([#348](https://github.com/cot-rs/cot/pull/348))
+
 ## [0.3.1](https://github.com/cot-rs/cot/compare/cot-v0.3.0...cot-v0.3.1) - 2025-05-16
 
 ### <!-- 1 -->New features

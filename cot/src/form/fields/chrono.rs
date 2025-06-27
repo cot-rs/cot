@@ -1673,10 +1673,6 @@ mod tests {
         }
     }
 
-    // ------------------------
-    // DateField tests
-    // ------------------------
-
     #[test]
     fn date_field_render() {
         let field = DateField::with_options(

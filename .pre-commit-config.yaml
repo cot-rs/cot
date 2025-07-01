@@ -44,4 +44,4 @@ repos:
       - id: djlint
         name: djLint
         files: \.(html|jinja|j2)$
-        args: [--check, --reformat]
+        args: [--check]

@@ -10,6 +10,7 @@ use cot::test::TestRequestBuilder;
 use cot::{RequestHandler, StatusCode};
 use schemars::SchemaGenerator;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 struct TestRequest {
@@ -163,17 +164,21 @@ fn api_router_cycle() {
     // cycled objects should be put into components.schemas
     let schemas = openapi.components.unwrap().schemas;
     let nested_schema = schemas.get("NestedData").unwrap();
-    let nested_object = nested_schema.json_schema.clone().into_object().object;
+    let nested_object = nested_schema.json_schema.as_object().unwrap();
     let reference = nested_object
+        .get("properties")
         .unwrap()
-        .properties
         .get("nested")
         .unwrap()
-        .clone()
-        .into_object()
-        .reference;
+        .get("anyOf")
+        .unwrap();
 
-    assert_eq!(reference.unwrap(), "#/components/schemas/NestedData");
+    let ref_obj = Value::Object(Map::from_iter([(
+        "$ref".to_string(),
+        Value::String("#/components/schemas/NestedData".to_string()),
+    )]));
+    let ref_arr = reference.as_array().unwrap();
+    assert_eq!(ref_arr[0], ref_obj);
 }
 
 #[test]

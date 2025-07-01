@@ -115,8 +115,8 @@ use aide::openapi::{
 };
 use http::request::Parts;
 use indexmap::IndexMap;
-use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
-use schemars::{JsonSchema, SchemaGenerator};
+use schemars::{JsonSchema, Schema, SchemaGenerator};
+use serde_json::Value;
 
 use crate::auth::Auth;
 use crate::form::Form;
@@ -791,54 +791,52 @@ impl<D: JsonSchema> ApiOperationPart for Path<D> {
         route_context: &RouteContext<'_>,
         schema_generator: &mut SchemaGenerator,
     ) {
-        let schema = D::json_schema(schema_generator).into_object();
+        let mut schema = D::json_schema(schema_generator);
+        let schema_obj = schema.ensure_object();
 
-        if let Some(array) = schema.array {
+        if let Some(items) = schema_obj.get("prefixItems") {
             // a tuple of path params, e.g. Path<(i32, String)>
 
-            if let Some(items) = array.items {
-                match items {
-                    SingleOrVec::Single(_) => {}
-                    SingleOrVec::Vec(item_list) => {
-                        assert_eq!(
-                            route_context.param_names.len(),
-                            item_list.len(),
-                            "the number of path parameters in the route URL must match \
-                            the number of params in the Path type (found path params: {:?})",
-                            route_context.param_names,
-                        );
+            if let Value::Array(item_list) = items {
+                assert_eq!(
+                    route_context.param_names.len(),
+                    item_list.len(),
+                    "the number of path parameters in the route URL must match \
+                    the number of params in the Path type (found path params: {:?})",
+                    route_context.param_names,
+                );
 
-                        for (&param_name, item) in
-                            route_context.param_names.iter().zip(item_list.into_iter())
-                        {
-                            let schema = item.into_object();
+                for (&param_name, item) in route_context.param_names.iter().zip(item_list.iter()) {
+                    let array_item = Schema::try_from(item.clone())
+                        .expect("schema.items must contain valid schemas");
 
-                            add_path_param(operation, schema, param_name.to_owned());
-                        }
-                    }
+                    add_path_param(operation, array_item, param_name.to_owned());
                 }
             }
-        } else if let Some(object) = schema.object {
+        } else if let Some(properties) = schema_obj.get("properties") {
             // a struct of path params, e.g. Path<MyStruct>
 
-            let mut route_context_sorted = route_context.param_names.to_vec();
-            route_context_sorted.sort_unstable();
-            let mut object_props_sorted = object.properties.keys().collect::<Vec<_>>();
-            object_props_sorted.sort();
+            if let Value::Object(properties) = properties {
+                let mut route_context_sorted = route_context.param_names.to_vec();
+                route_context_sorted.sort_unstable();
+                let mut object_props_sorted = properties.keys().collect::<Vec<_>>();
+                object_props_sorted.sort();
 
-            assert_eq!(
-                route_context_sorted, object_props_sorted,
-                "Path parameters in the route info must exactly match parameters \
-                in the Path type. Make sure that the type you pass to Path contains \
-                all the parameters for the route, and that the names match exactly."
-            );
+                assert_eq!(
+                    route_context_sorted, object_props_sorted,
+                    "Path parameters in the route info must exactly match parameters \
+                    in the Path type. Make sure that the type you pass to Path contains \
+                    all the parameters for the route, and that the names match exactly."
+                );
 
-            for (key, item) in object.properties {
-                let object_item = item.into_object();
+                for (key, item) in properties {
+                    let object_item = Schema::try_from(item.clone())
+                        .expect("schema.properties must contain valid schemas");
 
-                add_path_param(operation, object_item, key);
+                    add_path_param(operation, object_item, key.clone());
+                }
             }
-        } else if schema.instance_type.is_some() {
+        } else if schema_obj.contains_key("type") {
             // single path param, e.g. Path<i32>
 
             assert_eq!(
@@ -860,13 +858,14 @@ impl<D: JsonSchema> ApiOperationPart for UrlQuery<D> {
         _route_context: &RouteContext<'_>,
         schema_generator: &mut SchemaGenerator,
     ) {
-        let schema = D::json_schema(schema_generator).into_object();
+        let schema = D::json_schema(schema_generator);
 
-        if let Some(object) = schema.object {
-            for (key, item) in object.properties {
-                let object_item = item.into_object();
+        if let Some(Value::Object(properties)) = schema.get("properties") {
+            for (key, item) in properties {
+                let object_item = Schema::try_from(item.clone())
+                    .expect("schema.properties must contain valid schemas");
 
-                add_query_param(operation, object_item, key);
+                add_query_param(operation, object_item, key.clone());
             }
         }
     }
@@ -879,13 +878,14 @@ impl<F: Form + JsonSchema> ApiOperationPart for RequestForm<F> {
         schema_generator: &mut SchemaGenerator,
     ) {
         if route_context.method == Some(Method::GET) || route_context.method == Some(Method::HEAD) {
-            let schema = F::json_schema(schema_generator).into_object();
+            let schema = F::json_schema(schema_generator);
 
-            if let Some(object) = schema.object {
-                for (key, item) in object.properties {
-                    let object_item = item.into_object();
+            if let Some(Value::Object(properties)) = schema.get("properties") {
+                for (key, item) in properties {
+                    let object_item = Schema::try_from(item.clone())
+                        .expect("schema.properties must contain valid schemas");
 
-                    add_query_param(operation, object_item, key);
+                    add_query_param(operation, object_item, key.clone());
                 }
             }
         } else {
@@ -908,7 +908,7 @@ impl<F: Form + JsonSchema> ApiOperationPart for RequestForm<F> {
     }
 }
 
-fn add_path_param(operation: &mut Operation, mut schema: SchemaObject, param_name: String) {
+fn add_path_param(operation: &mut Operation, mut schema: Schema, param_name: String) {
     let required = extract_is_required(&mut schema);
 
     operation
@@ -919,7 +919,7 @@ fn add_path_param(operation: &mut Operation, mut schema: SchemaObject, param_nam
         }));
 }
 
-fn add_query_param(operation: &mut Operation, mut schema: SchemaObject, param_name: String) {
+fn add_query_param(operation: &mut Operation, mut schema: Schema, param_name: String) {
     let required = extract_is_required(&mut schema);
 
     operation
@@ -932,29 +932,36 @@ fn add_query_param(operation: &mut Operation, mut schema: SchemaObject, param_na
         }));
 }
 
-fn extract_is_required(object_item: &mut SchemaObject) -> bool {
-    match &mut object_item.instance_type {
-        Some(SingleOrVec::Vec(type_list)) => {
-            let nullable = type_list.contains(&InstanceType::Null);
-            type_list.retain(|&element| element != InstanceType::Null);
-            !nullable
+fn extract_is_required(object_item: &mut Schema) -> bool {
+    let object = object_item.ensure_object();
+    let obj_type = object.get_mut("type");
+    let null_value = Value::String("null".to_string());
+
+    if let Some(Value::Array(types)) = obj_type {
+        if types.contains(&null_value) {
+            // If the type is nullable, we need to remove "null" from the types
+            // and return false, indicating that the parameter is not required.
+            types.retain(|t| t != &null_value);
+            false
+        } else {
+            // If "null" is not in the types, we assume it's a required parameter
+            true
         }
-        Some(SingleOrVec::Single(_)) | None => true,
+    } else {
+        // If the type is a single string (or some other unknown value), we assume it's
+        // a required parameter
+        true
     }
 }
 
-fn param_with_name(
-    param_name: String,
-    schema_object: SchemaObject,
-    required: bool,
-) -> ParameterData {
+fn param_with_name(param_name: String, schema: Schema, required: bool) -> ParameterData {
     ParameterData {
         name: param_name,
         description: None,
         required,
         deprecated: None,
         format: ParameterSchemaOrContent::Schema(aide::openapi::SchemaObject {
-            json_schema: Schema::Object(schema_object),
+            json_schema: schema,
             external_docs: None,
             example: None,
         }),
@@ -1022,7 +1029,6 @@ impl ApiOperationResponse for crate::Result<Response> {
 mod tests {
     use aide::openapi::{Operation, Parameter};
     use schemars::SchemaGenerator;
-    use schemars::schema::Schema;
     use serde::{Deserialize, Serialize};
 
     use super::*;
@@ -1105,8 +1111,8 @@ mod tests {
             let content_json = content.get("application/json").unwrap();
             let schema_obj = &content_json.schema.clone().unwrap().json_schema;
 
-            if let Schema::Object(obj) = schema_obj {
-                if let Some(properties) = &obj.object.as_ref().map(|o| &o.properties) {
+            if let Some(obj) = schema_obj.as_object() {
+                if let Some(Value::Object(properties)) = obj.get("properties") {
                     assert!(properties.contains_key("field1"));
                     assert!(properties.contains_key("field2"));
                     assert!(properties.contains_key("optional_field"));
@@ -1175,8 +1181,8 @@ mod tests {
             let content_json = content.get("application/x-www-form-urlencoded").unwrap();
             let schema_obj = &content_json.schema.clone().unwrap().json_schema;
 
-            if let Schema::Object(obj) = schema_obj {
-                if let Some(properties) = &obj.object.as_ref().map(|o| &o.properties) {
+            if let Some(obj) = schema_obj.as_object() {
+                if let Some(Value::Object(properties)) = &obj.get("properties") {
                     assert!(properties.contains_key("field1"));
                     assert!(properties.contains_key("field2"));
                     assert!(properties.contains_key("optional_field"));
@@ -1347,13 +1353,13 @@ mod tests {
         assert!(content.schema.is_some());
 
         let schema = &content.schema.as_ref().unwrap().json_schema;
-        if let Schema::Object(obj) = schema {
-            if let Some(object_schema) = &obj.object {
-                assert!(object_schema.properties.contains_key("field1"));
-                assert!(object_schema.properties.contains_key("field2"));
-                assert!(object_schema.properties.contains_key("optional_field"));
+        if let Some(obj) = schema.as_object() {
+            if let Some(Value::Object(properties)) = &obj.get("properties") {
+                assert!(properties.contains_key("field1"));
+                assert!(properties.contains_key("field2"));
+                assert!(properties.contains_key("optional_field"));
             } else {
-                panic!("Expected object schema");
+                panic!("Expected properties in schema");
             }
         } else {
             panic!("Expected schema object");

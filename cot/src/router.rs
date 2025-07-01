@@ -345,23 +345,32 @@ impl Router {
     ///
     /// This might be useful if you want to manually serve the generated OpenAPI
     /// specs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if invalid schemas are generated. This should not happen in
+    /// normal operation, but if it does, it indicates a bug in the
+    /// [`schemars`](https://docs.rs/schemars/latest/schemars/) library
+    /// or in the way the OpenAPI specs are generated.
     #[cfg(feature = "openapi")]
     #[must_use]
     pub fn as_api(&self) -> aide::openapi::OpenApi {
         let mut paths = aide::openapi::Paths::default();
         let mut schema_generator =
-            schemars::SchemaGenerator::new(schemars::r#gen::SchemaSettings::openapi3());
+            schemars::SchemaGenerator::new(schemars::generate::SchemaSettings::openapi3());
 
         self.as_openapi_impl("", &[], &mut paths, &mut schema_generator);
 
         let component_schemas = schema_generator
-            .take_definitions()
+            .take_definitions(true)
             .into_iter()
             .map(|(name, json_schema)| {
                 (
                     name,
                     aide::openapi::SchemaObject {
-                        json_schema,
+                        json_schema: schemars::Schema::try_from(json_schema).expect(
+                            "SchemaGenerator::take_definitions should return valid schemas",
+                        ),
                         example: None,
                         external_docs: None,
                     },

@@ -862,8 +862,11 @@ where
 #[macro_export]
 macro_rules! reverse {
     ($request:expr, $view_name:literal $(, $($key:ident = $value:expr),*)?) => {{
-        // allow using either `Request` or `Urls` objects
-        #[allow(clippy::allow_attributes, unused_imports)]
+        #[allow(
+            clippy::allow_attributes,
+            unused_imports,
+            reason = "allow using either `Request` or `Urls` objects"
+        )]
         use $crate::request::RequestExt;
         let (app_name, view_name) = $crate::router::split_view_name($view_name);
         let app_name = app_name.or_else(|| $request.app_name());

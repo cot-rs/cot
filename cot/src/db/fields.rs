@@ -173,7 +173,8 @@ macro_rules! impl_db_field_with_postgres_int_cast {
                 #[allow(
                     clippy::allow_attributes,
                     clippy::cast_possible_truncation,
-                    clippy::cast_sign_loss
+                    clippy::cast_sign_loss,
+                    reason = "needed for casting from larger to smaller integer types"
                 )]
                 value.get::<$src_ty>().map(|v| v as $dest_ty)
             }
@@ -189,7 +190,8 @@ macro_rules! impl_db_field_with_postgres_int_cast {
                 #[allow(
                     clippy::allow_attributes,
                     clippy::cast_possible_truncation,
-                    clippy::cast_sign_loss
+                    clippy::cast_sign_loss,
+                    reason = "needed for casting from larger to smaller integer types"
                 )]
                 value
                     .get::<Option<$src_ty>>()

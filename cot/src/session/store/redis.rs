@@ -51,10 +51,7 @@ pub enum RedisStoreError {
 impl From<RedisStoreError> for session_store::Error {
     fn from(err: RedisStoreError) -> session_store::Error {
         match err {
-            RedisStoreError::PoolConnection(inner) => {
-                session_store::Error::Backend(inner.to_string())
-            }
-            RedisStoreError::PoolCreation(inner) => {
+            RedisStoreError::PoolConnection(inner) | RedisStoreError::PoolCreation(inner) => {
                 session_store::Error::Backend(inner.to_string())
             }
             RedisStoreError::Command(inner) => session_store::Error::Backend(inner.to_string()),
@@ -122,6 +119,11 @@ impl RedisStore {
     /// The returned `Connection` implements
     /// `AsyncCommands` so you can run Redis commands directly.
     ///
+    /// # Errors
+    ///
+    /// Returns [`RedisStoreError::PoolConnection`] if it fails to get a
+    /// connection from the pool.
+    ///
     /// # Examples
     ///
     /// ```ignore
@@ -145,7 +147,8 @@ fn get_expiry_as_u64(expiry: OffsetDateTime) -> u64 {
     expiry
         .unix_timestamp()
         .saturating_sub(now.unix_timestamp())
-        .max(0) as u64
+        .max(0)
+        .unsigned_abs()
 }
 
 #[async_trait]

@@ -170,8 +170,11 @@ macro_rules! impl_db_field_with_postgres_int_cast {
 
             #[cfg(feature = "postgres")]
             fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
-                #[allow(clippy::cast_possible_truncation)]
-                #[allow(clippy::cast_sign_loss)]
+                #[allow(
+                    clippy::allow_attributes,
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss
+                )]
                 value.get::<$src_ty>().map(|v| v as $dest_ty)
             }
         }
@@ -183,8 +186,11 @@ macro_rules! impl_db_field_with_postgres_int_cast {
 
             #[cfg(feature = "postgres")]
             fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
-                #[allow(clippy::cast_possible_truncation)]
-                #[allow(clippy::cast_sign_loss)]
+                #[allow(
+                    clippy::allow_attributes,
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss
+                )]
                 value
                     .get::<Option<$src_ty>>()
                     .map(|v| v.map(|v| v as $dest_ty))

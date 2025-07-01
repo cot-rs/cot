@@ -47,6 +47,7 @@ rust_2018_idioms = { level = "warn", priority = -1 }
 all = { level = "deny", priority = -1 }
 pedantic = "warn"
 future_not_send = "warn"
+allow_attributes = "warn"
 
 [workspace.dependencies]
 ahash = { version = "0.8.11", default-features = false }
@@ -104,8 +105,8 @@ proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 rand = { version = "0.9", default-features = false }
 rustversion = "1"
-redis = { version =  "0.29.1", default-features = false }
-deadpool-redis = { version =  "0.20.0", default-features = false }
+redis = { version = "0.29.1", default-features = false }
+deadpool-redis = { version = "0.20.0", default-features = false }
 schemars = { version = "0.8.22", default-features = false }
 sea-query = { version = "0.32", default-features = false }
 sea-query-binder = { version = "0.7", default-features = false }

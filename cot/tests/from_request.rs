@@ -3,7 +3,7 @@ use cot::http::request::Parts;
 use cot::request::extractors::FromRequestParts;
 
 #[derive(FromRequestParts)]
-#[allow(dead_code)]
+#[expect(dead_code)]
 struct MyStruct {
     user_id: DummyExtractor,
     session_id: DummyExtractor,

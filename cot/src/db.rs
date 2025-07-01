@@ -120,7 +120,7 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
     note = "annotate `{Self}` with the `#[cot::db::model]` attribute"
 )]
 pub trait Model: Sized + Send + 'static {
-    #[allow(clippy::doc_markdown)] // UPPER_SNAKE_CASE
+    #[expect(clippy::doc_markdown, reason = "UPPER_SNAKE_CASE")]
     /// A helper structure for the fields of the model.
     ///
     /// This structure should a constant [`FieldRef`](query::FieldRef) instance

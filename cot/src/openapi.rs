@@ -512,7 +512,11 @@ macro_rules! impl_as_openapi_operation {
             R: for<'a> Future<Output = Response> + Send,
             Response: ApiOperationResponse,
         {
-            #[allow(non_snake_case)]
+            #[allow(
+                clippy::allow_attributes,
+                non_snake_case,
+                reason = "for the case where there are no FromRequestParts params"
+            )]
             fn as_api_operation(
                 &self,
                 route_context: &RouteContext<'_>,

@@ -1058,7 +1058,7 @@ impl From<Expiry> for tower_sessions::Expiry {
 ///
 /// let config = SessionMiddlewareConfig::builder().secure(false).build();
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -1308,6 +1308,12 @@ impl SessionMiddlewareConfigBuilder {
             expiry: self.expiry.unwrap_or_default(),
             store: self.store.clone().unwrap_or_default(),
         }
+    }
+}
+
+impl Default for SessionMiddlewareConfig {
+    fn default() -> Self {
+        SessionMiddlewareConfig::builder().build()
     }
 }
 
@@ -1686,6 +1692,38 @@ mod tests {
         assert!(config.middlewares.session.always_save);
         assert_eq!(config.middlewares.session.name, String::from("some.sid"));
         assert_eq!(config.middlewares.session.path, String::from("/some/path"));
+    }
+
+    #[test]
+    fn default_values_from_valid_toml() {
+        let toml_content = "";
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+        assert!(config.debug);
+        assert!(config.register_panic_hook);
+        assert_eq!(config.secret_key.as_bytes(), b"");
+        assert_eq!(config.fallback_secret_keys.len(), 0);
+        assert_eq!(config.auth_backend, AuthBackendConfig::None);
+        assert_eq!(config.static_files.url, "/static/");
+        assert_eq!(
+            config.static_files.rewrite,
+            StaticFilesPathRewriteMode::None
+        );
+        assert_eq!(config.static_files.cache_timeout, None);
+        assert!(!config.middlewares.live_reload.enabled);
+        assert!(config.middlewares.session.secure);
+        assert!(config.middlewares.session.http_only);
+        assert_eq!(config.middlewares.session.domain, None);
+        assert!(!config.middlewares.session.always_save);
+        assert_eq!(config.middlewares.session.name, String::from("id"));
+        assert_eq!(config.middlewares.session.path, String::from("/"));
+        assert_eq!(config.middlewares.session.same_site, SameSite::Strict);
+        assert_eq!(config.middlewares.session.expiry, Expiry::OnSessionEnd);
+        assert_eq!(
+            config.middlewares.session.store.store_type,
+            SessionStoreTypeConfig::Memory
+        );
+        assert_eq!(config.database.url, None);
     }
 
     #[test]

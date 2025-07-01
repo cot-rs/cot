@@ -38,3 +38,10 @@ repos:
     hooks:
       - id: format-justfile
         name: "format justfiles"
+  - repo: https://github.com/Riverside-Healthcare/djLint
+    rev: v1.34.1
+    hooks:
+      - id: djlint
+        name: djLint
+        files: \.(html|jinja|j2)$
+        args: [--check, --reformat]

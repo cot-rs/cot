@@ -9,8 +9,9 @@ use cot::admin::{AdminApp, AdminModel, AdminModelManager, DefaultAdminModelManag
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
 use cot::config::{
-    AuthBackendConfig, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
-    StaticFilesConfig, StaticFilesPathRewriteMode,
+    AuthBackendConfig, DatabaseConfig, Expiry, MiddlewareConfig, ProjectConfig,
+    SessionMiddlewareConfig, SessionStoreConfig, SessionStoreTypeConfig, StaticFilesConfig,
+    StaticFilesPathRewriteMode,
 };
 use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model};
@@ -20,6 +21,7 @@ use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::extractors::RequestDb;
 use cot::router::{Route, Router, Urls};
+use cot::session::db::SessionApp;
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Project, ProjectContext};
 
@@ -104,7 +106,17 @@ impl Project for AdminProject {
             .auth_backend(AuthBackendConfig::Database)
             .middlewares(
                 MiddlewareConfig::builder()
-                    .session(SessionMiddlewareConfig::builder().secure(false).build())
+                    .session(
+                        SessionMiddlewareConfig::builder()
+                            .secure(false)
+                            .store(
+                                SessionStoreConfig::builder()
+                                    .store_type(SessionStoreTypeConfig::Database)
+                                    .build(),
+                            )
+                            .expiry(Expiry::OnInactivity(Duration::from_secs(5)))
+                            .build(),
+                    )
                     .build(),
             )
             .static_files(
@@ -120,6 +132,7 @@ impl Project for AdminProject {
         apps.register(DatabaseUserApp::new());
         apps.register_with_views(AdminApp::new(), "/admin");
         apps.register_with_views(HelloApp, "");
+        apps.register(SessionApp::new());
     }
 
     fn middlewares(

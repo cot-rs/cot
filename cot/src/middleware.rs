@@ -25,6 +25,8 @@ use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
 use crate::session::store::SessionStoreWrapper;
+#[cfg(feature = "db")]
+use crate::session::store::db::DbStore;
 #[cfg(feature = "json")]
 use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
@@ -313,7 +315,7 @@ impl SessionMiddleware {
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let session_cfg = &context.config().middlewares.session;
         let store_type = session_cfg.store.store_type.clone();
-        let boxed_store = Self::config_to_session_store(store_type);
+        let boxed_store = Self::config_to_session_store(store_type, context);
         let arc_store = Arc::from(boxed_store);
         let layer = SessionManagerLayer::new(SessionStoreWrapper::new(arc_store));
         let mut middleware = SessionMiddleware { inner: layer }
@@ -487,6 +489,7 @@ impl SessionMiddleware {
     /// [`SessionStore`]
     fn config_to_session_store(
         config: SessionStoreTypeConfig,
+        context: &MiddlewareContext,
     ) -> Box<dyn SessionStore + Send + Sync> {
         match config {
             SessionStoreTypeConfig::Memory => Box::new(MemoryStore::new()),
@@ -509,9 +512,7 @@ impl SessionMiddleware {
                 }
             }
             #[cfg(feature = "db")]
-            SessionStoreTypeConfig::Database => {
-                unimplemented!();
-            }
+            SessionStoreTypeConfig::Database => Box::new(DbStore::new(context.database().clone())),
         }
     }
 }

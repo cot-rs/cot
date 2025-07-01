@@ -50,9 +50,9 @@ future_not_send = "warn"
 allow_attributes = "warn"
 
 [workspace.dependencies]
-ahash = { version = "0.8.11", default-features = false }
+ahash = { version = "0.8.12", default-features = false }
 aide = { version = "0.14", default-features = false }
-anstyle = "1.0.10"
+anstyle = "1.0.11"
 anyhow = "1.0.98"
 askama = { version = "0.14", default-features = false }
 assert_cmd = "2"
@@ -66,7 +66,7 @@ chrono = { version = "0.4.41", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
-clap_mangen = "0.2.26"
+clap_mangen = "0.2.27"
 cot = { version = "0.3.1", path = "cot" }
 cot_codegen = { version = "0.3.1", path = "cot-codegen" }
 cot_macros = { version = "0.3.1", path = "cot-macros" }
@@ -123,7 +123,7 @@ sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
 time = { version = "0.3.41", default-features = false }
-tokio = { version = "1.44", default-features = false }
+tokio = { version = "1.45", default-features = false }
 toml = { version = "0.8", default-features = false }
 tower = "0.5.2"
 tower-livereload = "0.9.6"

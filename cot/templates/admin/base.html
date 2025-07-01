@@ -8,8 +8,7 @@
         <title>
             {% block title %}{% endblock %}
         | Cot Admin</title>
-        <link rel="stylesheet"
-              href="{{ ctx.static_files.url_for("admin/admin.css") ? }}">
+        <link rel="stylesheet" href="{{ ctx.static_files.url_for("admin/admin.css") ? }}">
     </head>
     <body class="{% block body_class %}{% endblock %}">
         <header id="header">

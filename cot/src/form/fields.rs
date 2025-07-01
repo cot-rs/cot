@@ -285,7 +285,7 @@ impl HtmlSafe for EmailField {}
 
 impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer);
 
-/// Custom options for a `IntegerField`.
+/// Custom options for a [`IntegerField`].
 #[derive(Debug, Copy, Clone)]
 pub struct IntegerFieldOptions<T> {
     /// The minimum value of the field. Used to set the `min` attribute in the
@@ -457,7 +457,7 @@ impl_integer_as_form_field!(NonZeroUsize);
 
 impl_form_field!(BoolField, BoolFieldOptions, "a boolean");
 
-/// Custom options for a `BoolField`.
+/// Custom options for a [`BoolField`].
 #[derive(Debug, Default, Copy, Clone)]
 pub struct BoolFieldOptions {
     /// If `true`, the field must be checked to be considered valid.
@@ -642,7 +642,7 @@ pub(crate) fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldV
 
 impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float);
 
-/// Custom options for a `FloatField`.
+/// Custom options for a [`FloatField`].
 #[derive(Debug, Copy, Clone)]
 pub struct FloatFieldOptions<T> {
     /// The minimum value of the field. Used to set the `min` attribute in the
@@ -769,7 +769,7 @@ impl_float_as_form_field!(f64);
 
 impl_form_field!(UrlField, UrlFieldOptions, "a URL");
 
-/// Custom options for a `UrlField`.
+/// Custom options for a [`UrlField`].
 #[derive(Debug, Default, Copy, Clone)]
 pub struct UrlFieldOptions;
 

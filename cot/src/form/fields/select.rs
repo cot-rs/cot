@@ -1,6 +1,113 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use askama::filters::HtmlSafe;
+/// Derive the [`SelectChoice`] trait for an enum.
+///
+/// This macro automatically implements the [`SelectChoice`] trait for enums,
+/// allowing them to be used with [`SelectField`] and [`SelectMultipleField`]
+/// form fields. The macro generates implementations for all required methods
+/// based on the enum variants.
+///
+/// # Requirements
+///
+/// - The type must be an enum (not a struct or union)
+/// - The enum must have at least one variant
+/// - All variants must be unit variants (no associated data)
+///
+/// # Default Behavior
+///
+/// By default, the macro uses the variant name for both the ID and display
+/// name:
+/// - `id()` returns the variant name as a string
+/// - `to_string()` returns the variant name as a string
+/// - `from_str()` matches the variant name (case-sensitive)
+/// - `default_choices()` returns all variants in declaration order
+///
+/// # Attributes
+///
+/// You can customize the behavior using the `#[select_choice(...)]` attribute
+/// on individual enum variants:
+///
+/// ## `id`
+///
+/// Override the ID used for this variant in form submissions and HTML.
+///
+/// ```rust
+/// use cot::form::fields::SelectChoice;
+///
+/// #[derive(SelectChoice, Debug, PartialEq)]
+/// enum Status {
+///     #[select_choice(id = "draft")]
+///     Draft,
+///     #[select_choice(id = "published")]
+///     Published,
+/// }
+///
+/// assert_eq!(Status::Draft.id(), "draft");
+/// assert_eq!(Status::Published.id(), "published");
+/// ```
+///
+/// ## `name`
+///
+/// Override the display name shown to users in the select dropdown.
+///
+/// ```rust
+/// use cot::form::fields::SelectChoice;
+///
+/// #[derive(SelectChoice, Debug, PartialEq)]
+/// enum Priority {
+///     #[select_choice(name = "Low Priority")]
+///     Low,
+///     #[select_choice(name = "High Priority")]
+///     High,
+/// }
+///
+/// assert_eq!(Priority::Low.to_string(), "Low Priority");
+/// assert_eq!(Priority::High.to_string(), "High Priority");
+/// ```
+///
+/// # Error Cases
+///
+/// The macro will fail to compile if:
+///
+/// - The type is not an enum
+/// - The enum has no variants
+/// - Any variant has associated data (non-unit variants)
+///
+/// ```rust,compile_fail
+/// use cot_macros::SelectChoice;
+///
+/// // This will fail - structs are not supported
+/// #[derive(SelectChoice)]
+/// struct NotAnEnum {
+///     field: String,
+/// }
+/// ```
+///
+/// ```rust,compile_fail
+/// use cot_macros::SelectChoice;
+///
+/// // This will fail - empty enums are not supported
+/// #[derive(SelectChoice)]
+/// enum EmptyEnum {}
+/// ```
+///
+/// ```rust,compile_fail
+/// use cot_macros::SelectChoice;
+///
+/// // This will fail - only unit variants are supported
+/// #[derive(SelectChoice)]
+/// enum EnumWithData {
+///     Unit,
+///     WithData(String),
+///     WithFields { field: i32 },
+/// }
+/// ```
+///
+/// [`SelectChoice`]: cot::form::fields::SelectChoice
+/// [`SelectField`]: cot::form::fields::SelectField
+/// [`SelectMultipleField`]: cot::form::fields::SelectMultipleField
+pub use cot_macros::SelectChoice;
 use indexmap::IndexSet;
 
 use crate::form::fields::impl_form_field;

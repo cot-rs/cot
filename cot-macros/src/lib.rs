@@ -5,6 +5,7 @@ mod from_request;
 mod main_fn;
 mod model;
 mod query;
+mod select_choice;
 mod utils;
 
 use darling::Error;
@@ -21,6 +22,7 @@ use crate::from_request::impl_from_request_parts_for_struct;
 use crate::main_fn::{fn_to_cot_e2e_test, fn_to_cot_main, fn_to_cot_test};
 use crate::model::impl_model_for_struct;
 use crate::query::{Query, query_to_tokens};
+use crate::select_choice::impl_select_choice_for_enum;
 
 #[proc_macro_derive(Form, attributes(form))]
 pub fn derive_form(input: TokenStream) -> TokenStream {
@@ -195,10 +197,16 @@ pub(crate) fn cot_ident() -> proc_macro2::TokenStream {
         }
     }
 }
-
 #[proc_macro_derive(FromRequestParts)]
 pub fn derive_from_request_parts(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     let token_stream = impl_from_request_parts_for_struct(&ast);
+    token_stream.into()
+}
+
+#[proc_macro_derive(SelectChoice, attributes(select_choice))]
+pub fn derive_select_choice(input: TokenStream) -> TokenStream {
+    let ast = syn::parse_macro_input!(input as syn::DeriveInput);
+    let token_stream = impl_select_choice_for_enum(&ast);
     token_stream.into()
 }

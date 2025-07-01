@@ -1,0 +1,7 @@
+error: `SelectChoice` can only be derived for enums
+ --> tests/ui/derive_select_choice_struct.rs:3:10
+  |
+3 | #[derive(SelectChoice)]
+  |          ^^^^^^^^^^^^
+  |
+  = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)

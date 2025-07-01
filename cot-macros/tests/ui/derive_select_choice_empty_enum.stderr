@@ -1,0 +1,7 @@
+error: `SelectChoice` cannot be derived for empty enums
+ --> tests/ui/derive_select_choice_empty_enum.rs:3:10
+  |
+3 | #[derive(SelectChoice)]
+  |          ^^^^^^^^^^^^
+  |
+  = note: this error originates in the derive macro `SelectChoice` (in Nightly builds, run with -Z macro-backtrace for more info)

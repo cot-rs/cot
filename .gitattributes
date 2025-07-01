@@ -1,2 +1,5 @@
 *.yaml text eol=lf
 *.yml text eol=lf
+*.html text eol=lf
+*.jinja text eol=lf
+*.j2 text eol=lf

@@ -38,10 +38,10 @@ repos:
     hooks:
       - id: format-justfile
         name: "format justfiles"
-  - repo: https://github.com/Riverside-Healthcare/djLint
+  - repo: https://github.com/djlint/djLint
     rev: v1.34.1
     hooks:
       - id: djlint
         name: djLint
         files: \.(html|jinja|j2)$
-        args: [--check, --ignore, "H030,H031,H025,H006"]
+        args: [--check]

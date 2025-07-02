@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Home{% endblock %}
+{% block title %}
+    Home
+{% endblock title %}
 {% block content -%}
     {%- let urls = urls -%}
     <h2>Choose a model to manage</h2>
@@ -11,4 +13,4 @@
             </li>
         {%- endfor -%}
     </ul>
-{%- endblock -%}
+{%- endblock content -%}

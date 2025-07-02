@@ -6,16 +6,19 @@ use cot::db::migrations::SyncDynMigration;
 use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+use cot::request::extractors::StaticFiles;
 use cot::router::{Route, Router};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
 use cot::{App, AppBuilder, BoxedHandler, Project, static_files};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
-struct IndexTemplate {}
+struct IndexTemplate {
+    static_files: StaticFiles,
+}
 
-async fn index() -> cot::Result<Html> {
-    let index_template = IndexTemplate {};
+async fn index(static_files: StaticFiles) -> cot::Result<Html> {
+    let index_template = IndexTemplate { static_files };
     let rendered = index_template.render()?;
 
     Ok(Html::new(rendered))

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Model{% endblock %}
+{% block title %}
+    Model
+{% endblock title %}
 {% block content -%}
     {%- let urls = urls -%}
     {%- let model = model -%}
@@ -9,10 +11,9 @@
     </p>
     <form action="" method="post">
         <div class="form-actions">
-            <a href="{{ cot::reverse!(urls, "view_model", model_name = model.url_name() )? }}"
+            <a href="{{ cot::reverse!(urls, "view_model", model_name = model.url_name())? }}"
                class="btn secondary">Cancel</a>
             <button type="submit" class="btn danger">Remove</button>
         </div>
     </form>
-</form>
-{%- endblock %}
+{%- endblock content %}

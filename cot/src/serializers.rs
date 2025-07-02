@@ -3,7 +3,7 @@ pub(crate) mod humantime {
 
     use serde::{Deserialize, Deserializer, Serializer};
 
-    #[allow(clippy::ref_option)] // &Option<_> needed for serde
+    #[expect(clippy::ref_option, reason = "&Option<_> needed for serde")]
     pub(crate) fn serialize<S>(
         duration: &Option<Duration>,
         serializer: S,

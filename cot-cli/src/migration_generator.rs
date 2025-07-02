@@ -1263,7 +1263,7 @@ impl DynMigration for Migration {
 /// This is used to generate migration files.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 // this is not frequently used, so we don't mind extra memory usage
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 pub enum DynDependency {
     Migration { app: String, migration: String },
     Model { model_type: syn::Type },

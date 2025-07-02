@@ -649,7 +649,7 @@ mod tests {
     macro_rules! test_deserialize_value {
         ($test_name:ident, $ty:ty, $value:literal, $expected:literal) => {
             #[test]
-            #[allow(clippy::float_cmp)]
+            #[allow(clippy::allow_attributes, clippy::float_cmp)]
             fn $test_name() {
                 let path_params = create_path_params([("some_name", $value)]);
                 let deserializer = PathParamsDeserializer::new(&path_params);

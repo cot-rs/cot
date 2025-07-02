@@ -256,8 +256,10 @@ impl ReverseParamMap {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! reverse_param_map {
+    () => {{
+        $crate::router::path::ReverseParamMap::new()
+    }};
     ($($key:ident = $value:expr),*) => {{
-        #[allow(unused_mut)] // for the case when there are no parameters
         let mut map = $crate::router::path::ReverseParamMap::new();
         $( map.insert(stringify!($key), &$value); )*
         map

@@ -80,9 +80,18 @@ macro_rules! impl_request_handler {
             Fut: Future<Output = R> + Send,
             R: IntoResponse,
         {
-            #[allow(non_snake_case)]
+            #[allow(
+                clippy::allow_attributes,
+                non_snake_case,
+                reason = "for the case where there are no params"
+            )]
             async fn handle(&self, request: Request) -> Result<Response> {
-                #[allow(unused_variables, unused_mut)] // for the case where there are no params
+                #[allow(
+                    clippy::allow_attributes,
+                    unused_variables,
+                    unused_mut,
+                    reason = "for the case where there are no params"
+                )]
                 let (mut parts, _body) = request.into_parts();
 
                 $(
@@ -106,9 +115,17 @@ macro_rules! impl_request_handler_from_request {
             Fut: Future<Output = R> + Send,
             R: IntoResponse,
         {
-            #[expect(non_snake_case)]
+            #[allow(
+                clippy::allow_attributes,
+                non_snake_case,
+                reason = "for the case where there are no FromRequestParts params"
+            )]
             async fn handle(&self, request: Request) -> Result<Response> {
-                #[allow(unused_mut)] // for the case where there are no FromRequestParts params
+                #[allow(
+                    clippy::allow_attributes,
+                    unused_mut,
+                    reason = "for the case where there are no FromRequestParts params"
+                )]
                 let (mut parts, body) = request.into_parts();
 
                 $(

@@ -47,11 +47,12 @@ rust_2018_idioms = { level = "warn", priority = -1 }
 all = { level = "deny", priority = -1 }
 pedantic = "warn"
 future_not_send = "warn"
+allow_attributes = "warn"
 
 [workspace.dependencies]
-ahash = { version = "0.8.11", default-features = false }
-aide = { version = "0.14", default-features = false }
-anstyle = "1.0.10"
+ahash = { version = "0.8.12", default-features = false }
+aide = { version = "0.15", default-features = false }
+anstyle = "1.0.11"
 anyhow = "1.0.98"
 askama = { version = "0.14", default-features = false }
 assert_cmd = "2"
@@ -65,17 +66,18 @@ chrono = { version = "0.4.41", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
-clap_mangen = "0.2.26"
+clap_mangen = "0.2.27"
 cot = { version = "0.3.1", path = "cot" }
 cot_codegen = { version = "0.3.1", path = "cot-codegen" }
 cot_macros = { version = "0.3.1", path = "cot-macros" }
 darling = "0.20"
+deadpool-redis = { version = "0.21", default-features = false }
 derive_builder = "0.20"
 derive_more = "2"
 digest = "0.10"
 email_address = "0.2.9"
 fake = "4"
-fantoccini = "0.21"
+fantoccini = "0.22"
 form_urlencoded = "1"
 futures = { version = "0.3", default-features = false }
 futures-core = { version = "0.3", default-features = false }
@@ -103,10 +105,9 @@ proc-macro-crate = "3"
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 rand = { version = "0.9", default-features = false }
+redis = { version = "0.31", default-features = false }
 rustversion = "1"
-redis = { version =  "0.29.1", default-features = false }
-deadpool-redis = { version =  "0.20.0", default-features = false }
-schemars = { version = "0.8.22", default-features = false }
+schemars = { version = "0.9", default-features = false }
 sea-query = { version = "0.32", default-features = false }
 sea-query-binder = { version = "0.7", default-features = false }
 serde = "1"
@@ -122,7 +123,7 @@ sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
 time = { version = "0.3.41", default-features = false }
-tokio = { version = "1.44", default-features = false }
+tokio = { version = "1.45", default-features = false }
 toml = { version = "0.8", default-features = false }
 tower = "0.5.2"
 tower-livereload = "0.9.6"

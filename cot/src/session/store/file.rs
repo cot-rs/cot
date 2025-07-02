@@ -207,7 +207,7 @@ mod tests {
 
     fn make_store() -> FileStore {
         let dir = tempdir().expect("failed to make tempdir");
-        FileStore::new(dir.into_path()).expect("could not create file store")
+        FileStore::new(dir.keep()).expect("could not create file store")
     }
 
     fn make_record() -> Record {

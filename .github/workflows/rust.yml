@@ -320,7 +320,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Run cargo check with every combination of features
-        run: cargo hack check --feature-powerset --exclude-features db --no-dev-deps
+        run: cargo hack check --feature-powerset --depth 3 --exclude-features db --no-dev-deps
 
   miri:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository

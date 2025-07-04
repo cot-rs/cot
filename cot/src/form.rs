@@ -154,14 +154,12 @@ pub enum FormFieldValidationError {
         /// The maximum permitted value.
         max_value: String,
     },
-
     /// The field value is an ambiguous datetime.
     #[error("This is an ambiguous datetime: {datetime}.")]
     AmbiguousDateTime {
         /// The ambiguous datetime value.
         datetime: NaiveDateTime,
     },
-
     /// The field value is a non-existent local datetime.
     #[error("Local datetime {datetime} does not exist for the given timezone {timezone}.")]
     NonExistentLocalDateTime {
@@ -170,7 +168,6 @@ pub enum FormFieldValidationError {
         /// The timezone in which the datetime was specified.
         timezone: Tz,
     },
-
     /// The field value is required to be true.
     #[error("This field must be checked.")]
     BooleanRequiredToBeTrue,

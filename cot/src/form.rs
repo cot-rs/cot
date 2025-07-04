@@ -29,6 +29,8 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use chrono::NaiveDateTime;
+use chrono_tz::Tz;
 use cot::error::ErrorRepr;
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
@@ -153,6 +155,22 @@ pub enum FormFieldValidationError {
         max_value: String,
     },
 
+    /// The field value is an ambiguous datetime.
+    #[error("This is an ambiguous datetime: {datetime}.")]
+    AmbiguousDateTime {
+        /// The ambiguous datetime value.
+        datetime: NaiveDateTime,
+    },
+
+    /// The field value is a non-existent local datetime.
+    #[error("Local datetime {datetime} does not exist for the given timezone {timezone}.")]
+    NonExistentLocalDateTime {
+        /// The non-existent local datetime value.
+        datetime: NaiveDateTime,
+        /// The timezone in which the datetime was specified.
+        timezone: Tz,
+    },
+
     /// The field value is required to be true.
     #[error("This field must be checked.")]
     BooleanRequiredToBeTrue,
@@ -205,6 +223,19 @@ impl FormFieldValidationError {
         FormFieldValidationError::MaximumValueExceeded {
             max_value: max_value.to_string(),
         }
+    }
+
+    /// Creates a new `FormFieldValidationError` for an ambiguous datetime.
+    #[must_use]
+    pub fn ambiguous_datetime(datetime: NaiveDateTime) -> Self {
+        FormFieldValidationError::AmbiguousDateTime { datetime }
+    }
+
+    /// Creates a new `FormFieldValidationError` for a non-existent local
+    /// datetime.
+    #[must_use]
+    pub fn non_existent_local_datetime(datetime: NaiveDateTime, timezone: Tz) -> Self {
+        FormFieldValidationError::NonExistentLocalDateTime { datetime, timezone }
     }
 
     /// Creates a new `FormFieldValidationError` from a `String`.

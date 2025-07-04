@@ -444,15 +444,13 @@ impl AsFormField for DateTime<FixedOffset> {
                 if let Some(prefer_latest) = field.custom_options.prefer_latest {
                     if prefer_latest { dt2 } else { dt1 }
                 } else {
-                    return Err(FormFieldValidationError::from_string(format!(
-                        "Ambiguous local datetime `{naive:?}`. set the `prefer_latest` option to resolve datetime."
-                    )));
+                    return Err(FormFieldValidationError::ambiguous_datetime(naive));
                 }
             }
             LocalResult::None => {
-                return Err(FormFieldValidationError::from_string(format!(
-                    "Local datetime `{naive:?}` does not exist for given timezone(`{tz:?}`)"
-                )));
+                return Err(FormFieldValidationError::non_existent_local_datetime(
+                    naive, tz,
+                ));
             }
         };
 
@@ -1420,18 +1418,15 @@ mod tests {
             },
         );
         field
-            .set_value(FormFieldValue::new_text("2024-03-10T02:30"))
+            .set_value(FormFieldValue::new_text("2024-11-03T01:30"))
             .await
             .unwrap();
 
         let dt = DateTime::<FixedOffset>::clean_value(&field);
-        assert_eq!(
+        assert!(matches!(
             dt,
-            Err(FormFieldValidationError::from_string(
-                "Local datetime `2024-03-10T02:30:00` does not exist for given timezone(`America/New_York`)"
-                    .into()
-            ))
-        );
+            Err(FormFieldValidationError::AmbiguousDateTime { .. })
+        ));
     }
     #[cot::test]
     async fn datetime_with_tz_clean_non_existent_local_time() {
@@ -1457,7 +1452,10 @@ mod tests {
             .unwrap();
 
         let dt = DateTime::<FixedOffset>::clean_value(&field);
-        assert_eq!(dt, Err(FormFieldValidationError::from_string("Local datetime `2024-03-10T02:30:00` does not exist for given timezone(`America/New_York`)".into())));
+        assert!(matches!(
+            dt,
+            Err(FormFieldValidationError::NonExistentLocalDateTime { .. })
+        ));
     }
 
     #[cot::test]

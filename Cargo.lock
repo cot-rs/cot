@@ -620,7 +620,7 @@ dependencies = [
 
 [[package]]
 name = "cot"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "ahash",
  "aide",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "cot-cli"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anstyle",
  "anyhow",
@@ -733,7 +733,7 @@ dependencies = [
 
 [[package]]
 name = "cot_macros"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "cot",
  "cot_codegen",
@@ -1245,7 +1245,7 @@ dependencies = [
 
 [[package]]
 name = "forms"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "askama",
  "chrono",

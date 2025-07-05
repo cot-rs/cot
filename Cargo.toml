@@ -69,9 +69,9 @@ clap = { version = "4", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.2.27"
-cot = { version = "0.3.1", path = "cot" }
+cot = { version = "0.4.0", path = "cot" }
 cot_codegen = { version = "0.3.1", path = "cot-codegen" }
-cot_macros = { version = "0.3.1", path = "cot-macros" }
+cot_macros = { version = "0.4.0", path = "cot-macros" }
 darling = "0.20"
 deadpool-redis = { version = "0.21", default-features = false }
 derive_builder = "0.20"

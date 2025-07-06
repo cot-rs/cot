@@ -414,10 +414,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
       - name: Run cargo-semver-checks
         uses: obi1kenobi/cargo-semver-checks-action@v2.8
         with:
-          rust-toolchain: stable
+          rust-toolchain: manual
           baseline-rev: ${{ github.event.pull_request.base.sha }}
+          shared-key: 'rust-ci'
           feature-group: all-features
           verbose: true

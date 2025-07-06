@@ -1305,7 +1305,7 @@ mod sealed {
 /// impl Project for MyProject {
 ///     // `WithConfig` phase here
 ///     fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
-///         todo!();
+///         unimplemented!();
 ///     }
 ///
 ///     // `WithDatabase` phase here (which comes after `WithConfig`)
@@ -1314,7 +1314,7 @@ mod sealed {
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
 ///     ) -> BoxedHandler {
-///         todo!()
+///         unimplemented!()
 ///     }
 /// }
 /// ```
@@ -1493,7 +1493,7 @@ impl<S: BootstrapPhase<Config = Arc<ProjectConfig>>> ProjectContext<S> {
     ///     let db_url = &config.database.url;
     ///
     ///     // ...
-    /// #    todo!()
+    /// #    unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -1529,7 +1529,7 @@ impl<S: BootstrapPhase<Apps = Vec<Box<dyn App>>>> ProjectContext<S> {
     ///     let apps = request.context().apps();
     ///
     ///     // ...
-    /// #    todo!()
+    /// #    unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -1606,7 +1606,7 @@ impl<S: BootstrapPhase<Router = Arc<Router>>> ProjectContext<S> {
     ///     let num_routes = router.routes().len();
     ///
     ///     // ...
-    /// #    todo!()
+    /// #    unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -1626,7 +1626,7 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let auth_backend = request.context().auth_backend();
     ///     // ...
-    /// #    todo!()
+    /// #    unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -1652,7 +1652,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     ///     } else {
     ///         // database is not enabled
     ///     }
-    /// #    todo!()
+    /// #    unimplemented!()
     /// }
     /// ```
     #[must_use]
@@ -1679,7 +1679,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     ///     request.db();
     ///
     ///     // ...
-    /// #    todo!()
+    /// #    unimplemented!()
     /// }
     /// ```
     #[cfg(feature = "db")]

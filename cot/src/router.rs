@@ -12,7 +12,7 @@
 //! }
 //!
 //! async fn get_page(request: Request) -> cot::Result<Response> {
-//!     todo!()
+//!     unimplemented!()
 //! }
 //!
 //! let router = Router::with_urls([Route::with_handler_and_name(
@@ -55,7 +55,7 @@ pub mod path;
 /// use cot::router::{Route, Router};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
-///     todo!()
+///     unimplemented!()
 /// }
 ///
 /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -94,7 +94,7 @@ impl Router {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -306,7 +306,7 @@ impl Router {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -327,7 +327,7 @@ impl Router {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::empty();
@@ -476,7 +476,7 @@ impl RouterService {
     /// use cot::router::{Route, Router, RouterService};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -527,7 +527,7 @@ pub fn split_view_name(view_name: &str) -> (Option<&str>, &str) {
 /// use cot::router::{Route, Router};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
-///     todo!()
+///     unimplemented!()
 /// }
 ///
 /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -687,7 +687,7 @@ impl Route {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -712,7 +712,7 @@ impl Route {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let route = Route::with_handler("/test", home);
@@ -734,7 +734,7 @@ impl Route {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let route = Route::with_handler_and_name("/", home, "home");

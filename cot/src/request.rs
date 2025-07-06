@@ -421,7 +421,7 @@ pub(crate) struct RouteName(pub(crate) String);
 ///
 ///     let name = println!("Hello, {}!", name);
 ///     // ...
-///     # todo!()
+///     # unimplemented!()
 /// }
 /// ```
 #[derive(Debug, Clone)]

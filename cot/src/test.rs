@@ -439,7 +439,7 @@ impl TestRequestBuilder {
     /// use cot::test::TestRequestBuilder;
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", index, "index")]);

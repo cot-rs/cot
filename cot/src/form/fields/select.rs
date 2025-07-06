@@ -32,7 +32,7 @@ use askama::filters::HtmlSafe;
 ///
 /// Override the ID used for this variant in form submissions and HTML.
 ///
-/// ```rust
+/// ```
 /// use cot::form::fields::SelectChoice;
 ///
 /// #[derive(SelectChoice, Debug, PartialEq)]
@@ -51,7 +51,7 @@ use askama::filters::HtmlSafe;
 ///
 /// Override the display name shown to users in the select dropdown.
 ///
-/// ```rust
+/// ```
 /// use cot::form::fields::SelectChoice;
 ///
 /// #[derive(SelectChoice, Debug, PartialEq)]
@@ -74,7 +74,7 @@ use askama::filters::HtmlSafe;
 /// - The enum has no variants
 /// - Any variant has associated data (non-unit variants)
 ///
-/// ```rust,compile_fail
+/// ```compile_fail
 /// use cot_macros::SelectChoice;
 ///
 /// // This will fail - structs are not supported
@@ -84,7 +84,7 @@ use askama::filters::HtmlSafe;
 /// }
 /// ```
 ///
-/// ```rust,compile_fail
+/// ```compile_fail
 /// use cot_macros::SelectChoice;
 ///
 /// // This will fail - empty enums are not supported
@@ -92,7 +92,7 @@ use askama::filters::HtmlSafe;
 /// enum EmptyEnum {}
 /// ```
 ///
-/// ```rust,compile_fail
+/// ```compile_fail
 /// use cot_macros::SelectChoice;
 ///
 /// // This will fail - only unit variants are supported

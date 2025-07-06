@@ -36,7 +36,7 @@ use crate::db::{DatabaseBackend, DatabaseError, Model, Result};
 ///     my_model.save(request.db()).await?;
 ///
 ///     // ...
-/// #   todo!()
+/// #   unimplemented!()
 /// }
 /// ```
 #[derive(Debug, Clone)]

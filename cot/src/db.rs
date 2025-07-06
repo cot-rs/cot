@@ -634,11 +634,11 @@ pub trait SqlxValueRef<'r>: Sized {
     ///     }
     /// #
     /// #    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self> {
-    /// #        todo!()
+    /// #        unimplemented!()
     /// #    }
     /// #
     /// #    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self> {
-    /// #        todo!()
+    /// #        unimplemented!()
     /// #    }
     /// }
     /// ```
@@ -1104,7 +1104,7 @@ impl Database {
     pub async fn raw_with(
         &self,
         query: &str,
-        values: &[&(dyn ToDbValue)],
+        values: &[&dyn ToDbValue],
     ) -> Result<StatementResult> {
         let values = values
             .iter()
@@ -1706,27 +1706,27 @@ impl<const LIMIT: u32> fake::Dummy<fake::Faker> for LimitedString<LIMIT> {
 /// #     where
 /// #         Self: Sized,
 /// #     {
-/// #         todo!()
+/// #         unimplemented!()
 /// #     }
 /// #
 /// #     fn from_postgres(value: cot::db::impl_postgres::PostgresValueRef<'_>) -> cot::db::Result<Self>
 /// #     where
 /// #         Self: Sized,
 /// #     {
-/// #         todo!()
+/// #         unimplemented!()
 /// #     }
 /// #
 /// #     fn from_mysql(value: cot::db::impl_mysql::MySqlValueRef<'_>) -> cot::db::Result<Self>
 /// #     where
 /// #         Self: Sized,
 /// #     {
-/// #         todo!()
+/// #         unimplemented!()
 /// #     }
 /// # }
 /// #
 /// # impl ToDbFieldValue for MyDbType {
 /// #     fn to_db_field_value(&self) -> DbFieldValue {
-/// #         todo!()
+/// #         unimplemented!()
 /// #     }
 /// # }
 ///

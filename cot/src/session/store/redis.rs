@@ -126,13 +126,17 @@ impl RedisStore {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use cot::config::CacheUrl;
     /// use cot::session::store::redis::RedisStore;
     ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), cot::session::store::redis::RedisStoreError> {
     /// let store = RedisStore::new(&CacheUrl::from("redis://127.0.0.1/"))?;
     /// // Actual TCP connection happens here:
     /// let mut conn = store.get_connection().await?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn get_connection(&self) -> Result<deadpool_redis::Connection, RedisStoreError> {
         self.pool

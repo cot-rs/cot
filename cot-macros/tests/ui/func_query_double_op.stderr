@@ -2,4 +2,4 @@ error: expected field, literal, or identifier
   --> tests/ui/func_query_double_op.rs:16:29
    |
 16 |         $name == "hello" && && $description == "world" || $visits == 0
-   |                             ^
+   |                             ^^

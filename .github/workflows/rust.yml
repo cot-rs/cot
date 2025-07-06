@@ -405,7 +405,6 @@ jobs:
 
     name: Semver compatibility check
     runs-on: ubuntu-latest
-    needs: ["check"]
     env:
       RUSTC_WRAPPER: ""
       SCCACHE_GHA_ENABLED: ""

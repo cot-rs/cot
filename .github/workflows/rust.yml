@@ -140,7 +140,8 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
+          # cot_macros ui tests require nightly
+          toolchain: nightly
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2

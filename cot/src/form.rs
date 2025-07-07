@@ -72,6 +72,7 @@ pub enum FormError {
     /// An error occurred while processing the request, before validating the
     /// form data.
     #[error("Request error: {error}")]
+    #[non_exhaustive]
     RequestError {
         /// The error that occurred while processing the request.
         #[from]
@@ -79,6 +80,7 @@ pub enum FormError {
     },
     /// An error occurred while processing a multipart form.
     #[error("Multipart error: {error}")]
+    #[non_exhaustive]
     MultipartError {
         /// The error that occurred while processing the multipart form.
         #[from]

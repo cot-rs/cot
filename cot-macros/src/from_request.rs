@@ -72,20 +72,21 @@ fn generic_from_request_parts_for_struct(
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 enum ImplTarget {
     FromRequestParts,
     FromErrorRequestParts,
 }
 
 impl ImplTarget {
-    fn name(&self) -> &'static str {
+    fn name(self) -> &'static str {
         match self {
             ImplTarget::FromRequestParts => "FromRequestParts",
             ImplTarget::FromErrorRequestParts => "FromErrorRequestParts",
         }
     }
 
-    fn trait_path(&self) -> proc_macro2::TokenStream {
+    fn trait_path(self) -> proc_macro2::TokenStream {
         let cot = cot_ident();
         match self {
             ImplTarget::FromRequestParts => quote! { #cot::request::extractors::FromRequestParts },

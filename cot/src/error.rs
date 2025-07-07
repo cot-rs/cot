@@ -34,19 +34,22 @@ impl Error {
 
     /// Create a new error with a custom error message or error type.
     ///
+    /// The error will be associated with a 500 Internal Server Error
+    /// status code, which is the default for unexpected errors.
+    ///
     /// # Examples
     ///
     /// ```
     /// use cot::Error;
     ///
-    /// let error = Error::new("An error occurred");
-    /// let error = Error::new(std::io::Error::new(
+    /// let error = Error::internal("An error occurred");
+    /// let error = Error::internal(std::io::Error::new(
     ///     std::io::ErrorKind::Other,
     ///     "An error occurred",
     /// ));
     /// ```
     #[must_use]
-    pub fn new<E>(error: E) -> Self
+    pub fn internal<E>(error: E) -> Self
     where
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
@@ -154,7 +157,7 @@ impl Error {
     /// ```
     /// use cot::{Error, StatusCode};
     ///
-    /// let error = Error::new("Something went wrong");
+    /// let error = Error::internal("Something went wrong");
     /// assert_eq!(error.status_code(), StatusCode::INTERNAL_SERVER_ERROR);
     ///
     /// let error = Error::with_status("Bad request", StatusCode::BAD_REQUEST);
@@ -183,12 +186,11 @@ impl Error {
         match &self.kind() {
             ErrorKind::Custom { .. } | ErrorKind::MiddlewareWrapped { .. } => {
                 let mut error = self as &(dyn StdError + 'static);
-                while let Some(inner) = self.source() {
+                while let Some(inner) = error.source() {
                     if let Some(error) = inner.downcast_ref::<Self>() {
                         return Some(error);
-                    } else {
-                        error = inner;
                     }
+                    error = inner;
                 }
                 None
             }
@@ -369,35 +371,40 @@ pub(crate) enum ErrorKind {
 
 impl ErrorKind {
     fn status_code(&self) -> StatusCode {
+        // TODO check if works with middleware
         match self {
-            ErrorKind::Custom { status_code, .. } => *status_code,
-            ErrorKind::LoadConfig { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::ParseConfig { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::StartServer { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            // 500 Internal Server Error
+            ErrorKind::AdminError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::Authentication(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::CollectStatic { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::ReadRequestBody { .. } => StatusCode::BAD_REQUEST,
-            ErrorKind::InvalidContentType { .. } => StatusCode::BAD_REQUEST,
-            ErrorKind::ExpectedForm => StatusCode::BAD_REQUEST,
-            ErrorKind::NotFound { .. } => StatusCode::NOT_FOUND,
-            ErrorKind::UncaughtPanic { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::MethodNotAllowed(_) => StatusCode::METHOD_NOT_ALLOWED,
-            ErrorKind::ResponseBuilder(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::NoViewToReverse { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::ReverseRoute(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::TemplateRender(_) => StatusCode::INTERNAL_SERVER_ERROR,
             #[cfg(feature = "db")]
             ErrorKind::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::SessionAccess(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::Form(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::FormFieldValueError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Authentication(_) => StatusCode::INTERNAL_SERVER_ERROR,
             #[cfg(feature = "json")]
             ErrorKind::Json(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::LoadConfig { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::MiddlewareWrapped { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::NoViewToReverse { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::ParseConfig { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::ResponseBuilder(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::ReverseRoute(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::SessionAccess(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::StartServer { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::StaticFilesGetError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::TemplateRender(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::UncaughtPanic { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            // 400 Bad Request
+            ErrorKind::ExpectedForm => StatusCode::BAD_REQUEST,
+            ErrorKind::InvalidContentType { .. } => StatusCode::BAD_REQUEST,
             ErrorKind::PathParametersParse(_) => StatusCode::BAD_REQUEST,
             ErrorKind::QueryParametersParse(_) => StatusCode::BAD_REQUEST,
-            ErrorKind::AdminError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::StaticFilesGetError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::ReadRequestBody { .. } => StatusCode::BAD_REQUEST,
+            // Other
+            ErrorKind::MethodNotAllowed(_) => StatusCode::METHOD_NOT_ALLOWED,
+            ErrorKind::NotFound { .. } => StatusCode::NOT_FOUND,
+            // Custom
+            ErrorKind::Custom { status_code, .. } => *status_code,
         }
     }
 }

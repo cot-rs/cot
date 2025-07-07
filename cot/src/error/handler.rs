@@ -158,7 +158,11 @@ macro_rules! impl_request_handler {
             Fut: Future<Output = R> + Send,
             R: crate::response::IntoResponse,
         {
-            #[allow(non_snake_case)]
+            #[allow(
+                clippy::allow_attributes,
+                non_snake_case,
+                reason = "for the case where there are no params"
+            )]
             async fn handle(&self, request: Request) -> crate::Result<Response> {
                 #[allow(unused_variables, unused_mut)] // for the case where there are no params
                 let (mut parts, _body) = request.into_parts();
@@ -239,7 +243,9 @@ impl FromErrorRequestParts for Error {
     async fn from_request_parts(parts: &mut Parts) -> crate::Result<Self> {
         let error = parts.extensions.remove::<RequestError>();
         error
-            .ok_or_else(|| Error::new("No error found in request parts. Was it extracted already?"))
+            .ok_or_else(|| {
+                Error::internal("No error found in request parts. Was it extracted already?")
+            })
             .map(|e| Arc::into_inner(e.0).expect("RequestError was cloned"))
     }
 }

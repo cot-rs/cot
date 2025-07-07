@@ -346,8 +346,6 @@ fn build_error_response(error: &Error, diagnostics: &Diagnostics) -> Result<Stri
 }
 
 const DEFAULT_SERVER_ERROR_PAGE: &[u8] = include_bytes!("../templates/500.html");
-// const DEFAULT_NOT_FOUND_PAGE: &[u8] =
-// include_bytes!("../templates/404.html");
 const FAILURE_PAGE: &[u8] = include_bytes!("../templates/fail.html");
 
 /// A last-resort Internal Server Error page.
@@ -458,7 +456,7 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_log_error() {
-        let error = Error::new("Test Error!");
+        let error = Error::internal("Test Error!");
         let request_data = Some(create_test_request_data());
 
         log_error(&error, request_data.as_ref());
@@ -498,7 +496,7 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_log_error_without_request() {
-        let error = Error::new("Test error");
+        let error = Error::internal("Test error");
         log_error(&error, None);
 
         assert!(logs_contain("Error occurred without request context"));
@@ -509,7 +507,7 @@ mod tests {
     #[traced_test]
     fn test_handle_response_error_logging() {
         let diagnostics = create_diagnostics();
-        let error = Error::new("Test handler error");
+        let error = Error::internal("Test handler error");
 
         let response = handle_response_error(&error, &diagnostics);
 

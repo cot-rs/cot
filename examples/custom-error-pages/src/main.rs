@@ -1,15 +1,12 @@
-use std::error::Error;
-
 use askama::Template;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::error::handler::DynErrorPageHandler;
-use cot::error::not_found::NotFound;
 use cot::html::Html;
 use cot::project::RegisterAppsContext;
 use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router};
-use cot::{App, AppBuilder, Project, StatusCode};
+use cot::{App, AppBuilder, Project};
 
 async fn return_hello() -> cot::Result<Response> {
     panic!()

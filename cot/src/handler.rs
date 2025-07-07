@@ -239,7 +239,7 @@ handle_all_parameters_from_request!(impl_request_handler_from_request);
 /// [`Bootstrapper`](cot::Bootstrapper).
 ///
 /// It is returned by
-/// [`Bootstrapper::into_context_and_handler`](cot::Bootstrapper::into_context_and_handler).
+/// [`Bootstrapper::into_bootstrapped_project`](cot::Bootstrapper::into_bootstrapped_project).
 /// Typically, you don't need to interact with this type directly, except for
 /// creating it in [`Project::middlewares`](cot::Project::middlewares) through
 /// the [`RootHandlerBuilder::build`](cot::project::RootHandlerBuilder::build)
@@ -260,7 +260,7 @@ handle_all_parameters_from_request!(impl_request_handler_from_request);
 ///     .with_config(ProjectConfig::default())
 ///     .boot()
 ///     .await?;
-/// let handler: BoxedHandler = bootstrapper.into_context_and_handler().handler;
+/// let handler: BoxedHandler = bootstrapper.into_bootstrapped_project().handler;
 /// # Ok(())
 /// # }
 /// ```

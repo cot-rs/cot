@@ -467,12 +467,14 @@ pub struct RootHandlerBuilder<S = RouterService, SE = DynErrorPageHandler> {
     error_handler: SE,
 }
 
-impl<S, SE> RootHandlerBuilder<S, SE>
+impl<RootService, ErrorHandlerService> RootHandlerBuilder<RootService, ErrorHandlerService>
 where
-    S: Service<Request, Response = Response, Error = Error> + Send + Sync + Clone + 'static,
-    S::Future: Send,
-    SE: Service<Request, Response = Response, Error = Error> + Send + Sync + Clone + 'static,
-    SE::Future: Send,
+    RootService:
+        Service<Request, Response = Response, Error = Error> + Send + Sync + Clone + 'static,
+    RootService::Future: Send,
+    ErrorHandlerService:
+        Service<Request, Response = Response, Error = Error> + Send + Sync + Clone + 'static,
+    ErrorHandlerService::Future: Send,
 {
     /// Adds middleware to the project.
     ///
@@ -504,11 +506,11 @@ where
         self,
         middleware: M,
     ) -> RootHandlerBuilder<
-        IntoCotError<IntoCotResponse<<M as Layer<S>>::Service>>,
-        IntoCotError<IntoCotResponse<<M as Layer<SE>>::Service>>,
+        IntoCotError<IntoCotResponse<<M as Layer<RootService>>::Service>>,
+        IntoCotError<IntoCotResponse<<M as Layer<ErrorHandlerService>>::Service>>,
     >
     where
-        M: Layer<S> + Layer<SE>,
+        M: Layer<RootService> + Layer<ErrorHandlerService>,
     {
         let layer = (
             IntoCotErrorLayer::new(),
@@ -553,9 +555,12 @@ where
     pub fn main_handler_middleware<M>(
         self,
         middleware: M,
-    ) -> RootHandlerBuilder<IntoCotError<IntoCotResponse<<M as Layer<S>>::Service>>, SE>
+    ) -> RootHandlerBuilder<
+        IntoCotError<IntoCotResponse<<M as Layer<RootService>>::Service>>,
+        ErrorHandlerService,
+    >
     where
-        M: Layer<S>,
+        M: Layer<RootService>,
     {
         let layer = (
             IntoCotErrorLayer::new(),
@@ -600,9 +605,12 @@ where
     pub fn error_handler_middleware<M>(
         self,
         middleware: M,
-    ) -> RootHandlerBuilder<S, IntoCotError<IntoCotResponse<<M as Layer<SE>>::Service>>>
+    ) -> RootHandlerBuilder<
+        RootService,
+        IntoCotError<IntoCotResponse<<M as Layer<ErrorHandlerService>>::Service>>,
+    >
     where
-        M: Layer<SE>,
+        M: Layer<ErrorHandlerService>,
     {
         let layer = (
             IntoCotErrorLayer::new(),
@@ -826,7 +834,7 @@ async fn default_server_error_handler(error: Error) -> cot::Result<impl IntoResp
 ///     .with_config(cot::config::ProjectConfig::default())
 ///     .boot()
 ///     .await?;
-/// let bootstrapped_project = bootstrapper.into_context_and_handler();
+/// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
 /// # Ok(())
 /// # }
 /// ```
@@ -956,7 +964,7 @@ impl Bootstrapper<Uninitialized> {
     ///     .with_config_name("test")?
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
     /// # Ok(())
     /// # }
     /// ```
@@ -986,7 +994,7 @@ impl Bootstrapper<Uninitialized> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
     /// # Ok(())
     /// # }
     /// ```
@@ -1059,7 +1067,7 @@ impl Bootstrapper<WithConfig> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
     /// # Ok(())
     /// # }
     /// ```
@@ -1145,7 +1153,7 @@ impl Bootstrapper<WithApps> {
     ///     .with_apps()
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
     /// # Ok(())
     /// # }
     /// ```
@@ -1248,7 +1256,7 @@ impl Bootstrapper<WithDatabase> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
     /// # Ok(())
     /// # }
     /// ```
@@ -1276,7 +1284,7 @@ impl Bootstrapper<WithDatabase> {
 }
 
 impl Bootstrapper<Initialized> {
-    /// Returns the context and handler of the bootstrapper.
+    /// Returns the context and handlers of the bootstrapper.
     ///
     /// # Examples
     ///
@@ -1294,12 +1302,12 @@ impl Bootstrapper<Initialized> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn into_context_and_handler(self) -> BootstrappedProject {
+    pub fn into_bootstrapped_project(self) -> BootstrappedProject {
         BootstrappedProject {
             context: self.context,
             handler: self.handler,
@@ -1332,7 +1340,7 @@ impl Bootstrapper<Initialized> {
 ///     .with_config(ProjectConfig::default())
 ///     .boot()
 ///     .await?;
-/// let bootstrapped_project = bootstrapper.into_context_and_handler();
+/// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
 /// # Ok(())
 /// # }
 /// ```
@@ -1846,7 +1854,7 @@ pub async fn run_at_with_shutdown(
         mut context,
         mut handler,
         mut error_handler,
-    } = bootstrapper.into_context_and_handler();
+    } = bootstrapper.into_bootstrapped_project();
 
     #[cfg(feature = "db")]
     if let Some(database) = &context.database {
@@ -1892,7 +1900,7 @@ pub async fn run_at_with_shutdown(
         match response {
             Ok(response) => response,
             Err(error_response) => {
-                if is_debug && allows_html(&request_parts) {
+                if is_debug && accepts_html(&request_parts) {
                     let diagnostics = Diagnostics::new(
                         context.config().clone(),
                         Arc::clone(&context.router),
@@ -1942,7 +1950,8 @@ pub async fn run_at_with_shutdown(
     Ok(())
 }
 
-fn allows_html(parts: &Option<Parts>) -> bool {
+fn accepts_html(parts: &Option<Parts>) -> bool {
+    // todo parse the mime types???
     parts
         .as_ref()
         .and_then(|p| p.headers.get(http::header::ACCEPT))
@@ -1983,30 +1992,30 @@ async fn build_custom_error_page(
 
     let request = build_request_for_error_handler(context, error);
 
-    let xd = poll_fn(|cx| server_error_handler.poll_ready(cx)).await;
-    if let Err(error) = xd {
+    let poll_status = poll_fn(|cx| server_error_handler.poll_ready(cx)).await;
+    if let Err(error) = poll_status {
         error!(
             ?error,
-            "Error occurred while running custom 500 Internal Server Error handler"
+            "Error occurred when polling the server error handler for readiness; \
+            returning default error page"
         );
-        // todo where logging?
 
-        error_page::build_cot_server_error_page()
-    } else {
-        let response = server_error_handler.call(request).await;
-        response.map_or_else(
-            |error| {
-                error!(
-                    ?error,
-                    "Error occurred while running custom 500 Internal Server Error handler"
-                );
-                // todo where logging?
-
-                error_page::build_cot_server_error_page()
-            },
-            response_cot_to_axum,
-        )
+        return error_page::build_cot_server_error_page();
     }
+
+    let response = server_error_handler.call(request).await;
+    response.map_or_else(
+        |error| {
+            error!(
+                ?error,
+                "Error occurred while running custom server error handler; \
+                returning default error page"
+            );
+
+            error_page::build_cot_server_error_page()
+        },
+        response_cot_to_axum,
+    )
 }
 
 #[must_use]

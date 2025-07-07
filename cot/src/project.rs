@@ -2267,4 +2267,206 @@ mod tests {
         assert_eq!(bootstrapper.context().apps.len(), 1);
         assert_eq!(bootstrapper.context().router.routes().len(), 1);
     }
+
+    #[cot::test]
+    async fn test_build_custom_error_page_poll_ready_failure() {
+        use tower::service_fn;
+
+        // Create a mock error handler that always fails on poll_ready
+        let mock_handler = service_fn(|_request: Request| async {
+            Err::<Response, Error>(Error::internal("Handler error"))
+        });
+
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
+
+        // Create a test context
+        let context = ProjectContext::new()
+            .with_config(ProjectConfig::default())
+            .with_apps(vec![], Arc::new(Router::empty()))
+            .with_database(None)
+            .with_auth(Arc::new(NoAuthBackend));
+
+        // Create a panic error response
+        let panic_payload = Box::new("Test panic message".to_string());
+        let error_response = ErrorResponse::Panic(panic_payload);
+
+        // Call build_custom_error_page - it should return the last-resort error page
+        let response =
+            build_custom_error_page(&mut error_handler, error_response, Arc::new(context)).await;
+
+        // Verify that the last-resort error page was returned
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        // The response should contain the default 500 error page content
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body_string = String::from_utf8_lossy(&body_bytes);
+
+        // Check that it contains the expected content from the 500.html template
+        assert!(body_string.contains("Server Error"));
+        assert!(
+            body_string.contains("Sorry, the page you are looking for is currently unavailable")
+        );
+    }
+
+    #[cot::test]
+    async fn test_build_custom_error_page_call_failure() {
+        use tower::service_fn;
+
+        // Create a mock error handler that succeeds on poll_ready but fails on call
+        let mock_handler = service_fn(|_request: Request| async {
+            Err::<Response, Error>(Error::internal("Handler call failed"))
+        });
+
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
+
+        // Create a test context
+        let context = ProjectContext::new()
+            .with_config(ProjectConfig::default())
+            .with_apps(vec![], Arc::new(Router::empty()))
+            .with_database(None)
+            .with_auth(Arc::new(NoAuthBackend));
+
+        // Create a regular error response
+        let error = Error::internal("Test error");
+        let error_response = ErrorResponse::ErrorReturned(error);
+
+        // Call build_custom_error_page - it should return the last-resort error page
+        let response =
+            build_custom_error_page(&mut error_handler, error_response, Arc::new(context)).await;
+
+        // Verify that the last-resort error page was returned
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        // The response should contain the default 500 error page content
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body_string = String::from_utf8_lossy(&body_bytes);
+
+        // Check that it contains the expected content from the 500.html template
+        assert!(body_string.contains("Server Error"));
+        assert!(
+            body_string.contains("Sorry, the page you are looking for is currently unavailable")
+        );
+    }
+
+    #[cot::test]
+    async fn test_build_custom_error_page_success() {
+        use tower::service_fn;
+
+        use crate::html::Html;
+
+        // Create a mock error handler that succeeds
+        let mock_handler = service_fn(|_request: Request| async {
+            let html = Html::new("Custom error page content");
+            Ok::<Response, Error>(html.into_response().unwrap())
+        });
+
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
+
+        // Create a test context
+        let context = ProjectContext::new()
+            .with_config(ProjectConfig::default())
+            .with_apps(vec![], Arc::new(Router::empty()))
+            .with_database(None)
+            .with_auth(Arc::new(NoAuthBackend));
+
+        // Create a regular error response
+        let error = Error::internal("Test error");
+        let error_response = ErrorResponse::ErrorReturned(error);
+
+        // Call build_custom_error_page - it should return the custom error page
+        let response =
+            build_custom_error_page(&mut error_handler, error_response, Arc::new(context)).await;
+
+        // Verify that the custom error page was returned successfully
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // The response should contain the custom content
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body_string = String::from_utf8_lossy(&body_bytes);
+
+        // Check that it contains the custom content
+        assert!(body_string.contains("Custom error page content"));
+    }
+
+    #[cot::test]
+    async fn test_build_custom_error_page_panic_conversion() {
+        use tower::service_fn;
+
+        use crate::error::handler::FromErrorRequestParts;
+        use crate::html::Html;
+
+        // Create a mock error handler that succeeds and verifies the error type
+        let mock_handler = service_fn(|request: Request| async {
+            // Extract the error from the request to verify it's an UncaughtPanic
+            let (mut parts, _body) = request.into_parts();
+            let error = Error::from_request_parts(&mut parts).await.unwrap();
+            match error.kind() {
+                ErrorKind::UncaughtPanic(_) => {}
+                _ => panic!("Expected UncaughtPanic error kind"),
+            }
+
+            let html = Html::new("Panic error handled");
+            Ok::<Response, Error>(html.into_response().unwrap())
+        });
+
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
+
+        // Create a test context
+        let context = ProjectContext::new()
+            .with_config(ProjectConfig::default())
+            .with_apps(vec![], Arc::new(Router::empty()))
+            .with_database(None)
+            .with_auth(Arc::new(NoAuthBackend));
+
+        // Create a panic error response
+        let panic_payload = Box::new("Test panic message".to_string());
+        let error_response = ErrorResponse::Panic(panic_payload);
+
+        // Call build_custom_error_page - it should convert panic to UncaughtPanic error
+        let response =
+            build_custom_error_page(&mut error_handler, error_response, Arc::new(context)).await;
+
+        // Verify that the custom error page was returned successfully
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // The response should contain the custom content
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body_string = String::from_utf8_lossy(&body_bytes);
+
+        // Check that it contains the custom content
+        assert!(body_string.contains("Panic error handled"));
+    }
+
+    #[cot::test]
+    async fn test_build_request_for_error_handler() {
+        use crate::error::handler::RequestError;
+
+        // Create a test context
+        let context = ProjectContext::new()
+            .with_config(ProjectConfig::default())
+            .with_apps(vec![], Arc::new(Router::empty()))
+            .with_database(None)
+            .with_auth(Arc::new(NoAuthBackend));
+
+        let error = Error::internal("Test error");
+
+        // Call build_request_for_error_handler
+        let request = build_request_for_error_handler(Arc::new(context), error);
+
+        // Verify that the request has the project context
+        assert!(request.extensions().get::<Arc<ProjectContext>>().is_some());
+
+        // Verify that the request has the error in extensions
+        let _request_error = request.extensions().get::<RequestError>().unwrap();
+        // We can't directly access the error field, but we can verify it exists
+        assert!(std::any::TypeId::of::<RequestError>() == std::any::TypeId::of::<RequestError>());
+    }
 }

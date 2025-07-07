@@ -12,7 +12,6 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use bytes::Bytes;
-use cot::config::StaticFilesPathRewriteMode;
 use digest::Digest;
 use futures_core::ready;
 use http::{Request, header};
@@ -20,7 +19,7 @@ use pin_project_lite::pin_project;
 use tower::Service;
 
 use crate::Body;
-use crate::config::StaticFilesConfig;
+use crate::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
 use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
 

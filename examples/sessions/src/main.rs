@@ -4,12 +4,12 @@ use cot::config::ProjectConfig;
 use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::SessionMiddleware;
-use cot::project::{MiddlewareContext, RegisterAppsContext};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::Request;
 use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router, Urls};
 use cot::session::Session;
-use cot::{App, AppBuilder, BoxedHandler, Project, reverse_redirect};
+use cot::{App, AppBuilder, Project, reverse_redirect};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
@@ -91,7 +91,7 @@ impl Project for SessionsProject {
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(SessionMiddleware::from_context(context))
             .build()

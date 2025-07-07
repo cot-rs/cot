@@ -28,7 +28,7 @@ impl Project for HelloProject {
     }
 
     fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
-        Ok(ProjectConfig::dev_default())
+        Ok(ProjectConfig::builder().debug(false).build())
     }
 
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {

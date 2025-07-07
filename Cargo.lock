@@ -1095,6 +1095,7 @@ dependencies = [
 name = "example-custom-error-pages"
 version = "0.1.0"
 dependencies = [
+ "askama",
  "cot",
 ]
 

@@ -2,11 +2,11 @@ use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::json::Json;
 use cot::openapi::swagger_ui::SwaggerUi;
-use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::router::method::openapi::api_post;
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project};
+use cot::{App, AppBuilder, Project};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
@@ -56,11 +56,7 @@ impl Project for JsonProject {
         Ok(ProjectConfig::dev_default())
     }
 
-    fn middlewares(
-        &self,
-        handler: RootHandlerBuilder,
-        context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    fn middlewares(&self, handler: RootHandlerBuilder, context: &MiddlewareContext) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .build()

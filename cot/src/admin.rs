@@ -9,7 +9,6 @@ use std::marker::PhantomData;
 use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
-use cot::request::extractors::StaticFiles;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.
@@ -24,11 +23,12 @@ use serde::Deserialize;
 
 use crate::auth::Auth;
 use crate::common_types::Password;
+use crate::error::not_found::NotFound;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
 use crate::html::Html;
-use crate::request::extractors::{FromRequestParts, Path, UrlQuery};
+use crate::request::extractors::{FromRequestParts, Path, StaticFiles, UrlQuery};
 use crate::request::{Request, RequestExt};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
@@ -128,7 +128,7 @@ async fn login(
     Html::new(template.render()?).into_response()
 }
 
-async fn authenticate(auth: &Auth, login_form: LoginForm) -> cot::Result<bool> {
+async fn authenticate(auth: &Auth, login_form: LoginForm) -> crate::Result<bool> {
     #[cfg(feature = "db")]
     let user = auth
         .authenticate(&crate::auth::db::DatabaseUserCredentials::new(
@@ -216,7 +216,9 @@ async fn view_model(
     let total_pages = total_object_counts.div_ceil(page_size);
 
     if (page == 0 || page > total_pages) && total_pages > 0 {
-        return Err(Error::not_found_message(format!("page {page} not found")));
+        return Err(Error::from(NotFound::with_message(format!(
+            "page {page} not found"
+        ))));
     }
 
     let pagination = Pagination::new(page_size, page);
@@ -357,11 +359,11 @@ async fn get_object(
         .get_object_by_id(request, object_id)
         .await?
         .ok_or_else(|| {
-            Error::not_found_message(format!(
+            Error::from(NotFound::with_message(format!(
                 "Object with ID `{}` not found in model `{}`",
                 object_id,
                 manager.name()
-            ))
+            )))
         })
 }
 
@@ -372,7 +374,11 @@ fn get_manager(
     model_managers
         .into_iter()
         .find(|manager| manager.url_name() == model_name)
-        .ok_or_else(|| Error::not_found_message(format!("Model `{model_name}` not found")))
+        .ok_or_else(|| {
+            Error::from(NotFound::with_message(format!(
+                "Model `{model_name}` not found"
+            )))
+        })
 }
 
 #[repr(transparent)]

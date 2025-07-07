@@ -5,13 +5,11 @@ pub mod openapi;
 
 use std::fmt::{Debug, Formatter};
 
-use cot::StatusCode;
-use cot::handler::BoxRequestHandler;
-use cot::request::Request;
-
-use crate::handler::into_box_request_handler;
+use crate::error::method_not_allowed::MethodNotAllowed;
+use crate::handler::{BoxRequestHandler, into_box_request_handler};
+use crate::request::Request;
 use crate::response::Response;
-use crate::{Body, Method, RequestHandler};
+use crate::{Method, RequestHandler};
 
 /// A router that routes requests based on the HTTP method.
 ///
@@ -415,17 +413,14 @@ define_method_router!(put => PUT);
 define_method_router!(trace => TRACE);
 define_method_router!(connect => CONNECT);
 
-const DEFAULT_METHOD_NOT_ALLOWED_PAGE: &[u8] = include_bytes!("../../templates/405.html");
-
-async fn default_fallback() -> cot::Result<Response> {
-    Ok(http::Response::builder()
-        .status(StatusCode::METHOD_NOT_ALLOWED)
-        .body(Body::fixed(DEFAULT_METHOD_NOT_ALLOWED_PAGE))
-        .expect("Building the Cot method not allowed page should never fail"))
+async fn default_fallback(method: Method) -> crate::Error {
+    MethodNotAllowed::new(method).into()
 }
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use super::*;
     use crate::StatusCode;
     use crate::html::Html;
@@ -449,9 +444,10 @@ mod tests {
         let router = MethodRouter::new();
 
         let request = TestRequestBuilder::get("/").build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(response.source().unwrap().is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -459,9 +455,10 @@ mod tests {
         let router = MethodRouter::default();
 
         let request = TestRequestBuilder::get("/").build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(response.source().unwrap().is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -496,9 +493,10 @@ mod tests {
         ];
         for method in methods {
             let request = TestRequestBuilder::with_method("/", method).build();
-            let response = router.handle(request).await.unwrap();
+            let response = router.handle(request).await.unwrap_err();
 
-            assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+            assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+            assert!(response.source().unwrap().is::<MethodNotAllowed>());
         }
     }
 
@@ -531,9 +529,10 @@ mod tests {
         let router = MethodRouter::new();
 
         let request = TestRequestBuilder::with_method("/", Method::HEAD).build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(response.source().unwrap().is::<MethodNotAllowed>());
 
         // check that if GET handler is defined, HEAD is routed to it
         let router = get(test_handler);

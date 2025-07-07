@@ -27,14 +27,15 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+use cot::error::not_found::NotFound;
 use derive_more::with_trait::Debug;
 use http::request::Parts;
 use tracing::debug;
 
-use crate::error::ErrorRepr;
+use crate::error::ErrorKind;
 use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
 use crate::request::{AppName, PathParams, Request, RequestExt, RouteName};
-use crate::response::{Response, not_found_response};
+use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};
 
@@ -139,7 +140,7 @@ impl Router {
             result.handler.handle(request).await
         } else {
             debug!("Not found: {}", request_path);
-            not_found_response(None)
+            Err(Error::from(NotFound::router()))
         }
     }
 
@@ -237,7 +238,7 @@ impl Router {
     ) -> Result<String> {
         Ok(self
             .reverse_option(app_name, name, params)?
-            .ok_or_else(|| ErrorRepr::NoViewToReverse {
+            .ok_or_else(|| ErrorKind::NoViewToReverse {
                 app_name: app_name.map(ToOwned::to_owned),
                 view_name: name.to_owned(),
             })?)
@@ -281,14 +282,14 @@ impl Router {
             .get(&RouteName(String::from(name)))
             .map(|matcher| matcher.reverse(params));
         if let Some(url) = url {
-            return Ok(Some(url.map_err(ErrorRepr::from)?));
+            return Ok(Some(url.map_err(ErrorKind::from)?));
         }
 
         for route in &self.urls {
             if let RouteInner::Router(router) = &route.view {
                 if let Some(url) = router.reverse_option(app_name, name, params)? {
                     return Ok(Some(
-                        route.url.reverse(params).map_err(ErrorRepr::from)? + &url,
+                        route.url.reverse(params).map_err(ErrorKind::from)? + &url,
                     ));
                 }
             }
@@ -564,9 +565,7 @@ impl Route {
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(into_box_request_handler(ErrorHandlerWrapper(
-                handler,
-            )))),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: None,
         }
     }
@@ -602,7 +601,7 @@ impl Route {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+                crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: None,
         }
@@ -671,7 +670,7 @@ impl Route {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+                crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: Some(RouteName(name.into())),
         }
@@ -778,39 +777,6 @@ enum RouteInner {
     Router(Router),
     #[cfg(feature = "openapi")]
     ApiHandler(Arc<dyn crate::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
-}
-
-struct ErrorHandlerWrapper<H>(H);
-
-impl<HandlerParams, H> RequestHandler<HandlerParams> for ErrorHandlerWrapper<H>
-where
-    H: RequestHandler<HandlerParams> + Send + Sync,
-{
-    async fn handle(&self, request: Request) -> Result<Response> {
-        let response = self.0.handle(request).await;
-
-        match response {
-            Ok(response) => Ok(response),
-            Err(error) => match error.inner {
-                ErrorRepr::NotFound { message } => not_found_response(message),
-                _ => Err(error),
-            },
-        }
-    }
-}
-
-#[cfg(feature = "openapi")]
-impl<H> crate::openapi::AsApiRoute for ErrorHandlerWrapper<H>
-where
-    H: crate::openapi::AsApiRoute,
-{
-    fn as_api_route(
-        &self,
-        route_context: &crate::openapi::RouteContext<'_>,
-        schema_generator: &mut schemars::SchemaGenerator,
-    ) -> aide::openapi::PathItem {
-        self.0.as_api_route(route_context, schema_generator)
-    }
 }
 
 /// Get a URL for a view by its registered name and given params.

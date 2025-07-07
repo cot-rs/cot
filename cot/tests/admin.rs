@@ -8,10 +8,10 @@ use cot::config::{
     AuthBackendConfig, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
 };
 use cot::middleware::{AuthMiddleware, SessionMiddleware};
-use cot::project::{MiddlewareContext, RegisterAppsContext};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::static_files::StaticFilesMiddleware;
 use cot::test::{TestServer, TestServerBuilder};
-use cot::{App, AppBuilder, BoxedHandler, Project, ProjectContext};
+use cot::{App, AppBuilder, Project, ProjectContext};
 use fantoccini::{Client, ClientBuilder, Locator};
 
 const DEFAULT_USERNAME: &str = "admin";
@@ -61,7 +61,7 @@ impl Project for AdminProject {
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .middleware(AuthMiddleware::new())

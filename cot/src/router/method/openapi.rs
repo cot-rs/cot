@@ -517,6 +517,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
+    use cot::error::method_not_allowed::MethodNotAllowed;
+
     use super::*;
     use crate::html::Html;
     use crate::json::Json;
@@ -543,9 +547,10 @@ mod tests {
         let router = ApiMethodRouter::new();
 
         let request = TestRequestBuilder::get("/").build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(response.source().unwrap().is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -553,9 +558,10 @@ mod tests {
         let router = ApiMethodRouter::default();
 
         let request = TestRequestBuilder::get("/").build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(response.source().unwrap().is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -590,9 +596,10 @@ mod tests {
         ];
         for method in methods {
             let request = TestRequestBuilder::with_method("/", method).build();
-            let response = router.handle(request).await.unwrap();
+            let response = router.handle(request).await.unwrap_err();
 
-            assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+            assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+            assert!(response.source().unwrap().is::<MethodNotAllowed>());
         }
     }
 
@@ -625,9 +632,10 @@ mod tests {
         let router = ApiMethodRouter::new();
 
         let request = TestRequestBuilder::with_method("/", Method::HEAD).build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(response.source().unwrap().is::<MethodNotAllowed>());
 
         // check that if GET handler is defined, HEAD is routed to it
         let router = api_get(test_handler);

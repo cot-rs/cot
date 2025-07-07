@@ -32,12 +32,12 @@
 //! use cot::config::ProjectConfig;
 //! use cot::json::Json;
 //! use cot::openapi::swagger_ui::SwaggerUi;
-//! use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+//! use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 //! use cot::response::{Response, ResponseExt};
 //! use cot::router::method::openapi::api_post;
 //! use cot::router::{Route, Router};
 //! use cot::static_files::StaticFilesMiddleware;
-//! use cot::{App, AppBuilder, BoxedHandler, Project, StatusCode};
+//! use cot::{App, AppBuilder, Project, StatusCode};
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Deserialize, schemars::JsonSchema)]
@@ -78,7 +78,7 @@
 //!         &self,
 //!         handler: RootHandlerBuilder,
 //!         context: &MiddlewareContext,
-//!     ) -> BoxedHandler {
+//!     ) -> RootHandler {
 //!         handler
 //!             // StaticFilesMiddleware is needed for SwaggerUi to serve its
 //!             // CSS and JavaScript files
@@ -1022,6 +1022,26 @@ impl ApiOperationResponse for crate::Result<Response> {
                 ..Default::default()
             },
         )]
+    }
+}
+
+impl<T, E> ApiOperationResponse for Result<T, E>
+where
+    T: ApiOperationResponse,
+{
+    fn api_operation_responses(
+        operation: &mut Operation,
+        route_context: &RouteContext<'_>,
+        schema_generator: &mut SchemaGenerator,
+    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
+        let mut responses = Vec::new();
+
+        let ok_response = T::api_operation_responses(operation, route_context, schema_generator);
+        for (status_code, response) in ok_response {
+            responses.push((status_code, response));
+        }
+
+        responses
     }
 }
 

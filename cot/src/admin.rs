@@ -19,7 +19,6 @@ use cot::request::extractors::StaticFiles;
 /// `#[derive(Form)]` attributes.
 pub use cot_macros::AdminModel;
 use derive_more::Debug;
-use http::request::Parts;
 use serde::Deserialize;
 
 use crate::auth::Auth;
@@ -29,7 +28,7 @@ use crate::form::{
 };
 use crate::html::Html;
 use crate::request::extractors::{FromRequestParts, Path, UrlQuery};
-use crate::request::{Request, RequestExt};
+use crate::request::{Parts, Request, RequestExt};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
 use crate::static_files::StaticFile;
@@ -379,7 +378,7 @@ fn get_manager(
 struct AdminModelManagers(Vec<Box<dyn AdminModelManager>>);
 
 impl FromRequestParts for AdminModelManagers {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         let managers = parts
             .context()
             .apps()

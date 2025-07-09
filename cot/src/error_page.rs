@@ -24,7 +24,7 @@ pub(crate) enum ErrorPageTrigger {
 pub(super) struct Diagnostics {
     project_config: ProjectConfig,
     router: Arc<Router>,
-    request_parts: Option<http::request::Parts>,
+    request_parts: Option<crate::request::Parts>,
 }
 
 impl Diagnostics {
@@ -32,7 +32,7 @@ impl Diagnostics {
     pub(super) fn new(
         project_config: ProjectConfig,
         router: Arc<Router>,
-        request_parts: Option<http::request::Parts>,
+        request_parts: Option<crate::request::Parts>,
     ) -> Self {
         Self {
             project_config,
@@ -169,7 +169,7 @@ impl ErrorPageTemplateBuilder {
     }
 
     #[must_use]
-    fn build_request_data(parts: &http::request::Parts) -> RequestData {
+    fn build_request_data(parts: &crate::request::Parts) -> RequestData {
         RequestData {
             method: parts.method.to_string(),
             url: parts.uri.to_string(),

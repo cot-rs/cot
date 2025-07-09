@@ -54,17 +54,16 @@ use std::sync::Arc;
 use cot::Error;
 use cot::error::ErrorRepr;
 use cot::request::{PathParams, Request};
-use http::request::Parts;
 use serde::de::DeserializeOwned;
 
-use crate::Method;
 use crate::auth::Auth;
 use crate::form::{Form, FormResult};
 #[cfg(feature = "json")]
 use crate::json::Json;
-use crate::request::RequestExt;
+use crate::request::{Parts, RequestExt};
 use crate::router::Urls;
 use crate::session::Session;
+use crate::{Body, Method};
 
 /// Trait for extractors that consume the request body.
 ///
@@ -80,12 +79,12 @@ pub trait FromRequest: Sized {
     ///
     /// Throws an error if the extractor fails to extract the data from the
     /// request.
-    fn from_request(request: Request) -> impl Future<Output = cot::Result<Self>> + Send;
+    fn from_request(parts: &Parts, body: Body) -> impl Future<Output = cot::Result<Self>> + Send;
 }
 
 impl FromRequest for Request {
-    async fn from_request(request: Request) -> cot::Result<Self> {
-        Ok(request)
+    async fn from_request(parts: &Parts, body: Body) -> cot::Result<Self> {
+        Ok(Request::from_parts(parts.clone(), body))
     }
 }
 
@@ -105,16 +104,16 @@ pub trait FromRequestParts: Sized {
     ///
     /// Throws an error if the extractor fails to extract the data from the
     /// request parts.
-    fn from_request_parts(parts: &mut Parts) -> impl Future<Output = cot::Result<Self>> + Send;
+    fn from_request_parts(parts: &Parts) -> impl Future<Output = cot::Result<Self>> + Send;
 }
 
 impl FromRequestParts for Urls {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         Ok(Self::from_parts(parts))
     }
 }
 
-/// An extractor that extract data from the URL params.
+/// An extractor that extracts data from the URL params.
 ///
 /// The extractor is generic over a type that implements
 /// `serde::de::DeserializeOwned`.
@@ -159,7 +158,7 @@ impl FromRequestParts for Urls {
 pub struct Path<D>(pub D);
 
 impl<D: DeserializeOwned> FromRequestParts for Path<D> {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         let params = parts
             .extensions
             .get::<PathParams>()
@@ -217,7 +216,7 @@ impl<D: DeserializeOwned> FromRequestParts for UrlQuery<D>
 where
     D: DeserializeOwned,
 {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         let query = parts.uri.query().unwrap_or_default();
 
         let deserializer =
@@ -282,10 +281,19 @@ where
 /// ```
 #[cfg(feature = "json")]
 impl<D: DeserializeOwned> FromRequest for Json<D> {
-    async fn from_request(mut request: Request) -> cot::Result<Self> {
-        request.expect_content_type(cot::headers::JSON_CONTENT_TYPE)?;
+    async fn from_request(parts: &Parts, body: Body) -> cot::Result<Self> {
+        let content_type = parts
+            .headers
+            .get(http::header::CONTENT_TYPE)
+            .map_or("".into(), |value| String::from_utf8_lossy(value.as_bytes()));
+        if content_type != cot::headers::JSON_CONTENT_TYPE {
+            return Err(ErrorRepr::InvalidContentType {
+                expected: cot::headers::JSON_CONTENT_TYPE,
+                actual: content_type.into_owned(),
+            }
+            .into());
+        }
 
-        let body = std::mem::take(request.body_mut());
         let bytes = body.into_bytes().await?;
 
         let deserializer = &mut serde_json::Deserializer::from_slice(&bytes);
@@ -345,7 +353,8 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 pub struct RequestForm<F: Form>(pub FormResult<F>);
 
 impl<F: Form> FromRequest for RequestForm<F> {
-    async fn from_request(mut request: Request) -> cot::Result<Self> {
+    async fn from_request(parts: &Parts, body: Body) -> cot::Result<Self> {
+        let mut request = Request::from_parts(parts.clone(), body);
         Ok(Self(F::from_request(&mut request).await?))
     }
 }
@@ -380,7 +389,7 @@ pub struct RequestDb(pub Arc<crate::db::Database>);
 
 #[cfg(feature = "db")]
 impl FromRequestParts for RequestDb {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         Ok(Self(parts.db().clone()))
     }
 }
@@ -481,7 +490,7 @@ pub enum StaticFilesGetError {
 }
 
 impl FromRequestParts for StaticFiles {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         Ok(StaticFiles {
             inner: parts
                 .extensions
@@ -493,20 +502,26 @@ impl FromRequestParts for StaticFiles {
 }
 
 // extractor impls for existing types
+impl FromRequestParts for Parts {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
+        Ok(parts.clone())
+    }
+}
+
 impl FromRequestParts for Method {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         Ok(parts.method.clone())
     }
 }
 
 impl FromRequestParts for Session {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         Ok(Session::from_extensions(&parts.extensions).clone())
     }
 }
 
 impl FromRequestParts for Auth {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
         let auth = parts
             .extensions
             .get::<Auth>()
@@ -572,7 +587,8 @@ mod tests {
             .body(Body::fixed(r#"{"hello":"world"}"#))
             .unwrap();
 
-        let Json(data): Json<serde_json::Value> = Json::from_request(request).await.unwrap();
+        let (parts, body) = request.into_parts();
+        let Json(data): Json<serde_json::Value> = Json::from_request(&parts, body).await.unwrap();
         assert_eq!(data, serde_json::json!({"hello": "world"}));
     }
 
@@ -588,7 +604,8 @@ mod tests {
             .body(Body::fixed("{}"))
             .unwrap();
 
-        let Json(data): Json<TestData> = Json::from_request(request).await.unwrap();
+        let (parts, body) = request.into_parts();
+        let Json(data): Json<TestData> = Json::from_request(&parts, body).await.unwrap();
         assert_eq!(data, TestData {});
     }
 
@@ -611,7 +628,8 @@ mod tests {
             .body(Body::fixed(r#"{"inner":{"hello":"world"}}"#))
             .unwrap();
 
-        let Json(data): Json<TestData> = Json::from_request(request).await.unwrap();
+        let (parts, body) = request.into_parts();
+        let Json(data): Json<TestData> = Json::from_request(&parts, body).await.unwrap();
         assert_eq!(
             data,
             TestData {
@@ -637,7 +655,7 @@ mod tests {
         params.insert("name".to_string(), "test".to_string());
         parts.extensions.insert(params);
 
-        let Path(extracted): Path<TestParams> = Path::from_request_parts(&mut parts).await.unwrap();
+        let Path(extracted): Path<TestParams> = Path::from_request_parts(&parts).await.unwrap();
         let expected = TestParams {
             id: 42,
             name: "test".to_string(),
@@ -658,7 +676,7 @@ mod tests {
         parts.uri = "https://example.com/?page=2&filter=active".parse().unwrap();
 
         let UrlQuery(query): UrlQuery<QueryParams> =
-            UrlQuery::from_request_parts(&mut parts).await.unwrap();
+            UrlQuery::from_request_parts(&parts).await.unwrap();
 
         assert_eq!(query.page, 2);
         assert_eq!(query.filter, "active");
@@ -672,7 +690,7 @@ mod tests {
         let (mut parts, _body) = Request::new(Body::empty()).into_parts();
         parts.uri = "https://example.com/".parse().unwrap();
 
-        let result: UrlQuery<EmptyParams> = UrlQuery::from_request_parts(&mut parts).await.unwrap();
+        let result: UrlQuery<EmptyParams> = UrlQuery::from_request_parts(&parts).await.unwrap();
         assert!(matches!(result, UrlQuery(_)));
     }
 
@@ -685,7 +703,8 @@ mod tests {
             .body(Body::fixed(r#"{"hello":"world"}"#))
             .unwrap();
 
-        let result = Json::<serde_json::Value>::from_request(request).await;
+        let (parts, body) = request.into_parts();
+        let result = Json::<serde_json::Value>::from_request(&parts, body).await;
         assert!(result.is_err());
     }
 
@@ -701,8 +720,9 @@ mod tests {
             .form_data(&[("hello", "world"), ("foo", "bar")])
             .build();
 
+        let (parts, body) = request.into_parts();
         let RequestForm(form_result): RequestForm<MyForm> =
-            RequestForm::from_request(request).await.unwrap();
+            RequestForm::from_request(&parts, body).await.unwrap();
 
         assert_eq!(
             form_result.unwrap(),

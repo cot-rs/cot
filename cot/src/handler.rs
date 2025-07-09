@@ -92,10 +92,10 @@ macro_rules! impl_request_handler {
                     unused_mut,
                     reason = "for the case where there are no params"
                 )]
-                let (mut parts, _body) = request.into_parts();
+                let (parts, _body) = request.into_parts();
 
                 $(
-                    let $ty = $ty::from_request_parts(&mut parts).await?;
+                    let $ty = $ty::from_request_parts(&parts).await?;
                 )*
 
                 self.clone()($($ty,)*).await.into_response()
@@ -126,17 +126,16 @@ macro_rules! impl_request_handler_from_request {
                     unused_mut,
                     reason = "for the case where there are no FromRequestParts params"
                 )]
-                let (mut parts, body) = request.into_parts();
+                let (parts, body) = request.into_parts();
 
                 $(
-                    let $ty_lhs = $ty_lhs::from_request_parts(&mut parts).await?;
+                    let $ty_lhs = $ty_lhs::from_request_parts(&parts).await?;
                 )*
                 $(
-                    let $ty_rhs = $ty_rhs::from_request_parts(&mut parts).await?;
+                    let $ty_rhs = $ty_rhs::from_request_parts(&parts).await?;
                 )*
 
-                let request = Request::from_parts(parts, body);
-                let $ty_from_request = $ty_from_request::from_request(request).await?;
+                let $ty_from_request = $ty_from_request::from_request(&parts, body).await?;
 
                 self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await.into_response()
             }

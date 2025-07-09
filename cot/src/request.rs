@@ -16,7 +16,6 @@ use std::future::Future;
 use std::sync::Arc;
 
 use http::Extensions;
-use http::request::Parts;
 use indexmap::IndexMap;
 
 #[cfg(feature = "db")]
@@ -31,6 +30,9 @@ mod path_params_deserializer;
 
 /// HTTP request type.
 pub type Request = http::Request<Body>;
+
+/// HTTP request parts type.
+pub type Parts = http::request::Parts;
 
 mod private {
     pub trait Sealed {}
@@ -270,8 +272,8 @@ impl RequestExt for Request {
     {
         let request = std::mem::take(self);
 
-        let (mut parts, body) = request.into_parts();
-        let result = E::from_request_parts(&mut parts).await;
+        let (parts, body) = request.into_parts();
+        let result = E::from_request_parts(&parts).await;
 
         *self = Request::from_parts(parts, body);
         result

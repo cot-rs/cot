@@ -45,7 +45,7 @@ pub(super) fn impl_from_request_parts_for_struct(
         #[automatically_derived]
         impl #cot::request::extractors::FromRequestParts for #struct_name {
             async fn from_request_parts(
-                parts: &mut #cot::http::request::Parts,
+                parts: &#cot::request::Parts,
             ) -> #cot::Result<Self> {
                 Ok(#constructor)
             }

@@ -29,7 +29,6 @@ use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
-use http::request::Parts;
 use tower::{Layer, Service};
 use tracing::{error, info, trace};
 
@@ -50,7 +49,7 @@ use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::request::{AppName, Request, RequestExt};
+use crate::request::{AppName, Parts, Request, RequestExt};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;

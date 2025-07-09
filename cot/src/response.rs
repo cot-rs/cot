@@ -27,6 +27,9 @@ const RESPONSE_BUILD_FAILURE: &str = "Failed to build response";
 /// HTTP response type.
 pub type Response = http::Response<Body>;
 
+/// HTTP request parts type.
+pub type Parts = http::response::Parts;
+
 mod private {
     pub trait Sealed {}
 }

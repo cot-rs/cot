@@ -121,8 +121,8 @@ use crate::auth::Auth;
 use crate::form::Form;
 use crate::handler::BoxRequestHandler;
 use crate::json::Json;
-use crate::request::extractors::{FromRequest, FromRequestParts, Path, RequestForm, UrlQuery};
-use crate::request::{Parts, Request};
+use crate::request::extractors::{FromRequest, FromRequestHead, Path, RequestForm, UrlQuery};
+use crate::request::{Request, RequestHead};
 use crate::response::{Response, WithExtension};
 use crate::router::Urls;
 use crate::session::Session;
@@ -421,15 +421,15 @@ where
 ///
 /// ```
 /// use cot::openapi::NoApi;
-/// use cot::request::Parts;
-/// use cot::request::extractors::FromRequestParts;
+/// use cot::request::RequestHead;
+/// use cot::request::extractors::FromRequestHead;
 /// use cot::response::Response;
 /// use cot::router::Route;
 /// use cot::router::method::openapi::api_get;
 ///
 /// struct MyExtractor;
-/// impl FromRequestParts for MyExtractor {
-///     async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
+/// impl FromRequestHead for MyExtractor {
+///     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
 ///         // ...
 /// #         unimplemented!()
 ///     }
@@ -479,14 +479,14 @@ where
 }
 
 impl<T: FromRequest> FromRequest for NoApi<T> {
-    async fn from_request(parts: &Parts, body: Body) -> cot::Result<Self> {
-        T::from_request(parts, body).await.map(Self)
+    async fn from_request(head: &RequestHead, body: Body) -> cot::Result<Self> {
+        T::from_request(head, body).await.map(Self)
     }
 }
 
-impl<T: FromRequestParts> FromRequestParts for NoApi<T> {
-    async fn from_request_parts(parts: &Parts) -> cot::Result<Self> {
-        T::from_request_parts(parts).await.map(Self)
+impl<T: FromRequestHead> FromRequestHead for NoApi<T> {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        T::from_request_head(head).await.map(Self)
     }
 }
 
@@ -514,7 +514,7 @@ macro_rules! impl_as_openapi_operation {
             #[allow(
                 clippy::allow_attributes,
                 non_snake_case,
-                reason = "for the case where there are no FromRequestParts params"
+                reason = "for the case where there are no FromRequestHead params"
             )]
             fn as_api_operation(
                 &self,
@@ -577,7 +577,7 @@ handle_all_parameters!(impl_as_openapi_operation);
 /// pub struct Json<D>(pub D);
 ///
 /// impl<D: DeserializeOwned> FromRequest for Json<D> {
-///     async fn from_request(parts: &cot::request::Parts, body: cot::Body) -> cot::Result<Self> {
+///     async fn from_request(head: &cot::request::RequestHead, body: cot::Body) -> cot::Result<Self> {
 ///         // parse the request body as JSON
 /// #       unimplemented!()
 ///     }

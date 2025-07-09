@@ -1,7 +1,0 @@
-error: Only structs can derive `FromRequestParts`
- --> tests/ui/derive_from_request_parts_enum.rs:3:10
-  |
-3 | #[derive(FromRequestParts)]
-  |          ^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the derive macro `FromRequestParts` (in Nightly builds, run with -Z macro-backtrace for more info)

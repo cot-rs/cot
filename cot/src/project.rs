@@ -49,7 +49,7 @@ use crate::error_page::{Diagnostics, ErrorPageTrigger};
 use crate::handler::BoxedHandler;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::request::{AppName, Parts, Request, RequestExt};
+use crate::request::{AppName, Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;
@@ -1783,7 +1783,7 @@ pub async fn run_at_with_shutdown(
 
     let handler = move |axum_request: axum::extract::Request| async move {
         let request = request_axum_to_cot(axum_request, Arc::clone(&context));
-        let (request_parts, request) = request_parts_for_diagnostics(request);
+        let (request_head, request) = request_parts_for_diagnostics(request);
 
         let catch_unwind_response = AssertUnwindSafe(pass_to_axum(request, &mut project_handler))
             .catch_unwind()
@@ -1808,7 +1808,7 @@ pub async fn run_at_with_shutdown(
                     let diagnostics = Diagnostics::new(
                         context.config().clone(),
                         Arc::clone(&context.router),
-                        request_parts,
+                        request_head,
                     );
 
                     build_cot_error_page(error_response, &diagnostics)
@@ -1939,11 +1939,11 @@ pub async fn run_cli(project: impl Project + 'static) -> cot::Result<()> {
     Bootstrapper::new(project).run_cli().await
 }
 
-fn request_parts_for_diagnostics(request: Request) -> (Option<Parts>, Request) {
+fn request_parts_for_diagnostics(request: Request) -> (Option<RequestHead>, Request) {
     if request.project_config().debug {
-        let (parts, body) = request.into_parts();
-        let parts_clone = parts.clone();
-        let request = Request::from_parts(parts, body);
+        let (head, body) = request.into_parts();
+        let parts_clone = head.clone();
+        let request = Request::from_parts(head, body);
         (Some(parts_clone), request)
     } else {
         (None, request)

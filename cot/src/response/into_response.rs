@@ -299,7 +299,7 @@ impl IntoResponse for http::Extensions {
     }
 }
 
-impl IntoResponse for http::response::Parts {
+impl IntoResponse for crate::response::ResponseHead {
     fn into_response(self) -> cot::Result<Response> {
         Ok(Response::from_parts(self, Body::empty()))
     }
@@ -638,9 +638,9 @@ mod tests {
             .headers_mut()
             .insert("X-From-Parts", HeaderValue::from_static("yes"));
         response.extensions_mut().insert(123usize);
-        let (parts, _) = response.into_parts();
+        let (head, _) = response.into_parts();
 
-        let new_response = parts.into_response().unwrap();
+        let new_response = head.into_response().unwrap();
 
         assert_eq!(new_response.status(), StatusCode::ACCEPTED);
         assert_eq!(new_response.headers().get("X-From-Parts").unwrap(), "yes");

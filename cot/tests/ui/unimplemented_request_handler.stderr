@@ -8,7 +8,7 @@ error[E0277]: `fn(()) -> impl Future<Output = Result<cot::http::Response<Body>, 
   |
   = help: the trait `RequestHandler<_>` is not implemented for fn item `fn(()) -> impl Future<Output = Result<cot::http::Response<Body>, cot::Error>> {test}`
   = note: make sure the function is marked `async`
-  = note: make sure all parameters implement `FromRequest` or `FromRequestParts`
+  = note: make sure all parameters implement `FromRequest` or `FromRequestHead`
   = note: make sure there is at most one parameter implementing `FromRequest`
   = note: make sure the function takes no more than 10 parameters
   = help: the following other types implement trait `RequestHandler<T>`:

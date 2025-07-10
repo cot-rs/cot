@@ -47,7 +47,7 @@ use crate::config::{AuthBackendConfig, ProjectConfig};
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
-use crate::error::ErrorKind;
+use crate::error::error_impl::ErrorKind;
 use crate::error::handler::{DynErrorPageHandler, RequestError};
 use crate::error::uncaught_panic::UncaughtPanic;
 use crate::error_page::Diagnostics;

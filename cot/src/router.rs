@@ -32,7 +32,7 @@ use derive_more::with_trait::Debug;
 use http::request::Parts;
 use tracing::debug;
 
-use crate::error::ErrorKind;
+use crate::error::error_impl::ErrorKind;
 use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
 use crate::request::{AppName, PathParams, Request, RequestExt, RouteName};
 use crate::response::Response;

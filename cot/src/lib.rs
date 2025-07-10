@@ -159,7 +159,7 @@ pub use cot_macros::e2e_test;
 /// ```
 pub use cot_macros::main;
 pub use cot_macros::test;
-pub use error::Error;
+pub use error::error_impl::Error;
 #[cfg(feature = "openapi")]
 pub use schemars;
 pub use {bytes, http};

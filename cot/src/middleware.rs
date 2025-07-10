@@ -21,7 +21,7 @@ use tower_sessions::{SessionManagerLayer, SessionStore};
 #[cfg(feature = "cache")]
 use crate::config::CacheType;
 use crate::config::{Expiry, SameSite, SessionStoreTypeConfig};
-use crate::error::ErrorKind;
+use crate::error::error_impl::ErrorKind;
 use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;

@@ -52,7 +52,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 use cot::Error;
-use cot::error::ErrorKind;
+use cot::error::error_impl::ErrorKind;
 use cot::request::{PathParams, Request};
 use http::request::Parts;
 use serde::de::DeserializeOwned;

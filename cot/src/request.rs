@@ -21,7 +21,7 @@ use indexmap::IndexMap;
 
 #[cfg(feature = "db")]
 use crate::db::Database;
-use crate::error::ErrorKind;
+use crate::error::error_impl::ErrorKind;
 use crate::request::extractors::FromRequestParts;
 use crate::router::Router;
 use crate::{Body, Result};

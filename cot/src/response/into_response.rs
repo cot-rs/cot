@@ -4,7 +4,7 @@ use cot::response::Response;
 use cot::{Body, Error, StatusCode};
 use http;
 
-use crate::error::ErrorKind;
+use crate::error::error_impl::ErrorKind;
 #[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;

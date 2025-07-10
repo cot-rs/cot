@@ -8,7 +8,7 @@ use http_body::{Frame, SizeHint};
 use http_body_util::combinators::BoxBody;
 use sync_wrapper::SyncWrapper;
 
-use crate::error::ErrorKind;
+use crate::error::error_impl::ErrorKind;
 use crate::{Error, Result};
 
 /// A type that represents an HTTP request or response body.

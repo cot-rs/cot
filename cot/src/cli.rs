@@ -9,7 +9,7 @@ pub use clap;
 use clap::{Arg, ArgMatches, Command, value_parser};
 use derive_more::Debug;
 
-use crate::error::ErrorKind;
+use crate::error::error_impl::ErrorKind;
 use crate::{Bootstrapper, Error, Result};
 
 const CONFIG_PARAM: &str = "config";

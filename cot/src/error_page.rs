@@ -7,9 +7,9 @@ use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace};
-use crate::error::{Error, ErrorKind};
+use crate::error::error_impl::ErrorKind;
 use crate::router::Router;
-use crate::{Result, StatusCode};
+use crate::{Error, Result, StatusCode};
 
 #[derive(Debug)]
 pub(super) struct Diagnostics {

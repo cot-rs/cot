@@ -71,6 +71,7 @@ url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 async-stream.workspace = true
+criterion.workspace = true
 fake.workspace = true
 fantoccini.workspace = true
 futures.workspace = true
@@ -111,3 +112,10 @@ swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
 cache = []
 test = []
+
+[lib]
+bench = false
+
+[[bench]]
+name = "router"
+harness = false

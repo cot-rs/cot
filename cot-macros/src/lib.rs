@@ -6,7 +6,6 @@ mod main_fn;
 mod model;
 mod query;
 mod select_choice;
-mod utils;
 
 use darling::Error;
 use darling::ast::NestedMeta;

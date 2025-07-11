@@ -16,7 +16,7 @@ use http::request::Parts;
 ///
 /// This trait is implemented by functions that can handle error pages. The
 /// trait is automatically implemented for async functions that take parameters
-/// implementing [`FromErrorRequestParts`] and return a type that implements
+/// implementing [`FromErrorRequestHead`] and return a type that implements
 /// [`IntoResponse`].
 ///
 /// # Examples
@@ -64,13 +64,13 @@ pub trait ErrorPageHandler<T = ()> {
     /// This method may return an error if the handler fails to build a
     /// response. In this case, the error will be logged and a generic
     /// error page will be returned to the user.
-    fn handle(&self, request: Request) -> impl Future<Output = crate::Result<Response>> + Send;
+    fn handle(&self, head: &RequestHead) -> impl Future<Output = crate::Result<Response>> + Send;
 }
 
 pub(crate) trait BoxErrorPageHandler: Send + Sync {
     fn handle(
         &self,
-        request: Request,
+        head: &RequestHead,
     ) -> Pin<Box<dyn Future<Output = crate::Result<Response>> + Send + '_>>;
 }
 
@@ -122,9 +122,9 @@ impl DynErrorPageHandler {
         impl<T, H: ErrorPageHandler<T> + Send + Sync> BoxErrorPageHandler for Inner<T, H> {
             fn handle(
                 &self,
-                request: Request,
+                head: &RequestHead,
             ) -> Pin<Box<dyn Future<Output = cot::Result<Response>> + Send + '_>> {
-                Box::pin(self.0.handle(request))
+                Box::pin(self.0.handle(head))
             }
         }
 
@@ -154,7 +154,7 @@ macro_rules! impl_request_handler {
         impl<Func, $($ty,)* Fut, R> ErrorPageHandler<($($ty,)*)> for Func
         where
             Func: FnOnce($($ty,)*) -> Fut + Clone + Send + Sync + 'static,
-            $($ty: FromErrorRequestParts + Send,)*
+            $($ty: FromErrorRequestHead + Send,)*
             Fut: Future<Output = R> + Send,
             R: crate::response::IntoResponse,
         {
@@ -163,12 +163,10 @@ macro_rules! impl_request_handler {
                 non_snake_case,
                 reason = "for the case where there are no params"
             )]
-            async fn handle(&self, request: Request) -> crate::Result<Response> {
+            async fn handle(&self, head: &RequestHead) -> crate::Result<Response> {
                 #[allow(unused_variables, unused_mut)] // for the case where there are no params
-                let (mut parts, _body) = request.into_parts();
-
                 $(
-                    let $ty = $ty::from_request_parts(&mut parts).await?;
+                    let $ty = $ty::from_request_parts(&head).await?;
                 )*
 
                 self.clone()($($ty,)*).await.into_response()
@@ -181,34 +179,34 @@ handle_all_parameters!(impl_request_handler);
 
 /// A trait for extracting data from request parts in error handlers.
 ///
-/// This trait is similar to [`FromRequestParts`] but is specifically designed
+/// This trait is similar to [`FromRequestHead`] but is specifically designed
 /// for use in error page handlers. It allows error handlers to extract data
 /// from the request parts, such as the original error, request information,
 /// or other context needed to generate an appropriate error response.
 ///
 /// Note that because the error handler receives a new request that
 /// is missing most of the original request information, this trait is
-/// intentionally more limited than [`FromRequestParts`] and not implemented
+/// intentionally more limited than [`FromRequestHead`] and not implemented
 /// for all types.
 ///
-/// [`FromRequestParts`]: crate::request::extractors::FromRequestParts
-pub trait FromErrorRequestParts: Sized {
+/// [`FromRequestHead`]: crate::request::extractors::FromRequestHead
+pub trait FromErrorRequestHead: Sized {
     /// Extracts data from the request parts.
     ///
     /// # Errors
     ///
     /// Throws an error if the extractor fails to extract the data from the
     /// request parts.
-    fn from_request_parts(parts: &mut Parts) -> impl Future<Output = crate::Result<Self>> + Send;
+    fn from_request_parts(parts: &Parts) -> impl Future<Output = crate::Result<Self>> + Send;
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! impl_from_error_request_parts {
     ($ty:ty) => {
-        impl $crate::error::handler::FromErrorRequestParts for $ty {
+        impl $crate::error::handler::FromErrorRequestHead for $ty {
             fn from_request_parts(
-                parts: &mut $crate::http::request::Parts,
+                parts: &$crate::request::RequestHead,
             ) -> impl ::std::future::Future<Output = $crate::Result<Self>> + Send {
                 <$ty as $crate::request::extractors::FromRequestParts>::from_request_parts(parts)
             }
@@ -219,6 +217,7 @@ macro_rules! impl_from_error_request_parts {
 pub use impl_from_error_request_parts;
 
 use crate::handler::handle_all_parameters;
+use crate::request::RequestHead;
 
 impl_from_error_request_parts!(crate::router::Urls);
 impl_from_error_request_parts!(crate::request::extractors::StaticFiles);
@@ -239,13 +238,14 @@ impl RequestError {
     }
 }
 
-impl FromErrorRequestParts for Error {
-    async fn from_request_parts(parts: &mut Parts) -> crate::Result<Self> {
-        let error = parts.extensions.remove::<RequestError>();
-        error
-            .ok_or_else(|| {
-                Error::internal("No error found in request parts. Was it extracted already?")
-            })
-            .map(|e| Arc::into_inner(e.0).expect("RequestError was cloned"))
+impl FromErrorRequestHead for &Error {
+    async fn from_request_parts(head: &RequestHead) -> crate::Result<Self> {
+        let error = head.extensions.get::<RequestError>();
+        Ok(error.unwrap().0.as_ref())
+        // error
+        //     .ok_or_else(|| {
+        //         Error::internal("No error found in request parts. Was it
+        // extracted already?")     })
+        //     .map(|e| Arc::into_inner(e.0).expect("RequestError was cloned"))
     }
 }

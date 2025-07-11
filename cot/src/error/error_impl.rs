@@ -1,5 +1,6 @@
 use std::error::Error as StdError;
 use std::fmt::Display;
+use std::sync::Arc;
 
 use derive_more::with_trait::Debug;
 use thiserror::Error;

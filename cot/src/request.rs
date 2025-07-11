@@ -32,6 +32,8 @@ mod path_params_deserializer;
 /// HTTP request type.
 pub type Request = http::Request<Body>;
 
+pub type RequestHead = http::request::Parts;
+
 mod private {
     pub trait Sealed {}
 }

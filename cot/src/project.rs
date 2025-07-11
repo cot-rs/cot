@@ -2398,7 +2398,7 @@ mod tests {
     async fn test_build_custom_error_page_panic_conversion() {
         use tower::service_fn;
 
-        use crate::error::handler::FromErrorRequestParts;
+        use crate::error::handler::FromErrorRequestHead;
         use crate::html::Html;
 
         // Create a mock error handler that succeeds and verifies the error type

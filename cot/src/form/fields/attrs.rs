@@ -101,9 +101,9 @@ pub enum Dir {
 
 impl Dir {
     pub fn as_str(&self) -> &'static str {
-        match self{
+        match self {
             Self::Rtl => "rtl",
-            Self::Ltr => "ltr"
+            Self::Ltr => "ltr",
         }
     }
 }
@@ -114,20 +114,17 @@ impl Display for Dir {
     }
 }
 
-
-
 #[derive(Debug, Clone, Copy)]
 pub enum Capture {
     User,
-    Environment
+    Environment,
 }
 
-
-impl Capture{
+impl Capture {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::User => "user",
-            Self::Environment => "environment"
+            Self::Environment => "environment",
         }
     }
 }

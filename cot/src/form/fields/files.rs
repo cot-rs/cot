@@ -5,8 +5,8 @@ use bytes::Bytes;
 use cot::form::{AsFormField, FormFieldValidationError};
 use cot::html::HtmlTag;
 
-use crate::form::{FormField, FormFieldOptions, FormFieldValue, FormFieldValueError};
 use crate::form::fields::attrs::Capture;
+use crate::form::{FormField, FormFieldOptions, FormFieldValue, FormFieldValueError};
 
 #[derive(Debug)]
 /// A form field for a file.
@@ -66,7 +66,7 @@ pub struct FileFieldOptions {
     /// [`accept` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/file#limiting_accepted_file_types
     pub accept: Option<Vec<String>>,
 
-    pub capture: Option<Capture>
+    pub capture: Option<Capture>,
 }
 
 impl Display for FileField {
@@ -212,7 +212,6 @@ mod tests {
             },
             FileFieldOptions {
                 ..Default::default()
-
             },
         );
 
@@ -248,7 +247,9 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FileFieldOptions { ..Default::default() },
+            FileFieldOptions {
+                ..Default::default()
+            },
         );
 
         let value = InMemoryUploadedFile::clean_value(&field);

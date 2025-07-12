@@ -1094,13 +1094,22 @@ mod tests {
             },
             PasswordFieldOptions {
                 max_length: Some(10),
+                min_length: Some(5),
+                size: Some(15),
+                autocomplete: Some(AutoComplete::Value("foo bar".to_string())),
+                placeholder: Some("Enter password".to_string()),
+                readonly: Some(false),
             },
         );
         let html = field.to_string();
         assert!(html.contains("type=\"password\""));
         assert!(html.contains("required"));
         assert!(html.contains("maxlength=\"10\""));
+        assert!(html.contains("minlength=\"5\""));
+        assert!(html.contains("autocomplete=\"foo bar\""));
+        assert!(html.contains("placeholder=\"Enter password\""));
     }
+
     #[cot::test]
     async fn password_field_clean_value() {
         let mut field = PasswordField::with_options(
@@ -1131,18 +1140,31 @@ mod tests {
                 required: true,
             },
             EmailFieldOptions {
-                min_length: Some(10),
-                max_length: Some(50),
+                max_length: Some(10),
+                min_length: Some(5),
+                size: Some(15),
+                autocomplete: Some(AutoComplete::Value("foo bar".to_string())),
+                dirname: Some("dir".to_string()),
+                list: Some(List::new(["foo@example.com", "baz@example.com"])),
+                placeholder: Some("Enter text".to_string()),
+                readonly: Some(true),
             },
         );
 
         let html = field.to_string();
+
         assert!(html.contains("type=\"email\""));
         assert!(html.contains("required"));
-        assert!(html.contains("minlength=\"10\""));
-        assert!(html.contains("maxlength=\"50\""));
+        assert!(html.contains("minlength=\"5\""));
+        assert!(html.contains("maxlength=\"10\""));
         assert!(html.contains("name=\"test_id\""));
         assert!(html.contains("id=\"test_id\""));
+        assert!(html.contains("placeholder=\"Enter text\""));
+        assert!(html.contains("readonly"));
+        assert!(html.contains("autocomplete=\"foo bar\""));
+        assert!(html.contains("dirname=\"dir\""));
+        assert!(html.contains("list=\"__test_id_datalist\""));
+        assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com">foo@example.com</option><option value="baz@example.com">baz@example.com</option></datalist>"#));
     }
 
     #[cot::test]
@@ -1286,13 +1308,22 @@ mod tests {
             IntegerFieldOptions {
                 min: Some(1),
                 max: Some(10),
+                placeholder: Some("Enter text".to_string()),
+                readonly: Some(false),
+                step: Some(Step::Value(10)),
             },
         );
         let html = field.to_string();
+
         assert!(html.contains("type=\"number\""));
         assert!(html.contains("required"));
         assert!(html.contains("min=\"1\""));
         assert!(html.contains("max=\"10\""));
+        assert!(html.contains("step=\"10\""));
+        assert!(html.contains("placeholder=\"Enter text\""));
+        assert!(html.contains("name=\"test\""));
+        assert!(html.contains("id=\"test\""));
+        assert!(!html.contains("readonly"));
     }
 
     #[cot::test]
@@ -1434,13 +1465,22 @@ mod tests {
             FloatFieldOptions {
                 min: Some(1.5),
                 max: Some(10.7),
+                placeholder: Some("Enter text".to_string()),
+                readonly: Some(true),
+                step: Some(Step::Any),
             },
         );
         let html = field.to_string();
+
         assert!(html.contains("type=\"number\""));
         assert!(html.contains("required"));
         assert!(html.contains("min=\"1.5\""));
         assert!(html.contains("max=\"10.7\""));
+        assert!(html.contains("step=\"any\""));
+        assert!(html.contains("placeholder=\"Enter text\""));
+        assert!(html.contains("name=\"test\""));
+        assert!(html.contains("id=\"test\""));
+        assert!(html.contains("readonly"));
     }
 
     #[cot::test]

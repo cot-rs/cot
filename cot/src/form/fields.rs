@@ -10,7 +10,7 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
-pub use attrs::{AutoCapitalize, AutoComplete, List, Step};
+pub use attrs::{AutoCapitalize, AutoComplete, Dir, List, Step};
 pub use chrono::{
     DateField, DateFieldOptions, DateTimeField, DateTimeFieldOptions, DateTimeWithTimezoneField,
     DateTimeWithTimezoneFieldOptions, TimeField, TimeFieldOptions,
@@ -77,13 +77,33 @@ pub struct StringFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
     pub max_length: Option<u32>,
+    /// The minimum length of the field. Used to set the `minlength` attribute
+    /// in the HTML input element.
     pub min_length: Option<u32>,
+    /// The size of the field. Used to set the `size` attribute in the HTML
+    /// input element.
     pub size: Option<u32>,
+    /// Corresponds to  the [`AutoCapitalize`] attribute in the HTML input
+    /// element.
     pub autocapitalize: Option<AutoCapitalize>,
+    /// Corresponds to the [`AutoComplete`] attribute in the HTML input element.
     pub autocomplete: Option<AutoComplete>,
+    /// The direction of the text input, which can be set to `ltr`
+    /// (left-to-right) or `rtl` (right-to-left). This corresponds to the
+    /// [`Dir`] attribute in the HTML input element.
+    pub dir: Option<Dir>,
+    /// The [`dirname`] attribute in the HTML input element, which is used to
+    /// specify the direction of the text input.
+    ///
+    /// [`dirname`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#dirname
     pub dirname: Option<String>,
+    /// A [`List`] of options for the `datalist` element, which can be used to
+    /// provide predefined options for the input.
     pub list: Option<List>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
     pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
     pub readonly: Option<bool>,
 }
 
@@ -116,6 +136,10 @@ impl Display for StringField {
 
         if let Some(size) = self.custom_options.size {
             tag.attr("size", size.to_string());
+        }
+
+        if let Some(dir) = &self.custom_options.dir {
+            tag.attr("dir", dir.as_str());
         }
 
         if let Some(dirname) = &self.custom_options.dirname {
@@ -187,10 +211,20 @@ pub struct PasswordFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
     pub max_length: Option<u32>,
+    /// The minimum length of the field. Used to set the `minlength` attribute
+    /// in the HTML input element.
     pub min_length: Option<u32>,
+    /// The size of the field. Used to set the [`size`] attribute in the HTML
+    /// input element.
+    ///
+    /// [`size`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#size
     pub size: Option<u32>,
+    /// Corresponds to the [`AutoComplete`] attribute in the HTML input element.
     pub autocomplete: Option<AutoComplete>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
     pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
     pub readonly: Option<bool>,
 }
 
@@ -290,11 +324,30 @@ pub struct EmailFieldOptions {
     /// The minimum length of the field used to set the `minlength` attribute
     /// in the HTML input element.
     pub min_length: Option<u32>,
+    /// The size of the field used to set the [`size`] attribute in the HTML
+    /// input element.
+    ///
+    /// [`size`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#size
     pub size: Option<u32>,
+    /// Corresponds to the [`AutoCapitalize`] attribute in the HTML input
+    /// element.
     pub autocomplete: Option<AutoComplete>,
+    /// The direction of the text input, which can be set to `ltr`
+    /// (left-to-right) or `rtl` (right-to-left). This corresponds to the
+    /// [`Dir`] attribute in the HTML input element.
+    pub dir: Option<Dir>,
+    /// The [`dirname`] attribute in the HTML input element, which is used to
+    /// specify the direction of the text input.
+    ///
+    /// [`dirname`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#dirname
     pub dirname: Option<String>,
+    /// A [`List`] of options for the `datalist` element, which can be used to
+    /// provide predefined options for the input.
     pub list: Option<List>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
     pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
     pub readonly: Option<bool>,
 }
 
@@ -328,6 +381,10 @@ impl Display for EmailField {
 
         if let Some(size) = self.custom_options.size {
             tag.attr("size", size.to_string());
+        }
+
+        if let Some(dir) = &self.custom_options.dir {
+            tag.attr("dir", dir.as_str());
         }
 
         if let Some(dirname) = &self.custom_options.dirname {
@@ -408,11 +465,13 @@ pub struct IntegerFieldOptions<T> {
     /// The maximum value of the field. Used to set the `max` attribute in the
     /// HTML input element.
     pub max: Option<T>,
-
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
     pub placeholder: Option<String>,
-
+    /// If `true`, the field is read-only and cannot be modified by the user.
     pub readonly: Option<bool>,
-
+    /// The step size for the field. Used to set the [`Step`] attribute in the
+    /// HTML input element.
     pub step: Option<Step<T>>,
 }
 
@@ -787,11 +846,13 @@ pub struct FloatFieldOptions<T> {
     /// The maximum value of the field. Used to set the `max` attribute in the
     /// HTML input element.
     pub max: Option<T>,
-
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
     pub placeholder: Option<String>,
-
+    /// If `true`, the field is read-only and cannot be modified by the user.
     pub readonly: Option<bool>,
-
+    /// The step size for the field. Used to set the [`Step`] attribute in the
+    /// HTML input element.
     pub step: Option<Step<T>>,
 }
 
@@ -928,13 +989,36 @@ impl_form_field!(UrlField, UrlFieldOptions, "a URL");
 /// Custom options for a [`UrlField`].
 #[derive(Debug, Default, Clone)]
 pub struct UrlFieldOptions {
+    /// The maximum length of the field. Used to set the `maxlength` attribute
+    /// in the HTML input element.
     pub max_length: Option<u32>,
+    /// The minimum length of the field. Used to set the `minlength` attribute
+    /// in the HTML input element.
     pub min_length: Option<u32>,
+    /// The size of the field. Used to set the [`size`]attribute in the HTML
+    /// input element.
+    ///
+    /// [`size`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#size
     pub size: Option<u32>,
+    /// The [`List`] of options for the `datalist` element, which can be used to
+    /// provide predefined options for the input.
     pub list: Option<List>,
+    /// The direction of the text input, which can be set to `ltr`
+    /// (left-to-right) or `rtl` (right-to-left). This corresponds to the
+    /// [`Dir`] attribute in the HTML input element.
+    pub dir: Option<Dir>,
+    /// The [`dirname`] attribute in the HTML input element, which is used to
+    /// specify the direction of the text input.
+    ///
+    /// [`dirname`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#dirname
     pub dirname: Option<String>,
+    /// The [`AutoComplete`] attribute in the HTML input element, which is used
+    /// to specify how the browser should handle autocomplete for the input.
     pub autocomplete: Option<AutoComplete>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
     pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
     pub readonly: Option<bool>,
 }
 
@@ -966,6 +1050,10 @@ impl Display for UrlField {
 
         if let Some(size) = self.custom_options.size {
             tag.attr("size", size.to_string());
+        }
+
+        if let Some(dir) = &self.custom_options.dir {
+            tag.attr("dir", dir.as_str());
         }
 
         if let Some(dirname) = &self.custom_options.dirname {
@@ -1025,6 +1113,7 @@ mod tests {
                 size: Some(15),
                 autocapitalize: Some(AutoCapitalize::Words),
                 autocomplete: Some(AutoComplete::Value("foo bar".to_string())),
+                dir: Some(Dir::Ltr),
                 dirname: Some("dir".to_string()),
                 list: Some(List::new(["bar", "baz"])),
                 placeholder: Some("Enter text".to_string()),
@@ -1040,6 +1129,7 @@ mod tests {
         assert!(html.contains("minlength=\"5\""));
         assert!(html.contains("size=\"15\""));
         assert!(html.contains("autocomplete=\"foo bar\""));
+        assert!(html.contains("dir=\"ltr\""));
         assert!(html.contains("dirname=\"dir\""));
         assert!(html.contains("placeholder=\"Enter text\""));
         assert!(html.contains("readonly"));
@@ -1144,6 +1234,7 @@ mod tests {
                 min_length: Some(5),
                 size: Some(15),
                 autocomplete: Some(AutoComplete::Value("foo bar".to_string())),
+                dir: Some(Dir::Ltr),
                 dirname: Some("dir".to_string()),
                 list: Some(List::new(["foo@example.com", "baz@example.com"])),
                 placeholder: Some("Enter text".to_string()),
@@ -1162,6 +1253,7 @@ mod tests {
         assert!(html.contains("placeholder=\"Enter text\""));
         assert!(html.contains("readonly"));
         assert!(html.contains("autocomplete=\"foo bar\""));
+        assert!(html.contains("dir=\"ltr\""));
         assert!(html.contains("dirname=\"dir\""));
         assert!(html.contains("list=\"__test_id_datalist\""));
         assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com">foo@example.com</option><option value="baz@example.com">baz@example.com</option></datalist>"#));
@@ -1619,6 +1711,7 @@ mod tests {
                 min_length: Some(5),
                 size: Some(30),
                 list: Some(List::new(["https://example.com"])),
+                dir: Some(Dir::Ltr),
                 dirname: Some("dir".to_owned()),
                 autocomplete: Some(AutoComplete::Value("url".to_owned())),
                 placeholder: Some("Enter URL".to_owned()),
@@ -1651,6 +1744,7 @@ mod tests {
                 min_length: Some(10),
                 size: Some(40),
                 list: Some(List::new(["https://one.com", "https://two.com"])),
+                dir: Some(Dir::Ltr),
                 dirname: Some("lang".to_owned()),
                 autocomplete: Some(AutoComplete::Value("url".to_owned())),
                 placeholder: Some("Paste link".to_owned()),
@@ -1675,6 +1769,7 @@ mod tests {
         assert!(html.contains("size=\"40\""));
         assert!(html.contains("placeholder=\"Paste link\""));
         assert!(html.contains("autocomplete=\"url\""));
+        assert!(html.contains("dir=\"ltr\""));
         assert!(html.contains("dirname=\"lang\""));
         assert!(html.contains("readonly"));
         assert!(html.contains("<datalist"));
@@ -1693,6 +1788,7 @@ mod tests {
                 min_length: Some(5),
                 size: Some(20),
                 list: None,
+                dir: Some(Dir::Rtl),
                 dirname: Some("rtl".to_owned()),
                 autocomplete: Some(AutoComplete::Off),
                 placeholder: Some("Enter a link".to_owned()),

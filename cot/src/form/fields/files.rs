@@ -65,7 +65,7 @@ pub struct FileFieldOptions {
     ///
     /// [`accept` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/file#limiting_accepted_file_types
     pub accept: Option<Vec<String>>,
-
+    /// The [`Capture`] attribute specifies the source of the file input.
     pub capture: Option<Capture>,
 }
 
@@ -177,7 +177,7 @@ mod tests {
         assert!(html.contains("type=\"file\""));
         assert!(html.contains("required"));
         assert!(html.contains("accept=\"image/*,.pdf\""));
-        assert!(html.contains("capture=\"environment\""))
+        assert!(html.contains("capture=\"environment\""));
     }
 
     #[test]
@@ -199,7 +199,7 @@ mod tests {
         assert!(html.contains("type=\"file\""));
         assert!(html.contains("required"));
         assert!(!html.contains("accept="));
-        assert!(html.contains("capture=\"user\""))
+        assert!(html.contains("capture=\"user\""));
     }
 
     #[cot::test]

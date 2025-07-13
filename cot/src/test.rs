@@ -24,7 +24,7 @@ use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
 use crate::handler::BoxedHandler;
-use crate::project::{build_request_for_error_handler, prepare_request, run_at_with_shutdown};
+use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
 use crate::request::Request;
 use crate::response::Response;
 use crate::router::Router;
@@ -166,7 +166,7 @@ impl Client {
         match self.handler.call(request).await {
             Ok(result) => Ok(result),
             Err(error) => {
-                let request = build_request_for_error_handler(self.context.clone(), error);
+                let request = prepare_request_for_error_handler(self.context.clone(), error);
 
                 poll_fn(|cx| self.error_handler.poll_ready(cx)).await?;
                 self.error_handler.call(request).await

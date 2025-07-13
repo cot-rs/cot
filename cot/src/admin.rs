@@ -18,7 +18,6 @@ use bytes::Bytes;
 /// `#[derive(Form)]` attributes.
 pub use cot_macros::AdminModel;
 use derive_more::Debug;
-use http::request::Parts;
 use serde::Deserialize;
 
 use crate::auth::Auth;
@@ -28,8 +27,8 @@ use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
 use crate::html::Html;
-use crate::request::extractors::{FromRequestParts, Path, StaticFiles, UrlQuery};
-use crate::request::{Request, RequestExt};
+use crate::request::extractors::{FromRequestHead, Path, StaticFiles, UrlQuery};
+use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
 use crate::static_files::StaticFile;
@@ -46,7 +45,7 @@ impl<T, H: RequestHandler<T> + Send + Sync> AdminAuthenticated<T, H> {
 
 impl<T, H: RequestHandler<T> + Send + Sync> RequestHandler<T> for AdminAuthenticated<T, H> {
     async fn handle(&self, mut request: Request) -> crate::Result<Response> {
-        let auth: Auth = request.extract_parts().await?;
+        let auth: Auth = request.extract_from_head().await?;
         if !auth.user().is_authenticated() {
             return Ok(reverse_redirect!(request, "login")?);
         }
@@ -55,7 +54,7 @@ impl<T, H: RequestHandler<T> + Send + Sync> RequestHandler<T> for AdminAuthentic
     }
 }
 
-#[derive(Debug, FromRequestParts)]
+#[derive(Debug, FromRequestHead)]
 struct BaseContext {
     urls: Urls,
     static_files: StaticFiles,
@@ -384,9 +383,9 @@ fn get_manager(
 #[repr(transparent)]
 struct AdminModelManagers(Vec<Box<dyn AdminModelManager>>);
 
-impl FromRequestParts for AdminModelManagers {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        let managers = parts
+impl FromRequestHead for AdminModelManagers {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        let managers = head
             .context()
             .apps()
             .iter()

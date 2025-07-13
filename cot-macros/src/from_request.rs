@@ -4,19 +4,19 @@ use syn::{Data, Field, Fields};
 
 use crate::cot_ident;
 
-pub(super) fn impl_from_request_parts_for_struct(
+pub(super) fn impl_from_request_head_for_struct(
     ast: &syn::DeriveInput,
 ) -> proc_macro2::TokenStream {
-    generic_from_request_parts_for_struct(ast, ImplTarget::FromRequestParts)
+    generic_from_request_head_for_struct(ast, ImplTarget::FromRequestHead)
 }
 
-pub(super) fn impl_from_error_request_parts_for_struct(
+pub(super) fn impl_from_error_request_head_for_struct(
     ast: &syn::DeriveInput,
 ) -> proc_macro2::TokenStream {
-    generic_from_request_parts_for_struct(ast, ImplTarget::FromErrorRequestParts)
+    generic_from_request_head_for_struct(ast, ImplTarget::FromErrorRequestHead)
 }
 
-fn generic_from_request_parts_for_struct(
+fn generic_from_request_head_for_struct(
     ast: &syn::DeriveInput,
     target: ImplTarget,
 ) -> proc_macro2::TokenStream {
@@ -32,7 +32,7 @@ fn generic_from_request_parts_for_struct(
                     let field_name = &field.ident;
                     let field_type = &field.ty;
                     quote! {
-                        #field_name: <#field_type as #trait_path>::from_request_parts(parts).await?,
+                        #field_name: <#field_type as #trait_path>::from_request_head(head).await?,
                     }
                 });
                 quote! { Self { #(#initializers)* } }
@@ -42,7 +42,7 @@ fn generic_from_request_parts_for_struct(
                 let initializers = fields_unnamed.unnamed.iter().map(|field: &Field| {
                     let field_type = &field.ty;
                     quote! {
-                        <#field_type as #trait_path>::from_request_parts(parts).await?,
+                        <#field_type as #trait_path>::from_request_head(head).await?,
                     }
                 });
                 quote! { Self(#(#initializers)*) }
@@ -58,13 +58,14 @@ fn generic_from_request_parts_for_struct(
             return Error::custom(format!("Only structs can derive `{}`", target.name()))
                 .write_errors();
         }
+        _ => return Error::custom("Only structs can derive `FromRequestHead`").write_errors(),
     };
 
     quote! {
         #[automatically_derived]
-        impl #trait_path for #struct_name {
-            async fn from_request_parts(
-                parts: &mut #cot::http::request::Parts,
+        impl #cot::request::extractors::FromRequestHead for #struct_name {
+            async fn from_request_head(
+                head: &#cot::request::RequestHead,
             ) -> #cot::Result<Self> {
                 Ok(#constructor)
             }
@@ -74,24 +75,24 @@ fn generic_from_request_parts_for_struct(
 
 #[derive(Debug, Copy, Clone)]
 enum ImplTarget {
-    FromRequestParts,
-    FromErrorRequestParts,
+    FromRequestHead,
+    FromErrorRequestHead,
 }
 
 impl ImplTarget {
     fn name(self) -> &'static str {
         match self {
-            ImplTarget::FromRequestParts => "FromRequestParts",
-            ImplTarget::FromErrorRequestParts => "FromErrorRequestParts",
+            ImplTarget::FromRequestHead => "FromRequestHead",
+            ImplTarget::FromErrorRequestHead => "FromErrorRequestHead",
         }
     }
 
     fn trait_path(self) -> proc_macro2::TokenStream {
         let cot = cot_ident();
         match self {
-            ImplTarget::FromRequestParts => quote! { #cot::request::extractors::FromRequestParts },
-            ImplTarget::FromErrorRequestParts => {
-                quote! { #cot::error::handler::FromErrorRequestParts }
+            ImplTarget::FromRequestHead => quote! { #cot::request::extractors::FromRequestHead },
+            ImplTarget::FromErrorRequestHead => {
+                quote! { #cot::error::handler::FromErrorRequestHead }
             }
         }
     }

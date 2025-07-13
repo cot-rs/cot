@@ -15,7 +15,7 @@ use crate::{Error, Result, StatusCode};
 pub(super) struct Diagnostics {
     project_config: ProjectConfig,
     router: Arc<Router>,
-    request_parts: Option<http::request::Parts>,
+    request_head: Option<crate::request::RequestHead>,
 }
 
 impl Diagnostics {
@@ -23,12 +23,12 @@ impl Diagnostics {
     pub(super) fn new(
         project_config: ProjectConfig,
         router: Arc<Router>,
-        request_parts: Option<http::request::Parts>,
+        request_head: Option<crate::request::RequestHead>,
     ) -> Self {
         Self {
             project_config,
             router,
-            request_parts,
+            request_head,
         }
     }
 }
@@ -107,7 +107,7 @@ impl ErrorPageTemplateBuilder {
         self.route_data.clear();
         Self::build_route_data(&mut self.route_data, &diagnostics.router, "", "");
         self.request_data = diagnostics
-            .request_parts
+            .request_head
             .as_ref()
             .map(Self::build_request_data);
         self
@@ -160,12 +160,12 @@ impl ErrorPageTemplateBuilder {
     }
 
     #[must_use]
-    fn build_request_data(parts: &http::request::Parts) -> RequestData {
+    fn build_request_data(head: &crate::request::RequestHead) -> RequestData {
         RequestData {
-            method: parts.method.to_string(),
-            url: parts.uri.to_string(),
-            protocol_version: format!("{:?}", parts.version),
-            headers: parts
+            method: head.method.to_string(),
+            url: head.uri.to_string(),
+            protocol_version: format!("{:?}", head.version),
+            headers: head
                 .headers
                 .iter()
                 .map(|(name, value)| {
@@ -243,7 +243,7 @@ pub(super) fn handle_not_found(
     log_not_found(
         message.as_deref(),
         diagnostics
-            .request_parts
+            .request_head
             .as_ref()
             .map(ErrorPageTemplateBuilder::build_request_data)
             .as_ref(),
@@ -260,7 +260,7 @@ pub(super) fn handle_response_panic(
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     let request_data = diagnostics
-        .request_parts
+        .request_head
         .as_ref()
         .map(ErrorPageTemplateBuilder::build_request_data);
 
@@ -290,7 +290,7 @@ pub(super) fn handle_response_error(
     log_error(
         error,
         diagnostics
-            .request_parts
+            .request_head
             .as_ref()
             .map(ErrorPageTemplateBuilder::build_request_data)
             .as_ref(),
@@ -533,9 +533,9 @@ mod tests {
         let project_config = ProjectConfig::default();
         let router = Arc::new(Router::with_urls(vec![]));
         let request = TestRequestBuilder::get("/").build();
-        let (parts, _body) = request.into_parts();
+        let (head, _body) = request.into_parts();
 
-        Diagnostics::new(project_config, router, Some(parts))
+        Diagnostics::new(project_config, router, Some(head))
     }
 
     #[test]

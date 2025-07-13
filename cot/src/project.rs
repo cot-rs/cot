@@ -55,7 +55,7 @@ use crate::handler::BoxedHandler;
 use crate::headers::HTML_NO_CHARSET_CONTENT_TYPE;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::request::{AppName, Request, RequestExt};
+use crate::request::{AppName, Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;
@@ -792,11 +792,11 @@ impl AppBuilder {
     }
 }
 
-async fn default_server_error_handler(error: Error) -> cot::Result<impl IntoResponse> {
+async fn default_server_error_handler(error: RequestError) -> crate::Result<impl IntoResponse> {
     #[derive(Debug, Template)]
     #[template(path = "default_error.html")]
     struct ErrorTemplate {
-        error: Error,
+        error: RequestError,
     }
 
     let status_code = error.status_code();
@@ -1884,7 +1884,11 @@ pub async fn run_at_with_shutdown(
         // todo root tracing span
         // todo per-router error handlers
         let request = request_axum_to_cot(axum_request, Arc::clone(&context));
-        let (request_parts, request) = request_parts_for_diagnostics(request);
+        let (head, request) = request.into_parts();
+        let head_for_error_handler = head.clone();
+        let request = Request::from_parts(head, request);
+
+        let (request_head, request) = request_parts_for_diagnostics(request);
 
         let catch_unwind_response = AssertUnwindSafe(pass_to_axum(request, &mut handler))
             .catch_unwind()
@@ -1900,11 +1904,11 @@ pub async fn run_at_with_shutdown(
         match response {
             Ok(response) => response,
             Err(error_response) => {
-                if is_debug && accepts_html(&request_parts) {
+                if is_debug && accepts_html(&request_head) {
                     let diagnostics = Diagnostics::new(
                         context.config().clone(),
                         Arc::clone(&context.router),
-                        request_parts,
+                        request_head,
                     );
 
                     build_cot_error_page(error_response, &diagnostics)
@@ -1912,7 +1916,7 @@ pub async fn run_at_with_shutdown(
                     build_custom_error_page(
                         &mut error_handler,
                         error_response,
-                        Arc::clone(&context),
+                        head_for_error_handler,
                     )
                     .await
                 }
@@ -1983,14 +1987,14 @@ fn build_cot_error_page(
 async fn build_custom_error_page(
     server_error_handler: &mut BoxCloneSyncService<Request, Response, Error>,
     error_response: ErrorResponse,
-    context: Arc<ProjectContext>,
+    mut request_head: RequestHead,
 ) -> axum::response::Response {
     let error = match error_response {
         ErrorResponse::ErrorReturned(error) => error,
         ErrorResponse::Panic(payload) => Error::from(UncaughtPanic::new(payload)),
     };
 
-    let request = build_request_for_error_handler(context, error);
+    prepare_request_for_error_handler(&mut request_head, error);
 
     let poll_status = poll_fn(|cx| server_error_handler.poll_ready(cx)).await;
     if let Err(error) = poll_status {
@@ -2003,6 +2007,7 @@ async fn build_custom_error_page(
         return error_page::build_cot_server_error_page();
     }
 
+    let request = Request::from_parts(request_head, Body::empty());
     let response = server_error_handler.call(request).await;
     response.map_or_else(
         |error| {
@@ -2018,15 +2023,8 @@ async fn build_custom_error_page(
     )
 }
 
-#[must_use]
-pub(crate) fn build_request_for_error_handler(
-    context: Arc<ProjectContext>,
-    error: Error,
-) -> Request {
-    let mut request = Request::default();
-    prepare_request(&mut request, context);
-    request.extensions_mut().insert(RequestError::new(error));
-    request
+pub(crate) fn prepare_request_for_error_handler(request_head: &mut RequestHead, error: Error) {
+    request_head.extensions.insert(RequestError::new(error));
 }
 
 /// Runs the CLI for the given project.
@@ -2058,11 +2056,11 @@ pub async fn run_cli(project: impl Project + 'static) -> cot::Result<()> {
     Bootstrapper::new(project).run_cli().await
 }
 
-fn request_parts_for_diagnostics(request: Request) -> (Option<Parts>, Request) {
+fn request_parts_for_diagnostics(request: Request) -> (Option<RequestHead>, Request) {
     if request.project_config().debug {
-        let (parts, body) = request.into_parts();
-        let parts_clone = parts.clone();
-        let request = Request::from_parts(parts, body);
+        let (head, body) = request.into_parts();
+        let parts_clone = head.clone();
+        let request = Request::from_parts(head, body);
         (Some(parts_clone), request)
     } else {
         (None, request)
@@ -2459,7 +2457,7 @@ mod tests {
         let error = Error::internal("Test error");
 
         // Call build_request_for_error_handler
-        let request = build_request_for_error_handler(Arc::new(context), error);
+        let request = prepare_request_for_error_handler(Arc::new(context), error);
 
         // Verify that the request has the project context
         assert!(request.extensions().get::<Arc<ProjectContext>>().is_some());

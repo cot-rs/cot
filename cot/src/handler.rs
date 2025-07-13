@@ -5,7 +5,7 @@ use std::pin::Pin;
 use tower::util::BoxCloneSyncService;
 
 use crate::request::Request;
-use crate::request::extractors::{FromRequest, FromRequestParts};
+use crate::request::extractors::{FromRequest, FromRequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::{Error, Result};
 
@@ -23,7 +23,7 @@ use crate::{Error, Result};
 /// Cot provides an implementation of `RequestHandler` for functions
 /// and closures that:
 /// * are marked `async`
-/// * take at most 10 parameters, all of which implement [`FromRequestParts`],
+/// * take at most 10 parameters, all of which implement [`FromRequestHead`],
 ///   except for at most one that implements [`FromRequest`]
 /// * return a type that implements [`IntoResponse`]
 /// * is `Clone + Send + 'static` (important if it's a closure)
@@ -33,7 +33,7 @@ use crate::{Error, Result};
     message = "`{Self}` is not a valid request handler",
     label = "not a valid request handler",
     note = "make sure the function is marked `async`",
-    note = "make sure all parameters implement `FromRequest` or `FromRequestParts`",
+    note = "make sure all parameters implement `FromRequest` or `FromRequestHead`",
     note = "make sure there is at most one parameter implementing `FromRequest`",
     note = "make sure the function takes no more than 10 parameters",
     note = "make sure the function returns a type that implements `IntoResponse`"
@@ -77,7 +77,7 @@ macro_rules! impl_request_handler {
         impl<Func, $($ty,)* Fut, R> RequestHandler<($($ty,)*)> for Func
         where
             Func: FnOnce($($ty,)*) -> Fut + Clone + Send + Sync + 'static,
-            $($ty: FromRequestParts + Send,)*
+            $($ty: FromRequestHead + Send,)*
             Fut: Future<Output = R> + Send,
             R: IntoResponse,
         {
@@ -93,10 +93,10 @@ macro_rules! impl_request_handler {
                     unused_mut,
                     reason = "for the case where there are no params"
                 )]
-                let (mut parts, _body) = request.into_parts();
+                let (head, _body) = request.into_parts();
 
                 $(
-                    let $ty = $ty::from_request_parts(&mut parts).await?;
+                    let $ty = <$ty as FromRequestHead>::from_request_head(&head).await?;
                 )*
 
                 self.clone()($($ty,)*).await.into_response()
@@ -110,34 +110,33 @@ macro_rules! impl_request_handler_from_request {
         impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for Func
         where
             Func: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> Fut + Clone + Send + Sync + 'static,
-            $($ty_lhs: FromRequestParts + Send,)*
+            $($ty_lhs: FromRequestHead + Send,)*
             $ty_from_request: FromRequest + Send,
-            $($ty_rhs: FromRequestParts + Send,)*
+            $($ty_rhs: FromRequestHead + Send,)*
             Fut: Future<Output = R> + Send,
             R: IntoResponse,
         {
             #[allow(
                 clippy::allow_attributes,
                 non_snake_case,
-                reason = "for the case where there are no FromRequestParts params"
+                reason = "for the case where there are no FromRequestHead params"
             )]
             async fn handle(&self, request: Request) -> Result<Response> {
                 #[allow(
                     clippy::allow_attributes,
                     unused_mut,
-                    reason = "for the case where there are no FromRequestParts params"
+                    reason = "for the case where there are no FromRequestHead params"
                 )]
-                let (mut parts, body) = request.into_parts();
+                let (head, body) = request.into_parts();
 
                 $(
-                    let $ty_lhs = $ty_lhs::from_request_parts(&mut parts).await?;
+                    let $ty_lhs = $ty_lhs::from_request_head(&head).await?;
                 )*
                 $(
-                    let $ty_rhs = $ty_rhs::from_request_parts(&mut parts).await?;
+                    let $ty_rhs = $ty_rhs::from_request_head(&head).await?;
                 )*
 
-                let request = Request::from_parts(parts, body);
-                let $ty_from_request = $ty_from_request::from_request(request).await?;
+                let $ty_from_request = $ty_from_request::from_request(&head, body).await?;
 
                 self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await.into_response()
             }

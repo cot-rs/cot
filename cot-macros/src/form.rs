@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
+use darling::util::PreservedStrExpr;
 use darling::{FromDeriveInput, FromField};
 use heck::ToTitleCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
 
 use crate::cot_ident;
-use crate::utils::PreservedStrExpr;
 
 pub(super) fn impl_form_for_struct(ast: &syn::DeriveInput) -> TokenStream {
     let opts = match FormOpts::from_derive_input(ast) {

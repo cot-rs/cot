@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 
 use thiserror::Error;
 
+use crate::error::error_impl::impl_into_cot_error;
+
 /// An error that represents an uncaught panic that occurred during request
 /// processing.
 ///
@@ -25,10 +27,11 @@ use thiserror::Error;
 /// let panic = UncaughtPanic::new(Box::new("Something went wrong"));
 /// ```
 #[derive(Debug, Clone, Error)]
-#[error("Uncaught panic occurred")]
+#[error("an unexpected error occurred")]
 pub struct UncaughtPanic {
     payload: Arc<Mutex<Box<dyn Any + Send + 'static>>>,
 }
+impl_into_cot_error!(UncaughtPanic, INTERNAL_SERVER_ERROR);
 
 impl UncaughtPanic {
     /// Creates a new `UncaughtPanic` with the given panic payload.

@@ -61,17 +61,18 @@ pub use field_value::{FormFieldValue, FormFieldValueError};
 use http_body_util::BodyExt;
 use thiserror::Error;
 
-use crate::error::error_impl::ErrorKind;
+use crate::error::error_impl::impl_into_cot_error;
 use crate::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
 use crate::request::{Request, RequestExt};
 
+const ERROR_PREFIX: &str = "failed to process a form: ";
 /// Error occurred while processing a form.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum FormError {
     /// An error occurred while processing the request, before validating the
     /// form data.
-    #[error("Request error: {error}")]
+    #[error("{ERROR_PREFIX}request error: {error}")]
     #[non_exhaustive]
     RequestError {
         /// The error that occurred while processing the request.
@@ -79,7 +80,7 @@ pub enum FormError {
         error: Box<crate::Error>,
     },
     /// An error occurred while processing a multipart form.
-    #[error("Multipart error: {error}")]
+    #[error("{ERROR_PREFIX}multipart error: {error}")]
     #[non_exhaustive]
     MultipartError {
         /// The error that occurred while processing the multipart form.
@@ -87,6 +88,7 @@ pub enum FormError {
         error: FormFieldValueError,
     },
 }
+impl_into_cot_error!(FormError, BAD_REQUEST);
 
 /// The result of validating a form.
 ///
@@ -370,12 +372,20 @@ async fn urlencoded_form_data(request: &mut Request) -> Result<Bytes, FormError>
             .map_err(|e| FormError::RequestError { error: Box::new(e) })?
     } else {
         return Err(FormError::RequestError {
-            error: Box::new(crate::Error::from_kind(ErrorKind::ExpectedForm)),
+            error: Box::new(crate::Error::from(ExpectedForm)),
         });
     };
 
     Ok(result)
 }
+
+#[derive(Debug, Error)]
+#[error(
+    "request does not contain a form (expected `application/x-www-form-urlencoded` or \
+        `multipart/form-data` content type, or a GET or HEAD request)"
+)]
+struct ExpectedForm;
+impl_into_cot_error!(ExpectedForm, BAD_REQUEST);
 
 fn content_type_str(request: &mut Request) -> String {
     request

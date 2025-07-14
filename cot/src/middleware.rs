@@ -21,7 +21,6 @@ use tower_sessions::{SessionManagerLayer, SessionStore};
 #[cfg(feature = "cache")]
 use crate::config::CacheType;
 use crate::config::{Expiry, SameSite, SessionStoreTypeConfig};
-use crate::error::error_impl::ErrorKind;
 use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
@@ -265,7 +264,7 @@ where
     boxed
         .downcast::<Error>()
         .map(|e| *e)
-        .unwrap_or_else(|boxed| Error::from_kind(ErrorKind::MiddlewareWrapped { source: boxed }))
+        .unwrap_or_else(Error::new)
 }
 
 type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;

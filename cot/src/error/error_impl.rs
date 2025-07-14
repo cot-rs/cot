@@ -1,5 +1,6 @@
 use std::error::Error as StdError;
 use std::fmt::Display;
+use std::ops::Deref;
 
 use derive_more::with_trait::Debug;
 use thiserror::Error;
@@ -19,14 +20,11 @@ pub struct Error {
 
 impl Error {
     #[must_use]
-    pub(crate) fn from_kind(inner: ErrorKind) -> Self {
-        let inner = ErrorImpl {
-            kind: inner,
-            backtrace: __cot_create_backtrace(),
-        };
-        Self {
-            inner: Box::new(inner),
-        }
+    pub fn new<E>(error: E) -> Self
+    where
+        E: Into<Box<dyn StdError + Send + Sync + 'static>>,
+    {
+        Self::with_status(error, StatusCode::INTERNAL_SERVER_ERROR)
     }
 
     /// Create a new error with a custom error message or error type.
@@ -77,10 +75,13 @@ impl Error {
     where
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
-        Self::from_kind(ErrorKind::Custom {
-            inner: error.into(),
-            status_code,
-        })
+        Self {
+            inner: Box::new(ErrorImpl {
+                inner: error.into(),
+                status_code: Some(status_code),
+                backtrace: __cot_create_backtrace(),
+            }),
+        }
     }
 
     /// Create a new admin panel error with a custom error message or error
@@ -97,11 +98,15 @@ impl Error {
     ///     "An error occurred",
     /// ));
     /// ```
+    #[deprecated(
+        note = "Use `cot::Error::new` or `cot::Error::with_status` directly instead",
+        since = "0.4.0"
+    )]
     pub fn admin<E>(error: E) -> Self
     where
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
-        Self::from_kind(ErrorKind::AdminError(error.into()))
+        Self::new(error)
     }
 
     /// Create a new "404 Not Found" error without a message.
@@ -162,12 +167,10 @@ impl Error {
     /// ```
     #[must_use]
     pub fn status_code(&self) -> StatusCode {
-        self.inner.kind.status_code()
-    }
-
-    #[must_use]
-    pub(crate) fn kind(&self) -> &ErrorKind {
-        &self.inner.kind
+        self.inner()
+            .inner
+            .status_code
+            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
     }
 
     #[must_use]
@@ -179,20 +182,22 @@ impl Error {
     /// `cot::Error`, if any (recursively). If the error is not a custom
     /// error, returns a reference to itself.
     #[must_use]
-    pub fn inner(&self) -> Option<&Self> {
-        match &self.kind() {
-            ErrorKind::Custom { .. } | ErrorKind::MiddlewareWrapped { .. } => {
-                let mut error = self as &(dyn StdError + 'static);
-                while let Some(inner) = error.source() {
-                    if let Some(error) = inner.downcast_ref::<Self>() {
-                        return Some(error);
-                    }
-                    error = inner;
+    pub fn inner(&self) -> &Self {
+        let mut error = self as &(dyn StdError + 'static);
+        while let Some(inner) = error.source() {
+            if let Some(error) = inner.downcast_ref::<Self>() {
+                if !error.is_wrapper() {
+                    return error;
                 }
-                None
             }
-            _ => Some(self),
+            error = inner;
         }
+        self
+    }
+
+    #[must_use]
+    pub fn is_wrapper(&self) -> bool {
+        self.inner.status_code.is_none()
     }
 }
 
@@ -204,37 +209,30 @@ impl Debug for Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(self.kind(), f)
+        Display::fmt(&self.inner.inner, f)
     }
 }
 
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.kind().source()
+        self.inner.inner.source()
     }
 }
 
-impl From<ErrorKind> for Error {
-    fn from(value: ErrorKind) -> Self {
-        Self::from_kind(value)
+impl Deref for Error {
+    type Target = dyn StdError + Send + Sync;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.inner.inner
     }
 }
 
 #[derive(Debug)]
 struct ErrorImpl {
-    pub(crate) kind: ErrorKind,
+    inner: Box<dyn StdError + Send + Sync>,
+    status_code: Option<StatusCode>,
     #[debug(skip)]
     backtrace: CotBacktrace,
-}
-
-macro_rules! impl_error_from_repr {
-    ($ty:ty) => {
-        impl From<$ty> for Error {
-            fn from(value: $ty) -> Self {
-                Error::from(ErrorKind::from(value))
-            }
-        }
-    };
 }
 
 impl From<Error> for askama::Error {
@@ -243,166 +241,41 @@ impl From<Error> for askama::Error {
     }
 }
 
-impl_error_from_repr!(toml::de::Error);
-impl_error_from_repr!(askama::Error);
-impl_error_from_repr!(NotFound);
-impl_error_from_repr!(UncaughtPanic);
-impl_error_from_repr!(MethodNotAllowed);
-impl_error_from_repr!(crate::router::path::ReverseError);
-#[cfg(feature = "db")]
-impl_error_from_repr!(crate::db::DatabaseError);
-impl_error_from_repr!(tower_sessions::session::Error);
-impl_error_from_repr!(crate::form::FormError);
-impl_error_from_repr!(crate::form::FormFieldValueError);
-impl_error_from_repr!(crate::auth::AuthError);
-impl_error_from_repr!(crate::request::PathParamsDeserializerError);
-impl_error_from_repr!(crate::request::extractors::StaticFilesGetError);
+macro_rules! impl_into_cot_error {
+    ($error_ty:ty) => {
+        impl From<$error_ty> for $crate::Error {
+            fn from(err: $error_ty) -> Self {
+                $crate::Error::internal(err)
+            }
+        }
+    };
+    ($error_ty:ty, $status_code:ident) => {
+        impl From<$error_ty> for $crate::Error {
+            fn from(err: $error_ty) -> Self {
+                $crate::Error::with_status(err, $crate::StatusCode::$status_code)
+            }
+        }
+    };
+}
+pub(crate) use impl_into_cot_error;
 
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub(crate) enum ErrorKind {
-    /// A custom user error occurred.
-    #[error("{inner}")]
-    Custom {
-        #[source]
-        inner: Box<dyn StdError + Send + Sync>,
-        status_code: StatusCode,
-    },
-    /// An error occurred while trying to load the config.
-    #[error("Could not read the config file at `{config}` or `config/{config}.toml`")]
-    LoadConfig {
-        config: String,
-        source: std::io::Error,
-    },
-    /// An error occurred while trying to parse the config.
-    #[error("Could not parse the config: {source}")]
-    ParseConfig {
-        #[from]
-        source: toml::de::Error,
-    },
-    /// An error occurred while trying to start the server.
-    #[error("Could not start server: {source}")]
-    StartServer { source: std::io::Error },
-    /// An error occurred while trying to collect static files into a directory.
-    #[error("Could not collect static files: {source}")]
-    CollectStatic { source: std::io::Error },
-    /// An error occurred while trying to read the request body.
-    #[error("Could not retrieve request body: {source}")]
-    ReadRequestBody {
-        #[source]
-        source: Box<dyn StdError + Send + Sync>,
-    },
-    /// The request body had an invalid `Content-Type` header.
-    #[error("Invalid content type; expected `{expected}`, found `{actual}`")]
-    InvalidContentType {
-        expected: &'static str,
-        actual: String,
-    },
-    /// The request does not contain a form.
-    #[error(
-        "Request does not contain a form (expected `application/x-www-form-urlencoded` or \
-        `multipart/form-data` content type, or a GET or HEAD request)"
-    )]
-    ExpectedForm,
-    /// Could not find a route for the request.
-    #[error("{0}")]
-    NotFound(#[from] NotFound),
-    #[error("An unexpected error occurred")]
-    UncaughtPanic(#[from] UncaughtPanic),
-    #[error("{0}")]
-    MethodNotAllowed(#[from] MethodNotAllowed),
-    /// Could not create a response object.
-    #[error("Could not create a response object: {0}")]
-    ResponseBuilder(#[from] http::Error),
-    /// `reverse` was called on a route that does not exist.
-    #[error("Failed to reverse route `{view_name}` due to view not existing")]
-    NoViewToReverse {
-        app_name: Option<String>,
-        view_name: String,
-    },
-    /// An error occurred while trying to reverse a route (e.g. due to missing
-    /// parameters).
-    #[error("Failed to reverse route: {0}")]
-    ReverseRoute(#[from] crate::router::path::ReverseError),
-    /// An error occurred while trying to render a template.
-    #[error("Failed to render template: {0}")]
-    TemplateRender(#[from] askama::Error),
-    /// An error occurred while communicating with the database.
-    #[error("Database error: {0}")]
-    #[cfg(feature = "db")]
-    Database(#[from] crate::db::DatabaseError),
-    /// An error occurred while accessing the session object.
-    #[error("Error while accessing the session object")]
-    SessionAccess(#[from] tower_sessions::session::Error),
-    /// An error occurred while parsing a form.
-    #[error("Failed to process a form: {0}")]
-    Form(#[from] crate::form::FormError),
-    /// An error occurred while trying to retrieve the value of a form field.
-    #[error("Failed to retrieve the value of a form field: {0}")]
-    FormFieldValueError(#[from] crate::form::FormFieldValueError),
-    /// An error occurred while trying to authenticate a user.
-    #[error("Failed to authenticate user: {0}")]
-    Authentication(#[from] crate::auth::AuthError),
-    /// An error occurred while trying to serialize or deserialize JSON.
-    #[error("JSON error: {0}")]
-    #[cfg(feature = "json")]
-    Json(serde_path_to_error::Error<serde_json::Error>),
-    /// An error occurred inside a middleware-wrapped view.
-    #[error(transparent)]
-    MiddlewareWrapped {
-        source: Box<dyn StdError + Send + Sync>,
-    },
-    /// An error occurred while trying to parse path parameters.
-    #[error("Could not parse path parameters: {0}")]
-    PathParametersParse(#[from] crate::request::PathParamsDeserializerError),
-    /// An error occurred while trying to parse query parameters.
-    #[error("Could not parse query parameters: {0}")]
-    QueryParametersParse(serde_path_to_error::Error<serde::de::value::Error>),
-    /// An error occurred in an [`AdminModel`](crate::admin::AdminModel).
-    #[error("Admin error: {0}")]
-    AdminError(#[source] Box<dyn StdError + Send + Sync>),
-    /// An error occurred while getting a URL for a static files.
-    #[error("Could not get URL for a static file: {0}")]
-    StaticFilesGetError(#[from] crate::request::extractors::StaticFilesGetError),
+#[derive(Debug, thiserror::Error)]
+#[error("Failed to render template: {0}")]
+struct TemplateRender(#[from] askama::Error);
+impl_into_cot_error!(TemplateRender);
+impl From<askama::Error> for Error {
+    fn from(err: askama::Error) -> Self {
+        Error::from(TemplateRender(err))
+    }
 }
 
-impl ErrorKind {
-    fn status_code(&self) -> StatusCode {
-        // TODO check if works with middleware
-        match self {
-            // 500 Internal Server Error
-            ErrorKind::AdminError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Authentication(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::CollectStatic { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            #[cfg(feature = "db")]
-            ErrorKind::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Form(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::FormFieldValueError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            #[cfg(feature = "json")]
-            ErrorKind::Json(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::LoadConfig { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::MiddlewareWrapped { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::NoViewToReverse { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::ParseConfig { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::ResponseBuilder(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::ReverseRoute(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::SessionAccess(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::StartServer { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::StaticFilesGetError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::TemplateRender(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::UncaughtPanic { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            // 400 Bad Request
-            ErrorKind::ExpectedForm => StatusCode::BAD_REQUEST,
-            ErrorKind::InvalidContentType { .. } => StatusCode::BAD_REQUEST,
-            ErrorKind::PathParametersParse(_) => StatusCode::BAD_REQUEST,
-            ErrorKind::QueryParametersParse(_) => StatusCode::BAD_REQUEST,
-            ErrorKind::ReadRequestBody { .. } => StatusCode::BAD_REQUEST,
-            // Other
-            ErrorKind::MethodNotAllowed(_) => StatusCode::METHOD_NOT_ALLOWED,
-            ErrorKind::NotFound { .. } => StatusCode::NOT_FOUND,
-            // Custom
-            ErrorKind::Custom { status_code, .. } => *status_code,
-        }
+#[derive(Debug, thiserror::Error)]
+#[error("Error while accessing the session object")]
+struct SessionAccess(#[from] tower_sessions::session::Error);
+impl_into_cot_error!(SessionAccess);
+impl From<tower_sessions::session::Error> for Error {
+    fn from(err: tower_sessions::session::Error) -> Self {
+        Error::from(SessionAccess(err))
     }
 }
 

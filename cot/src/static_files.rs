@@ -16,10 +16,12 @@ use digest::Digest;
 use futures_core::ready;
 use http::{Request, header};
 use pin_project_lite::pin_project;
+use thiserror::Error;
 use tower::Service;
 
 use crate::Body;
 use crate::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
+use crate::error::error_impl::impl_into_cot_error;
 use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
 
@@ -143,7 +145,7 @@ impl StaticFiles {
             .map(|file_with_meta| file_with_meta.url.as_str())
     }
 
-    pub(crate) fn collect_into(&self, path: &Path) -> Result<(), std::io::Error> {
+    pub(crate) fn collect_into(&self, path: &Path) -> Result<(), CollectStaticError> {
         for (file_path, file_with_meta) in &self.files {
             let file_path = path.join(file_path);
             std::fs::create_dir_all(
@@ -156,6 +158,11 @@ impl StaticFiles {
         Ok(())
     }
 }
+
+#[derive(Debug, Error)]
+#[error("could not collect static files: {0}")]
+pub(crate) struct CollectStaticError(#[from] std::io::Error);
+impl_into_cot_error!(CollectStaticError);
 
 impl From<&MiddlewareContext> for StaticFiles {
     fn from(context: &MiddlewareContext) -> Self {

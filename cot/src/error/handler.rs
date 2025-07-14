@@ -185,7 +185,6 @@ handle_all_parameters!(impl_request_handler);
 ///
 /// It is a separate, private type to make sure the user cannot accidentally
 /// interact with it by using request extensions directly.
-#[repr(transparent)]
 #[derive(Debug, Clone)]
 pub struct RequestError(Arc<Error>);
 
@@ -212,5 +211,29 @@ impl FromRequestHead for RequestError {
                 Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")
             })
             .map(|request_error| request_error.clone())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RequestInnerError(Arc<Error>);
+
+impl Deref for RequestInnerError {
+    type Target = Error;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0.inner()
+    }
+}
+
+impl FromRequestHead for RequestInnerError {
+    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+        let error = head.extensions.get::<RequestError>();
+        error
+            .ok_or_else(|| {
+                Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")
+            })
+            .map(|request_error| {
+                Self(request_error.0.clone())
+            })
     }
 }

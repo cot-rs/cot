@@ -2,6 +2,8 @@
 
 use thiserror::Error;
 
+use crate::error::error_impl::impl_into_cot_error;
+
 /// A 404 Not Found error that can be returned by Cot applications.
 ///
 /// This struct represents a "404 Not Found" error and can be used to indicate
@@ -26,6 +28,7 @@ pub struct NotFound {
     /// The specific type of not-found error that occurred.
     pub kind: Kind,
 }
+impl_into_cot_error!(NotFound, NOT_FOUND);
 
 impl NotFound {
     /// Creates a new `NotFound` error with a generic "Not Found" message.

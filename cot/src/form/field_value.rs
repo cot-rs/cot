@@ -1,5 +1,10 @@
+use std::error::Error as StdError;
+use std::fmt::Display;
+
 use bytes::Bytes;
 use thiserror::Error;
+
+use crate::error::error_impl::impl_into_cot_error;
 
 /// A value from a form field.
 ///
@@ -169,10 +174,26 @@ struct MultipartField<'a> {
 ///
 /// This type represents errors that can occur when processing form field
 /// values, such as errors from the multipart parser or validation errors.
-#[derive(Debug, PartialEq, Eq, Error)]
-#[error(transparent)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct FormFieldValueError {
     inner: FormFieldValueErrorImpl,
+}
+impl_into_cot_error!(FormFieldValueError, BAD_REQUEST);
+
+impl Display for FormFieldValueError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "failed to retrieve the value of a form field: {}",
+            self.inner
+        )
+    }
+}
+
+impl StdError for FormFieldValueError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.inner.source()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Error)]

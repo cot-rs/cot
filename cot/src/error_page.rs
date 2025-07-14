@@ -7,7 +7,6 @@ use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace};
-use crate::error::error_impl::ErrorKind;
 use crate::router::Router;
 use crate::{Error, Result, StatusCode};
 
@@ -199,8 +198,7 @@ impl ErrorPageTemplateBuilder {
             request_data: self.request_data.clone(),
             project_config: self.project_config.clone(),
         }
-        .render()
-        .map_err(ErrorKind::from)?)
+        .render()?)
     }
 }
 
@@ -388,7 +386,6 @@ pub(super) fn error_page_panic_hook(info: &PanicHookInfo<'_>) {
 fn log_error(error: &Error, request_data: Option<&RequestData>) {
     let span = tracing::span!(Level::ERROR,
         "request_error",
-        error_type = %error.kind(),
         error_message = %error
     );
     let _enter = span.enter();

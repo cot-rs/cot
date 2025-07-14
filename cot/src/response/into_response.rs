@@ -1,10 +1,10 @@
 use bytes::{Bytes, BytesMut};
+use cot::error::error_impl::impl_into_cot_error;
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use cot::response::Response;
 use cot::{Body, Error, StatusCode};
 use http;
 
-use crate::error::error_impl::ErrorKind;
 #[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
@@ -363,13 +363,18 @@ impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {
 
         let mut buf = Vec::with_capacity(DEFAULT_JSON_SIZE);
         let mut serializer = serde_json::Serializer::new(&mut buf);
-        serde_path_to_error::serialize(&self.0, &mut serializer)
-            .map_err(|error| Error::from_kind(ErrorKind::Json(error)))?;
+        serde_path_to_error::serialize(&self.0, &mut serializer).map_err(JsonSerializeError)?;
         let data = String::from_utf8(buf).expect("JSON serialization always returns valid UTF-8");
 
         data.with_content_type(JSON_CONTENT_TYPE).into_response()
     }
 }
+
+#[cfg(feature = "json")]
+#[derive(Debug, thiserror::Error)]
+#[error("JSON serialization error: {0}")]
+struct JsonSerializeError(serde_path_to_error::Error<serde_json::Error>);
+impl_into_cot_error!(JsonSerializeError, INTERNAL_SERVER_ERROR);
 
 // Shortcuts for common uses
 

@@ -52,7 +52,6 @@ use std::future::Future;
 use std::sync::Arc;
 
 use cot::Error;
-use cot::error::error_impl::ErrorKind;
 use cot::request::{PathParams, Request};
 use serde::de::DeserializeOwned;
 
@@ -60,7 +59,7 @@ use crate::auth::Auth;
 use crate::form::{Form, FormResult};
 #[cfg(feature = "json")]
 use crate::json::Json;
-use crate::request::{RequestExt, RequestHead};
+use crate::request::{InvalidContentType, RequestExt, RequestHead};
 use crate::router::Urls;
 use crate::session::Session;
 use crate::{Body, Method};
@@ -166,8 +165,7 @@ impl<D: DeserializeOwned> FromRequestHead for Path<D> {
             .extensions
             .get::<PathParams>()
             .expect("PathParams extension missing")
-            .parse()
-            .map_err(|error| Error::from_kind(ErrorKind::PathParametersParse(error)))?;
+            .parse()?;
         Ok(Self(params))
     }
 }
@@ -225,12 +223,16 @@ where
         let deserializer =
             serde_html_form::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
 
-        let value = serde_path_to_error::deserialize(deserializer)
-            .map_err(|error| Error::from_kind(ErrorKind::QueryParametersParse(error)))?;
+        let value = serde_path_to_error::deserialize(deserializer).map_err(QueryParametersParse)?;
 
         Ok(UrlQuery(value))
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("could not parse query parameters: {0}")]
+struct QueryParametersParse(serde_path_to_error::Error<serde::de::value::Error>);
+impl_into_cot_error!(QueryParametersParse, BAD_REQUEST);
 
 /// Extractor that gets the request body as JSON and deserializes it into a type
 /// `T` implementing `serde::de::DeserializeOwned`.
@@ -290,7 +292,7 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
             .get(http::header::CONTENT_TYPE)
             .map_or("".into(), |value| String::from_utf8_lossy(value.as_bytes()));
         if content_type != cot::headers::JSON_CONTENT_TYPE {
-            return Err(ErrorKind::InvalidContentType {
+            return Err(InvalidContentType {
                 expected: cot::headers::JSON_CONTENT_TYPE,
                 actual: content_type.into_owned(),
             }
@@ -300,12 +302,18 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
         let bytes = body.into_bytes().await?;
 
         let deserializer = &mut serde_json::Deserializer::from_slice(&bytes);
-        let result = serde_path_to_error::deserialize(deserializer)
-            .map_err(|error| Error::from_kind(ErrorKind::Json(error)))?;
+        let result =
+            serde_path_to_error::deserialize(deserializer).map_err(JsonDeserializeError)?;
 
         Ok(Self(result))
     }
 }
+
+#[cfg(feature = "json")]
+#[derive(Debug, thiserror::Error)]
+#[error("JSON deserialization error: {0}")]
+struct JsonDeserializeError(serde_path_to_error::Error<serde_json::Error>);
+impl_into_cot_error!(JsonDeserializeError, BAD_REQUEST);
 
 /// An extractor that gets the request body as form data and deserializes it
 /// into a type `F` implementing `cot::form::Form`.
@@ -477,6 +485,7 @@ impl StaticFiles {
     }
 }
 
+const ERROR_PREFIX: &str = "could not get URL for a static file: ";
 /// Errors that can occur when trying to get a static file.
 ///
 /// This enum represents errors that can occur when attempting to
@@ -485,13 +494,14 @@ impl StaticFiles {
 #[non_exhaustive]
 pub enum StaticFilesGetError {
     /// The requested static file was not found.
-    #[error("static file `{path}` not found")]
+    #[error("{ERROR_PREFIX}static file `{path}` not found")]
     #[non_exhaustive]
     NotFound {
         /// The path of the static file that was not found.
         path: String,
     },
 }
+impl_into_cot_error!(StaticFilesGetError);
 
 impl FromRequestHead for StaticFiles {
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
@@ -570,6 +580,8 @@ impl FromRequestHead for Auth {
 /// }
 /// ```
 pub use cot_macros::FromRequestHead;
+
+use crate::error::error_impl::impl_into_cot_error;
 
 #[cfg(test)]
 mod tests {

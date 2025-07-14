@@ -31,6 +31,7 @@ use axum::handler::HandlerWithoutStateExt;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use http::request::Parts;
+use thiserror::Error;
 use tower::util::BoxCloneSyncService;
 use tower::{Layer, Service};
 use tracing::{error, info, trace};
@@ -47,7 +48,7 @@ use crate::config::{AuthBackendConfig, ProjectConfig};
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
-use crate::error::error_impl::ErrorKind;
+use crate::error::error_impl::impl_into_cot_error;
 use crate::error::handler::{DynErrorPageHandler, RequestError};
 use crate::error::uncaught_panic::UncaughtPanic;
 use crate::error_page::Diagnostics;
@@ -1026,15 +1027,21 @@ fn read_config(config: &str) -> cot::Result<ProjectConfig> {
         }
     };
 
-    let config_content = result.map_err(|err| {
-        Error::from_kind(ErrorKind::LoadConfig {
-            config: config.to_owned(),
-            source: err,
-        })
+    let config_content = result.map_err(|err| LoadConfig {
+        config: config.to_owned(),
+        source: err,
     })?;
 
     ProjectConfig::from_toml(&config_content)
 }
+
+#[derive(Debug, Error)]
+#[error("could not read the config file at `{config}` or `config/{config}.toml`")]
+struct LoadConfig {
+    config: String,
+    source: std::io::Error,
+}
+impl_into_cot_error!(LoadConfig);
 
 impl Bootstrapper<WithConfig> {
     /// Builds the Cot project instance.
@@ -1799,7 +1806,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
 pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> cot::Result<()> {
     let listener = tokio::net::TcpListener::bind(address_str)
         .await
-        .map_err(|e| ErrorKind::StartServer { source: e })?;
+        .map_err(StartServerError)?;
 
     run_at(bootstrapper, listener).await
 }
@@ -1926,9 +1933,7 @@ pub async fn run_at_with_shutdown(
 
     eprintln!(
         "Starting the server at http://{}",
-        listener
-            .local_addr()
-            .map_err(|e| ErrorKind::StartServer { source: e })?
+        listener.local_addr().map_err(StartServerError)?
     );
 
     if register_panic_hook {
@@ -1942,7 +1947,7 @@ pub async fn run_at_with_shutdown(
     axum::serve(listener, handler.into_make_service())
         .with_graceful_shutdown(shutdown_signal)
         .await
-        .map_err(|e| ErrorKind::StartServer { source: e })?;
+        .map_err(StartServerError)?;
     if register_panic_hook {
         let _ = std::panic::take_hook();
     }
@@ -1952,6 +1957,16 @@ pub async fn run_at_with_shutdown(
     }
 
     Ok(())
+}
+
+#[derive(Debug, Error)]
+#[error("failed to start the server: {0}")]
+pub(crate) struct StartServerError(#[from] pub(crate) std::io::Error);
+
+impl From<StartServerError> for crate::Error {
+    fn from(error: StartServerError) -> Self {
+        crate::Error::new(error)
+    }
 }
 
 fn accepts_html(parts: &Option<Parts>) -> bool {

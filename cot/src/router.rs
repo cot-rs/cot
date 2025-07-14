@@ -31,7 +31,7 @@ use cot::error::not_found::NotFound;
 use derive_more::with_trait::Debug;
 use tracing::debug;
 
-use crate::error::error_impl::ErrorKind;
+use crate::error::error_impl::impl_into_cot_error;
 use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
 use crate::request::{AppName, PathParams, Request, RequestExt, RequestHead, RouteName};
 use crate::response::Response;
@@ -237,7 +237,7 @@ impl Router {
     ) -> Result<String> {
         Ok(self
             .reverse_option(app_name, name, params)?
-            .ok_or_else(|| ErrorKind::NoViewToReverse {
+            .ok_or_else(|| NoViewToReverse {
                 app_name: app_name.map(ToOwned::to_owned),
                 view_name: name.to_owned(),
             })?)
@@ -281,15 +281,13 @@ impl Router {
             .get(&RouteName(String::from(name)))
             .map(|matcher| matcher.reverse(params));
         if let Some(url) = url {
-            return Ok(Some(url.map_err(ErrorKind::from)?));
+            return Ok(Some(url?));
         }
 
         for route in &self.urls {
             if let RouteInner::Router(router) = &route.view {
                 if let Some(url) = router.reverse_option(app_name, name, params)? {
-                    return Ok(Some(
-                        route.url.reverse(params).map_err(ErrorKind::from)? + &url,
-                    ));
+                    return Ok(Some(route.url.reverse(params)? + &url));
                 }
             }
         }
@@ -443,6 +441,14 @@ impl Default for Router {
         Self::empty()
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("failed to reverse route `{view_name}` due to view not existing")]
+struct NoViewToReverse {
+    app_name: Option<String>,
+    view_name: String,
+}
+impl_into_cot_error!(NoViewToReverse);
 
 #[derive(Debug)]
 struct HandlerFound<'a> {

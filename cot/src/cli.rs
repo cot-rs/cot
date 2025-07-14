@@ -1,6 +1,7 @@
 //! A command line interface for Cot-based applications.
 
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -9,7 +10,6 @@ pub use clap;
 use clap::{Arg, ArgMatches, Command, value_parser};
 use derive_more::Debug;
 
-use crate::error::error_impl::ErrorKind;
 use crate::{Bootstrapper, Error, Result};
 
 const CONFIG_PARAM: &str = "config";
@@ -306,8 +306,15 @@ impl CliTask for RunServer {
 
 impl RunServer {
     fn get_user_friendly_error(error: &Error, addr_port: &str) -> Option<String> {
-        match error.kind() {
-            ErrorKind::StartServer { source } => match source.kind() {
+        let source = error.source();
+        let source = if let Some(source) = source {
+            source
+        } else {
+            return None;
+        };
+
+        if let Some(start_server_error) = source.downcast_ref::<StartServerError>() {
+            match start_server_error.0.kind() {
                 std::io::ErrorKind::AddrInUse => {
                     let exec = std::env::args()
                         .next()
@@ -325,8 +332,9 @@ impl RunServer {
                     ))
                 }
                 _ => None,
-            },
-            _ => None,
+            }
+        } else {
+            None
         }
     }
 }
@@ -358,9 +366,7 @@ impl CliTask for CollectStatic {
         println!("Collecting static files into {:?}", dir);
 
         let bootstrapper = bootstrapper.with_apps().with_database().await?;
-        StaticFiles::from(bootstrapper.context())
-            .collect_into(dir)
-            .map_err(|e| Error::from_kind(ErrorKind::CollectStatic { source: e }))?;
+        StaticFiles::from(bootstrapper.context()).collect_into(dir)?;
 
         Ok(())
     }
@@ -401,7 +407,7 @@ macro_rules! metadata {
 
 pub use metadata;
 
-use crate::project::WithConfig;
+use crate::project::{StartServerError, WithConfig};
 use crate::static_files::StaticFiles;
 
 #[cfg(test)]

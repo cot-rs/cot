@@ -17,9 +17,7 @@ use syn::{ItemFn, parse_macro_input};
 use crate::admin::impl_admin_model_for_struct;
 use crate::dbtest::fn_to_dbtest;
 use crate::form::impl_form_for_struct;
-use crate::from_request::{
-    impl_from_error_request_head_for_struct, impl_from_request_head_for_struct,
-};
+use crate::from_request::impl_from_request_head_for_struct;
 use crate::main_fn::{fn_to_cot_e2e_test, fn_to_cot_main, fn_to_cot_test};
 use crate::model::impl_model_for_struct;
 use crate::query::{Query, query_to_tokens};
@@ -203,13 +201,6 @@ pub(crate) fn cot_ident() -> proc_macro2::TokenStream {
 pub fn derive_from_request_head(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     let token_stream = impl_from_request_head_for_struct(&ast);
-    token_stream.into()
-}
-
-#[proc_macro_derive(FromErrorRequestHead)]
-pub fn derive_from_error_request_head(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as syn::DeriveInput);
-    let token_stream = impl_from_error_request_head_for_struct(&ast);
     token_stream.into()
 }
 

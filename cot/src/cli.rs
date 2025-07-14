@@ -576,7 +576,7 @@ mod tests {
     #[test]
     fn get_user_friendly_error_addr_in_use() {
         let source = std::io::Error::new(std::io::ErrorKind::AddrInUse, "error");
-        let error = Error::from_kind(ErrorKind::StartServer { source });
+        let error = Error::from(StartServerError(source));
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
 
@@ -589,7 +589,7 @@ mod tests {
     #[test]
     fn get_user_friendly_error_io_error_other() {
         let source = std::io::Error::other("error");
-        let error = Error::from_kind(ErrorKind::StartServer { source });
+        let error = Error::from(StartServerError(source));
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
 
@@ -598,10 +598,7 @@ mod tests {
 
     #[test]
     fn get_user_friendly_error_unsupported_error() {
-        let error = Error::from_kind(ErrorKind::NoViewToReverse {
-            app_name: None,
-            view_name: "test".to_string(),
-        });
+        let error = Error::internal("test");
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
 

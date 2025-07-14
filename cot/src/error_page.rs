@@ -557,10 +557,7 @@ mod tests {
     #[test]
     fn test_handle_response_error() {
         let diagnostics = create_diagnostics();
-        let error = Error::from_kind(ErrorKind::NoViewToReverse {
-            app_name: None,
-            view_name: "error occurred".to_string(),
-        });
+        let error = Error::internal("error occurred");
 
         let response = handle_response_error(&error, &diagnostics);
 

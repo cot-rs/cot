@@ -161,12 +161,16 @@ impl Client {
     /// ```
     pub async fn request(&mut self, mut request: Request) -> Result<Response> {
         prepare_request(&mut request, self.context.clone());
+        let (head, body) = request.into_parts();
+        let mut error_head = head.clone();
+        let request = Request::from_parts(head, body);
 
         poll_fn(|cx| self.handler.poll_ready(cx)).await?;
         match self.handler.call(request).await {
             Ok(result) => Ok(result),
             Err(error) => {
-                let request = prepare_request_for_error_handler(self.context.clone(), error);
+                prepare_request_for_error_handler(&mut error_head, error);
+                let request = Request::from_parts(error_head, Body::empty());
 
                 poll_fn(|cx| self.error_handler.poll_ready(cx)).await?;
                 self.error_handler.call(request).await

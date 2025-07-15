@@ -64,8 +64,8 @@ impl NotFound {
     /// let error = NotFound::with_message(format!("Page '{}' not found", page_name));
     /// ```
     #[must_use]
-    pub fn with_message<T: ToString>(message: T) -> Self {
-        Self::with_kind(Kind::WithMessage(message.to_string()))
+    pub fn with_message<T: Into<String>>(message: T) -> Self {
+        Self::with_kind(Kind::WithMessage(message.into()))
     }
 
     #[must_use]

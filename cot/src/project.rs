@@ -2366,7 +2366,7 @@ mod tests {
     #[cot::test]
     async fn build_custom_error_page_panic_conversion() {
         let mock_handler = service_fn(|request: Request| async {
-            let (mut parts, _body) = request.into_parts();
+            let (parts, _body) = request.into_parts();
             let error = RequestError::from_request_head(&parts).await.unwrap();
             assert!(error.is::<UncaughtPanic>());
 

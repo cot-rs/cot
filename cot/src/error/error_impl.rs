@@ -180,7 +180,7 @@ impl Error {
     /// error, returns a reference to itself.
     #[must_use]
     pub fn inner(&self) -> &Self {
-        let mut error = self as &(dyn StdError + 'static);
+        let mut error: &dyn StdError = self;
         while let Some(inner) = error.source() {
             if let Some(error) = inner.downcast_ref::<Self>() {
                 if !error.is_wrapper() {

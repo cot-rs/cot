@@ -312,6 +312,7 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 #[derive(Debug, thiserror::Error)]
 #[error("JSON deserialization error: {0}")]
 struct JsonDeserializeError(serde_path_to_error::Error<serde_json::Error>);
+#[cfg(feature = "json")]
 impl_into_cot_error!(JsonDeserializeError, BAD_REQUEST);
 
 /// An extractor that gets the request body as form data and deserializes it

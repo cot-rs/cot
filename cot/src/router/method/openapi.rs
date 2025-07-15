@@ -517,8 +517,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use cot::error::method_not_allowed::MethodNotAllowed;
 
     use super::*;

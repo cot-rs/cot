@@ -419,8 +419,6 @@ async fn default_fallback(method: Method) -> crate::Error {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use super::*;
     use crate::StatusCode;
     use crate::html::Html;

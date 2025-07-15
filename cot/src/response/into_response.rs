@@ -374,6 +374,7 @@ impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {
 #[derive(Debug, thiserror::Error)]
 #[error("JSON serialization error: {0}")]
 struct JsonSerializeError(serde_path_to_error::Error<serde_json::Error>);
+#[cfg(feature = "json")]
 impl_into_cot_error!(JsonSerializeError, INTERNAL_SERVER_ERROR);
 
 // Shortcuts for common uses

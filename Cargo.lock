@@ -653,6 +653,7 @@ dependencies = [
  "http-body-util",
  "humantime",
  "indexmap",
+ "mime",
  "mime_guess",
  "mockall",
  "multer",

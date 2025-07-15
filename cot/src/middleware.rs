@@ -261,7 +261,7 @@ where
 {
     #[expect(trivial_casts)]
     let boxed = Box::new(error) as Box<dyn std::error::Error + Send + Sync>;
-    boxed.downcast::<Error>().map_or_else(Error::new, |e| *e)
+    boxed.downcast::<Error>().map_or_else(Error::wrap, |e| *e)
 }
 
 type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;

@@ -200,9 +200,9 @@ impl StdError for FormFieldValueError {
 enum FormFieldValueErrorImpl {
     #[error(transparent)]
     Multer(multer::Error),
-    #[error("Multipart field does not have a name")]
+    #[error("multipart field does not have a name")]
     NoName,
-    #[error("File field requires the form to be sent as multipart/form-data")]
+    #[error("file field requires the form to be sent as `multipart/form-data`")]
     MultipartRequired,
 }
 

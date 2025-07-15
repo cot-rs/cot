@@ -30,7 +30,6 @@ use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
-use http::request::Parts;
 use thiserror::Error;
 use tower::util::BoxCloneSyncService;
 use tower::{Layer, Service};
@@ -53,13 +52,13 @@ use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
 use crate::error::uncaught_panic::UncaughtPanic;
 use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
-use crate::headers::HTML_NO_CHARSET_CONTENT_TYPE;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{AppName, Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;
+use crate::utils::accept_header_parser::AcceptHeaderParser;
 use crate::{Body, Error, cli, error_page};
 
 /// A building block for a Cot project.
@@ -507,8 +506,8 @@ where
         self,
         middleware: M,
     ) -> RootHandlerBuilder<
-        IntoCotError<IntoCotResponse<<M as Layer<RootService>>::Service>>,
-        IntoCotError<IntoCotResponse<<M as Layer<ErrorHandlerService>>::Service>>,
+        WrappedMiddleware<M, RootService>,
+        WrappedMiddleware<M, ErrorHandlerService>,
     >
     where
         M: Layer<RootService> + Layer<ErrorHandlerService>,
@@ -556,10 +555,7 @@ where
     pub fn main_handler_middleware<M>(
         self,
         middleware: M,
-    ) -> RootHandlerBuilder<
-        IntoCotError<IntoCotResponse<<M as Layer<RootService>>::Service>>,
-        ErrorHandlerService,
-    >
+    ) -> RootHandlerBuilder<WrappedMiddleware<M, RootService>, ErrorHandlerService>
     where
         M: Layer<RootService>,
     {
@@ -606,10 +602,7 @@ where
     pub fn error_handler_middleware<M>(
         self,
         middleware: M,
-    ) -> RootHandlerBuilder<
-        RootService,
-        IntoCotError<IntoCotResponse<<M as Layer<ErrorHandlerService>>::Service>>,
-    >
+    ) -> RootHandlerBuilder<RootService, WrappedMiddleware<M, ErrorHandlerService>>
     where
         M: Layer<ErrorHandlerService>,
     {
@@ -654,6 +647,10 @@ where
         }
     }
 }
+
+/// A type alias for the service type returned by the
+/// [`RootHandlerBuilder::middleware`] and similar methods.
+pub type WrappedMiddleware<M, S> = IntoCotError<IntoCotResponse<<M as Layer<S>>::Service>>;
 
 /// A built root handler that contains both the main request handler and error
 /// handler.
@@ -1913,7 +1910,7 @@ pub async fn run_at_with_shutdown(
         match response {
             Ok(response) => response,
             Err(error_response) => {
-                if is_debug && accepts_html(&request_head) {
+                if is_debug && accepts_html(request_head.as_ref()) {
                     let diagnostics = Diagnostics::new(
                         context.config().clone(),
                         Arc::clone(&context.router),
@@ -1967,20 +1964,16 @@ pub(crate) struct StartServerError(#[from] pub(crate) std::io::Error);
 
 impl From<StartServerError> for Error {
     fn from(error: StartServerError) -> Self {
-        Error::new(error)
+        Error::wrap(error)
     }
 }
 
-fn accepts_html(parts: &Option<Parts>) -> bool {
-    // todo parse the mime types???
-    parts
-        .as_ref()
-        .and_then(|p| p.headers.get(http::header::ACCEPT))
-        .is_some_and(|allow| {
-            allow
-                .to_str()
-                .unwrap_or_default()
-                .contains(HTML_NO_CHARSET_CONTENT_TYPE)
+fn accepts_html(head: Option<&RequestHead>) -> bool {
+    head.and_then(|p| p.headers.get(http::header::ACCEPT))
+        .is_some_and(|accept| {
+            let value = accept.to_str().unwrap_or_default();
+            let accept = AcceptHeaderParser::parse(value);
+            accept.contains_explicit(&mime::TEXT_HTML)
         })
 }
 

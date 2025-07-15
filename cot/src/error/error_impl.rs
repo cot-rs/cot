@@ -16,18 +16,47 @@ pub struct Error {
 }
 
 impl Error {
+    /// Create a new error with a custom error message or error type.
+    ///
+    /// This method is used to create a new error that does not have a specific
+    /// HTTP status code associated with it. If in the chain of `Error` sources
+    /// there is an error with a status code, it will be used instead. If not,
+    /// the default status code of 500 Internal Server Error will be used.
+    ///
+    /// To get the first instance of `Error` in the chain that has a
+    /// status code, use the [`Error::inner`] method.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::{Error, StatusCode};
+    ///
+    /// let error = Error::with_status("An error occurred", StatusCode::BAD_REQUEST);
+    /// let error = std::io::Error::other(error);
+    /// let error = Error::wrap(error);
+    /// assert_eq!(error.status_code(), StatusCode::BAD_REQUEST);
+    /// ```
     #[must_use]
-    pub fn new<E>(error: E) -> Self
+    pub fn wrap<E>(error: E) -> Self
     where
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
-        Self::with_status(error, StatusCode::INTERNAL_SERVER_ERROR)
+        Self {
+            inner: Box::new(ErrorImpl {
+                inner: error.into(),
+                status_code: None,
+                backtrace: __cot_create_backtrace(),
+            }),
+        }
     }
 
     /// Create a new error with a custom error message or error type.
     ///
     /// The error will be associated with a 500 Internal Server Error
     /// status code, which is the default for unexpected errors.
+    ///
+    /// If you want to create an error with a different status code,
+    /// use [`Error::with_status`].
     ///
     /// # Examples
     ///
@@ -96,14 +125,15 @@ impl Error {
     /// ));
     /// ```
     #[deprecated(
-        note = "Use `cot::Error::new` or `cot::Error::with_status` directly instead",
+        note = "Use `cot::Error::wrap`, `cot::Error::internal`, or \
+        `cot::Error::with_status` directly instead",
         since = "0.4.0"
     )]
     pub fn admin<E>(error: E) -> Self
     where
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
-        Self::new(error)
+        Self::internal(error)
     }
 
     /// Create a new "404 Not Found" error without a message.
@@ -175,9 +205,19 @@ impl Error {
         &self.inner.backtrace
     }
 
-    /// If the error is a custom error, returns a reference to the inner
-    /// `cot::Error`, if any (recursively). If the error is not a custom
-    /// error, returns a reference to itself.
+    /// Returns a reference to inner `Error`, if `self` is wrapping a wrapper.
+    ///
+    /// If this error is a wrapper around another `Error`, this method will
+    /// return the inner `Error` that has a specific status code.
+    ///
+    /// This is useful for extracting the original error that caused the
+    /// error, especially when dealing with errors that may have been
+    /// wrapped multiple times in the error chain (e.g. by middleware or
+    /// other error handling logic).
+    ///
+    /// # See also
+    ///
+    /// - [`Error::wrap`]
     #[must_use]
     pub fn inner(&self) -> &Self {
         let mut error: &dyn StdError = self;
@@ -192,6 +232,11 @@ impl Error {
         self
     }
 
+    /// Returns `true` if this error is a wrapper around another error.
+    ///
+    /// In other words, this returns `true` if the error has been created
+    /// with [`Error::wrap`], which means it does not have a specific
+    /// HTTP status code associated with it. Otherwise, it returns `false`.
     #[must_use]
     pub fn is_wrapper(&self) -> bool {
         self.inner.status_code.is_none()
@@ -257,7 +302,7 @@ macro_rules! impl_into_cot_error {
 pub(crate) use impl_into_cot_error;
 
 #[derive(Debug, thiserror::Error)]
-#[error("Failed to render template: {0}")]
+#[error("failed to render template: {0}")]
 struct TemplateRender(#[from] askama::Error);
 impl_into_cot_error!(TemplateRender);
 impl From<askama::Error> for Error {
@@ -267,7 +312,7 @@ impl From<askama::Error> for Error {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Error while accessing the session object")]
+#[error("error while accessing the session object")]
 struct SessionAccess(#[from] tower_sessions::session::Error);
 impl_into_cot_error!(SessionAccess);
 impl From<tower_sessions::session::Error> for Error {
@@ -278,46 +323,24 @@ impl From<tower_sessions::session::Error> for Error {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
-    // #[test]
-    // fn test_error_new() {
-    //     let inner = ErrorKind::StartServer {
-    //         source: io::Error::other("server error"),
-    //     };
-    //
-    //     let error = Error::from_kind(inner);
-    //
-    //     assert!(StdError::source(&error).is_some());
-    // }
-    //
-    // #[test]
-    // fn test_error_display() {
-    //     let inner = ErrorKind::InvalidContentType {
-    //         expected: "application/json",
-    //         actual: "text/html".to_string(),
-    //     };
-    //     let error = Error::from_kind(inner);
-    //
-    //     let display = format!("{error}");
-    //
-    //     assert_eq!(
-    //         display,
-    //         "Invalid content type; expected `application/json`, found
-    // `text/html`"     );
-    // }
-    //
-    // #[test]
-    // fn test_error_from_repr() {
-    //     let inner = ErrorKind::NoViewToReverse {
-    //         app_name: None,
-    //         view_name: "home".to_string(),
-    //     };
-    //
-    //     let error: Error = inner.into();
-    //
-    //     assert_eq!(
-    //         format!("{error}"),
-    //         "Failed to reverse route `home` due to view not existing"
-    //     );
-    // }
+    #[test]
+    fn error_new() {
+        let inner = std::io::Error::other("server error");
+        let error = Error::wrap(inner);
+
+        assert!(StdError::source(&error).is_none());
+        assert_eq!(error.status_code(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn error_display() {
+        let inner = std::io::Error::other("server error");
+        let error = Error::internal(inner);
+
+        let display = format!("{error}");
+
+        assert_eq!(display, "server error");
+    }
 }

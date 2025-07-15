@@ -46,7 +46,7 @@ use crate::response::Response;
     message = "`{Self}` is not a valid error page handler",
     label = "not a valid error page handler",
     note = "make sure the function is marked `async`",
-    note = "make sure all parameters implement `FromErrorRequestParts`",
+    note = "make sure all parameters implement `FromRequestHead`",
     note = "make sure the function takes no more than 10 parameters",
     note = "make sure the function returns a type that implements `IntoResponse`"
 )]
@@ -181,11 +181,12 @@ macro_rules! impl_request_handler {
 
 handle_all_parameters!(impl_request_handler);
 
-/// A simple wrapper around `crate::Error` that indicates that it is an error
+/// A wrapper around `crate::Error` that indicates that it is an error
 /// returned by the request handler.
 ///
-/// It is a separate, private type to make sure the user cannot accidentally
-/// interact with it by using request extensions directly.
+/// In most cases, you should use [`RequestError`] instead, which derefs to the
+/// inner `Error` and allows you to check for specific error types even when
+/// middleware might have wrapped the error.
 #[derive(Debug, Clone)]
 pub struct RequestOuterError(Arc<Error>);
 
@@ -220,6 +221,14 @@ impl FromRequestHead for RequestOuterError {
     }
 }
 
+/// A wrapper around `crate::Error` that indicates that it is an error
+/// returned by the request handler.
+///
+/// Note that the [`Deref`] implementation returns the inner `Error` (see
+/// [`Error::inner`]). This is usually what you want since it allows you to
+/// check for specific error types even when middleware might have wrapped the
+/// error, but if you need to access the outermost error instead, you should use
+/// [`RequestOuterError`] instead.
 #[derive(Debug, Clone)]
 pub struct RequestError(Arc<Error>);
 
@@ -242,10 +251,11 @@ impl FromRequestHead for RequestError {
         let error = head.extensions.get::<RequestOuterError>();
         error
             .ok_or_else(|| {
-                Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")
+                Error::internal(
+                    "No error found in request head. \
+                Make sure you use this extractor in an error handler.",
+                )
             })
-            .map(|request_error| {
-                Self(request_error.0.clone())
-            })
+            .map(|request_error| Self(request_error.0.clone()))
     }
 }

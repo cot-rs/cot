@@ -1,10 +1,11 @@
-//! Error types and utilities for handling 404 Not Found errors.
+//! Error types and utilities for handling "404 Not Found" errors.
 
 use thiserror::Error;
 
 use crate::error::error_impl::impl_into_cot_error;
 
-/// A 404 Not Found error that can be returned by Cot applications.
+#[expect(clippy::doc_link_with_quotes, reason = "404 Not Found link")]
+/// A ["404 Not Found"] error that can be returned by Cot applications.
 ///
 /// This struct represents a "404 Not Found" error and can be used to indicate
 /// that a requested resource was not found. It contains information about the
@@ -21,7 +22,8 @@ use crate::error::error_impl::impl_into_cot_error;
 /// // Create a 404 error with a custom message
 /// let error = NotFound::with_message("User not found");
 /// ```
-#[non_exhaustive]
+///
+/// ["404 Not Found"]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/404
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct NotFound {

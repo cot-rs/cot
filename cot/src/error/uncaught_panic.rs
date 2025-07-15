@@ -1,7 +1,8 @@
 //! Error types and utilities for handling uncaught panics.
 
 use std::any::Any;
-use std::sync::{Arc, Mutex};
+use std::ops::Deref;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use thiserror::Error;
 
@@ -39,11 +40,6 @@ impl UncaughtPanic {
     /// This method is typically used internally by Cot when catching panics
     /// that occur during request processing.
     ///
-    /// # Arguments
-    ///
-    /// * `payload` - The panic payload, which can be any type that implements
-    ///   `Any + Send + 'static`
-    ///
     /// # Examples
     ///
     /// ```
@@ -58,11 +54,14 @@ impl UncaughtPanic {
         }
     }
 
-    /// Returns a reference to the panic payload.
+    /// Returns a wrapper over the panic payload.
     ///
     /// This method provides access to the original panic payload, which can be
-    /// useful for debugging purposes. The payload is returned as a thread-safe
-    /// reference that can be cloned and shared.
+    /// useful for debugging purposes.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if the internal mutex cannot be locked.
     ///
     /// # Examples
     ///
@@ -73,7 +72,23 @@ impl UncaughtPanic {
     /// let payload = panic.payload();
     /// ```
     #[must_use]
-    pub fn payload(&self) -> Arc<Mutex<Box<dyn Any + Send + 'static>>> {
-        Arc::clone(&self.payload)
+    pub fn payload(&self) -> UncaughtPanicPayload<'_> {
+        let mutex_guard = self.payload.lock().expect("Failed to lock panic payload");
+        UncaughtPanicPayload { mutex_guard }
+    }
+}
+
+/// A wrapper around the panic payload that provides access to the original
+/// panic data.
+#[derive(Debug)]
+pub struct UncaughtPanicPayload<'a> {
+    mutex_guard: MutexGuard<'a, Box<dyn Any + Send + 'static>>,
+}
+
+impl Deref for UncaughtPanicPayload<'_> {
+    type Target = Box<dyn Any + Send + 'static>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.mutex_guard
     }
 }

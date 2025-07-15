@@ -427,7 +427,7 @@ mod tests {
         let file = StaticFile {
             path: "test.txt".to_owned(),
             content: Bytes::from("This is a test file"),
-            mime_type: mime_guess::mime::TEXT_PLAIN,
+            mime_type: mime::TEXT_PLAIN,
         };
 
         let response = file.as_response();
@@ -576,7 +576,7 @@ mod tests {
         let static_files = middleware.static_files;
 
         let file = static_files.get_file("test/test.txt").unwrap();
-        assert_eq!(file.mime_type, mime_guess::mime::TEXT_PLAIN);
+        assert_eq!(file.mime_type, mime::TEXT_PLAIN);
         assert_eq!(
             file.content,
             Bytes::from_static(include_bytes!("../static/test/test.txt"))
@@ -649,16 +649,16 @@ mod tests {
     #[test]
     fn static_file_mime_type_detection() {
         let file = StaticFile::new("style.css", "body { color: red; }");
-        assert_eq!(file.mime_type, mime_guess::mime::TEXT_CSS);
+        assert_eq!(file.mime_type, mime::TEXT_CSS);
 
         let file = StaticFile::new("script.js", "console.log('test');");
-        assert_eq!(file.mime_type, mime_guess::mime::TEXT_JAVASCRIPT);
+        assert_eq!(file.mime_type, mime::TEXT_JAVASCRIPT);
 
         let file = StaticFile::new("image.png", "fake image data");
-        assert_eq!(file.mime_type, mime_guess::mime::IMAGE_PNG);
+        assert_eq!(file.mime_type, mime::IMAGE_PNG);
 
         let file = StaticFile::new("unknown", "some content");
-        assert_eq!(file.mime_type, mime_guess::mime::APPLICATION_OCTET_STREAM);
+        assert_eq!(file.mime_type, mime::APPLICATION_OCTET_STREAM);
     }
 
     #[test]

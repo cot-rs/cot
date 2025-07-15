@@ -10,7 +10,7 @@ use crate::request::PathParams;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
 pub(super) enum PathParamsDeserializerError {
     /// Invalid number of path parameters
-    #[error("Invalid number of path parameters: expected {expected}, got {actual}")]
+    #[error("invalid number of path parameters: expected {expected}, got {actual}")]
     InvalidParamNumber {
         /// The expected number of path parameters.
         expected: usize,
@@ -18,7 +18,7 @@ pub(super) enum PathParamsDeserializerError {
         actual: usize,
     },
     /// A value cannot be parsed into given type.
-    #[error("Failed to parse value `{value}` as `{expected_type}`")]
+    #[error("failed to parse value `{value}` as `{expected_type}`")]
     ParseError {
         /// The value that was provided.
         value: String,
@@ -26,7 +26,7 @@ pub(super) enum PathParamsDeserializerError {
         expected_type: &'static str,
     },
     /// Deserialization into given type is not supported.
-    #[error("Deserializing `{type_name}` is not supported")]
+    #[error("deserializing `{type_name}` is not supported")]
     UnsupportedType {
         /// The type name that was provided.
         type_name: &'static str,

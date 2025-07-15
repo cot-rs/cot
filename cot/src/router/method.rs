@@ -447,7 +447,7 @@ mod tests {
         let response = router.handle(request).await.unwrap_err();
 
         assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
-        assert!(response.source().unwrap().is::<MethodNotAllowed>());
+        assert!(response.is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -458,7 +458,7 @@ mod tests {
         let response = router.handle(request).await.unwrap_err();
 
         assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
-        assert!(response.source().unwrap().is::<MethodNotAllowed>());
+        assert!(response.is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -496,7 +496,7 @@ mod tests {
             let response = router.handle(request).await.unwrap_err();
 
             assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
-            assert!(response.source().unwrap().is::<MethodNotAllowed>());
+            assert!(response.is::<MethodNotAllowed>());
         }
     }
 
@@ -532,7 +532,7 @@ mod tests {
         let response = router.handle(request).await.unwrap_err();
 
         assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
-        assert!(response.source().unwrap().is::<MethodNotAllowed>());
+        assert!(response.is::<MethodNotAllowed>());
 
         // check that if GET handler is defined, HEAD is routed to it
         let router = get(test_handler);

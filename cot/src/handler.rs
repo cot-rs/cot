@@ -90,7 +90,6 @@ macro_rules! impl_request_handler {
                 #[allow(
                     clippy::allow_attributes,
                     unused_variables,
-                    unused_mut,
                     reason = "for the case where there are no params"
                 )]
                 let (head, _body) = request.into_parts();
@@ -124,7 +123,6 @@ macro_rules! impl_request_handler_from_request {
             async fn handle(&self, request: Request) -> Result<Response> {
                 #[allow(
                     clippy::allow_attributes,
-                    unused_mut,
                     reason = "for the case where there are no FromRequestHead params"
                 )]
                 let (head, body) = request.into_parts();

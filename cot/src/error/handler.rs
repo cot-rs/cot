@@ -165,10 +165,10 @@ macro_rules! impl_request_handler {
             #[allow(
                 clippy::allow_attributes,
                 non_snake_case,
+                unused_variables,
                 reason = "for the case where there are no params"
             )]
             async fn handle(&self, head: &RequestHead) -> crate::Result<Response> {
-                #[allow(unused_variables, unused_mut)] // for the case where there are no params
                 $(
                     let $ty = <$ty as FromRequestHead>::from_request_head(&head).await?;
                 )*

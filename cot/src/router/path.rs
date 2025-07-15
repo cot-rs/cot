@@ -501,7 +501,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
-            "Missing parameter for reverse: `post_id`"
+            "failed to reverse route: missing parameter for reverse: `post_id`"
         );
     }
 

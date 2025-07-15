@@ -1,7 +1,7 @@
 use askama::Template;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
-use cot::error::handler::{DynErrorPageHandler, RequestError, RequestOuterError};
+use cot::error::handler::{DynErrorPageHandler, RequestError};
 use cot::html::Html;
 use cot::project::RegisterAppsContext;
 use cot::response::{IntoResponse, Response};

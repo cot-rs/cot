@@ -810,7 +810,7 @@ mod tests {
             assert!(
                 error
                     .to_string()
-                    .contains("Request does not contain a form"),
+                    .contains("request does not contain a form"),
                 "{}",
                 error
             );

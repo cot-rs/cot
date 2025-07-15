@@ -216,8 +216,7 @@ impl FromRequestHead for RequestOuterError {
         error
             .ok_or_else(|| {
                 Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")
-            })
-            .map(|request_error| request_error.clone())
+            }).cloned()
     }
 }
 
@@ -228,7 +227,7 @@ impl Deref for RequestError {
     type Target = Error;
 
     fn deref(&self) -> &Self::Target {
-        &self.0.inner()
+        self.0.inner()
     }
 }
 

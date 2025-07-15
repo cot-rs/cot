@@ -51,7 +51,6 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use cot::Error;
 use cot::request::{PathParams, Request};
 use serde::de::DeserializeOwned;
 

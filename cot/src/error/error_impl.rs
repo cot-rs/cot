@@ -3,15 +3,12 @@ use std::fmt::Display;
 use std::ops::Deref;
 
 use derive_more::with_trait::Debug;
-use thiserror::Error;
 
 use crate::StatusCode;
 // Need to rename Backtrace to CotBacktrace, because otherwise it triggers special behavior
 // in the thiserror library
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace as CotBacktrace};
-use crate::error::method_not_allowed::MethodNotAllowed;
 use crate::error::not_found::NotFound;
-use crate::error::uncaught_panic::UncaughtPanic;
 
 /// An error that can occur while using Cot.
 pub struct Error {
@@ -281,9 +278,6 @@ impl From<tower_sessions::session::Error> for Error {
 
 #[cfg(test)]
 mod tests {
-    use std::io;
-
-    use super::*;
 
     // #[test]
     // fn test_error_new() {

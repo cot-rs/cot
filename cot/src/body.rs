@@ -162,7 +162,7 @@ impl Body {
             .collect()
             .await
             .map(http_body_util::Collected::to_bytes)
-            .map_err(|source| ReadRequestBody(source))?)
+            .map_err(ReadRequestBody)?)
     }
 
     #[must_use]

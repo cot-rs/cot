@@ -1965,9 +1965,9 @@ pub async fn run_at_with_shutdown(
 #[error("failed to start the server: {0}")]
 pub(crate) struct StartServerError(#[from] pub(crate) std::io::Error);
 
-impl From<StartServerError> for crate::Error {
+impl From<StartServerError> for Error {
     fn from(error: StartServerError) -> Self {
-        crate::Error::new(error)
+        Error::new(error)
     }
 }
 
@@ -1976,7 +1976,7 @@ fn accepts_html(parts: &Option<Parts>) -> bool {
     parts
         .as_ref()
         .and_then(|p| p.headers.get(http::header::ACCEPT))
-        .map_or(false, |allow| {
+        .is_some_and(|allow| {
             allow
                 .to_str()
                 .unwrap_or_default()
@@ -2139,7 +2139,7 @@ async fn shutdown_signal() {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
+
     use std::task::{Context, Poll};
 
     use tower::service_fn;
@@ -2299,7 +2299,7 @@ mod tests {
         struct TestService;
         impl Service<Request> for TestService {
             type Response = Response;
-            type Error = crate::Error;
+            type Error = Error;
             type Future = std::future::Ready<crate::Result<Response>>;
 
             fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

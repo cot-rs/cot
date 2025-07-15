@@ -306,14 +306,7 @@ impl CliTask for RunServer {
 
 impl RunServer {
     fn get_user_friendly_error(error: &Error, addr_port: &str) -> Option<String> {
-        let source = error.source();
-        let source = if let Some(source) = source {
-            source
-        } else {
-            return None;
-        };
-
-        if let Some(start_server_error) = source.downcast_ref::<StartServerError>() {
+        if let Some(start_server_error) = error.downcast_ref::<StartServerError>() {
             match start_server_error.0.kind() {
                 std::io::ErrorKind::AddrInUse => {
                     let exec = std::env::args()

@@ -405,10 +405,10 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
-    /// use cot::error::handler::{DynErrorPageHandler, ErrorPageHandler};
+    /// use cot::Project;
+    /// use cot::error::handler::{DynErrorPageHandler, RequestInnerError};
     /// use cot::html::Html;
-    /// use cot::response::{IntoResponse, Response};
-    /// use cot::{Error, Project, Result, StatusCode};
+    /// use cot::response::IntoResponse;
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -417,7 +417,7 @@ pub trait Project {
     ///     }
     /// }
     ///
-    /// async fn error_handler(error: Error) -> impl IntoResponse {
+    /// async fn error_handler(error: RequestInnerError) -> impl IntoResponse {
     ///     Html::new(format!("An error occurred: {error}")).with_status(error.status_code())
     /// }
     /// ```

@@ -1,5 +1,6 @@
 //! Error handling functionality for custom error pages and handlers.
 
+use std::fmt::Display;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::pin::Pin;
@@ -24,10 +25,10 @@ use crate::response::Response;
 /// # Examples
 ///
 /// ```
-/// use cot::error::handler::{DynErrorPageHandler, ErrorPageHandler};
+/// use cot::Project;
+/// use cot::error::handler::{DynErrorPageHandler, RequestInnerError};
 /// use cot::html::Html;
-/// use cot::response::{IntoResponse, Response};
-/// use cot::{Error, Project, Result, StatusCode};
+/// use cot::response::IntoResponse;
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -37,7 +38,7 @@ use crate::response::Response;
 /// }
 ///
 /// // This function automatically implements ErrorPageHandler
-/// async fn error_handler(error: Error) -> impl IntoResponse {
+/// async fn error_handler(error: RequestInnerError) -> impl IntoResponse {
 ///     Html::new(format!("An error occurred: {error}")).with_status(error.status_code())
 /// }
 /// ```
@@ -97,10 +98,10 @@ impl DynErrorPageHandler {
     /// # Examples
     ///
     /// ```
-    /// use cot::error::handler::{DynErrorPageHandler, ErrorPageHandler};
+    /// use cot::Project;
+    /// use cot::error::handler::{DynErrorPageHandler, RequestInnerError};
     /// use cot::html::Html;
-    /// use cot::response::{IntoResponse, Response};
-    /// use cot::{Error, Project, Result, StatusCode};
+    /// use cot::response::IntoResponse;
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -110,7 +111,7 @@ impl DynErrorPageHandler {
     /// }
     ///
     /// // This function automatically implements ErrorPageHandler
-    /// async fn error_handler(error: Error) -> impl IntoResponse {
+    /// async fn error_handler(error: RequestInnerError) -> impl IntoResponse {
     ///     Html::new(format!("An error occurred: {error}")).with_status(error.status_code())
     /// }
     /// ```
@@ -203,6 +204,12 @@ impl Deref for RequestError {
     }
 }
 
+impl Display for RequestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0.inner(), f)
+    }
+}
+
 impl FromRequestHead for RequestError {
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         let error = head.extensions.get::<RequestError>();
@@ -222,6 +229,12 @@ impl Deref for RequestInnerError {
 
     fn deref(&self) -> &Self::Target {
         &self.0.inner()
+    }
+}
+
+impl Display for RequestInnerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0.inner(), f)
     }
 }
 

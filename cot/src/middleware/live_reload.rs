@@ -39,8 +39,8 @@ type LiveReloadLayerType = tower::util::Either<
 ///
 /// ```
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+/// use cot::{Project, ProjectContext};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -48,7 +48,7 @@ type LiveReloadLayerType = tower::util::Either<
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler
 ///             .middleware(LiveReloadMiddleware::from_context(context))
 ///             .build()
@@ -68,8 +68,8 @@ impl LiveReloadMiddleware {
     ///
     /// ```
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+    /// use cot::{Project, ProjectContext};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -77,7 +77,7 @@ impl LiveReloadMiddleware {
     ///         &self,
     ///         handler: RootHandlerBuilder,
     ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
+    ///     ) -> RootHandler {
     ///         // only enable live reloading when compiled in debug mode
     ///         #[cfg(debug_assertions)]
     ///         let handler = handler.middleware(cot::middleware::LiveReloadMiddleware::new());
@@ -97,8 +97,8 @@ impl LiveReloadMiddleware {
     ///
     /// ```
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+    /// use cot::{Project, ProjectContext};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -106,7 +106,7 @@ impl LiveReloadMiddleware {
     ///         &self,
     ///         handler: RootHandlerBuilder,
     ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
+    ///     ) -> RootHandler {
     ///         handler
     ///             .middleware(LiveReloadMiddleware::from_context(context))
     ///             .build()

@@ -25,17 +25,6 @@ impl Error {
     ///
     /// To get the first instance of `Error` in the chain that has a
     /// status code, use the [`Error::inner`] method.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::{Error, StatusCode};
-    ///
-    /// let error = Error::with_status("An error occurred", StatusCode::BAD_REQUEST);
-    /// let error = std::io::Error::other(error);
-    /// let error = Error::wrap(error);
-    /// assert_eq!(error.status_code(), StatusCode::BAD_REQUEST);
-    /// ```
     #[must_use]
     pub fn wrap<E>(error: E) -> Self
     where

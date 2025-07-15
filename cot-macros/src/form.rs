@@ -288,7 +288,7 @@ impl FormDeriveBuilder {
                 fn fields(
                     &self,
                 ) -> ::std::boxed::Box<dyn ::core::iter::DoubleEndedIterator<
-                    Item = &dyn ::cot::form::DynFormField,
+                    Item = &dyn #crate_ident::form::DynFormField,
                 > + '_> {
                     Box::new([#( #fields_as_dyn_field_ref, )*].into_iter())
                 }

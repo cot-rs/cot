@@ -49,7 +49,7 @@ use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error::error_impl::impl_into_cot_error;
-use crate::error::handler::{DynErrorPageHandler, RequestError};
+use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
 use crate::error::uncaught_panic::UncaughtPanic;
 use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
@@ -406,7 +406,7 @@ pub trait Project {
     ///
     /// ```
     /// use cot::Project;
-    /// use cot::error::handler::{DynErrorPageHandler, RequestInnerError};
+    /// use cot::error::handler::{DynErrorPageHandler, RequestError};
     /// use cot::html::Html;
     /// use cot::response::IntoResponse;
     ///
@@ -417,7 +417,7 @@ pub trait Project {
     ///     }
     /// }
     ///
-    /// async fn error_handler(error: RequestInnerError) -> impl IntoResponse {
+    /// async fn error_handler(error: RequestError) -> impl IntoResponse {
     ///     Html::new(format!("An error occurred: {error}")).with_status(error.status_code())
     /// }
     /// ```
@@ -793,11 +793,13 @@ impl AppBuilder {
     }
 }
 
-async fn default_server_error_handler(error: RequestError) -> crate::Result<impl IntoResponse> {
+async fn default_server_error_handler(
+    error: RequestOuterError,
+) -> crate::Result<impl IntoResponse> {
     #[derive(Debug, Template)]
     #[template(path = "default_error.html")]
     struct ErrorTemplate {
-        error: RequestError,
+        error: RequestOuterError,
     }
 
     let status_code = error.status_code();
@@ -2039,7 +2041,9 @@ async fn build_custom_error_page(
 }
 
 pub(crate) fn prepare_request_for_error_handler(request_head: &mut RequestHead, error: Error) {
-    request_head.extensions.insert(RequestError::new(error));
+    request_head
+        .extensions
+        .insert(RequestOuterError::new(error));
 }
 
 /// Runs the CLI for the given project.
@@ -2144,7 +2148,7 @@ mod tests {
     use crate::StatusCode;
     use crate::auth::UserId;
     use crate::config::SecretKey;
-    use crate::error::handler::{RequestError, RequestInnerError};
+    use crate::error::handler::{RequestError, RequestOuterError};
     use crate::html::Html;
     use crate::request::extractors::FromRequestHead;
     use crate::test::serial_guard;
@@ -2363,9 +2367,7 @@ mod tests {
     async fn build_custom_error_page_panic_conversion() {
         let mock_handler = service_fn(|request: Request| async {
             let (mut parts, _body) = request.into_parts();
-            let error = RequestInnerError::from_request_head(&mut parts)
-                .await
-                .unwrap();
+            let error = RequestError::from_request_head(&mut parts).await.unwrap();
             assert!(error.is::<UncaughtPanic>());
 
             let html = Html::new("Panic error handled");
@@ -2413,7 +2415,7 @@ mod tests {
         let (mut head, _) = Request::new(Body::empty()).into_parts();
         prepare_request_for_error_handler(&mut head, error);
 
-        let request_error = head.extensions.get::<RequestError>().unwrap();
+        let request_error = head.extensions.get::<RequestOuterError>().unwrap();
         assert_eq!(request_error.to_string(), "test error");
     }
 }

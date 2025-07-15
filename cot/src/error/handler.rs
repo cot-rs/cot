@@ -26,7 +26,7 @@ use crate::response::Response;
 ///
 /// ```
 /// use cot::Project;
-/// use cot::error::handler::{DynErrorPageHandler, RequestInnerError};
+/// use cot::error::handler::{DynErrorPageHandler, RequestError};
 /// use cot::html::Html;
 /// use cot::response::IntoResponse;
 ///
@@ -38,7 +38,7 @@ use crate::response::Response;
 /// }
 ///
 /// // This function automatically implements ErrorPageHandler
-/// async fn error_handler(error: RequestInnerError) -> impl IntoResponse {
+/// async fn error_handler(error: RequestError) -> impl IntoResponse {
 ///     Html::new(format!("An error occurred: {error}")).with_status(error.status_code())
 /// }
 /// ```
@@ -99,7 +99,7 @@ impl DynErrorPageHandler {
     ///
     /// ```
     /// use cot::Project;
-    /// use cot::error::handler::{DynErrorPageHandler, RequestInnerError};
+    /// use cot::error::handler::{DynErrorPageHandler, RequestError};
     /// use cot::html::Html;
     /// use cot::response::IntoResponse;
     ///
@@ -111,7 +111,7 @@ impl DynErrorPageHandler {
     /// }
     ///
     /// // This function automatically implements ErrorPageHandler
-    /// async fn error_handler(error: RequestInnerError) -> impl IntoResponse {
+    /// async fn error_handler(error: RequestError) -> impl IntoResponse {
     ///     Html::new(format!("An error occurred: {error}")).with_status(error.status_code())
     /// }
     /// ```
@@ -187,20 +187,48 @@ handle_all_parameters!(impl_request_handler);
 /// It is a separate, private type to make sure the user cannot accidentally
 /// interact with it by using request extensions directly.
 #[derive(Debug, Clone)]
-pub struct RequestError(Arc<Error>);
+pub struct RequestOuterError(Arc<Error>);
 
-impl RequestError {
+impl RequestOuterError {
     #[must_use]
     pub(crate) fn new(error: Error) -> Self {
         Self(Arc::new(error))
     }
 }
 
-impl Deref for RequestError {
+impl Deref for RequestOuterError {
     type Target = Error;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Display for RequestOuterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0.inner(), f)
+    }
+}
+
+impl FromRequestHead for RequestOuterError {
+    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+        let error = head.extensions.get::<RequestOuterError>();
+        error
+            .ok_or_else(|| {
+                Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")
+            })
+            .map(|request_error| request_error.clone())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RequestError(Arc<Error>);
+
+impl Deref for RequestError {
+    type Target = Error;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0.inner()
     }
 }
 
@@ -212,35 +240,7 @@ impl Display for RequestError {
 
 impl FromRequestHead for RequestError {
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        let error = head.extensions.get::<RequestError>();
-        error
-            .ok_or_else(|| {
-                Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")
-            })
-            .map(|request_error| request_error.clone())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RequestInnerError(Arc<Error>);
-
-impl Deref for RequestInnerError {
-    type Target = Error;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0.inner()
-    }
-}
-
-impl Display for RequestInnerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0.inner(), f)
-    }
-}
-
-impl FromRequestHead for RequestInnerError {
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        let error = head.extensions.get::<RequestError>();
+        let error = head.extensions.get::<RequestOuterError>();
         error
             .ok_or_else(|| {
                 Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")

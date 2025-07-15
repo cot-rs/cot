@@ -74,7 +74,7 @@ pub(crate) trait BoxErrorPageHandler: Send + Sync {
     fn handle<'a>(
         &'a self,
         head: &'a RequestHead,
-    ) -> Pin<Box<dyn Future<Output = crate::Result<Response>> + Send + '_>>;
+    ) -> Pin<Box<dyn Future<Output = crate::Result<Response>> + Send + 'a>>;
 }
 
 /// A type-erased wrapper around an error page handler.
@@ -126,7 +126,7 @@ impl DynErrorPageHandler {
             fn handle<'a>(
                 &'a self,
                 head: &'a RequestHead,
-            ) -> Pin<Box<dyn Future<Output = cot::Result<Response>> + Send + '_>> {
+            ) -> Pin<Box<dyn Future<Output = cot::Result<Response>> + Send + 'a>> {
                 Box::pin(self.0.handle(head))
             }
         }

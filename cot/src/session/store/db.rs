@@ -1,19 +1,110 @@
+//! Database-backed session store.
+//!
+//! This module provides a session store implementation that persists session
+//! records in a database using the Cot ORM. It enables durable session storage
+//! across application restarts and supports features such as user login
+//! sessions, flash messages, and other stateful interactions.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use std::sync::Arc;
+//!
+//! use cot::db::Database;
+//! use cot::session::store::db::DbStore;
+//!
+//! #[tokio::main]
+//! async fn main() -> cot::Result<()> {
+//!     let db = Arc::new(Database::new("sqlite://:memory:").await?);
+//!     let store = DbStore::new(db);
+//!     // Use `store` to manage sessions
+//!     Ok(())
+//! }
+//! ```
+
+use std::error::Error;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use cot::db::{Auto, DatabaseError, Model, query};
+use thiserror::Error;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
 use crate::db::Database;
 use crate::session::db::Session;
 
+/// Errors that can occur while interacting with the database session store.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum DbStoreError {
+    /// An error occurred while interacting with the database.
+    #[error(transparent)]
+    DatabaseError(#[from] DatabaseError),
+    /// An error occurred during JSON serialization.
+    #[error("JSON serialization error: {0}")]
+    Serialize(Box<dyn Error + Send + Sync>),
+    /// An error occurred during JSON deserialization.
+    #[error("JSON serialization error: {0}")]
+    Deserialize(Box<dyn Error + Send + Sync>),
+}
+
+impl From<DbStoreError> for session_store::Error {
+    fn from(err: DbStoreError) -> Self {
+        match err {
+            DbStoreError::DatabaseError(db_err) => {
+                session_store::Error::Backend(db_err.to_string())
+            }
+            DbStoreError::Serialize(ser_err) => session_store::Error::Encode(ser_err.to_string()),
+            DbStoreError::Deserialize(de_err) => session_store::Error::Decode(de_err.to_string()),
+        }
+    }
+}
+
+/// A database-backed session store.
+///
+/// This store uses a database to persist session records, allowing for
+/// session data to be stored across application restarts.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::sync::Arc;
+///
+/// use cot::db::Database;
+/// use cot::session::store::db::DbStore;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), cot::session::store::db::DbStoreError> {
+///     let db = Arc::new(Database::new("sqlite://:memory:").await?);
+///     let store = DbStore::new(db);
+///     Ok(())
+/// }
+/// ```
 #[derive(Clone, Debug)]
 pub struct DbStore {
     connection: Arc<Database>,
 }
 
 impl DbStore {
+    /// Creates a new `DbStore` instance with the provided database connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::sync::Arc;
+    ///
+    /// use cot::db::Database;
+    /// use cot::session::store::db::DbStore;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), cot::session::store::db::DbStoreError> {
+    ///     let db = Arc::new(Database::new("sqlite://:memory:").await?);
+    ///     let store = DbStore::new(db);
+    ///     Ok(())
+    /// }
+    /// ```
+    #[must_use]
     pub fn new(connection: Arc<Database>) -> DbStore {
         DbStore { connection }
     }
@@ -25,9 +116,8 @@ fn is_unique_violation(err: &sqlx::Error) -> bool {
         _ => return false,
     };
 
-    let code = match db_err.code() {
-        Some(c) => c,
-        None => return false,
+    let Some(code) = db_err.code() else {
+        return false;
     };
 
     matches!(
@@ -54,7 +144,7 @@ impl SessionStore for DbStore {
             };
             let res = self.connection.insert(&mut model).await;
             match res {
-                Ok(_) => {
+                Ok(()) => {
                     break Ok(());
                 }
                 Err(DatabaseError::DatabaseEngineError(sqlx_error))
@@ -63,9 +153,7 @@ impl SessionStore for DbStore {
                     // If a unique constraint violation occurs, we need to generate a new ID
                     record.id = Id::default();
                 }
-                Err(err) => {
-                    return Err(session_store::Error::Backend(err.to_string()));
-                }
+                Err(err) => return Err(DbStoreError::DatabaseError(err))?,
             }
         }
     }
@@ -83,7 +171,7 @@ impl SessionStore for DbStore {
             model
                 .update(&self.connection)
                 .await
-                .map_err(|err| session_store::Error::Backend(err.to_string()))?;
+                .map_err(DbStoreError::DatabaseError)?;
         } else {
             let mut record = record.clone();
             self.create(&mut record).await?;
@@ -98,9 +186,8 @@ impl SessionStore for DbStore {
             .await
             .map_err(|err| session_store::Error::Backend(err.to_string()))?;
         if let Some(data) = query {
-            let j = serde_json::from_str::<Record>(&data.data);
             let rec = serde_json::from_str::<Record>(&data.data)
-                .map_err(|err| session_store::Error::Backend(err.to_string()))?;
+                .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
             Ok(Some(rec))
         } else {
             Ok(None)
@@ -112,7 +199,7 @@ impl SessionStore for DbStore {
         query!(Session, $key ==key)
             .delete(&self.connection)
             .await
-            .map_err(|err| session_store::Error::Backend(err.to_string()))?;
+            .map_err(DbStoreError::DatabaseError)?;
         Ok(())
     }
 }

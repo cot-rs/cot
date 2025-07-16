@@ -25,7 +25,7 @@ use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
 use crate::session::store::SessionStoreWrapper;
-#[cfg(feature = "db")]
+#[cfg(all(feature = "db", feature = "json"))]
 use crate::session::store::db::DbStore;
 #[cfg(feature = "json")]
 use crate::session::store::file::FileStore;
@@ -511,7 +511,7 @@ impl SessionMiddleware {
                     }
                 }
             }
-            #[cfg(feature = "db")]
+            #[cfg(all(feature = "db", feature = "json"))]
             SessionStoreTypeConfig::Database => Box::new(DbStore::new(context.database().clone())),
         }
     }

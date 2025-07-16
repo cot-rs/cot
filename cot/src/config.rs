@@ -806,7 +806,7 @@ pub enum SessionStoreTypeConfig {
     ///
     /// This stores session data in the configured database. This requires the
     /// "db" feature to be enabled.
-    #[cfg(feature = "db")]
+    #[cfg(all(feature = "db", feature = "json"))]
     Database,
 
     /// File-based session storage.

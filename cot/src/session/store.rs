@@ -8,7 +8,7 @@
 //! Different implementations store data in different places, such as memory,
 //! files, databases, or external caching services like Redis.
 
-#[cfg(feature = "db")]
+#[cfg(all(feature = "db", feature = "json"))]
 pub mod db;
 #[cfg(feature = "json")]
 pub mod file;

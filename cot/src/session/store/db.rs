@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use cot::db::{Auto, Model, query};
+use cot::db::{Auto, DatabaseError, Model, query};
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
@@ -19,22 +19,55 @@ impl DbStore {
     }
 }
 
+fn is_unique_violation(err: &sqlx::Error) -> bool {
+    let db_err = match err {
+        sqlx::Error::Database(db_err) => &**db_err,
+        _ => return false,
+    };
+
+    let code = match db_err.code() {
+        Some(c) => c,
+        None => return false,
+    };
+
+    matches!(
+        code.as_ref(),
+        // SQLite 3.37+: 2067 (prior versions used 1555)
+        "2067" | "1555"
+        // Postgres unique_violation
+        | "23505"
+        // MySQL ER_DUP_ENTRY
+        | "1062"
+    )
+}
 #[async_trait]
 impl SessionStore for DbStore {
     async fn create(&self, record: &mut Record) -> session_store::Result<()> {
-        let key = record.id.to_string();
+        loop {
+            let key = record.id.to_string();
 
-        let data = serde_json::to_string(&record).unwrap();
-        let mut model = Session {
-            id: Auto::auto(),
-            key,
-            data,
-        };
-        self.connection
-            .insert(&mut model)
-            .await
-            .map_err(|err| session_store::Error::Backend(err.to_string()))?;
-        Ok(())
+            let data = serde_json::to_string(&record).unwrap();
+            let mut model = Session {
+                id: Auto::auto(),
+                key,
+                data,
+            };
+            let res = self.connection.insert(&mut model).await;
+            match res {
+                Ok(_) => {
+                    break Ok(());
+                }
+                Err(DatabaseError::DatabaseEngineError(sqlx_error))
+                    if is_unique_violation(&sqlx_error) =>
+                {
+                    // If a unique constraint violation occurs, we need to generate a new ID
+                    record.id = Id::default();
+                }
+                Err(err) => {
+                    return Err(session_store::Error::Backend(err.to_string()));
+                }
+            }
+        }
     }
 
     async fn save(&self, record: &Record) -> session_store::Result<()> {
@@ -86,5 +119,125 @@ impl SessionStore for DbStore {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::sync::OnceLock;
+
+    use cot::db::DatabaseError;
+    use cot::db::migrations::MigrationEngine;
+    use cot::session::db::migrations::m_0001_initial::Migration;
+    use tempfile::{TempDir, tempdir};
+    use time::{Duration, OffsetDateTime};
+    use tower_sessions::session::{Id, Record};
+
     use super::*;
+
+    static TEMPDIR: OnceLock<TempDir> = OnceLock::new();
+
+    fn get_tempdir() -> &'static str {
+        TEMPDIR
+            .get_or_init(|| tempdir().expect("Failed to create temporary directory"))
+            .path()
+            .to_str()
+            .expect("Failed to convert path to string")
+    }
+
+    async fn engine_setup() -> Result<(), DatabaseError> {
+        let test_db = format!("sqlite://{}/db_store.sqlite3?mode=rwc", get_tempdir());
+        let engine = MigrationEngine::new([Migration])?;
+        let database = Database::new(test_db).await?;
+        engine.run(&database).await?;
+        Ok(())
+    }
+    async fn make_db_store() -> DbStore {
+        let test_db = format!("sqlite://{}/db_store.sqlite3?mode=rwc", get_tempdir());
+        engine_setup()
+            .await
+            .unwrap_or_else(|err| println!("{err:?}"));
+        let db = Arc::new(
+            Database::new(&test_db)
+                .await
+                .expect("Failed to connect to database"),
+        );
+
+        DbStore::new(db)
+    }
+
+    fn make_record() -> Record {
+        Record {
+            id: Id::default(),
+            data: HashMap::default(),
+            expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
+        }
+    }
+
+    #[cot::test]
+    async fn test_create_and_load() {
+        let store = make_db_store().await;
+        let mut rec = make_record();
+        store.create(&mut rec).await.expect("create failed");
+        let loaded = store.load(&rec.id).await.expect("load err");
+        assert_eq!(Some(rec.clone()), loaded);
+    }
+
+    #[cot::test]
+    async fn test_save_overwrites() {
+        let store = make_db_store().await;
+        let mut rec = make_record();
+        store.create(&mut rec).await.unwrap();
+
+        let mut rec2 = rec.clone();
+        rec2.data.insert("foo".into(), "bar".into());
+        store.save(&rec2).await.expect("save failed");
+
+        let loaded = store.load(&rec.id).await.unwrap().unwrap();
+        assert_eq!(rec2.data, loaded.data);
+    }
+
+    #[cot::test]
+    async fn test_save_creates_if_missing() {
+        let store = make_db_store().await;
+        let rec = make_record();
+        store.save(&rec).await.expect("save failed");
+        let loaded = store.load(&rec.id).await.unwrap();
+        assert_eq!(Some(rec), loaded);
+    }
+
+    #[cot::test]
+    async fn test_delete() {
+        let store = make_db_store().await;
+        let mut rec = make_record();
+        store.create(&mut rec).await.unwrap();
+
+        store.delete(&rec.id).await.expect("delete failed");
+        let loaded = store.load(&rec.id).await.unwrap();
+        assert!(loaded.is_none());
+
+        store.delete(&rec.id).await.expect("second delete");
+    }
+
+    #[cot::test]
+    async fn test_create_id_collision() {
+        let store = make_db_store().await;
+        let expiry = OffsetDateTime::now_utc() + Duration::minutes(30);
+
+        let mut r1 = Record {
+            id: Id::default(),
+            data: HashMap::default(),
+            expiry_date: expiry,
+        };
+        store.create(&mut r1).await.unwrap();
+
+        let mut r2 = Record {
+            id: r1.id,
+            data: HashMap::default(),
+            expiry_date: expiry,
+        };
+        store.create(&mut r2).await.unwrap();
+
+        assert_ne!(r1.id, r2.id, "ID collision not resolved");
+
+        let loaded1 = store.load(&r1.id).await.unwrap();
+        let loaded2 = store.load(&r2.id).await.unwrap();
+        assert!(loaded1.is_some() && loaded2.is_some());
+    }
 }

@@ -10,6 +10,7 @@ use crate::db::{Auto, Model, model};
 pub struct Session {
     #[model(primary_key)]
     pub id: Auto<i32>,
+    #[model(unique)]
     pub key: String,
     pub data: String,
 }

@@ -6,4 +6,6 @@ error[E0277]: `TodoItem` is not marked as a database model
   |
   = help: the trait `cot::db::Model` is not implemented for `TodoItem`
   = note: annotate `TodoItem` with the `#[cot::db::model]` attribute
-  = help: the trait `cot::db::Model` is implemented for `DatabaseUser`
+  = help: the following other types implement trait `cot::db::Model`:
+            DatabaseUser
+            cot::session::db::Session

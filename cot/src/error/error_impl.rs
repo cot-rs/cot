@@ -90,13 +90,14 @@ impl Error {
     where
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
-        Self {
+        let error = Self {
             inner: Box::new(ErrorImpl {
                 inner: error.into(),
                 status_code: Some(status_code),
                 backtrace: __cot_create_backtrace(),
             }),
-        }
+        };
+        Self::wrap(WithStatusCode(error))
     }
 
     /// Create a new admin panel error with a custom error message or error
@@ -201,8 +202,9 @@ impl Error {
     ///
     /// This is useful for extracting the original error that caused the
     /// error, especially when dealing with errors that may have been
-    /// wrapped multiple times in the error chain (e.g. by middleware or
-    /// other error handling logic).
+    /// wrapped multiple times in the error chain (e.g., by middleware or
+    /// other error handling logic). You should use this method most
+    /// of the time when you need to access the original error.
     ///
     /// # See also
     ///
@@ -264,6 +266,25 @@ struct ErrorImpl {
     status_code: Option<StatusCode>,
     #[debug(skip)]
     backtrace: CotBacktrace,
+}
+
+/// Indicates that the inner `Error` has a status code associated with it.
+///
+/// This is important, as we need to have this `Error` to be returned
+/// by `std::error::Error::source` to be able to extract the status code.
+#[derive(Debug)]
+struct WithStatusCode(Error);
+
+impl Display for WithStatusCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
+impl StdError for WithStatusCode {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        Some(&self.0)
+    }
 }
 
 impl From<Error> for askama::Error {

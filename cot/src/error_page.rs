@@ -7,6 +7,7 @@ use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace};
+use crate::error::not_found::NotFound;
 use crate::router::Router;
 use crate::{Error, Result, StatusCode};
 
@@ -65,10 +66,28 @@ struct ErrorPageTemplateBuilder {
 
 impl ErrorPageTemplateBuilder {
     #[must_use]
-    fn not_found(message: Option<String>) -> Self {
+    fn not_found(error: &Error) -> Self {
+        let mut error_data = Vec::new();
+        let mut error_message = None;
+
+        if let Some(not_found) = error.inner().downcast_ref::<NotFound>() {
+            use crate::error::not_found::Kind;
+            match &not_found.kind {
+                Kind::FromRouter => {}
+                Kind::Custom => {
+                    Self::build_error_data(&mut error_data, error);
+                }
+                Kind::WithMessage(message) => {
+                    Self::build_error_data(&mut error_data, error);
+                    error_message = Some(message.clone());
+                }
+            }
+        }
+
         Self {
             kind: Kind::NotFound,
-            error_message: message,
+            error_message,
+            error_data,
             ..Default::default()
         }
     }
@@ -235,11 +254,11 @@ struct RequestData {
 
 #[must_use]
 pub(super) fn handle_not_found(
-    message: Option<String>,
+    error: &Error,
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     log_not_found(
-        message.as_deref(),
+        error,
         diagnostics
             .request_head
             .as_ref()
@@ -247,7 +266,7 @@ pub(super) fn handle_not_found(
             .as_ref(),
     );
     build_response(
-        build_not_found_response(message, diagnostics),
+        build_not_found_response(error, diagnostics),
         StatusCode::NOT_FOUND,
     )
 }
@@ -280,9 +299,8 @@ pub(super) fn handle_response_error(
     error: &Error,
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
-    // TODO maybe do it better?
     if error.status_code() == StatusCode::NOT_FOUND {
-        return handle_not_found(None, diagnostics);
+        return handle_not_found(error, diagnostics);
     }
 
     log_error(
@@ -320,8 +338,8 @@ fn build_response(
     }
 }
 
-fn build_not_found_response(message: Option<String>, diagnostics: &Diagnostics) -> Result<String> {
-    ErrorPageTemplateBuilder::not_found(message)
+fn build_not_found_response(error: &Error, diagnostics: &Diagnostics) -> Result<String> {
+    ErrorPageTemplateBuilder::not_found(error)
         .diagnostics(diagnostics)
         .render()
 }
@@ -415,11 +433,11 @@ fn log_panic(
     }
 }
 
-fn log_not_found(message: Option<&str>, request_data: Option<&RequestData>) {
+fn log_not_found(error: &Error, request_data: Option<&RequestData>) {
     let span = tracing::span!(
         Level::WARN,
         "not_found",
-        message = ?message,
+        message = %error
     );
     let _enter = span.enter();
 
@@ -479,10 +497,10 @@ mod tests {
     #[test]
     #[traced_test]
     fn test_log_not_found() {
-        let message = Some("Resource not found");
+        let error = Error::from(NotFound::with_message("Resource not found"));
         let request_data = Some(create_test_request_data());
 
-        log_not_found(message, request_data.as_ref());
+        log_not_found(&error, request_data.as_ref());
 
         assert!(logs_contain("Route not found"));
         assert!(logs_contain("Resource not found"));
@@ -539,7 +557,8 @@ mod tests {
     fn test_handle_not_found() {
         let diagnostics = create_diagnostics();
 
-        let response = handle_not_found(None, &diagnostics);
+        let error = Error::from(NotFound::new());
+        let response = handle_not_found(&error, &diagnostics);
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }

@@ -25,6 +25,7 @@ use crate::error::error_impl::impl_into_cot_error;
 ///
 /// ["404 Not Found"]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/404
 #[derive(Debug, Error)]
+#[non_exhaustive]
 #[error(transparent)]
 pub struct NotFound {
     /// The specific type of not-found error that occurred.
@@ -100,12 +101,14 @@ pub enum Kind {
     /// This variant is used when the router cannot find a route that matches
     /// the request's path and method.
     #[error("Not Found")]
+    #[non_exhaustive]
     FromRouter,
     /// A generic 404 error without additional context.
     ///
     /// This variant is used for basic "not found" errors where no specific
     /// message or context is needed.
     #[error("Not Found")]
+    #[non_exhaustive]
     Custom,
     /// A 404 error with a custom message providing additional context.
     ///
@@ -113,5 +116,6 @@ pub enum Kind {
     /// was not found, which can be useful for debugging or providing more
     /// informative error responses.
     #[error("Not Found: {0}")]
+    #[non_exhaustive]
     WithMessage(String),
 }

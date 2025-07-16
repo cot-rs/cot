@@ -546,9 +546,10 @@ mod tests {
 
         let request = TestRequestBuilder::get("/").build();
         let response = router.handle(request).await.unwrap_err();
+        let inner = response.inner();
 
-        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
-        assert!(response.is::<MethodNotAllowed>());
+        assert_eq!(inner.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(inner.is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -557,9 +558,10 @@ mod tests {
 
         let request = TestRequestBuilder::get("/").build();
         let response = router.handle(request).await.unwrap_err();
+        let inner = response.inner();
 
-        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
-        assert!(response.is::<MethodNotAllowed>());
+        assert_eq!(inner.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(inner.is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -595,9 +597,10 @@ mod tests {
         for method in methods {
             let request = TestRequestBuilder::with_method("/", method).build();
             let response = router.handle(request).await.unwrap_err();
+            let inner = response.inner();
 
-            assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
-            assert!(response.is::<MethodNotAllowed>());
+            assert_eq!(inner.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+            assert!(inner.is::<MethodNotAllowed>());
         }
     }
 
@@ -631,9 +634,10 @@ mod tests {
 
         let request = TestRequestBuilder::with_method("/", Method::HEAD).build();
         let response = router.handle(request).await.unwrap_err();
+        let inner = response.inner();
 
-        assert_eq!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
-        assert!(response.is::<MethodNotAllowed>());
+        assert_eq!(inner.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(inner.is::<MethodNotAllowed>());
 
         // check that if GET handler is defined, HEAD is routed to it
         let router = api_get(test_handler);

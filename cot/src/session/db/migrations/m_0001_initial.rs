@@ -36,8 +36,8 @@ impl ::cot::db::migrations::Migration for Migration {
 #[::cot::db::model(model_type = "migration")]
 struct _Session {
     #[model(primary_key)]
-    pub id: cot::db::Auto<i32>,
+    pub(crate) id: cot::db::Auto<i32>,
     #[model(unique)]
-    pub key: String,
-    pub data: String,
+    pub(crate) key: String,
+    pub(crate) data: String,
 }

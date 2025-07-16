@@ -1,8 +1,10 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
+use cot::error::handler::{DynErrorPageHandler, RequestError};
 use cot::json::Json;
 use cot::openapi::swagger_ui::SwaggerUi;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
+use cot::response::IntoResponse;
 use cot::router::method::openapi::api_post;
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
@@ -66,6 +68,20 @@ impl Project for JsonProject {
         apps.register_with_views(SwaggerUi::new(), "/swagger");
         apps.register_with_views(AddApp, "");
     }
+
+    fn server_error_handler(&self) -> DynErrorPageHandler {
+        DynErrorPageHandler::new(error_handler)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+struct ErrorResponse {
+    message: String,
+}
+
+async fn error_handler(error: RequestError) -> impl IntoResponse {
+    let message = error.to_string();
+    Json(ErrorResponse { message }).with_status(error.status_code())
 }
 
 #[cot::main]

@@ -85,7 +85,7 @@ impl Client {
             .await
             .expect("Could not boot project");
 
-        let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+        let bootstrapped_project = bootstrapper.finish();
         Self {
             context: Arc::new(bootstrapped_project.context),
             handler: bootstrapped_project.handler,

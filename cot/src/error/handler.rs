@@ -259,3 +259,46 @@ impl FromRequestHead for RequestError {
             .map(|request_error| Self(request_error.0.clone()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn request_outer_error_display() {
+        let error = Error::internal("Test error");
+        let request_error = RequestOuterError::new(error);
+
+        assert_eq!(format!("{}", request_error), "Test error");
+    }
+
+    #[test]
+    fn request_error_display() {
+        let error = Error::internal("Test error");
+        let request_error = RequestError(Arc::new(error));
+
+        assert_eq!(format!("{}", request_error), "Test error");
+    }
+
+    #[cot::test]
+    async fn request_outer_error_from_request_head() {
+        let request = Request::default();
+        let (mut head, _) = request.into_parts();
+        head.extensions
+            .insert(RequestOuterError::new(Error::internal("Test error")));
+
+        let extracted_error = RequestOuterError::from_request_head(&head).await.unwrap();
+        assert_eq!(format!("{}", extracted_error), "Test error");
+    }
+
+    #[cot::test]
+    async fn request_error_from_request_head() {
+        let request = Request::default();
+        let (mut head, _) = request.into_parts();
+        head.extensions
+            .insert(RequestOuterError::new(Error::internal("Test error")));
+
+        let extracted_error = RequestError::from_request_head(&head).await.unwrap();
+        assert_eq!(format!("{}", extracted_error), "Test error");
+    }
+}

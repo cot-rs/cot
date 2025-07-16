@@ -1808,6 +1808,12 @@ mod tests {
 
         let config = ProjectConfig::from_toml(&toml_content);
         assert!(config.is_err());
+        assert!(
+            config
+                .unwrap_err()
+                .to_string()
+                .contains("could not parse the config")
+        );
     }
 
     #[test]

@@ -234,6 +234,34 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn form_field_value_error_display() {
+        let error = FormFieldValueError::no_name();
+        assert_eq!(
+            error.to_string(),
+            "failed to retrieve the value of a form field: multipart field does not have a name"
+        );
+
+        let error = FormFieldValueError::from_multer(multer::Error::IncompleteStream);
+        assert_eq!(
+            error.to_string(),
+            "failed to retrieve the value of a form field: incomplete multipart stream"
+        );
+    }
+
+    #[test]
+    fn form_field_value_error_source() {
+        let error = FormFieldValueError::no_name();
+        assert!(error.source().is_none());
+
+        let error = FormFieldValueError::from_multer(multer::Error::DecodeHeaderName {
+            name: "test".to_string(),
+            cause: Box::new(std::io::Error::other("oh no!")),
+        });
+        assert!(error.source().is_some());
+        assert_eq!(error.source().unwrap().to_string(), "oh no!");
+    }
+
     #[cot::test]
     async fn text_field_value() {
         let value = FormFieldValue::new_text("hello");

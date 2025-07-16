@@ -834,7 +834,7 @@ async fn default_server_error_handler(
 ///     .with_config(cot::config::ProjectConfig::default())
 ///     .boot()
 ///     .await?;
-/// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+/// let bootstrapped_project = bootstrapper.finish();
 /// # Ok(())
 /// # }
 /// ```
@@ -964,7 +964,7 @@ impl Bootstrapper<Uninitialized> {
     ///     .with_config_name("test")?
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -994,7 +994,7 @@ impl Bootstrapper<Uninitialized> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -1073,7 +1073,7 @@ impl Bootstrapper<WithConfig> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -1159,7 +1159,7 @@ impl Bootstrapper<WithApps> {
     ///     .with_apps()
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -1262,7 +1262,7 @@ impl Bootstrapper<WithDatabase> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -1308,12 +1308,12 @@ impl Bootstrapper<Initialized> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn into_bootstrapped_project(self) -> BootstrappedProject {
+    pub fn finish(self) -> BootstrappedProject {
         BootstrappedProject {
             context: self.context,
             handler: self.handler,
@@ -1346,7 +1346,7 @@ impl Bootstrapper<Initialized> {
 ///     .with_config(ProjectConfig::default())
 ///     .boot()
 ///     .await?;
-/// let bootstrapped_project = bootstrapper.into_bootstrapped_project();
+/// let bootstrapped_project = bootstrapper.finish();
 /// # Ok(())
 /// # }
 /// ```
@@ -1860,7 +1860,7 @@ pub async fn run_at_with_shutdown(
         mut context,
         mut handler,
         mut error_handler,
-    } = bootstrapper.into_bootstrapped_project();
+    } = bootstrapper.finish();
 
     #[cfg(feature = "db")]
     if let Some(database) = &context.database {
@@ -1973,6 +1973,9 @@ fn accepts_html(head: Option<&RequestHead>) -> bool {
         .is_some_and(|accept| {
             let value = accept.to_str().unwrap_or_default();
             let accept = AcceptHeaderParser::parse(value);
+            // we check if the "Accept" header contains "text/html" explicitly
+            // we ignore wildcards, such as "*/*", because they are
+            // sent by tools like curl as well
             accept.contains_explicit(&mime::TEXT_HTML)
         })
 }
@@ -2132,10 +2135,10 @@ async fn shutdown_signal() {
 
 #[cfg(test)]
 mod tests {
-
     use std::task::{Context, Poll};
 
-    use tower::service_fn;
+    use tower::util::MapResultLayer;
+    use tower::{ServiceExt, service_fn};
 
     use super::*;
     use crate::StatusCode;
@@ -2173,6 +2176,81 @@ mod tests {
         assert_eq!(metadata.version, env!("CARGO_PKG_VERSION"));
         assert_eq!(metadata.authors, env!("CARGO_PKG_AUTHORS"));
         assert_eq!(metadata.description, env!("CARGO_PKG_DESCRIPTION"));
+    }
+
+    #[cot::test]
+    async fn root_handler_builder_middleware() {
+        // we create a root handler that returns an error for all requests
+        // then we apply a middleware that returns a fixed "ok" response
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+        };
+
+        let root_handler = root_handler_builder
+            .middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_ok(root_handler.handler).await;
+        expect_handler_ok(root_handler.error_handler).await;
+    }
+
+    #[cot::test]
+    async fn root_handler_builder_main_handler_middleware() {
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+        };
+
+        let root_handler = root_handler_builder
+            .main_handler_middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_ok(root_handler.handler).await;
+        expect_handler_error(root_handler.error_handler).await;
+    }
+
+    #[cot::test]
+    async fn root_handler_builder_error_handler_middleware() {
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+        };
+
+        let root_handler = root_handler_builder
+            .error_handler_middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_error(root_handler.handler).await;
+        expect_handler_ok(root_handler.error_handler).await;
+    }
+
+    fn make_ok_middleware() -> MapResultLayer<fn(Result<Response, Error>) -> Result<Response, Error>>
+    {
+        MapResultLayer::new(|_| Ok(Response::new(Body::fixed("Hello, world!"))))
+    }
+
+    async fn expect_handler_ok(handler: BoxedHandler) {
+        let response = handler.oneshot(Request::default()).await;
+        assert!(response.is_ok());
+        assert_eq!(response.unwrap().status(), StatusCode::OK);
+    }
+
+    async fn expect_handler_error(handler: BoxedHandler) {
+        let response = handler.oneshot(Request::default()).await;
+        assert!(response.is_err());
     }
 
     #[cfg(feature = "live-reload")]
@@ -2317,7 +2395,7 @@ mod tests {
     }
 
     #[cot::test]
-    async fn test_build_custom_error_page_call_failure() {
+    async fn build_custom_error_page_call_failure() {
         let mock_handler = service_fn(|_request: Request| async {
             Err::<Response, Error>(Error::internal("handler call failed"))
         });

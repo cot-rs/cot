@@ -269,7 +269,7 @@ mod tests {
         let error = Error::internal("Test error");
         let request_error = RequestOuterError::new(error);
 
-        assert_eq!(format!("{}", request_error), "Test error");
+        assert_eq!(format!("{request_error}"), "Test error");
     }
 
     #[test]
@@ -277,7 +277,7 @@ mod tests {
         let error = Error::internal("Test error");
         let request_error = RequestError(Arc::new(error));
 
-        assert_eq!(format!("{}", request_error), "Test error");
+        assert_eq!(format!("{request_error}"), "Test error");
     }
 
     #[cot::test]
@@ -288,7 +288,7 @@ mod tests {
             .insert(RequestOuterError::new(Error::internal("Test error")));
 
         let extracted_error = RequestOuterError::from_request_head(&head).await.unwrap();
-        assert_eq!(format!("{}", extracted_error), "Test error");
+        assert_eq!(format!("{extracted_error}"), "Test error");
     }
 
     #[cot::test]
@@ -299,6 +299,6 @@ mod tests {
             .insert(RequestOuterError::new(Error::internal("Test error")));
 
         let extracted_error = RequestError::from_request_head(&head).await.unwrap();
-        assert_eq!(format!("{}", extracted_error), "Test error");
+        assert_eq!(format!("{extracted_error}"), "Test error");
     }
 }

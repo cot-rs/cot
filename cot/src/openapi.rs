@@ -1453,10 +1453,6 @@ mod tests {
 
     #[test]
     fn api_operation_response_for_result_with_multiple_responses() {
-        let mut operation = Operation::default();
-        let route_context = RouteContext::new();
-        let mut schema_generator = SchemaGenerator::default();
-
         #[derive(schemars::JsonSchema)]
         struct MultiResponse;
 
@@ -1484,6 +1480,10 @@ mod tests {
                 ]
             }
         }
+
+        let mut operation = Operation::default();
+        let route_context = RouteContext::new();
+        let mut schema_generator = SchemaGenerator::default();
 
         let responses = <Result<MultiResponse, ()>>::api_operation_responses(
             &mut operation,

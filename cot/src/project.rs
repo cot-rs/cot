@@ -2237,6 +2237,7 @@ mod tests {
         expect_handler_ok(root_handler.error_handler).await;
     }
 
+    #[expect(clippy::type_complexity, reason = "test function")]
     fn make_ok_middleware() -> MapResultLayer<fn(Result<Response, Error>) -> Result<Response, Error>>
     {
         MapResultLayer::new(|_| Ok(Response::new(Body::fixed("Hello, world!"))))

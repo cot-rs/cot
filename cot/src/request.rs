@@ -20,7 +20,7 @@ use indexmap::IndexMap;
 
 #[cfg(feature = "db")]
 use crate::db::Database;
-use crate::error::ErrorRepr;
+use crate::error::error_impl::impl_into_cot_error;
 use crate::request::extractors::FromRequestHead;
 use crate::router::Router;
 use crate::{Body, Result};
@@ -251,7 +251,7 @@ pub trait RequestExt: private::Sealed {
         if content_type == expected {
             Ok(())
         } else {
-            Err(ErrorRepr::InvalidContentType {
+            Err(InvalidContentType {
                 expected,
                 actual: content_type.into_owned(),
             }
@@ -390,6 +390,14 @@ impl RequestExt for RequestHead {
         &self.extensions
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("invalid content type; expected `{expected}`, found `{actual}`")]
+pub(crate) struct InvalidContentType {
+    expected: &'static str,
+    actual: String,
+}
+impl_into_cot_error!(InvalidContentType, BAD_REQUEST);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -638,12 +646,13 @@ impl PathParams {
 
 /// An error that occurs when deserializing path parameters.
 #[derive(Debug, Clone, thiserror::Error)]
-#[error("{0}")]
+#[error("could not parse path parameters: {0}")]
 pub struct PathParamsDeserializerError(
     // A wrapper over the original deserializer error. The exact error reason
     // shouldn't be useful to the user, hence we're not exposing it.
     #[source] serde_path_to_error::Error<path_params_deserializer::PathParamsDeserializerError>,
 );
+impl_into_cot_error!(PathParamsDeserializerError, BAD_REQUEST);
 
 #[cfg(test)]
 mod tests {

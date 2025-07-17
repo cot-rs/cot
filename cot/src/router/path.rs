@@ -10,6 +10,8 @@ use std::fmt::Display;
 use thiserror::Error;
 use tracing::debug;
 
+use crate::error::error_impl::impl_into_cot_error;
+
 #[derive(Debug, Clone)]
 pub(super) struct PathMatcher {
     parts: Vec<PathPart>,
@@ -266,14 +268,17 @@ macro_rules! reverse_param_map {
     }};
 }
 
+const ERROR_PREFIX: &str = "failed to reverse route: ";
 /// An error that occurs when reversing a path with missing parameters.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ReverseError {
     /// A parameter is missing for the reverse operation.
-    #[error("Missing parameter for reverse: `{0}`")]
+    #[error("{ERROR_PREFIX}missing parameter for reverse: `{0}`")]
+    #[non_exhaustive]
     MissingParam(String),
 }
+impl_into_cot_error!(ReverseError);
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct CaptureResult<'matcher, 'path> {
@@ -496,7 +501,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
-            "Missing parameter for reverse: `post_id`"
+            "failed to reverse route: missing parameter for reverse: `post_id`"
         );
     }
 

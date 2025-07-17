@@ -653,6 +653,7 @@ dependencies = [
  "http-body-util",
  "humantime",
  "indexmap",
+ "mime",
  "mime_guess",
  "mockall",
  "multer",
@@ -1130,6 +1131,7 @@ dependencies = [
 name = "example-custom-error-pages"
 version = "0.1.0"
 dependencies = [
+ "askama",
  "cot",
 ]
 

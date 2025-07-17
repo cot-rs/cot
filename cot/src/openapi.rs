@@ -32,12 +32,12 @@
 //! use cot::config::ProjectConfig;
 //! use cot::json::Json;
 //! use cot::openapi::swagger_ui::SwaggerUi;
-//! use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+//! use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 //! use cot::response::{Response, ResponseExt};
 //! use cot::router::method::openapi::api_post;
 //! use cot::router::{Route, Router};
 //! use cot::static_files::StaticFilesMiddleware;
-//! use cot::{App, AppBuilder, BoxedHandler, Project, StatusCode};
+//! use cot::{App, AppBuilder, Project, StatusCode};
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Deserialize, schemars::JsonSchema)]
@@ -78,7 +78,7 @@
 //!         &self,
 //!         handler: RootHandlerBuilder,
 //!         context: &MiddlewareContext,
-//!     ) -> BoxedHandler {
+//!     ) -> RootHandler {
 //!         handler
 //!             // StaticFilesMiddleware is needed for SwaggerUi to serve its
 //!             // CSS and JavaScript files
@@ -1024,6 +1024,31 @@ impl ApiOperationResponse for crate::Result<Response> {
     }
 }
 
+// we don't require `E: ApiOperationResponse` here because a global error
+// handler will typically take care of generating OpenAPI responses for errors
+//
+// we might want to add a version for `E: ApiOperationResponse` when (if ever)
+// specialization lands in Rust: https://github.com/rust-lang/rust/issues/31844
+impl<T, E> ApiOperationResponse for Result<T, E>
+where
+    T: ApiOperationResponse,
+{
+    fn api_operation_responses(
+        operation: &mut Operation,
+        route_context: &RouteContext<'_>,
+        schema_generator: &mut SchemaGenerator,
+    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
+        let mut responses = Vec::new();
+
+        let ok_response = T::api_operation_responses(operation, route_context, schema_generator);
+        for (status_code, response) in ok_response {
+            responses.push((status_code, response));
+        }
+
+        responses
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use aide::openapi::{Operation, Parameter};
@@ -1401,5 +1426,79 @@ mod tests {
         assert_eq!(status_code, &None); // Default response
         assert_eq!(response.description, "*&lt;unspecified&gt;*");
         assert!(response.content.is_empty());
+    }
+
+    #[test]
+    fn api_operation_response_for_result_with_json_success() {
+        let mut operation = Operation::default();
+        let route_context = RouteContext::new();
+        let mut schema_generator = SchemaGenerator::default();
+
+        let responses = <Result<Json<TestRequest>, ()>>::api_operation_responses(
+            &mut operation,
+            &route_context,
+            &mut schema_generator,
+        );
+
+        assert_eq!(responses.len(), 1);
+        let (status_code, response) = &responses[0];
+
+        assert_eq!(status_code, &Some(StatusCode::Code(200)));
+        assert_eq!(response.description, "OK");
+        assert!(response.content.contains_key("application/json"));
+
+        let content = response.content.get("application/json").unwrap();
+        assert!(content.schema.is_some());
+    }
+
+    #[test]
+    fn api_operation_response_for_result_with_multiple_responses() {
+        #[derive(schemars::JsonSchema)]
+        struct MultiResponse;
+
+        impl ApiOperationResponse for MultiResponse {
+            fn api_operation_responses(
+                _operation: &mut Operation,
+                _route_context: &RouteContext<'_>,
+                _schema_generator: &mut SchemaGenerator,
+            ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
+                vec![
+                    (
+                        Some(StatusCode::Code(200)),
+                        aide::openapi::Response {
+                            description: "Success".to_string(),
+                            ..Default::default()
+                        },
+                    ),
+                    (
+                        Some(StatusCode::Code(400)),
+                        aide::openapi::Response {
+                            description: "Bad Request".to_string(),
+                            ..Default::default()
+                        },
+                    ),
+                ]
+            }
+        }
+
+        let mut operation = Operation::default();
+        let route_context = RouteContext::new();
+        let mut schema_generator = SchemaGenerator::default();
+
+        let responses = <Result<MultiResponse, ()>>::api_operation_responses(
+            &mut operation,
+            &route_context,
+            &mut schema_generator,
+        );
+
+        assert_eq!(responses.len(), 2);
+
+        let (status_code_1, response_1) = &responses[0];
+        assert_eq!(status_code_1, &Some(StatusCode::Code(200)));
+        assert_eq!(response_1.description, "Success");
+
+        let (status_code_2, response_2) = &responses[1];
+        assert_eq!(status_code_2, &Some(StatusCode::Code(400)));
+        assert_eq!(response_2.description, "Bad Request");
     }
 }

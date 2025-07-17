@@ -96,6 +96,7 @@ humantime = "2"
 indexmap = "2"
 insta = { version = "1", features = ["filters"] }
 insta-cmd = "0.6"
+mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 mockall = "0.13"
 multer = "3"

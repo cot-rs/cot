@@ -90,7 +90,7 @@ impl App for SwaggerUi {
     fn router(&self) -> Router {
         let swagger_ui = Arc::new(self.inner.clone());
         let swagger_handler = async move || {
-            let swagger = swagger_ui.serve().map_err(cot::Error::custom)?;
+            let swagger = swagger_ui.serve().map_err(cot::Error::internal)?;
             Ok::<_, crate::Error>(Html::new(swagger))
         };
 

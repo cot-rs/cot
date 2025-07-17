@@ -40,11 +40,11 @@ pub enum RedisStoreError {
     Command(Box<dyn Error + Send + Sync>),
 
     /// An error occurred during JSON serialization.
-    #[error("Serialization error: {0}")]
+    #[error("serialization error: {0}")]
     Serialize(Box<dyn Error + Send + Sync>),
 
     /// An error occurred during JSON deserialization.
-    #[error("Deserialization error: {0}")]
+    #[error("deserialization error: {0}")]
     Deserialize(Box<dyn Error + Send + Sync>),
 }
 

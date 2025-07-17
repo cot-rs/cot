@@ -55,7 +55,12 @@ extern crate self as cot;
 
 #[cfg(feature = "db")]
 pub mod db;
-mod error;
+/// Error handling types and utilities for Cot applications.
+///
+/// This module provides error types, error handlers, and utilities for
+/// handling various types of errors that can occur in Cot applications,
+/// including 404 Not Found errors, uncaught panics, and custom error pages.
+pub mod error;
 pub mod form;
 mod headers;
 // Not public API. Referenced by macro-generated code.
@@ -154,7 +159,7 @@ pub use cot_macros::e2e_test;
 /// ```
 pub use cot_macros::main;
 pub use cot_macros::test;
-pub use error::Error;
+pub use error::error_impl::Error;
 #[cfg(feature = "openapi")]
 pub use schemars;
 pub use {bytes, http};

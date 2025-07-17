@@ -2,33 +2,36 @@
 //!
 //! This module defines the [`Project`] and [`App`] traits, which are the main
 //! entry points for your application.
-/// # Examples
-///
-/// ```no_run
-/// use cot::Project;
-/// use cot::cli::CliMetadata;
-///
-/// struct MyProject;
-/// impl Project for MyProject {
-///     fn cli_metadata(&self) -> CliMetadata {
-///         cot::cli::metadata!()
-///     }
-/// }
-///
-/// #[cot::main]
-/// fn main() -> impl Project {
-///     MyProject
-/// }
-/// ```
+//! # Examples
+//!
+//! ```no_run
+//! use cot::Project;
+//! use cot::cli::CliMetadata;
+//!
+//! struct MyProject;
+//! impl Project for MyProject {
+//!     fn cli_metadata(&self) -> CliMetadata {
+//!         cot::cli::metadata!()
+//!     }
+//! }
+//!
+//! #[cot::main]
+//! fn main() -> impl Project {
+//!     MyProject
+//! }
+//! ```
 use std::future::poll_fn;
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use askama::Template;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
+use thiserror::Error;
+use tower::util::BoxCloneSyncService;
 use tower::{Layer, Service};
 use tracing::{error, info, trace};
 
@@ -44,8 +47,10 @@ use crate::config::{AuthBackendConfig, ProjectConfig};
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
-use crate::error::ErrorRepr;
-use crate::error_page::{Diagnostics, ErrorPageTrigger};
+use crate::error::error_impl::impl_into_cot_error;
+use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
+use crate::error::uncaught_panic::UncaughtPanic;
+use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
@@ -53,7 +58,8 @@ use crate::request::{AppName, Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;
-use crate::{Body, Error, StatusCode, cli, error_page};
+use crate::utils::accept_header_parser::AcceptHeaderParser;
+use crate::{Body, Error, cli, error_page};
 
 /// A building block for a Cot project.
 ///
@@ -354,9 +360,9 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
+    /// use cot::Project;
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -364,7 +370,7 @@ pub trait Project {
     ///         &self,
     ///         handler: RootHandlerBuilder,
     ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
+    ///     ) -> RootHandler {
     ///         handler
     ///             .middleware(LiveReloadMiddleware::from_context(context))
     ///             .build()
@@ -372,62 +378,15 @@ pub trait Project {
     /// }
     /// ```
     #[expect(unused_variables)]
-    fn middlewares(
-        &self,
-        handler: RootHandlerBuilder,
-        context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    fn middlewares(&self, handler: RootHandlerBuilder, context: &MiddlewareContext) -> RootHandler {
         handler.build()
     }
 
-    /// Returns the 500 Internal Server Error handler for the project.
+    /// Returns the error handler for the project.
     ///
-    /// The default handler returns a simple, static page.
-    ///
-    /// # Errors
-    ///
-    /// This method may return an error if the handler fails to build a
-    /// response. In this case, the error will be logged and a generic
-    /// error page will be returned to the user.
-    ///
-    /// # Panics
-    ///
-    /// Note that this handler is exempt of the typical panic handling
-    /// machinery in Cot. This means that if this handler panics, no
-    /// response will be sent to a user. Because of that, you should
-    /// avoid panicking here and return [`Err`] instead.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::html::Html;
-    /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{IntoResponse, Response};
-    /// use cot::{Project, StatusCode};
-    ///
-    /// struct MyProject;
-    /// impl Project for MyProject {
-    ///     fn server_error_handler(&self) -> Box<dyn ErrorPageHandler> {
-    ///         Box::new(MyHandler)
-    ///     }
-    /// }
-    ///
-    /// struct MyHandler;
-    /// impl ErrorPageHandler for MyHandler {
-    ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Html::new("Internal Server Error")
-    ///             .with_status(StatusCode::INTERNAL_SERVER_ERROR)
-    ///             .into_response()
-    ///     }
-    /// }
-    /// ```
-    fn server_error_handler(&self) -> Box<dyn ErrorPageHandler> {
-        Box::new(DefaultServerErrorHandler)
-    }
-
-    /// Returns the 404 Not Found handler for the project.
-    ///
-    /// The default handler returns a simple, static page.
+    /// The default handler returns a simple, minimalistic error page
+    /// that displays the status code canonical name and a
+    /// generic error message.
     ///
     /// # Errors
     ///
@@ -445,29 +404,24 @@ pub trait Project {
     /// # Examples
     ///
     /// ```
+    /// use cot::Project;
+    /// use cot::error::handler::{DynErrorPageHandler, RequestError};
     /// use cot::html::Html;
-    /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{IntoResponse, Response};
-    /// use cot::{Project, StatusCode};
+    /// use cot::response::IntoResponse;
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
-    ///     fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-    ///         Box::new(MyHandler)
+    ///     fn server_error_handler(&self) -> DynErrorPageHandler {
+    ///         DynErrorPageHandler::new(error_handler)
     ///     }
     /// }
     ///
-    /// struct MyHandler;
-    /// impl ErrorPageHandler for MyHandler {
-    ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Html::new("Not Found")
-    ///             .with_status(StatusCode::NOT_FOUND)
-    ///             .into_response()
-    ///     }
+    /// async fn error_handler(error: RequestError) -> impl IntoResponse {
+    ///     Html::new(format!("An error occurred: {error}")).with_status(error.status_code())
     /// }
     /// ```
-    fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-        Box::new(DefaultNotFoundHandler)
+    fn server_error_handler(&self) -> DynErrorPageHandler {
+        DynErrorPageHandler::new(default_server_error_handler)
     }
 }
 
@@ -490,9 +444,9 @@ pub type MiddlewareContext = ProjectContext<WithDatabase>;
 /// # Examples
 ///
 /// ```
+/// use cot::Project;
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -500,7 +454,7 @@ pub type MiddlewareContext = ProjectContext<WithDatabase>;
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler
 ///             .middleware(LiveReloadMiddleware::from_context(context))
 ///             .build()
@@ -508,14 +462,19 @@ pub type MiddlewareContext = ProjectContext<WithDatabase>;
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RootHandlerBuilder<S = RouterService> {
+pub struct RootHandlerBuilder<S = RouterService, SE = DynErrorPageHandler> {
     handler: S,
+    error_handler: SE,
 }
 
-impl<S> RootHandlerBuilder<S>
+impl<RootService, ErrorHandlerService> RootHandlerBuilder<RootService, ErrorHandlerService>
 where
-    S: Service<Request, Response = Response, Error = Error> + Send + Sync + Clone + 'static,
-    S::Future: Send,
+    RootService:
+        Service<Request, Response = Response, Error = Error> + Send + Sync + Clone + 'static,
+    RootService::Future: Send,
+    ErrorHandlerService:
+        Service<Request, Response = Response, Error = Error> + Send + Sync + Clone + 'static,
+    ErrorHandlerService::Future: Send,
 {
     /// Adds middleware to the project.
     ///
@@ -525,9 +484,9 @@ where
     /// # Examples
     ///
     /// ```
+    /// use cot::Project;
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -535,7 +494,7 @@ where
     ///         &self,
     ///         handler: RootHandlerBuilder,
     ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
+    ///     ) -> RootHandler {
     ///         handler
     ///             .middleware(LiveReloadMiddleware::from_context(context))
     ///             .build()
@@ -546,9 +505,12 @@ where
     pub fn middleware<M>(
         self,
         middleware: M,
-    ) -> RootHandlerBuilder<IntoCotError<IntoCotResponse<<M as Layer<S>>::Service>>>
+    ) -> RootHandlerBuilder<
+        WrappedMiddleware<M, RootService>,
+        WrappedMiddleware<M, ErrorHandlerService>,
+    >
     where
-        M: Layer<S>,
+        M: Layer<RootService> + Layer<ErrorHandlerService>,
     {
         let layer = (
             IntoCotErrorLayer::new(),
@@ -558,6 +520,101 @@ where
 
         RootHandlerBuilder {
             handler: layer.layer(self.handler),
+            error_handler: layer.layer(self.error_handler),
+        }
+    }
+
+    /// Adds middleware to only the main request handler.
+    ///
+    /// This method is used to add middleware that should only be applied to
+    /// the main request handler, not to the error handler. This is useful when
+    /// you have middleware that should only run for successful requests, such
+    /// as logging middleware that should not interfere with error handling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::Project;
+    /// use cot::middleware::LiveReloadMiddleware;
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {
+    ///     fn middlewares(
+    ///         &self,
+    ///         handler: RootHandlerBuilder,
+    ///         context: &MiddlewareContext,
+    ///     ) -> RootHandler {
+    ///         handler
+    ///             .main_handler_middleware(LiveReloadMiddleware::from_context(context))
+    ///             .build()
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn main_handler_middleware<M>(
+        self,
+        middleware: M,
+    ) -> RootHandlerBuilder<WrappedMiddleware<M, RootService>, ErrorHandlerService>
+    where
+        M: Layer<RootService>,
+    {
+        let layer = (
+            IntoCotErrorLayer::new(),
+            IntoCotResponseLayer::new(),
+            middleware,
+        );
+
+        RootHandlerBuilder {
+            handler: layer.layer(self.handler),
+            error_handler: self.error_handler,
+        }
+    }
+
+    /// Adds middleware to only the error handler.
+    ///
+    /// This method is used to add middleware that should only be applied to
+    /// the error handler, not to the main request handler. This is useful when
+    /// you have middleware that should only run when handling errors, such as
+    /// error reporting middleware or middleware that modifies error responses.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::Project;
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+    /// use cot::static_files::StaticFilesMiddleware;
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {
+    ///     fn middlewares(
+    ///         &self,
+    ///         handler: RootHandlerBuilder,
+    ///         context: &MiddlewareContext,
+    ///     ) -> RootHandler {
+    ///         handler
+    ///             .error_handler_middleware(StaticFilesMiddleware::from_context(context))
+    ///             .build()
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn error_handler_middleware<M>(
+        self,
+        middleware: M,
+    ) -> RootHandlerBuilder<RootService, WrappedMiddleware<M, ErrorHandlerService>>
+    where
+        M: Layer<ErrorHandlerService>,
+    {
+        let layer = (
+            IntoCotErrorLayer::new(),
+            IntoCotResponseLayer::new(),
+            middleware,
+        );
+
+        RootHandlerBuilder {
+            handler: self.handler,
+            error_handler: layer.layer(self.error_handler),
         }
     }
 
@@ -566,9 +623,9 @@ where
     /// # Examples
     ///
     /// ```
+    /// use cot::Project;
     /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -576,16 +633,59 @@ where
     ///         &self,
     ///         handler: RootHandlerBuilder,
     ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
+    ///     ) -> RootHandler {
     ///         handler
     ///             .middleware(LiveReloadMiddleware::from_context(context))
     ///             .build()
     ///     }
     /// }
     /// ```
-    pub fn build(self) -> BoxedHandler {
-        BoxedHandler::new(self.handler)
+    pub fn build(self) -> RootHandler {
+        RootHandler {
+            handler: BoxedHandler::new(self.handler),
+            error_handler: BoxedHandler::new(self.error_handler),
+        }
     }
+}
+
+/// A type alias for the service type returned by the
+/// [`RootHandlerBuilder::middleware`] and similar methods.
+pub type WrappedMiddleware<M, S> = IntoCotError<IntoCotResponse<<M as Layer<S>>::Service>>;
+
+/// A built root handler that contains both the main request handler and error
+/// handler.
+///
+/// This struct is the result of building a [`RootHandlerBuilder`] and contains
+/// the finalized handlers that are ready to be used for processing requests
+/// and handling errors.
+///
+/// # Examples
+///
+/// ```
+/// use cot::Project;
+/// use cot::middleware::LiveReloadMiddleware;
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+///
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn middlewares(
+///         &self,
+///         handler: RootHandlerBuilder,
+///         context: &MiddlewareContext,
+///     ) -> RootHandler {
+///         handler
+///             .middleware(LiveReloadMiddleware::from_context(context))
+///             .build()
+///     }
+/// }
+/// ```
+#[derive(Debug)]
+pub struct RootHandler {
+    /// The main request handler that processes incoming requests.
+    pub(crate) handler: BoxedHandler,
+    /// The error handler that processes errors that occur during request
+    /// handling.
+    pub(crate) error_handler: BoxedHandler,
 }
 
 /// A helper struct to build the apps for the project.
@@ -690,87 +790,20 @@ impl AppBuilder {
     }
 }
 
-/// A trait for defining custom error page handlers.
-///
-/// This is useful with [`Project::server_error_handler`] and
-/// [`Project::not_found_handler`].
-///
-/// # Examples
-///
-/// ```
-/// use cot::html::Html;
-/// use cot::project::ErrorPageHandler;
-/// use cot::response::{IntoResponse, Response};
-/// use cot::{Project, StatusCode};
-///
-/// struct MyProject;
-/// impl Project for MyProject {
-///     fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-///         Box::new(MyHandler)
-///     }
-/// }
-///
-/// struct MyHandler;
-/// impl ErrorPageHandler for MyHandler {
-///     fn handle(&self) -> cot::Result<Response> {
-///         Html::new("Not Found")
-///             .with_status(StatusCode::NOT_FOUND)
-///             .into_response()
-///     }
-/// }
-/// ```
-pub trait ErrorPageHandler: Send + Sync {
-    /// Returns the error response.
-    ///
-    /// # Errors
-    ///
-    /// This method may return an error if the handler fails to build a
-    /// response. In this case, the error will be logged and a generic
-    /// error page will be returned to the user.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::html::Html;
-    /// use cot::project::ErrorPageHandler;
-    /// use cot::response::{IntoResponse, Response};
-    /// use cot::{Project, StatusCode};
-    ///
-    /// struct MyProject;
-    /// impl Project for MyProject {
-    ///     fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-    ///         Box::new(MyHandler)
-    ///     }
-    /// }
-    ///
-    /// struct MyHandler;
-    /// impl ErrorPageHandler for MyHandler {
-    ///     fn handle(&self) -> cot::Result<Response> {
-    ///         Ok(Html::new("Not Found")
-    ///             .with_status(StatusCode::NOT_FOUND)
-    ///             .into_response()?)
-    ///     }
-    /// }
-    /// ```
-    fn handle(&self) -> crate::Result<Response>;
-}
-
-struct DefaultNotFoundHandler;
-impl ErrorPageHandler for DefaultNotFoundHandler {
-    fn handle(&self) -> crate::Result<Response> {
-        Html::new(include_str!("../templates/404.html"))
-            .with_status(StatusCode::NOT_FOUND)
-            .into_response()
+async fn default_server_error_handler(
+    error: RequestOuterError,
+) -> crate::Result<impl IntoResponse> {
+    #[derive(Debug, Template)]
+    #[template(path = "default_error.html")]
+    struct ErrorTemplate {
+        error: RequestOuterError,
     }
-}
 
-struct DefaultServerErrorHandler;
-impl ErrorPageHandler for DefaultServerErrorHandler {
-    fn handle(&self) -> crate::Result<Response> {
-        Html::new(include_str!("../templates/500.html"))
-            .with_status(StatusCode::INTERNAL_SERVER_ERROR)
-            .into_response()
-    }
+    let status_code = error.status_code();
+    let error_template = ErrorTemplate { error };
+    let rendered = error_template.render()?;
+
+    Ok(Html::new(rendered).with_status(status_code))
 }
 
 /// The main struct for bootstrapping the project.
@@ -801,7 +834,7 @@ impl ErrorPageHandler for DefaultServerErrorHandler {
 ///     .with_config(cot::config::ProjectConfig::default())
 ///     .boot()
 ///     .await?;
-/// let (context, handler) = bootstrapper.into_context_and_handler();
+/// let bootstrapped_project = bootstrapper.finish();
 /// # Ok(())
 /// # }
 /// ```
@@ -811,6 +844,7 @@ pub struct Bootstrapper<S: BootstrapPhase = Initialized> {
     project: Box<dyn Project>,
     context: ProjectContext<S>,
     handler: S::RequestHandler,
+    error_handler: S::ErrorHandler,
 }
 
 impl Bootstrapper<Uninitialized> {
@@ -837,6 +871,7 @@ impl Bootstrapper<Uninitialized> {
             project: Box::new(project),
             context: ProjectContext::new(),
             handler: (),
+            error_handler: (),
         }
     }
 }
@@ -856,6 +891,7 @@ impl<S: BootstrapPhase> Bootstrapper<S> {
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let bootstrapper = Bootstrapper::new(MyProject);
+    /// let project = bootstrapper.project();
     /// # Ok(())
     /// # }
     /// ```
@@ -928,7 +964,7 @@ impl Bootstrapper<Uninitialized> {
     ///     .with_config_name("test")?
     ///     .boot()
     ///     .await?;
-    /// let (context, handler) = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -958,7 +994,7 @@ impl Bootstrapper<Uninitialized> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let (context, handler) = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -968,6 +1004,7 @@ impl Bootstrapper<Uninitialized> {
             project: self.project,
             context: self.context.with_config(config),
             handler: self.handler,
+            error_handler: self.error_handler,
         }
     }
 }
@@ -989,15 +1026,21 @@ fn read_config(config: &str) -> cot::Result<ProjectConfig> {
         }
     };
 
-    let config_content = result.map_err(|err| {
-        Error::new(ErrorRepr::LoadConfig {
-            config: config.to_owned(),
-            source: err,
-        })
+    let config_content = result.map_err(|err| LoadConfig {
+        config: config.to_owned(),
+        source: err,
     })?;
 
     ProjectConfig::from_toml(&config_content)
 }
+
+#[derive(Debug, Error)]
+#[error("could not read the config file at `{config}` or `config/{config}.toml`")]
+struct LoadConfig {
+    config: String,
+    source: std::io::Error,
+}
+impl_into_cot_error!(LoadConfig);
 
 impl Bootstrapper<WithConfig> {
     /// Builds the Cot project instance.
@@ -1030,7 +1073,7 @@ impl Bootstrapper<WithConfig> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let (context, handler) = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -1079,6 +1122,7 @@ impl Bootstrapper<WithConfig> {
             project: self.project,
             context,
             handler: self.handler,
+            error_handler: self.error_handler,
         }
     }
 }
@@ -1115,7 +1159,7 @@ impl Bootstrapper<WithApps> {
     ///     .with_apps()
     ///     .boot()
     ///     .await?;
-    /// let (context, handler) = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -1171,6 +1215,7 @@ impl Bootstrapper<WithApps> {
             project: self.project,
             context,
             handler: self.handler,
+            error_handler: self.error_handler,
         })
     }
 
@@ -1217,7 +1262,7 @@ impl Bootstrapper<WithDatabase> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let (context, handler) = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
@@ -1226,10 +1271,11 @@ impl Bootstrapper<WithDatabase> {
     #[expect(clippy::unused_async, clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
-        let handler = RootHandlerBuilder {
+        let handler_builder = RootHandlerBuilder {
             handler: router_service,
+            error_handler: self.project.server_error_handler(),
         };
-        let handler = self.project.middlewares(handler, &self.context);
+        let handler = self.project.middlewares(handler_builder, &self.context);
 
         let auth_backend = self.project.auth_backend(&self.context);
         let context = self.context.with_auth(auth_backend);
@@ -1237,13 +1283,14 @@ impl Bootstrapper<WithDatabase> {
         Ok(Bootstrapper {
             project: self.project,
             context,
-            handler,
+            handler: handler.handler,
+            error_handler: handler.error_handler,
         })
     }
 }
 
 impl Bootstrapper<Initialized> {
-    /// Returns the context and handler of the bootstrapper.
+    /// Returns the context and handlers of the bootstrapper.
     ///
     /// # Examples
     ///
@@ -1261,14 +1308,59 @@ impl Bootstrapper<Initialized> {
     ///     .with_config(ProjectConfig::default())
     ///     .boot()
     ///     .await?;
-    /// let (context, handler) = bootstrapper.into_context_and_handler();
+    /// let bootstrapped_project = bootstrapper.finish();
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn into_context_and_handler(self) -> (ProjectContext, BoxedHandler) {
-        (self.context, self.handler)
+    pub fn finish(self) -> BootstrappedProject {
+        BootstrappedProject {
+            context: self.context,
+            handler: self.handler,
+            error_handler: self.error_handler,
+        }
     }
+}
+
+/// A fully bootstrapped project with all components initialized and ready to
+/// run.
+///
+/// This struct contains the final state of a project after the bootstrapping
+/// process is complete. It includes the project context with all dependencies
+/// initialized, as well as the request and error handlers that are ready to
+/// process incoming requests.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::ProjectConfig;
+/// use cot::project::Bootstrapper;
+/// use cot::{Project, ProjectContext};
+///
+/// struct MyProject;
+/// impl Project for MyProject {}
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// let bootstrapper = Bootstrapper::new(MyProject)
+///     .with_config(ProjectConfig::default())
+///     .boot()
+///     .await?;
+/// let bootstrapped_project = bootstrapper.finish();
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct BootstrappedProject {
+    /// The fully initialized project context containing all dependencies and
+    /// configuration.
+    pub context: ProjectContext<Initialized>,
+    /// The main request handler that processes incoming HTTP requests.
+    pub handler: BoxedHandler,
+    /// The error handler that processes errors that occur during request
+    /// handling.
+    pub error_handler: BoxedHandler,
 }
 
 mod sealed {
@@ -1297,8 +1389,8 @@ mod sealed {
 /// # Examples
 ///
 /// ```
-/// use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
-/// use cot::{AppBuilder, BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
+/// use cot::{AppBuilder, Project};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -1312,7 +1404,7 @@ mod sealed {
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         unimplemented!()
 ///     }
 /// }
@@ -1321,6 +1413,8 @@ pub trait BootstrapPhase: sealed::Sealed {
     // Bootstrapper types
     /// The type of the request handler.
     type RequestHandler: Debug;
+    /// The type of the error handler.
+    type ErrorHandler: Debug;
 
     // App context types
     /// The type of the configuration.
@@ -1348,6 +1442,7 @@ pub enum Uninitialized {}
 impl sealed::Sealed for Uninitialized {}
 impl BootstrapPhase for Uninitialized {
     type RequestHandler = ();
+    type ErrorHandler = ();
     type Config = ();
     type Apps = ();
     type Router = ();
@@ -1368,6 +1463,7 @@ pub enum WithConfig {}
 impl sealed::Sealed for WithConfig {}
 impl BootstrapPhase for WithConfig {
     type RequestHandler = ();
+    type ErrorHandler = ();
     type Config = Arc<ProjectConfig>;
     type Apps = ();
     type Router = ();
@@ -1388,6 +1484,7 @@ pub enum WithApps {}
 impl sealed::Sealed for WithApps {}
 impl BootstrapPhase for WithApps {
     type RequestHandler = ();
+    type ErrorHandler = ();
     type Config = <WithConfig as BootstrapPhase>::Config;
     type Apps = Vec<Box<dyn App>>;
     type Router = Arc<Router>;
@@ -1408,6 +1505,7 @@ pub enum WithDatabase {}
 impl sealed::Sealed for WithDatabase {}
 impl BootstrapPhase for WithDatabase {
     type RequestHandler = ();
+    type ErrorHandler = ();
     type Config = <WithApps as BootstrapPhase>::Config;
     type Apps = <WithApps as BootstrapPhase>::Apps;
     type Router = <WithApps as BootstrapPhase>::Router;
@@ -1428,6 +1526,7 @@ pub enum Initialized {}
 impl sealed::Sealed for Initialized {}
 impl BootstrapPhase for Initialized {
     type RequestHandler = BoxedHandler;
+    type ErrorHandler = BoxedHandler;
     type Config = <WithDatabase as BootstrapPhase>::Config;
     type Apps = <WithDatabase as BootstrapPhase>::Apps;
     type Router = <WithDatabase as BootstrapPhase>::Router;
@@ -1699,12 +1798,14 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-// Send not needed; Bootstrapper/CLI is run async in a single thread
-#[expect(clippy::future_not_send)]
+#[expect(
+    clippy::future_not_send,
+    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
+)]
 pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> cot::Result<()> {
     let listener = tokio::net::TcpListener::bind(address_str)
         .await
-        .map_err(|e| ErrorRepr::StartServer { source: e })?;
+        .map_err(StartServerError)?;
 
     run_at(bootstrapper, listener).await
 }
@@ -1722,8 +1823,10 @@ pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> 
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-// Send not needed; Bootstrapper/CLI is run async in a single thread
-#[expect(clippy::future_not_send)]
+#[expect(
+    clippy::future_not_send,
+    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
+)]
 pub async fn run_at(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
@@ -1744,18 +1847,20 @@ pub async fn run_at(
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-// Send not needed; Bootstrapper/CLI is run async in a single thread
-#[expect(clippy::future_not_send)]
+#[expect(
+    clippy::future_not_send,
+    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
+)]
 pub async fn run_at_with_shutdown(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
     shutdown_signal: impl Future<Output = ()> + Send + 'static,
 ) -> cot::Result<()> {
-    let not_found_handler: Arc<dyn ErrorPageHandler> =
-        bootstrapper.project().not_found_handler().into();
-    let server_error_handler: Arc<dyn ErrorPageHandler> =
-        bootstrapper.project().server_error_handler().into();
-    let (mut context, mut project_handler) = bootstrapper.into_context_and_handler();
+    let BootstrappedProject {
+        mut context,
+        mut handler,
+        mut error_handler,
+    } = bootstrapper.finish();
 
     #[cfg(feature = "db")]
     if let Some(database) = &context.database {
@@ -1782,29 +1887,30 @@ pub async fn run_at_with_shutdown(
     let context_cleanup = context.clone();
 
     let handler = move |axum_request: axum::extract::Request| async move {
+        // todo root tracing span
+        // todo per-router error handlers
         let request = request_axum_to_cot(axum_request, Arc::clone(&context));
+        let (head, request) = request.into_parts();
+        let head_for_error_handler = head.clone();
+        let request = Request::from_parts(head, request);
+
         let (request_head, request) = request_parts_for_diagnostics(request);
 
-        let catch_unwind_response = AssertUnwindSafe(pass_to_axum(request, &mut project_handler))
+        let catch_unwind_response = AssertUnwindSafe(pass_to_axum(request, &mut handler))
             .catch_unwind()
             .await;
 
         let response: Result<axum::response::Response, ErrorResponse> = match catch_unwind_response
         {
-            Ok(response) => match response {
-                Ok(response) => match response.extensions().get::<ErrorPageTrigger>() {
-                    Some(trigger) => Err(ErrorResponse::ErrorPageTrigger(trigger.clone())),
-                    None => Ok(response),
-                },
-                Err(error) => Err(ErrorResponse::ErrorReturned(error)),
-            },
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(error)) => Err(ErrorResponse::ErrorReturned(error)),
             Err(error) => Err(ErrorResponse::Panic(error)),
         };
 
         match response {
             Ok(response) => response,
             Err(error_response) => {
-                if is_debug {
+                if is_debug && accepts_html(request_head.as_ref()) {
                     let diagnostics = Diagnostics::new(
                         context.config().clone(),
                         Arc::clone(&context.router),
@@ -1814,10 +1920,11 @@ pub async fn run_at_with_shutdown(
                     build_cot_error_page(error_response, &diagnostics)
                 } else {
                     build_custom_error_page(
-                        &not_found_handler,
-                        &server_error_handler,
-                        &error_response,
+                        &mut error_handler,
+                        error_response,
+                        head_for_error_handler,
                     )
+                    .await
                 }
             }
         }
@@ -1825,9 +1932,7 @@ pub async fn run_at_with_shutdown(
 
     eprintln!(
         "Starting the server at http://{}",
-        listener
-            .local_addr()
-            .map_err(|e| ErrorRepr::StartServer { source: e })?
+        listener.local_addr().map_err(StartServerError)?
     );
 
     if register_panic_hook {
@@ -1841,7 +1946,7 @@ pub async fn run_at_with_shutdown(
     axum::serve(listener, handler.into_make_service())
         .with_graceful_shutdown(shutdown_signal)
         .await
-        .map_err(|e| ErrorRepr::StartServer { source: e })?;
+        .map_err(StartServerError)?;
     if register_panic_hook {
         let _ = std::panic::take_hook();
     }
@@ -1853,8 +1958,29 @@ pub async fn run_at_with_shutdown(
     Ok(())
 }
 
+#[derive(Debug, Error)]
+#[error("failed to start the server: {0}")]
+pub(crate) struct StartServerError(#[from] pub(crate) std::io::Error);
+
+impl From<StartServerError> for Error {
+    fn from(error: StartServerError) -> Self {
+        Error::wrap(error)
+    }
+}
+
+fn accepts_html(head: Option<&RequestHead>) -> bool {
+    head.and_then(|p| p.headers.get(http::header::ACCEPT))
+        .is_some_and(|accept| {
+            let value = accept.to_str().unwrap_or_default();
+            let accept = AcceptHeaderParser::parse(value);
+            // we check if the "Accept" header contains "text/html" explicitly
+            // we ignore wildcards, such as "*/*", because they are
+            // sent by tools like curl as well
+            accept.contains_explicit(&mime::TEXT_HTML)
+        })
+}
+
 enum ErrorResponse {
-    ErrorPageTrigger(ErrorPageTrigger),
     ErrorReturned(Error),
     Panic(Box<dyn std::any::Any + Send>),
 }
@@ -1864,11 +1990,6 @@ fn build_cot_error_page(
     diagnostics: &Diagnostics,
 ) -> axum::response::Response {
     match error_response {
-        ErrorResponse::ErrorPageTrigger(trigger) => match trigger {
-            ErrorPageTrigger::NotFound { message } => {
-                error_page::handle_not_found(message, diagnostics)
-            }
-        },
         ErrorResponse::ErrorReturned(error) => {
             error_page::handle_response_error(&error, diagnostics)
         }
@@ -1876,38 +1997,49 @@ fn build_cot_error_page(
     }
 }
 
-fn build_custom_error_page(
-    not_found_handler: &Arc<dyn ErrorPageHandler>,
-    server_error_handler: &Arc<dyn ErrorPageHandler>,
-    error_response: &ErrorResponse,
+async fn build_custom_error_page(
+    server_error_handler: &mut BoxCloneSyncService<Request, Response, Error>,
+    error_response: ErrorResponse,
+    mut request_head: RequestHead,
 ) -> axum::response::Response {
-    match error_response {
-        ErrorResponse::ErrorPageTrigger(ErrorPageTrigger::NotFound { .. }) => {
-            not_found_handler.handle().map_or_else(
-                |error| {
-                    error!(
-                        ?error,
-                        "Error occurred while running custom 404 Not Found handler"
-                    );
-                    error_page::build_cot_not_found_page()
-                },
-                response_cot_to_axum,
-            )
-        }
-        ErrorResponse::ErrorReturned(_) | ErrorResponse::Panic(_) => {
-            server_error_handler.handle().map_or_else(
-                |error| {
-                    error!(
-                        ?error,
-                        "Error occurred while running custom 500 Internal Server Error handler"
-                    );
+    let error = match error_response {
+        ErrorResponse::ErrorReturned(error) => error,
+        ErrorResponse::Panic(payload) => Error::from(UncaughtPanic::new(payload)),
+    };
 
-                    error_page::build_cot_server_error_page()
-                },
-                response_cot_to_axum,
-            )
-        }
+    prepare_request_for_error_handler(&mut request_head, error);
+
+    let poll_status = poll_fn(|cx| server_error_handler.poll_ready(cx)).await;
+    if let Err(error) = poll_status {
+        error!(
+            ?error,
+            "Error occurred when polling the server error handler for readiness; \
+            returning default error page"
+        );
+
+        return error_page::build_cot_server_error_page();
     }
+
+    let request = Request::from_parts(request_head, Body::empty());
+    let response = server_error_handler.call(request).await;
+    response.map_or_else(
+        |error| {
+            error!(
+                ?error,
+                "Error occurred while running custom server error handler; \
+                returning default error page"
+            );
+
+            error_page::build_cot_server_error_page()
+        },
+        response_cot_to_axum,
+    )
+}
+
+pub(crate) fn prepare_request_for_error_handler(request_head: &mut RequestHead, error: Error) {
+    request_head
+        .extensions
+        .insert(RequestOuterError::new(error));
 }
 
 /// Runs the CLI for the given project.
@@ -2003,11 +2135,19 @@ async fn shutdown_signal() {
 
 #[cfg(test)]
 mod tests {
-    use cot::test::serial_guard;
+    use std::task::{Context, Poll};
+
+    use tower::util::MapResultLayer;
+    use tower::{ServiceExt, service_fn};
 
     use super::*;
+    use crate::StatusCode;
     use crate::auth::UserId;
     use crate::config::SecretKey;
+    use crate::error::handler::{RequestError, RequestOuterError};
+    use crate::html::Html;
+    use crate::request::extractors::FromRequestHead;
+    use crate::test::serial_guard;
 
     struct TestApp;
 
@@ -2038,6 +2178,82 @@ mod tests {
         assert_eq!(metadata.description, env!("CARGO_PKG_DESCRIPTION"));
     }
 
+    #[cot::test]
+    async fn root_handler_builder_middleware() {
+        // we create a root handler that returns an error for all requests
+        // then we apply a middleware that returns a fixed "ok" response
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+        };
+
+        let root_handler = root_handler_builder
+            .middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_ok(root_handler.handler).await;
+        expect_handler_ok(root_handler.error_handler).await;
+    }
+
+    #[cot::test]
+    async fn root_handler_builder_main_handler_middleware() {
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+        };
+
+        let root_handler = root_handler_builder
+            .main_handler_middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_ok(root_handler.handler).await;
+        expect_handler_error(root_handler.error_handler).await;
+    }
+
+    #[cot::test]
+    async fn root_handler_builder_error_handler_middleware() {
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+        };
+
+        let root_handler = root_handler_builder
+            .error_handler_middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_error(root_handler.handler).await;
+        expect_handler_ok(root_handler.error_handler).await;
+    }
+
+    #[expect(clippy::type_complexity, reason = "test function")]
+    fn make_ok_middleware() -> MapResultLayer<fn(Result<Response, Error>) -> Result<Response, Error>>
+    {
+        MapResultLayer::new(|_| Ok(Response::new(Body::fixed("Hello, world!"))))
+    }
+
+    async fn expect_handler_ok(handler: BoxedHandler) {
+        let response = handler.oneshot(Request::default()).await;
+        assert!(response.is_ok());
+        assert_eq!(response.unwrap().status(), StatusCode::OK);
+    }
+
+    async fn expect_handler_error(handler: BoxedHandler) {
+        let response = handler.oneshot(Request::default()).await;
+        assert!(response.is_err());
+    }
+
     #[cfg(feature = "live-reload")]
     #[cot::test]
     async fn project_middlewares() {
@@ -2051,7 +2267,7 @@ mod tests {
                 &self,
                 handler: RootHandlerBuilder,
                 context: &MiddlewareContext,
-            ) -> BoxedHandler {
+            ) -> RootHandler {
                 handler
                     .middleware(crate::static_files::StaticFilesMiddleware::from_context(
                         context,
@@ -2106,7 +2322,7 @@ mod tests {
     }
 
     #[cot::test]
-    async fn test_default_auth_backend() {
+    async fn default_auth_backend() {
         let context = ProjectContext::new()
             .with_config(
                 ProjectConfig::builder()
@@ -2147,5 +2363,131 @@ mod tests {
 
         assert_eq!(bootstrapper.context().apps.len(), 1);
         assert_eq!(bootstrapper.context().router.routes().len(), 1);
+    }
+
+    #[cot::test]
+    async fn build_custom_error_page_poll_ready_failure() {
+        #[derive(Clone)]
+        struct TestService;
+        impl Service<Request> for TestService {
+            type Response = Response;
+            type Error = Error;
+            type Future = std::future::Ready<crate::Result<Response>>;
+
+            fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+                Poll::Ready(Err(Error::internal("Poll ready failed")))
+            }
+
+            fn call(&mut self, _req: Request) -> Self::Future {
+                std::future::ready(Ok(Response::default()))
+            }
+        }
+
+        let mut server_error_handler = BoxCloneSyncService::new(TestService);
+
+        let panic_payload = Box::new("Test panic message".to_string());
+        let error_response = ErrorResponse::Panic(panic_payload);
+
+        let (request_head, _) = Request::new(Body::empty()).into_parts();
+        let response =
+            build_custom_error_page(&mut server_error_handler, error_response, request_head).await;
+
+        test_last_resort_error(response).await;
+    }
+
+    #[cot::test]
+    async fn build_custom_error_page_call_failure() {
+        let mock_handler = service_fn(|_request: Request| async {
+            Err::<Response, Error>(Error::internal("handler call failed"))
+        });
+
+        let mut server_error_handler = BoxCloneSyncService::new(mock_handler);
+
+        let error = Error::internal("Test error");
+        let error_response = ErrorResponse::ErrorReturned(error);
+
+        let (request_head, _) = Request::new(Body::empty()).into_parts();
+        let response =
+            build_custom_error_page(&mut server_error_handler, error_response, request_head).await;
+
+        test_last_resort_error(response).await;
+    }
+    #[cot::test]
+    async fn build_custom_error_page_success() {
+        // Create a mock error handler that succeeds
+        let mock_handler = service_fn(|_request: Request| async {
+            let html = Html::new("Custom error page content")
+                .with_status(StatusCode::INTERNAL_SERVER_ERROR);
+            Ok::<Response, Error>(html.into_response().unwrap())
+        });
+
+        let mut server_error_handler = BoxCloneSyncService::new(mock_handler);
+
+        let error = Error::internal("Test error");
+        let error_response = ErrorResponse::ErrorReturned(error);
+
+        let (request_head, _) = Request::new(Body::empty()).into_parts();
+        let response =
+            build_custom_error_page(&mut server_error_handler, error_response, request_head).await;
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body_string = axum_response_into_body(response).await;
+        assert!(body_string.contains("Custom error page content"));
+    }
+
+    #[cot::test]
+    async fn build_custom_error_page_panic_conversion() {
+        let mock_handler = service_fn(|request: Request| async {
+            let (parts, _body) = request.into_parts();
+            let error = RequestError::from_request_head(&parts).await.unwrap();
+            assert!(error.is::<UncaughtPanic>());
+
+            let html = Html::new("Panic error handled");
+            Ok::<Response, Error>(html.into_response().unwrap())
+        });
+
+        let mut server_error_handler = BoxCloneSyncService::new(mock_handler);
+
+        let panic_payload = Box::new("Test panic message".to_string());
+        let error_response = ErrorResponse::Panic(panic_payload);
+
+        let (request_head, _) = Request::new(Body::empty()).into_parts();
+        let response =
+            build_custom_error_page(&mut server_error_handler, error_response, request_head).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body_string = axum_response_into_body(response).await;
+        assert!(body_string.contains("Panic error handled"));
+    }
+
+    /// Test that last-resort error page (500.html) is returned
+    async fn test_last_resort_error(response: axum::response::Response) {
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let body_string = axum_response_into_body(response).await;
+
+        assert!(body_string.contains("Server Error"));
+        assert!(
+            body_string.contains("Sorry, the page you are looking for is currently unavailable")
+        );
+    }
+
+    async fn axum_response_into_body(response: axum::response::Response) -> String {
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body_string = String::from_utf8_lossy(&body_bytes);
+        body_string.into_owned()
+    }
+
+    #[cot::test]
+    async fn build_request_for_error_handler() {
+        let error = Error::internal("test error");
+
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
+        prepare_request_for_error_handler(&mut head, error);
+
+        let request_error = head.extensions.get::<RequestOuterError>().unwrap();
+        assert_eq!(request_error.to_string(), "test error");
     }
 }

@@ -8,12 +8,12 @@ use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model, query};
 use cot::form::Form;
 use cot::html::Html;
-use cot::project::{MiddlewareContext, RegisterAppsContext};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::extractors::{Path, RequestDb, RequestForm};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project, reverse_redirect};
+use cot::{App, AppBuilder, Project, reverse_redirect};
 
 #[derive(Debug, Clone)]
 #[model]
@@ -117,7 +117,7 @@ impl Project for TodoProject {
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .build()

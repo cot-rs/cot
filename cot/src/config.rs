@@ -26,6 +26,8 @@ use subtle::ConstantTimeEq;
 use thiserror::Error;
 use time::{OffsetDateTime, UtcOffset};
 
+use crate::error::error_impl::impl_into_cot_error;
+
 /// The configuration for a project.
 ///
 /// This is all the project-specific configuration data that can (and makes
@@ -290,10 +292,15 @@ impl ProjectConfig {
     /// # Ok::<_, cot::Error>(())
     /// ```
     pub fn from_toml(toml_content: &str) -> crate::Result<ProjectConfig> {
-        let config: ProjectConfig = toml::from_str(toml_content)?;
+        let config: ProjectConfig = toml::from_str(toml_content).map_err(ParseConfig)?;
         Ok(config)
     }
 }
+
+#[derive(Debug, Error)]
+#[error("could not parse the config: {0}")]
+struct ParseConfig(#[from] toml::de::Error);
+impl_into_cot_error!(ParseConfig);
 
 impl ProjectConfigBuilder {
     /// Builds the project configuration.
@@ -1801,6 +1808,12 @@ mod tests {
 
         let config = ProjectConfig::from_toml(&toml_content);
         assert!(config.is_err());
+        assert!(
+            config
+                .unwrap_err()
+                .to_string()
+                .contains("could not parse the config")
+        );
     }
 
     #[test]

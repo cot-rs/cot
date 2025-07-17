@@ -184,7 +184,7 @@ impl SessionStore for DbStore {
         let query = query!(Session, $key ==key)
             .get(&self.connection)
             .await
-            .map_err(|err| session_store::Error::Backend(err.to_string()))?;
+            .map_err(DbStoreError::DatabaseError)?;
         if let Some(data) = query {
             let rec = serde_json::from_str::<Record>(&data.data)
                 .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
@@ -211,12 +211,13 @@ mod tests {
 
     use cot::db::DatabaseError;
     use cot::db::migrations::MigrationEngine;
-    use cot::session::db::migrations::m_0001_initial::Migration;
+    use cot::session::db::SessionApp;
     use tempfile::{TempDir, tempdir};
     use time::{Duration, OffsetDateTime};
     use tower_sessions::session::{Id, Record};
 
     use super::*;
+    use crate::App;
 
     static TEMPDIR: OnceLock<TempDir> = OnceLock::new();
 
@@ -229,17 +230,16 @@ mod tests {
     }
 
     async fn engine_setup() -> Result<(), DatabaseError> {
+        let session_app = SessionApp::default();
         let test_db = format!("sqlite://{}/db_store.sqlite3?mode=rwc", get_tempdir());
-        let engine = MigrationEngine::new([Migration])?;
+        let engine = MigrationEngine::new(session_app.migrations())?;
         let database = Database::new(test_db).await?;
         engine.run(&database).await?;
         Ok(())
     }
     async fn make_db_store() -> DbStore {
         let test_db = format!("sqlite://{}/db_store.sqlite3?mode=rwc", get_tempdir());
-        engine_setup()
-            .await
-            .unwrap_or_else(|err| println!("{err:?}"));
+        engine_setup().await.expect("could not setup db engine");
         let db = Arc::new(
             Database::new(&test_db)
                 .await

@@ -1817,7 +1817,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "cache")]
     fn session_store_valid_toml() {
         let toml_content = r#"
             debug = true
@@ -1845,6 +1844,7 @@ mod tests {
             "#,
                 SessionStoreTypeConfig::Memory,
             ),
+            #[cfg(feature = "cache")]
             (
                 r#"
             [middlewares.session.store]
@@ -1864,6 +1864,14 @@ mod tests {
                 SessionStoreTypeConfig::File {
                     path: PathBuf::from("session/path"),
                 },
+            ),
+            #[cfg(all(feature = "db", feature = "json"))]
+            (
+                r#"
+            [middlewares.session.store]
+            type = "database"
+            "#,
+                SessionStoreTypeConfig::Database,
             ),
         ];
 

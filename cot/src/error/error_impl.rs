@@ -41,6 +41,31 @@ impl Error {
 
     /// Create a new error with a custom error message or error type.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::Error;
+    ///
+    /// let error = Error::custom("An error occurred");
+    /// let error = Error::custom(std::io::Error::new(
+    ///     std::io::ErrorKind::Other,
+    ///     "An error occurred",
+    /// ));
+    /// ```
+    #[deprecated(
+        note = "Use `cot::Error::internal`, or `cot::Error::with_status` instead",
+        since = "0.4.0"
+    )]
+    #[must_use]
+    pub fn custom<E>(error: E) -> Self
+    where
+        E: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    {
+        Self::internal(error)
+    }
+
+    /// Create a new error with a custom error message or error type.
+    ///
     /// The error will be associated with a 500 Internal Server Error
     /// status code, which is the default for unexpected errors.
     ///

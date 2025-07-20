@@ -165,7 +165,7 @@ impl SessionStore for DbStore {
         let query = query!(Session, $key ==key.clone())
             .get(&self.connection)
             .await
-            .map_err(|err| session_store::Error::Backend(err.to_string()))?;
+            .map_err(DbStoreError::DatabaseError)?;
         if let Some(mut model) = query {
             model.data = data;
             model
@@ -207,6 +207,7 @@ impl SessionStore for DbStore {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::io::{self, ErrorKind};
     use std::sync::OnceLock;
 
     use cot::db::DatabaseError;
@@ -230,7 +231,7 @@ mod tests {
     }
 
     async fn engine_setup() -> Result<(), DatabaseError> {
-        let session_app = SessionApp::default();
+        let session_app = SessionApp;
         let test_db = format!("sqlite://{}/db_store.sqlite3?mode=rwc", get_tempdir());
         let engine = MigrationEngine::new(session_app.migrations())?;
         let database = Database::new(test_db).await?;
@@ -326,5 +327,37 @@ mod tests {
         let loaded1 = store.load(&r1.id).await.unwrap();
         let loaded2 = store.load(&r2.id).await.unwrap();
         assert!(loaded1.is_some() && loaded2.is_some());
+    }
+
+    #[test]
+    fn test_from_db_store_error_to_session_store_error() {
+        // DatabaseEngineError variant -> Backend
+        let sqlx_err = sqlx::Error::Protocol("protocol error".into());
+        let db_err = DatabaseError::DatabaseEngineError(sqlx_err);
+        let sess_err: session_store::Error = DbStoreError::DatabaseError(db_err).into();
+        match sess_err {
+            session_store::Error::Backend(msg) => assert!(msg.contains("protocol error")),
+            _ => panic!("Expected Backend variant"),
+        }
+
+        // Serialize error -> Encode
+        let io_err = io::Error::new(ErrorKind::Other, "oops");
+        let serialize_err: session_store::Error = DbStoreError::Serialize(Box::new(io_err)).into();
+        match serialize_err {
+            session_store::Error::Encode(msg) => assert!(msg.contains("oops")),
+            _ => panic!("Expected Encode variant"),
+        }
+
+        // Deserialize error -> Decode
+        let parse_err = serde_json::from_str::<Record>("not a json").unwrap_err();
+        let deserialize_err: session_store::Error =
+            DbStoreError::Deserialize(Box::new(parse_err)).into();
+        match deserialize_err {
+            session_store::Error::Decode(msg) => {
+                println!("msg: {msg}");
+                assert!(msg.contains("expected ident"))
+            }
+            _ => panic!("Expected Decode variant"),
+        }
     }
 }

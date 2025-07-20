@@ -207,7 +207,7 @@ impl SessionStore for DbStore {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::io::{self, ErrorKind};
+    use std::io;
     use std::sync::OnceLock;
 
     use cot::db::DatabaseError;
@@ -341,7 +341,7 @@ mod tests {
         }
 
         // Serialize error -> Encode
-        let io_err = io::Error::new(ErrorKind::Other, "oops");
+        let io_err = io::Error::other("oops");
         let serialize_err: session_store::Error = DbStoreError::Serialize(Box::new(io_err)).into();
         match serialize_err {
             session_store::Error::Encode(msg) => assert!(msg.contains("oops")),
@@ -355,7 +355,7 @@ mod tests {
         match deserialize_err {
             session_store::Error::Decode(msg) => {
                 println!("msg: {msg}");
-                assert!(msg.contains("expected ident"))
+                assert!(msg.contains("expected ident"));
             }
             _ => panic!("Expected Decode variant"),
         }

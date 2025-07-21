@@ -209,62 +209,69 @@ mod tests {
     use std::borrow::Cow;
     use std::collections::HashMap;
     use std::io;
+    use std::path::PathBuf;
     use std::sync::OnceLock;
 
     use cot::db::DatabaseError;
     use cot::db::migrations::MigrationEngine;
     use cot::session::db::SessionApp;
-    use tempfile::{TempDir, tempdir};
+    use tempfile::TempDir;
     use time::{Duration, OffsetDateTime};
     use tower_sessions::session::{Id, Record};
 
     use super::*;
     use crate::App;
 
-    static TEMPDIR: OnceLock<TempDir> = OnceLock::new();
-
-    fn get_tempdir() -> &'static str {
-        static DBSTORE_PATH: OnceLock<String> = OnceLock::new();
-
-        DBSTORE_PATH.get_or_init(|| {
-            let base_dir = TEMPDIR
-                .get_or_init(|| tempdir().expect("Failed to create temporary directory"))
-                .path();
-
-            let dbstore_dir = base_dir.join("dbstore");
-            std::fs::create_dir_all(&dbstore_dir).expect("Failed to create dbstore directory");
-
-            dbstore_dir
-                .to_str()
-                .expect("Failed to convert path to string")
-                .to_string()
-        })
+    struct TestContext {
+        _temp_dir: TempDir,
+        db_folder: PathBuf,
     }
 
-    async fn engine_setup() -> Result<(), DatabaseError> {
-        let session_app = SessionApp;
-        let test_db = format!("sqlite://{}/db_store.sqlite3?mode=rwc", get_tempdir());
-        let engine = MigrationEngine::new(session_app.migrations())?;
-        let database = Database::new(test_db).await?;
-        engine.run(&database).await?;
-        Ok(())
+    impl TestContext {
+        fn get() -> &'static Self {
+            static CTX: OnceLock<TestContext> = OnceLock::new();
+            CTX.get_or_init(|| {
+                let td = TempDir::new().expect("TempDir");
+                // create a nested directory to fix potential race condition in the CI.
+                let db_folder = td.path().join("dbstore");
+                std::fs::create_dir_all(&db_folder).expect("mkdir dbstore");
+                TestContext {
+                    _temp_dir: td,
+                    db_folder,
+                }
+            })
+        }
+
+        fn db_uri(&self) -> String {
+            format!(
+                "sqlite://{}/db_store.sqlite3?mode=rwc",
+                self.db_folder.display()
+            )
+        }
+
+        async fn prepare_schema(&self) -> Result<Database, DatabaseError> {
+            let uri = self.db_uri();
+            let engine = MigrationEngine::new(SessionApp.migrations())?;
+            let db = Database::new(&uri).await?;
+            engine.run(&db).await?;
+            Ok(db)
+        }
     }
+
     async fn make_db_store() -> DbStore {
-        let test_db = format!("sqlite://{}/db_store.sqlite3?mode=rwc", get_tempdir());
-        engine_setup().await.expect("could not setup db engine");
         let db = Arc::new(
-            Database::new(&test_db)
+            TestContext::get()
+                .prepare_schema()
                 .await
-                .expect("Failed to connect to database"),
+                .expect("prepare_schema"),
         );
-
         DbStore::new(db)
     }
 
     fn make_record() -> Record {
         Record {
             id: Id::default(),
-            data: HashMap::default(),
+            data: Default::default(),
             expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
         }
     }

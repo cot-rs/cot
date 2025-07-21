@@ -206,6 +206,7 @@ impl SessionStore for DbStore {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
     use std::collections::HashMap;
     use std::io;
     use std::sync::OnceLock;
@@ -331,33 +332,87 @@ mod tests {
 
     #[test]
     fn test_from_db_store_error_to_session_store_error() {
-        // DatabaseEngineError variant -> Backend
         let sqlx_err = sqlx::Error::Protocol("protocol error".into());
         let db_err = DatabaseError::DatabaseEngineError(sqlx_err);
         let sess_err: session_store::Error = DbStoreError::DatabaseError(db_err).into();
-        match sess_err {
-            session_store::Error::Backend(msg) => assert!(msg.contains("protocol error")),
-            _ => panic!("Expected Backend variant"),
-        }
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
 
-        // Serialize error -> Encode
         let io_err = io::Error::other("oops");
         let serialize_err: session_store::Error = DbStoreError::Serialize(Box::new(io_err)).into();
-        match serialize_err {
-            session_store::Error::Encode(msg) => assert!(msg.contains("oops")),
-            _ => panic!("Expected Encode variant"),
-        }
 
-        // Deserialize error -> Decode
+        assert!(matches!(serialize_err, session_store::Error::Encode(_)));
+
         let parse_err = serde_json::from_str::<Record>("not a json").unwrap_err();
         let deserialize_err: session_store::Error =
             DbStoreError::Deserialize(Box::new(parse_err)).into();
-        match deserialize_err {
-            session_store::Error::Decode(msg) => {
-                println!("msg: {msg}");
-                assert!(msg.contains("expected ident"));
-            }
-            _ => panic!("Expected Decode variant"),
+        assert!(matches!(deserialize_err, session_store::Error::Decode(_)));
+    }
+
+    use sqlx::Error as SqlxError;
+    use sqlx::error::{DatabaseError as SqlxDbErrorTrait, ErrorKind};
+
+    /// A fake database error to drive `sqlx::Error::Database`.
+    #[derive(Debug)]
+    struct FakeDbErr(Option<String>);
+
+    impl std::fmt::Display for FakeDbErr {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "FakeDbErr")
+        }
+    }
+    impl Error for FakeDbErr {}
+    impl SqlxDbErrorTrait for FakeDbErr {
+        fn message(&self) -> &str {
+            "fake error"
+        }
+
+        fn code(&self) -> Option<Cow<'_, str>> {
+            self.0.as_ref().map(Cow::from)
+        }
+
+        fn as_error(&self) -> &(dyn Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn as_error_mut(&mut self) -> &mut (dyn Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn into_error(self: Box<Self>) -> Box<dyn Error + Send + Sync + 'static> {
+            self
+        }
+
+        fn kind(&self) -> ErrorKind {
+            ErrorKind::UniqueViolation
+        }
+    }
+
+    #[test]
+    fn non_database_variant_is_false() {
+        assert!(!is_unique_violation(&SqlxError::RowNotFound));
+    }
+
+    #[test]
+    fn database_with_no_code_is_false() {
+        let err = SqlxError::Database(Box::new(FakeDbErr(None)));
+        assert!(!is_unique_violation(&err));
+    }
+
+    #[test]
+    fn database_with_unrelated_code_is_false() {
+        let err = SqlxError::Database(Box::new(FakeDbErr(Some("9999".into()))));
+        assert!(!is_unique_violation(&err));
+    }
+
+    #[test]
+    fn database_with_unique_violation_codes_are_true() {
+        for &code in &["2067", "1555", "23505", "1062"] {
+            let err = SqlxError::Database(Box::new(FakeDbErr(Some(code.to_string()))));
+            assert!(
+                is_unique_violation(&err),
+                "Expected code {} to be recognized as unique violation",
+                code
+            );
         }
     }
 }

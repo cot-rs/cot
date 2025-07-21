@@ -32,7 +32,7 @@ use crate::response::Response;
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
-///     fn server_error_handler(&self) -> DynErrorPageHandler {
+///     fn error_handler(&self) -> DynErrorPageHandler {
 ///         DynErrorPageHandler::new(error_handler)
 ///     }
 /// }
@@ -99,7 +99,7 @@ impl DynErrorPageHandler {
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
-    ///     fn server_error_handler(&self) -> DynErrorPageHandler {
+    ///     fn error_handler(&self) -> DynErrorPageHandler {
     ///         DynErrorPageHandler::new(error_handler)
     ///     }
     /// }

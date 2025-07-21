@@ -162,7 +162,7 @@ impl Error {
     /// ```
     #[must_use]
     #[deprecated(
-        note = "Use `cot::Error::from(cot::error::not_found::NotFound::new())` instead",
+        note = "Use `cot::Error::from(cot::error::NotFound::new())` instead",
         since = "0.4.0"
     )]
     pub fn not_found() -> Self {
@@ -184,7 +184,7 @@ impl Error {
     /// ```
     #[must_use]
     #[deprecated(
-        note = "Use `cot::Error::from(cot::error::not_found::NotFound::with_message())` instead",
+        note = "Use `cot::Error::from(cot::error::NotFound::with_message())` instead",
         since = "0.4.0"
     )]
     pub fn not_found_message(message: String) -> Self {

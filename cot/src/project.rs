@@ -1998,7 +1998,7 @@ fn build_cot_error_page(
 }
 
 async fn build_custom_error_page(
-    server_error_handler: &mut BoxCloneSyncService<Request, Response, Error>,
+    error_handler: &mut BoxCloneSyncService<Request, Response, Error>,
     error_response: ErrorResponse,
     mut request_head: RequestHead,
 ) -> axum::response::Response {
@@ -2009,7 +2009,7 @@ async fn build_custom_error_page(
 
     prepare_request_for_error_handler(&mut request_head, error);
 
-    let poll_status = poll_fn(|cx| server_error_handler.poll_ready(cx)).await;
+    let poll_status = poll_fn(|cx| error_handler.poll_ready(cx)).await;
     if let Err(error) = poll_status {
         error!(
             ?error,
@@ -2021,7 +2021,7 @@ async fn build_custom_error_page(
     }
 
     let request = Request::from_parts(request_head, Body::empty());
-    let response = server_error_handler.call(request).await;
+    let response = error_handler.call(request).await;
     response.map_or_else(
         |error| {
             error!(
@@ -2383,14 +2383,14 @@ mod tests {
             }
         }
 
-        let mut server_error_handler = BoxCloneSyncService::new(TestService);
+        let mut error_handler = BoxCloneSyncService::new(TestService);
 
         let panic_payload = Box::new("Test panic message".to_string());
         let error_response = ErrorResponse::Panic(panic_payload);
 
         let (request_head, _) = Request::new(Body::empty()).into_parts();
         let response =
-            build_custom_error_page(&mut server_error_handler, error_response, request_head).await;
+            build_custom_error_page(&mut error_handler, error_response, request_head).await;
 
         test_last_resort_error(response).await;
     }
@@ -2401,14 +2401,14 @@ mod tests {
             Err::<Response, Error>(Error::internal("handler call failed"))
         });
 
-        let mut server_error_handler = BoxCloneSyncService::new(mock_handler);
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
 
         let error = Error::internal("Test error");
         let error_response = ErrorResponse::ErrorReturned(error);
 
         let (request_head, _) = Request::new(Body::empty()).into_parts();
         let response =
-            build_custom_error_page(&mut server_error_handler, error_response, request_head).await;
+            build_custom_error_page(&mut error_handler, error_response, request_head).await;
 
         test_last_resort_error(response).await;
     }
@@ -2421,14 +2421,14 @@ mod tests {
             Ok::<Response, Error>(html.into_response().unwrap())
         });
 
-        let mut server_error_handler = BoxCloneSyncService::new(mock_handler);
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
 
         let error = Error::internal("Test error");
         let error_response = ErrorResponse::ErrorReturned(error);
 
         let (request_head, _) = Request::new(Body::empty()).into_parts();
         let response =
-            build_custom_error_page(&mut server_error_handler, error_response, request_head).await;
+            build_custom_error_page(&mut error_handler, error_response, request_head).await;
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body_string = axum_response_into_body(response).await;
@@ -2446,14 +2446,14 @@ mod tests {
             Ok::<Response, Error>(html.into_response().unwrap())
         });
 
-        let mut server_error_handler = BoxCloneSyncService::new(mock_handler);
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
 
         let panic_payload = Box::new("Test panic message".to_string());
         let error_response = ErrorResponse::Panic(panic_payload);
 
         let (request_head, _) = Request::new(Body::empty()).into_parts();
         let response =
-            build_custom_error_page(&mut server_error_handler, error_response, request_head).await;
+            build_custom_error_page(&mut error_handler, error_response, request_head).await;
 
         assert_eq!(response.status(), StatusCode::OK);
         let body_string = axum_response_into_body(response).await;

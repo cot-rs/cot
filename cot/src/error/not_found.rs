@@ -14,7 +14,7 @@ use crate::error::error_impl::impl_into_cot_error;
 /// # Examples
 ///
 /// ```
-/// use cot::error::not_found::NotFound;
+/// use cot::error::NotFound;
 ///
 /// // Create a basic 404 error
 /// let error = NotFound::new();
@@ -42,7 +42,7 @@ impl NotFound {
     /// # Examples
     ///
     /// ```
-    /// use cot::error::not_found::NotFound;
+    /// use cot::error::NotFound;
     ///
     /// let error = NotFound::new();
     /// ```
@@ -60,7 +60,7 @@ impl NotFound {
     /// # Examples
     ///
     /// ```
-    /// use cot::error::not_found::NotFound;
+    /// use cot::error::NotFound;
     ///
     /// let error = NotFound::with_message("User with ID 123 not found");
     /// let page_name = "home";

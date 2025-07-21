@@ -6,8 +6,8 @@ use askama::Template;
 use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
+use crate::error::NotFound;
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace};
-use crate::error::not_found::NotFound;
 use crate::router::Router;
 use crate::{Error, Result, StatusCode};
 
@@ -71,7 +71,7 @@ impl ErrorPageTemplateBuilder {
         let mut error_message = None;
 
         if let Some(not_found) = error.inner().downcast_ref::<NotFound>() {
-            use crate::error::not_found::Kind;
+            use crate::error::NotFoundKind as Kind;
             match &not_found.kind {
                 Kind::FromRouter => {}
                 Kind::Custom => {

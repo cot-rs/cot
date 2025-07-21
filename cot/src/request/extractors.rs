@@ -51,14 +51,13 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use cot::request::{PathParams, Request};
 use serde::de::DeserializeOwned;
 
 use crate::auth::Auth;
 use crate::form::{Form, FormResult};
 #[cfg(feature = "json")]
 use crate::json::Json;
-use crate::request::{InvalidContentType, RequestExt, RequestHead};
+use crate::request::{InvalidContentType, PathParams, Request, RequestExt, RequestHead};
 use crate::router::Urls;
 use crate::session::Session;
 use crate::{Body, Method};
@@ -222,7 +221,8 @@ where
         let deserializer =
             serde_html_form::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
 
-        let value = serde_path_to_error::deserialize(deserializer).map_err(QueryParametersParse)?;
+        let value =
+            serde_path_to_error::deserialize(deserializer).map_err(QueryParametersParseError)?;
 
         Ok(UrlQuery(value))
     }
@@ -230,8 +230,8 @@ where
 
 #[derive(Debug, thiserror::Error)]
 #[error("could not parse query parameters: {0}")]
-struct QueryParametersParse(serde_path_to_error::Error<serde::de::value::Error>);
-impl_into_cot_error!(QueryParametersParse, BAD_REQUEST);
+struct QueryParametersParseError(serde_path_to_error::Error<serde::de::value::Error>);
+impl_into_cot_error!(QueryParametersParseError, BAD_REQUEST);
 
 /// Extractor that gets the request body as JSON and deserializes it into a type
 /// `T` implementing `serde::de::DeserializeOwned`.
@@ -485,7 +485,7 @@ impl StaticFiles {
     }
 }
 
-const ERROR_PREFIX: &str = "could not get URL for a static file: ";
+const ERROR_PREFIX: &str = "could not get URL for a static file:";
 /// Errors that can occur when trying to get a static file.
 ///
 /// This enum represents errors that can occur when attempting to
@@ -494,7 +494,7 @@ const ERROR_PREFIX: &str = "could not get URL for a static file: ";
 #[non_exhaustive]
 pub enum StaticFilesGetError {
     /// The requested static file was not found.
-    #[error("{ERROR_PREFIX}static file `{path}` not found")]
+    #[error("{ERROR_PREFIX} static file `{path}` not found")]
     #[non_exhaustive]
     NotFound {
         /// The path of the static file that was not found.

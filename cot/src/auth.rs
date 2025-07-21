@@ -31,28 +31,28 @@ use crate::error::error_impl::impl_into_cot_error;
 use crate::request::{Request, RequestExt};
 use crate::session::Session;
 
-const ERROR_PREFIX: &str = "failed to authenticate user: ";
+const ERROR_PREFIX: &str = "failed to authenticate user:";
 
 /// An error that occurs during authentication.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum AuthError {
     /// The password hash that is passed to [`PasswordHash::new`] is invalid.
-    #[error("{ERROR_PREFIX}password hash is invalid")]
+    #[error("{ERROR_PREFIX} password hash is invalid")]
     PasswordHashInvalid,
     /// An error occurred while accessing the session object.
-    #[error("{ERROR_PREFIX}error while accessing the session object")]
+    #[error("{ERROR_PREFIX} error while accessing the session object")]
     SessionAccess(#[from] tower_sessions::session::Error),
     /// An error occurred while accessing the user object.
-    #[error("{ERROR_PREFIX}error while accessing the user object")]
+    #[error("{ERROR_PREFIX} error while accessing the user object")]
     UserBackend(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
     /// The credentials type provided to [`AuthBackend::authenticate`] is not
     /// supported.
-    #[error("{ERROR_PREFIX}tried to authenticate with an unsupported credentials type")]
+    #[error("{ERROR_PREFIX} tried to authenticate with an unsupported credentials type")]
     CredentialsTypeNotSupported,
     /// The [`UserId`] type provided to [`AuthBackend::get_by_id`] is not
     /// supported.
-    #[error("{ERROR_PREFIX}tried to get a user by an unsupported user ID type")]
+    #[error("{ERROR_PREFIX} tried to get a user by an unsupported user ID type")]
     UserIdTypeNotSupported,
 }
 impl_into_cot_error!(AuthError, UNAUTHORIZED);

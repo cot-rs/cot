@@ -12,7 +12,7 @@ use crate::error::not_found::NotFound;
 
 /// An error that can occur while using Cot.
 pub struct Error {
-    inner: Box<ErrorImpl>,
+    repr: Box<ErrorImpl>,
 }
 
 impl Error {
@@ -31,7 +31,7 @@ impl Error {
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
         Self {
-            inner: Box::new(ErrorImpl {
+            repr: Box::new(ErrorImpl {
                 inner: error.into(),
                 status_code: None,
                 backtrace: __cot_create_backtrace(),
@@ -53,7 +53,7 @@ impl Error {
     /// ));
     /// ```
     #[deprecated(
-        note = "Use `cot::Error::internal`, or `cot::Error::with_status` instead",
+        note = "Use `cot::Error::internal` or `cot::Error::with_status` instead",
         since = "0.4.0"
     )]
     #[must_use]
@@ -116,7 +116,7 @@ impl Error {
         E: Into<Box<dyn StdError + Send + Sync + 'static>>,
     {
         let error = Self {
-            inner: Box::new(ErrorImpl {
+            repr: Box::new(ErrorImpl {
                 inner: error.into(),
                 status_code: Some(status_code),
                 backtrace: __cot_create_backtrace(),
@@ -210,17 +210,18 @@ impl Error {
     #[must_use]
     pub fn status_code(&self) -> StatusCode {
         self.inner()
-            .inner
+            .repr
             .status_code
             .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
     }
 
     #[must_use]
     pub(crate) fn backtrace(&self) -> &CotBacktrace {
-        &self.inner.backtrace
+        &self.repr.backtrace
     }
 
     /// Returns a reference to inner `Error`, if `self` is wrapping a wrapper.
+    /// Otherwise, it returns `self`.
     ///
     /// If this error is a wrapper around another `Error`, this method will
     /// return the inner `Error` that has a specific status code.
@@ -255,25 +256,25 @@ impl Error {
     /// HTTP status code associated with it. Otherwise, it returns `false`.
     #[must_use]
     pub fn is_wrapper(&self) -> bool {
-        self.inner.status_code.is_none()
+        self.repr.status_code.is_none()
     }
 }
 
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self.inner, f)
+        Debug::fmt(&self.repr, f)
     }
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.inner.inner, f)
+        Display::fmt(&self.repr.inner, f)
     }
 }
 
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.inner.inner.source()
+        self.repr.inner.source()
     }
 }
 
@@ -281,7 +282,7 @@ impl Deref for Error {
     type Target = dyn StdError + Send + Sync;
 
     fn deref(&self) -> &Self::Target {
-        &*self.inner.inner
+        &*self.repr.inner
     }
 }
 
@@ -358,6 +359,8 @@ impl From<tower_sessions::session::Error> for Error {
 
 #[cfg(test)]
 mod tests {
+    use serde::ser::Error as _;
+
     use super::*;
 
     #[test]
@@ -377,5 +380,78 @@ mod tests {
         let display = format!("{error}");
 
         assert_eq!(display, "server error");
+    }
+
+    #[test]
+    fn error_wrap_and_is_wrapper() {
+        let inner = std::io::Error::other("wrapped");
+        let error = Error::wrap(inner);
+
+        assert!(error.is_wrapper());
+        assert_eq!(error.status_code(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn error_with_status_propagation() {
+        let error = Error::with_status("bad request", StatusCode::BAD_REQUEST);
+        assert_eq!(error.status_code(), StatusCode::BAD_REQUEST);
+        // wrapping again should not override the status code
+        let wrapped = Error::wrap(error);
+
+        assert_eq!(wrapped.status_code(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn error_inner_returns_original() {
+        let error = Error::with_status("bad request", StatusCode::BAD_REQUEST);
+        let wrapped = Error::wrap(error);
+
+        assert_eq!(wrapped.inner().status_code(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn error_inner_multiple_wrapped() {
+        let error = Error::with_status("bad request", StatusCode::BAD_REQUEST);
+        let wrapped = Error::wrap(error);
+        let wrapped_twice = Error::wrap(wrapped);
+        let wrapped_thrice = Error::wrap(wrapped_twice);
+
+        assert_eq!(wrapped_thrice.to_string(), "bad request");
+        assert!(wrapped_thrice.source().is_some());
+        assert!(wrapped_thrice.source().unwrap().source().is_none());
+        assert_eq!(
+            wrapped_thrice.inner().status_code(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn error_deref_to_inner() {
+        let error = Error::internal("deref test");
+        let msg = format!("{}", &*error);
+
+        assert_eq!(msg, "deref test");
+    }
+
+    #[test]
+    fn error_from_template_render() {
+        let askama_err = askama::Error::Custom(Box::new(std::io::Error::other("fail")));
+        let error: Error = askama_err.into();
+
+        assert!(error.to_string().contains("failed to render template"));
+    }
+
+    #[test]
+    fn error_from_session_access() {
+        let session_err =
+            tower_sessions::session::Error::SerdeJson(serde_json::Error::custom("session error"));
+
+        let error: Error = session_err.into();
+
+        assert!(
+            error
+                .to_string()
+                .contains("error while accessing the session object")
+        );
     }
 }

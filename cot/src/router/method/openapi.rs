@@ -517,9 +517,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use cot::error::method_not_allowed::MethodNotAllowed;
-
     use super::*;
+    use crate::error::MethodNotAllowed;
     use crate::html::Html;
     use crate::json::Json;
     use crate::request::extractors::Path;

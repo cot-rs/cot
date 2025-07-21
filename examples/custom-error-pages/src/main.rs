@@ -42,7 +42,7 @@ impl Project for HelloProject {
         apps.register_with_views(HelloApp, "");
     }
 
-    fn server_error_handler(&self) -> DynErrorPageHandler {
+    fn error_handler(&self) -> DynErrorPageHandler {
         DynErrorPageHandler::new(error_page_handler)
     }
 }

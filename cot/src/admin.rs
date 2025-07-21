@@ -22,7 +22,7 @@ use serde::Deserialize;
 
 use crate::auth::Auth;
 use crate::common_types::Password;
-use crate::error::not_found::NotFound;
+use crate::error::NotFound;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
@@ -189,7 +189,7 @@ async fn view_model(
     Path(model_name): Path<String>,
     UrlQuery(pagination_params): UrlQuery<PaginationParams>,
     request: Request,
-) -> cot::Result<Response> {
+) -> crate::Result<Response> {
     #[derive(Debug, Template)]
     #[template(path = "admin/model.html")]
     struct ModelTemplate<'a> {

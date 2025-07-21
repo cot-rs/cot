@@ -47,9 +47,9 @@ use crate::config::{AuthBackendConfig, ProjectConfig};
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
+use crate::error::UncaughtPanic;
 use crate::error::error_impl::impl_into_cot_error;
 use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
-use crate::error::uncaught_panic::UncaughtPanic;
 use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
 use crate::html::Html;
@@ -392,7 +392,9 @@ pub trait Project {
     ///
     /// This method may return an error if the handler fails to build a
     /// response. In this case, the error will be logged and a generic
-    /// error page will be returned to the user.
+    /// error page will be returned to the user. Because of that, you
+    /// should avoid returning an error from this handler and try to
+    /// handle the error gracefully instead.
     ///
     /// # Panics
     ///
@@ -411,7 +413,7 @@ pub trait Project {
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
-    ///     fn server_error_handler(&self) -> DynErrorPageHandler {
+    ///     fn error_handler(&self) -> DynErrorPageHandler {
     ///         DynErrorPageHandler::new(error_handler)
     ///     }
     /// }
@@ -420,8 +422,8 @@ pub trait Project {
     ///     Html::new(format!("An error occurred: {error}")).with_status(error.status_code())
     /// }
     /// ```
-    fn server_error_handler(&self) -> DynErrorPageHandler {
-        DynErrorPageHandler::new(default_server_error_handler)
+    fn error_handler(&self) -> DynErrorPageHandler {
+        DynErrorPageHandler::new(default_error_handler)
     }
 }
 
@@ -524,7 +526,7 @@ where
         }
     }
 
-    /// Adds middleware to only the main request handler.
+    /// Adds middleware only to the main request handler.
     ///
     /// This method is used to add middleware that should only be applied to
     /// the main request handler, not to the error handler. This is useful when
@@ -571,7 +573,7 @@ where
         }
     }
 
-    /// Adds middleware to only the error handler.
+    /// Adds middleware only to the error handler.
     ///
     /// This method is used to add middleware that should only be applied to
     /// the error handler, not to the main request handler. This is useful when
@@ -790,9 +792,7 @@ impl AppBuilder {
     }
 }
 
-async fn default_server_error_handler(
-    error: RequestOuterError,
-) -> crate::Result<impl IntoResponse> {
+async fn default_error_handler(error: RequestOuterError) -> crate::Result<impl IntoResponse> {
     #[derive(Debug, Template)]
     #[template(path = "default_error.html")]
     struct ErrorTemplate {
@@ -1273,7 +1273,7 @@ impl Bootstrapper<WithDatabase> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler_builder = RootHandlerBuilder {
             handler: router_service,
-            error_handler: self.project.server_error_handler(),
+            error_handler: self.project.error_handler(),
         };
         let handler = self.project.middlewares(handler_builder, &self.context);
 

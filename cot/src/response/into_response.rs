@@ -393,7 +393,7 @@ mod tests {
     use http::{self, HeaderMap, HeaderValue};
 
     use super::*;
-    use crate::error::not_found::NotFound;
+    use crate::error::NotFound;
     use crate::html::Html;
 
     #[cot::test]

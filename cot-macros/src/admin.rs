@@ -218,7 +218,7 @@ impl AdminModelDeriveBuilder {
                 use ::std::str::FromStr;
 
                 <T as #crate_ident::db::Model>::PrimaryKey::from_str(id).map_err(|_| {
-                    #crate_ident::error::not_found::NotFound::with_message(::std::format!(
+                    #crate_ident::error::NotFound::with_message(::std::format!(
                         "invalid ID for admin model `{model_name}`: `{id}`",
                         model_name = stringify!(#name)
                     ))

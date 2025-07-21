@@ -69,7 +69,7 @@ impl Project for JsonProject {
         apps.register_with_views(AddApp, "");
     }
 
-    fn server_error_handler(&self) -> DynErrorPageHandler {
+    fn error_handler(&self) -> DynErrorPageHandler {
         DynErrorPageHandler::new(error_handler)
     }
 }

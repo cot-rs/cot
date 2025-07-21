@@ -43,20 +43,20 @@ use crate::db::impl_sqlite::{DatabaseSqlite, SqliteRow, SqliteValueRef};
 use crate::db::migrations::ColumnTypeMapper;
 use crate::error::error_impl::impl_into_cot_error;
 
-const ERROR_PREFIX: &str = "database error: ";
+const ERROR_PREFIX: &str = "database error:";
 /// An error that can occur when interacting with the database.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum DatabaseError {
     /// Database engine error.
-    #[error("{ERROR_PREFIX}database engine error: {0}")]
+    #[error("{ERROR_PREFIX} database engine error: {0}")]
     DatabaseEngineError(#[from] sqlx::Error),
     /// Error when building query.
-    #[error("{ERROR_PREFIX}error when building query: {0}")]
+    #[error("{ERROR_PREFIX} error when building query: {0}")]
     QueryBuildingError(#[from] sea_query::error::Error),
     /// Type mismatch in database value.
     #[error(
-        "{ERROR_PREFIX}type mismatch in database value: expected `{expected}`, found `{found}`. \
+        "{ERROR_PREFIX} type mismatch in database value: expected `{expected}`, found `{found}`. \
         Perhaps a migration is needed"
     )]
     TypeMismatch {
@@ -66,20 +66,20 @@ pub enum DatabaseError {
         found: String,
     },
     /// Error when decoding database value.
-    #[error("{ERROR_PREFIX}error when decoding database value: {0}")]
+    #[error("{ERROR_PREFIX} error when decoding database value: {0}")]
     ValueDecode(Box<dyn std::error::Error + 'static + Send + Sync>),
     /// Error when applying migrations.
-    #[error("{ERROR_PREFIX}error when applying migrations: {0}")]
+    #[error("{ERROR_PREFIX} error when applying migrations: {0}")]
     MigrationError(#[from] migrations::MigrationEngineError),
     /// An object could not be found in the database.
-    #[error("{ERROR_PREFIX}record with primary key `{primary_key}` not found in the database")]
+    #[error("{ERROR_PREFIX} record with primary key `{primary_key}` not found in the database")]
     RecordNotFound {
         /// The primary key of the record that was not found.
         primary_key: DbValue,
     },
     /// Foreign Key could not be retrieved from the database because the record
     /// was not found.
-    #[error("{ERROR_PREFIX}error retrieving a Foreign Key from the database: record not found")]
+    #[error("{ERROR_PREFIX} error retrieving a Foreign Key from the database: record not found")]
     ForeignKeyNotFound,
 }
 impl_into_cot_error!(DatabaseError, INTERNAL_SERVER_ERROR);

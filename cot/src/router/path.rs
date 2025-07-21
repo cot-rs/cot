@@ -268,13 +268,13 @@ macro_rules! reverse_param_map {
     }};
 }
 
-const ERROR_PREFIX: &str = "failed to reverse route: ";
+const ERROR_PREFIX: &str = "failed to reverse route:";
 /// An error that occurs when reversing a path with missing parameters.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ReverseError {
     /// A parameter is missing for the reverse operation.
-    #[error("{ERROR_PREFIX}missing parameter for reverse: `{0}`")]
+    #[error("{ERROR_PREFIX} missing parameter for reverse: `{0}`")]
     #[non_exhaustive]
     MissingParam(String),
 }

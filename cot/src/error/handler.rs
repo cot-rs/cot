@@ -56,12 +56,6 @@ pub trait ErrorPageHandler<T = ()> {
     /// This method is called when an error occurs and the application needs to
     /// generate an error page response.
     ///
-    /// Note that the request passed to this method is **not** the original
-    /// request that caused the error, but rather a new request that contains
-    /// the error information in its extensions, along with the project context.
-    /// This allows the handler to generate a response based on the error
-    /// context without having to retain the original request.
-    ///
     /// # Errors
     ///
     /// This method may return an error if the handler fails to build a
@@ -93,7 +87,7 @@ impl DynErrorPageHandler {
     ///
     /// This method wraps a concrete error page handler in a type-erased
     /// wrapper, allowing it to be used in
-    /// [`crate::project::Project::server_error_handler`].
+    /// [`crate::project::Project::error_handler`].
     ///
     /// # Examples
     ///
@@ -181,12 +175,15 @@ macro_rules! impl_request_handler {
 
 handle_all_parameters!(impl_request_handler);
 
-/// A wrapper around `crate::Error` that indicates that it is an error
-/// returned by the request handler.
+/// A wrapper around [`Error`] that contains an error (outermost,
+/// possibly middleware-wrapped) to be processed by the error handler.
 ///
-/// In most cases, you should use [`RequestError`] instead, which derefs to the
-/// inner `Error` and allows you to check for specific error types even when
-/// middleware might have wrapped the error.
+/// This returns the outermost error returned by the request handler and
+/// middlewares. In most cases, you should use [`RequestError`] instead, which
+/// dereferences to the inner [`Error`] (the first error in the error chain that
+/// contains an explicitly set status code). [`RequestError`] will allow you to
+/// check for specific error types even when middleware might have wrapped the
+/// error.
 #[derive(Debug, Clone)]
 pub struct RequestOuterError(Arc<Error>);
 
@@ -221,14 +218,15 @@ impl FromRequestHead for RequestOuterError {
     }
 }
 
-/// A wrapper around `crate::Error` that indicates that it is an error
-/// returned by the request handler.
+/// A wrapper around [`Error`] that contains an error to be processed by the
+/// error handler.
 ///
-/// Note that the [`Deref`] implementation returns the inner `Error` (see
-/// [`Error::inner`]). This is usually what you want since it allows you to
-/// check for specific error types even when middleware might have wrapped the
-/// error, but if you need to access the outermost error instead, you should use
-/// [`RequestOuterError`] instead.
+/// Note that the [`Deref`] implementation returns the inner [`Error`] (see
+/// [`Error::inner`]), which is the first error in the error chain that contains
+/// an explicitly set status code. This is usually what you want since it allows
+/// you to check for specific error types even when middleware might have
+/// wrapped the error. If you need to access the outermost error instead,
+/// you can use [`RequestOuterError`].
 #[derive(Debug, Clone)]
 pub struct RequestError(Arc<Error>);
 

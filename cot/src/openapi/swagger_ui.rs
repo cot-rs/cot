@@ -3,7 +3,7 @@
 //! This module provides a [`cot::App`] which serves the OpenAPI (Swagger) UI.
 
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use bytes::Bytes;
 use swagger_ui_redist::SwaggerUiStaticFile;
@@ -11,6 +11,7 @@ use swagger_ui_redist::SwaggerUiStaticFile;
 use crate::App;
 use crate::html::Html;
 use crate::json::Json;
+use crate::request::extractors::StaticFiles;
 use crate::request::{Request, RequestExt};
 use crate::router::{Route, Router};
 use crate::static_files::StaticFile;
@@ -34,7 +35,8 @@ use crate::static_files::StaticFile;
 /// ```
 #[derive(Debug, Clone)]
 pub struct SwaggerUi {
-    inner: swagger_ui_redist::SwaggerUi,
+    inner: Arc<OnceLock<swagger_ui_redist::SwaggerUi>>,
+    openapi_path: Arc<Cow<'static, str>>,
     serve_openapi: bool,
 }
 
@@ -64,17 +66,25 @@ impl SwaggerUi {
     }
 
     fn new_impl(openapi_path: Cow<'static, str>, serve_openapi: bool) -> Self {
+        Self {
+            inner: Arc::new(OnceLock::new()),
+            openapi_path: Arc::new(openapi_path),
+            serve_openapi,
+        }
+    }
+
+    fn build_swagger_ui(
+        openapi_path: Cow<'static, str>,
+        static_files: &StaticFiles,
+    ) -> crate::Result<swagger_ui_redist::SwaggerUi> {
         let mut swagger_ui = swagger_ui_redist::SwaggerUi::new();
         swagger_ui.config().urls([openapi_path]);
         for static_file in SwaggerUiStaticFile::all() {
-            let file_path = format!("/static/{}", Self::static_file_path(*static_file));
-            swagger_ui.override_file_path(*static_file, file_path);
+            let file_path = static_files.url_for(&Self::static_file_path(*static_file))?;
+            swagger_ui.override_file_path(*static_file, file_path.to_owned());
         }
 
-        Self {
-            inner: swagger_ui,
-            serve_openapi,
-        }
+        Ok(swagger_ui)
     }
 
     fn static_file_path(static_file: SwaggerUiStaticFile) -> String {
@@ -88,8 +98,16 @@ impl App for SwaggerUi {
     }
 
     fn router(&self) -> Router {
-        let swagger_ui = Arc::new(self.inner.clone());
-        let swagger_handler = async move || {
+        let swagger_ui = Arc::clone(&self.inner);
+        let openapi_path = Arc::clone(&self.openapi_path);
+
+        let swagger_handler = async move |static_files: StaticFiles| {
+            let swagger_ui = swagger_ui.get_or_init(move || {
+                // TODO return an error when feature(once_cell_get_mut) is stable:
+                // https://github.com/rust-lang/rust/issues/121641
+                Self::build_swagger_ui((*openapi_path).clone(), &static_files)
+                    .expect("could not build swagger UI")
+            });
             let swagger = swagger_ui.serve().map_err(cot::Error::internal)?;
             Ok::<_, crate::Error>(Html::new(swagger))
         };

@@ -25,7 +25,7 @@ use crate::error::error_impl::impl_into_cot_error;
 /// use cot::error::UncaughtPanic;
 ///
 /// // This would typically be created internally by Cot when catching panics
-/// let panic = UncaughtPanic::new(Box::new("Something went wrong"));
+/// let panic = UncaughtPanic::new(Box::new("something went wrong"));
 /// ```
 #[derive(Debug, Clone, Error)]
 #[error("an unexpected error occurred")]
@@ -45,7 +45,7 @@ impl UncaughtPanic {
     /// ```
     /// use cot::error::UncaughtPanic;
     ///
-    /// let panic = UncaughtPanic::new(Box::new("A panic occurred"));
+    /// let panic = UncaughtPanic::new(Box::new("a panic occurred"));
     /// ```
     #[must_use]
     pub fn new(payload: Box<dyn Any + Send + 'static>) -> Self {
@@ -68,12 +68,12 @@ impl UncaughtPanic {
     /// ```
     /// use cot::error::UncaughtPanic;
     ///
-    /// let panic = UncaughtPanic::new(Box::new("Test panic"));
+    /// let panic = UncaughtPanic::new(Box::new("test panic"));
     /// let payload = panic.payload();
     /// ```
     #[must_use]
     pub fn payload(&self) -> UncaughtPanicPayload<'_> {
-        let mutex_guard = self.payload.lock().expect("Failed to lock panic payload");
+        let mutex_guard = self.payload.lock().expect("failed to lock panic payload");
         UncaughtPanicPayload { mutex_guard }
     }
 }

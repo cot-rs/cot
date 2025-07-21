@@ -224,11 +224,21 @@ mod tests {
     static TEMPDIR: OnceLock<TempDir> = OnceLock::new();
 
     fn get_tempdir() -> &'static str {
-        TEMPDIR
-            .get_or_init(|| tempdir().expect("Failed to create temporary directory"))
-            .path()
-            .to_str()
-            .expect("Failed to convert path to string")
+        static DBSTORE_PATH: OnceLock<String> = OnceLock::new();
+
+        DBSTORE_PATH.get_or_init(|| {
+            let base_dir = TEMPDIR
+                .get_or_init(|| tempdir().expect("Failed to create temporary directory"))
+                .path();
+
+            let dbstore_dir = base_dir.join("dbstore");
+            std::fs::create_dir_all(&dbstore_dir).expect("Failed to create dbstore directory");
+
+            dbstore_dir
+                .to_str()
+                .expect("Failed to convert path to string")
+                .to_string()
+        })
     }
 
     async fn engine_setup() -> Result<(), DatabaseError> {

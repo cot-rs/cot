@@ -215,6 +215,8 @@ mod tests {
     use cot::db::DatabaseError;
     use cot::db::migrations::MigrationEngine;
     use cot::session::db::SessionApp;
+    use sqlx::Error as SqlxError;
+    use sqlx::error::{DatabaseError as SqlxDbErrorTrait, ErrorKind};
     use tempfile::TempDir;
     use time::{Duration, OffsetDateTime};
     use tower_sessions::session::{Id, Record};
@@ -232,7 +234,6 @@ mod tests {
             static CTX: OnceLock<TestContext> = OnceLock::new();
             CTX.get_or_init(|| {
                 let td = TempDir::new().expect("TempDir");
-                // create a nested directory to fix potential race condition in the CI.
                 let db_folder = td.path().join("dbstore");
                 std::fs::create_dir_all(&db_folder).expect("mkdir dbstore");
                 TestContext {
@@ -276,6 +277,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(miri))]
     #[cot::test]
     async fn test_create_and_load() {
         let store = make_db_store().await;
@@ -285,6 +287,7 @@ mod tests {
         assert_eq!(Some(rec.clone()), loaded);
     }
 
+    #[cfg(not(miri))]
     #[cot::test]
     async fn test_save_overwrites() {
         let store = make_db_store().await;
@@ -299,6 +302,7 @@ mod tests {
         assert_eq!(rec2.data, loaded.data);
     }
 
+    #[cfg(not(miri))]
     #[cot::test]
     async fn test_save_creates_if_missing() {
         let store = make_db_store().await;
@@ -308,6 +312,7 @@ mod tests {
         assert_eq!(Some(rec), loaded);
     }
 
+    #[cfg(not(miri))]
     #[cot::test]
     async fn test_delete() {
         let store = make_db_store().await;
@@ -321,6 +326,7 @@ mod tests {
         store.delete(&rec.id).await.expect("second delete");
     }
 
+    #[cfg(not(miri))]
     #[cot::test]
     async fn test_create_id_collision() {
         let store = make_db_store().await;
@@ -364,9 +370,6 @@ mod tests {
             DbStoreError::Deserialize(Box::new(parse_err)).into();
         assert!(matches!(deserialize_err, session_store::Error::Decode(_)));
     }
-
-    use sqlx::Error as SqlxError;
-    use sqlx::error::{DatabaseError as SqlxDbErrorTrait, ErrorKind};
 
     /// A fake database error to drive `sqlx::Error::Database`.
     #[derive(Debug)]

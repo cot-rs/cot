@@ -1,6 +1,9 @@
 use askama::Template;
 use cot::cli::CliMetadata;
-use cot::config::{DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig, SessionStoreConfig, SessionStoreTypeConfig};
+use cot::config::{
+    DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig, SessionStoreConfig,
+    SessionStoreTypeConfig,
+};
 use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::SessionMiddleware;

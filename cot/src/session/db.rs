@@ -55,6 +55,7 @@ pub struct Session {
 ///     MyProject
 /// }
 /// ```
+
 #[derive(Debug, Copy, Clone)]
 pub struct SessionApp;
 
@@ -88,5 +89,25 @@ impl App for SessionApp {
     /// Returns the database migrations required for the session model.
     fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
         cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::App;
+
+    #[test]
+    #[expect(clippy::default_constructed_unit_structs)]
+    fn test_session_app_basic_behavior() {
+        let app1 = SessionApp::new();
+
+        let app2 = SessionApp::default();
+
+        assert_eq!(app1.name(), "cot_session");
+        assert_eq!(app2.name(), "cot_session");
+
+        let migrations = app1.migrations();
+        assert!(!migrations.is_empty());
     }
 }

@@ -271,7 +271,7 @@ mod tests {
     fn make_record() -> Record {
         Record {
             id: Id::default(),
-            data: Default::default(),
+            data: HashMap::default(),
             expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
         }
     }
@@ -379,7 +379,7 @@ mod tests {
     }
     impl Error for FakeDbErr {}
     impl SqlxDbErrorTrait for FakeDbErr {
-        fn message(&self) -> &str {
+        fn message(&self) -> &'static str {
             "fake error"
         }
 
@@ -405,6 +405,24 @@ mod tests {
     }
 
     #[test]
+    fn exercise_fake_db_err_methods_for_coverage() {
+        let mut fake = FakeDbErr(Some("XYZ".into()));
+        assert_eq!(fake.message(), "fake error");
+        assert_eq!(fake.code().as_deref(), Some("XYZ"));
+        assert_eq!(fake.kind(), ErrorKind::UniqueViolation);
+
+        let err_ref = SqlxDbErrorTrait::as_error(&fake);
+        assert_eq!(err_ref.to_string(), "FakeDbErr");
+
+        let err_mut = SqlxDbErrorTrait::as_error_mut(&mut fake);
+        assert_eq!(err_mut.to_string(), "FakeDbErr");
+
+        let boxed: Box<dyn Error + Send + Sync> =
+            <FakeDbErr as SqlxDbErrorTrait>::into_error(Box::new(fake));
+        assert_eq!(boxed.to_string(), "FakeDbErr");
+    }
+
+    #[test]
     fn non_database_variant_is_false() {
         assert!(!is_unique_violation(&SqlxError::RowNotFound));
     }
@@ -425,11 +443,7 @@ mod tests {
     fn database_with_unique_violation_codes_are_true() {
         for &code in &["2067", "1555", "23505", "1062"] {
             let err = SqlxError::Database(Box::new(FakeDbErr(Some(code.to_string()))));
-            assert!(
-                is_unique_violation(&err),
-                "Expected code {} to be recognized as unique violation",
-                code
-            );
+            assert!(is_unique_violation(&err));
         }
     }
 }

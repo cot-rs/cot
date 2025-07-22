@@ -17,7 +17,6 @@
 //! async fn main() -> cot::Result<()> {
 //!     let db = Arc::new(Database::new("sqlite://:memory:").await?);
 //!     let store = DbStore::new(db);
-//!     // Use `store` to manage sessions
 //!     Ok(())
 //! }
 //! ```

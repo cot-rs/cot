@@ -18,7 +18,6 @@ pub struct Session {
     #[model(unique)]
     pub(crate) key: String,
     pub(crate) data: String,
-    pub(crate) expiry: chrono::DateTime<chrono::Utc>,
 }
 
 /// An app that provides session management via a session model stored in the

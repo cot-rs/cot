@@ -1,9 +1,9 @@
 //! Database-backed session store.
 //!
 //! This module provides a session store implementation that persists session
-//! records in a database using the Cot ORM. It enables durable session storage
-//! across application restarts and supports features such as user login
-//! sessions, flash messages, and other stateful interactions.
+//! records in a database using the Cot ORM. The database connection is
+//! typically set via the [`cot::config::DatabaseConfig`] in the project
+//! configuration and then passed to the `DbStore` constructor.
 //!
 //! # Examples
 //!
@@ -121,11 +121,11 @@ fn is_unique_violation(err: &sqlx::Error) -> bool {
 
     matches!(
         code.as_ref(),
-        // SQLite 3.37+: 2067 (prior versions used 1555)
-        "2067" | "1555"
-        // Postgres unique_violation
+        // [SQLite](https://www.sqlite.org/rescode.html#constraint_unique)
+        "2067"
+        // [Postgres unique_violation](https://www.postgresql.org/docs/current/errcodes-appendix.html)
         | "23505"
-        // MySQL ER_DUP_ENTRY
+        // [MySQL ER_DUP_ENTRY](https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html#error_er_dup_entry)
         | "1062"
     )
 }
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn database_with_unique_violation_codes_are_true() {
-        for &code in &["2067", "1555", "23505", "1062"] {
+        for &code in &["2067", "23505", "1062"] {
             let err = SqlxError::Database(Box::new(FakeDbErr(Some(code.to_string()))));
             assert!(is_unique_violation(&err));
         }

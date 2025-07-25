@@ -1,9 +1,7 @@
 //! Database-backed session management backend.
 //!
 //! This module provides a session type and an app for storing session data
-//! in a database using the Cot ORM. It enables persistent session storage
-//! for features such as user login sessions, flash messages, and other
-//! stateful interactions.
+//! in a database using the Cot ORM.
 pub mod migrations;
 
 use cot::db::migrations::SyncDynMigration;
@@ -20,16 +18,16 @@ pub struct Session {
     #[model(unique)]
     pub(crate) key: String,
     pub(crate) data: String,
+    pub(crate) expiry: chrono::DateTime<chrono::Utc>,
 }
 
 /// An app that provides session management via a session model stored in the
 /// database.
 ///
 /// This app registers the session model and its migrations, enabling persistent
-/// session storage in the database. It is typically used to support features
-/// like user login sessions, flash messages, and other stateful interactions.
+/// session storage in the database.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```no_run
 /// use cot::config::{DatabaseConfig, ProjectConfig};
@@ -62,7 +60,7 @@ pub struct SessionApp;
 impl SessionApp {
     /// Create a new instance of the session management app.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// use cot::session::db::SessionApp;
@@ -81,12 +79,10 @@ impl Default for SessionApp {
 }
 
 impl App for SessionApp {
-    /// Returns the name of the app.
     fn name(&self) -> &'static str {
         "cot_session"
     }
 
-    /// Returns the database migrations required for the session model.
     fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
         cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
     }

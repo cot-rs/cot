@@ -218,6 +218,7 @@ mod tests {
     use sqlx::error::{DatabaseError as SqlxDbErrorTrait, ErrorKind};
     use tempfile::TempDir;
     use time::{Duration, OffsetDateTime};
+    use tokio::sync::OnceCell;
     use tower_sessions::session::{Id, Record};
 
     use super::*;
@@ -226,6 +227,7 @@ mod tests {
     struct TestContext {
         _temp_dir: TempDir,
         db_folder: PathBuf,
+        db_store: OnceCell<DbStore>,
     }
 
     impl TestContext {
@@ -238,6 +240,7 @@ mod tests {
                 TestContext {
                     _temp_dir: td,
                     db_folder,
+                    db_store: OnceCell::const_new(),
                 }
             })
         }
@@ -249,23 +252,22 @@ mod tests {
             )
         }
 
-        async fn prepare_schema(&self) -> Result<Database, DatabaseError> {
-            let uri = self.db_uri();
-            let engine = MigrationEngine::new(SessionApp.migrations())?;
-            let db = Database::new(&uri).await?;
-            engine.run(&db).await?;
-            Ok(db)
+        async fn db_store(&self) -> &DbStore {
+            self.db_store
+                .get_or_init(|| async {
+                    let uri = self.db_uri();
+                    let engine = MigrationEngine::new(SessionApp.migrations())
+                        .expect("Failed to create migration engine");
+                    let db = Database::new(&uri).await.expect("Failed to open database");
+                    engine.run(&db).await.expect("Failed to run migrations");
+                    DbStore::new(Arc::new(db))
+                })
+                .await
         }
     }
 
-    async fn make_db_store() -> DbStore {
-        let db = Arc::new(
-            TestContext::get()
-                .prepare_schema()
-                .await
-                .expect("prepare_schema"),
-        );
-        DbStore::new(db)
+    async fn make_db_store() -> &'static DbStore {
+        TestContext::get().db_store().await
     }
 
     fn make_record() -> Record {

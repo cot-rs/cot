@@ -15,7 +15,9 @@ use criterion::{Criterion, Throughput};
 use futures_util::future::join_all;
 
 pub(crate) struct ProjectBenchmarkBuilder<'a> {
+    #[allow(clippy::allow_attributes, dead_code)]
     name: &'static str,
+    #[allow(clippy::allow_attributes, dead_code)]
     criterion: &'a mut Criterion,
     method: reqwest::Method,
     path: Option<&'static str>,
@@ -28,7 +30,6 @@ pub(crate) struct ProjectBenchmarkBuilder<'a> {
 macro_rules! builder_method {
     ($name:ident, $ty:ty) => {
         #[must_use]
-        #[allow(dead_code)]
         pub(crate) fn $name(mut self, $name: $ty) -> Self {
             self.$name = $name;
             self
@@ -36,7 +37,6 @@ macro_rules! builder_method {
     };
     ($name:ident, $ty:ty, opt) => {
         #[must_use]
-        #[allow(dead_code)]
         pub(crate) fn $name(mut self, $name: $ty) -> Self {
             self.$name = Some($name);
             self
@@ -44,6 +44,7 @@ macro_rules! builder_method {
     };
 }
 
+#[allow(clippy::allow_attributes, dead_code)]
 pub(crate) fn bench<'a>(
     criterion: &'a mut Criterion,
     name: &'static str,
@@ -51,6 +52,7 @@ pub(crate) fn bench<'a>(
     ProjectBenchmarkBuilder::new(criterion, name)
 }
 
+#[allow(clippy::allow_attributes, dead_code)]
 impl<'a> ProjectBenchmarkBuilder<'a> {
     pub(crate) fn new(criterion: &'a mut Criterion, name: &'static str) -> Self {
         Self {
@@ -72,21 +74,18 @@ impl<'a> ProjectBenchmarkBuilder<'a> {
     builder_method!(method, reqwest::Method);
     builder_method!(expected_status_code, reqwest::StatusCode);
 
-    #[allow(dead_code)]
-    pub(crate) fn plain_body<T: ToString>(mut self, body: T) -> Self {
+    pub(crate) fn plain_body<T: ToString>(mut self, body: &T) -> Self {
         self.body = Some(body.to_string());
         self.content_type = Some("text/plain");
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn json_body<T: serde::Serialize>(mut self, body: &T) -> Self {
         self.body = Some(serde_json::to_string(body).expect("Failed to serialize JSON"));
         self.content_type = Some("application/json");
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn form_body<T: serde::Serialize>(mut self, body: &T) -> Self {
         self.body = Some(serde_urlencoded::to_string(body).expect("Failed to serialize form"));
         self.content_type = Some("application/x-www-form-urlencoded");

@@ -2354,4 +2354,129 @@ mod tests {
             "Should call build() but got: {tokens_str}"
         );
     }
+
+    #[test]
+    fn make_alter_field_operation_type_change() {
+        let migration_model = get_test_model();
+        let mut app_model = migration_model.clone();
+
+        app_model.model.fields[0].ty = parse_quote!(i32);
+
+        let migration_field = &migration_model.model.fields[0];
+        let app_field = &app_model.model.fields[0];
+
+        let alter_op = MigrationOperationGenerator::make_alter_field_operation(
+            &app_model,
+            app_field,
+            &migration_model,
+            migration_field,
+        );
+
+        match alter_op {
+            Some(DynOperation::AlterField {
+                table_name,
+                model_ty,
+                old_field,
+                new_field,
+            }) => {
+                assert_eq!(table_name, "test_model");
+                assert_eq!(model_ty, parse_quote!(TestModel));
+                // The old field type should be String
+                assert_eq!(old_field.ty, parse_quote!(String));
+                // The new field type should be i32
+                assert_eq!(new_field.ty, parse_quote!(i32));
+                assert_eq!(old_field.column_name, new_field.column_name);
+            }
+            _ => panic!("Expected DynOperation::AlterField for type change"),
+        }
+    }
+
+    #[test]
+    fn make_alter_field_operation_nullable_change() {
+        let migration_model = get_test_model();
+        let mut app_model = migration_model.clone();
+
+        app_model.model.fields[0].ty = parse_quote!(Option<String>);
+
+        let migration_field = &migration_model.model.fields[0];
+        let app_field = &app_model.model.fields[0];
+
+        let alter_op = MigrationOperationGenerator::make_alter_field_operation(
+            &app_model,
+            app_field,
+            &migration_model,
+            migration_field,
+        );
+
+        match alter_op {
+            Some(DynOperation::AlterField {
+                table_name,
+                model_ty,
+                old_field,
+                new_field,
+            }) => {
+                assert_eq!(table_name, "test_model");
+                assert_eq!(model_ty, parse_quote!(TestModel));
+                // Old field type is String, new is Option<String>
+                assert_eq!(old_field.ty, parse_quote!(String));
+                assert_eq!(new_field.ty, parse_quote!(Option<String>));
+                assert_eq!(old_field.column_name, new_field.column_name);
+            }
+            _ => panic!("Expected DynOperation::AlterField for nullability change"),
+        }
+    }
+
+    #[test]
+    fn make_alter_field_operation_primary_key_change() {
+        let migration_model = get_test_model();
+        let mut app_model = migration_model.clone();
+
+        app_model.model.fields[0].primary_key = true;
+
+        let migration_field = &migration_model.model.fields[0];
+        let app_field = &app_model.model.fields[0];
+
+        let alter_op = MigrationOperationGenerator::make_alter_field_operation(
+            &app_model,
+            app_field,
+            &migration_model,
+            migration_field,
+        );
+
+        match alter_op {
+            Some(DynOperation::AlterField {
+                table_name,
+                model_ty,
+                old_field,
+                new_field,
+            }) => {
+                assert_eq!(table_name, "test_model");
+                assert_eq!(model_ty, parse_quote!(TestModel));
+                assert_ne!(old_field.primary_key, new_field.primary_key);
+                assert!(new_field.primary_key);
+            }
+            _ => panic!("Expected DynOperation::AlterField for primary_key change"),
+        }
+    }
+
+    #[test]
+    fn make_alter_field_operation_no_change_returns_none() {
+        let migration_model = get_test_model();
+        let app_model = migration_model.clone();
+
+        let migration_field = &migration_model.model.fields[0];
+        let app_field = &app_model.model.fields[0];
+
+        let alter_op = MigrationOperationGenerator::make_alter_field_operation(
+            &app_model,
+            app_field,
+            &migration_model,
+            migration_field,
+        );
+
+        assert!(
+            alter_op.is_none(),
+            "No operation should be produced for identical fields"
+        );
+    }
 }

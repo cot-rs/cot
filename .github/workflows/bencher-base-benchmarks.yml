@@ -1,3 +1,5 @@
+name: Continuous Benchmarking for Base Branch
+
 on:
   push:
     branches:
@@ -43,4 +45,4 @@ jobs:
             --err \
             --adapter rust_criterion \
             --github-actions '${{ secrets.GITHUB_TOKEN }}' \
-            "cargo bench --package cot"
+            "cargo bench --package cot --features test"

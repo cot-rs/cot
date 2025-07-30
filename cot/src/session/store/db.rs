@@ -25,12 +25,11 @@ use std::error::Error;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use cot::db::{Auto, DatabaseError, Model, query};
 use thiserror::Error;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
-use crate::db::Database;
+use crate::db::{Auto, Database, DatabaseError, Model, query};
 use crate::session::db::Session;
 
 /// Errors that can occur while interacting with the database session store.
@@ -158,10 +157,11 @@ impl SessionStore for DbStore {
     }
 
     async fn save(&self, record: &Record) -> session_store::Result<()> {
+        // TODO: use transactions when implemented
         let key = record.id.to_string();
         let data = serde_json::to_string(&record).unwrap();
 
-        let query = query!(Session, $key ==key.clone())
+        let query = query!(Session, $key == key)
             .get(&self.connection)
             .await
             .map_err(DbStoreError::DatabaseError)?;
@@ -180,7 +180,7 @@ impl SessionStore for DbStore {
 
     async fn load(&self, session_id: &Id) -> session_store::Result<Option<Record>> {
         let key = session_id.to_string();
-        let query = query!(Session, $key ==key)
+        let query = query!(Session, $key == key)
             .get(&self.connection)
             .await
             .map_err(DbStoreError::DatabaseError)?;
@@ -195,7 +195,7 @@ impl SessionStore for DbStore {
 
     async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
         let key = session_id.to_string();
-        query!(Session, $key ==key)
+        query!(Session, $key == key)
             .delete(&self.connection)
             .await
             .map_err(DbStoreError::DatabaseError)?;
@@ -211,9 +211,6 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::OnceLock;
 
-    use cot::db::DatabaseError;
-    use cot::db::migrations::MigrationEngine;
-    use cot::session::db::SessionApp;
     use sqlx::Error as SqlxError;
     use sqlx::error::{DatabaseError as SqlxDbErrorTrait, ErrorKind};
     use tempfile::TempDir;
@@ -223,6 +220,9 @@ mod tests {
 
     use super::*;
     use crate::App;
+    use crate::db::DatabaseError;
+    use crate::db::migrations::MigrationEngine;
+    use crate::session::db::SessionApp;
 
     struct TestContext {
         _temp_dir: TempDir,
@@ -278,7 +278,10 @@ mod tests {
         }
     }
 
-    #[cfg(not(miri))]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     #[cot::test]
     async fn test_create_and_load() {
         let store = make_db_store().await;
@@ -288,7 +291,10 @@ mod tests {
         assert_eq!(Some(rec.clone()), loaded);
     }
 
-    #[cfg(not(miri))]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     #[cot::test]
     async fn test_save_overwrites() {
         let store = make_db_store().await;
@@ -303,7 +309,10 @@ mod tests {
         assert_eq!(rec2.data, loaded.data);
     }
 
-    #[cfg(not(miri))]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     #[cot::test]
     async fn test_save_creates_if_missing() {
         let store = make_db_store().await;
@@ -313,7 +322,10 @@ mod tests {
         assert_eq!(Some(rec), loaded);
     }
 
-    #[cfg(not(miri))]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     #[cot::test]
     async fn test_delete() {
         let store = make_db_store().await;
@@ -327,7 +339,10 @@ mod tests {
         store.delete(&rec.id).await.expect("second delete");
     }
 
-    #[cfg(not(miri))]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     #[cot::test]
     async fn test_create_id_collision() {
         let store = make_db_store().await;

@@ -87,7 +87,7 @@ impl Project for SessionsProject {
         Ok(ProjectConfig::builder()
             .database(
                 DatabaseConfig::builder()
-                    .url("sqlite://db.sqlite3?mode=rwc")
+                    .url("sqlite://example-session.sqlite3?mode=rwc")
                     .build(),
             )
             .middlewares(

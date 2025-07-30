@@ -54,6 +54,7 @@ pub struct Session {
 /// ```
 
 #[derive(Debug, Copy, Clone)]
+#[non_exhaustive]
 pub struct SessionApp;
 
 impl SessionApp {

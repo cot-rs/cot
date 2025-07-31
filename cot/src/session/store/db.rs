@@ -108,26 +108,6 @@ impl DbStore {
     }
 }
 
-fn is_unique_violation(err: &sqlx::Error) -> bool {
-    let db_err = match err {
-        sqlx::Error::Database(db_err) => &**db_err,
-        _ => return false,
-    };
-
-    let Some(code) = db_err.code() else {
-        return false;
-    };
-
-    matches!(
-        code.as_ref(),
-        // [SQLite](https://www.sqlite.org/rescode.html#constraint_unique)
-        "2067"
-        // [Postgres unique_violation](https://www.postgresql.org/docs/current/errcodes-appendix.html)
-        | "23505"
-        // [MySQL ER_DUP_ENTRY](https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html#error_er_dup_entry)
-        | "1062"
-    )
-}
 #[async_trait]
 impl SessionStore for DbStore {
     async fn create(&self, record: &mut Record) -> session_store::Result<()> {
@@ -145,9 +125,7 @@ impl SessionStore for DbStore {
                 Ok(()) => {
                     break Ok(());
                 }
-                Err(DatabaseError::DatabaseEngineError(sqlx_error))
-                    if is_unique_violation(&sqlx_error) =>
-                {
+                Err(DatabaseError::UniqueConstraintViolation) => {
                     // If a unique constraint violation occurs, we need to generate a new ID
                     record.id = Id::default();
                 }
@@ -205,14 +183,11 @@ impl SessionStore for DbStore {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
     use std::collections::HashMap;
     use std::io;
     use std::path::PathBuf;
     use std::sync::OnceLock;
 
-    use sqlx::Error as SqlxError;
-    use sqlx::error::{DatabaseError as SqlxDbErrorTrait, ErrorKind};
     use tempfile::TempDir;
     use time::{Duration, OffsetDateTime};
     use tokio::sync::OnceCell;
@@ -385,84 +360,5 @@ mod tests {
         let deserialize_err: session_store::Error =
             DbStoreError::Deserialize(Box::new(parse_err)).into();
         assert!(matches!(deserialize_err, session_store::Error::Decode(_)));
-    }
-
-    /// A fake database error to drive `sqlx::Error::Database`.
-    #[derive(Debug)]
-    struct FakeDbErr(Option<String>);
-
-    impl std::fmt::Display for FakeDbErr {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "FakeDbErr")
-        }
-    }
-    impl Error for FakeDbErr {}
-    impl SqlxDbErrorTrait for FakeDbErr {
-        fn message(&self) -> &'static str {
-            "fake error"
-        }
-
-        fn code(&self) -> Option<Cow<'_, str>> {
-            self.0.as_ref().map(Cow::from)
-        }
-
-        fn as_error(&self) -> &(dyn Error + Send + Sync + 'static) {
-            self
-        }
-
-        fn as_error_mut(&mut self) -> &mut (dyn Error + Send + Sync + 'static) {
-            self
-        }
-
-        fn into_error(self: Box<Self>) -> Box<dyn Error + Send + Sync + 'static> {
-            self
-        }
-
-        fn kind(&self) -> ErrorKind {
-            ErrorKind::UniqueViolation
-        }
-    }
-
-    #[test]
-    fn exercise_fake_db_err_methods_for_coverage() {
-        let mut fake = FakeDbErr(Some("XYZ".into()));
-        assert_eq!(fake.message(), "fake error");
-        assert_eq!(fake.code().as_deref(), Some("XYZ"));
-        assert_eq!(fake.kind(), ErrorKind::UniqueViolation);
-
-        let err_ref = SqlxDbErrorTrait::as_error(&fake);
-        assert_eq!(err_ref.to_string(), "FakeDbErr");
-
-        let err_mut = SqlxDbErrorTrait::as_error_mut(&mut fake);
-        assert_eq!(err_mut.to_string(), "FakeDbErr");
-
-        let boxed: Box<dyn Error + Send + Sync> =
-            <FakeDbErr as SqlxDbErrorTrait>::into_error(Box::new(fake));
-        assert_eq!(boxed.to_string(), "FakeDbErr");
-    }
-
-    #[test]
-    fn non_database_variant_is_false() {
-        assert!(!is_unique_violation(&SqlxError::RowNotFound));
-    }
-
-    #[test]
-    fn database_with_no_code_is_false() {
-        let err = SqlxError::Database(Box::new(FakeDbErr(None)));
-        assert!(!is_unique_violation(&err));
-    }
-
-    #[test]
-    fn database_with_unrelated_code_is_false() {
-        let err = SqlxError::Database(Box::new(FakeDbErr(Some("9999".into()))));
-        assert!(!is_unique_violation(&err));
-    }
-
-    #[test]
-    fn database_with_unique_violation_codes_are_true() {
-        for &code in &["2067", "23505", "1062"] {
-            let err = SqlxError::Database(Box::new(FakeDbErr(Some(code.to_string()))));
-            assert!(is_unique_violation(&err));
-        }
     }
 }

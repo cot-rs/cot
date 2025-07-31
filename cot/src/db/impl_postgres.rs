@@ -2,7 +2,7 @@
 
 use crate::db::sea_query_db::impl_sea_query_db_backend;
 
-impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::postgres::PgPool, PostgresRow, PostgresValueRef, sea_query::PostgresQueryBuilder);
+impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::postgres::PgPool, PostgresRow, PostgresValueRef, sea_query::PostgresQueryBuilder, unique_violation_codes = ["23505"]);
 
 impl DatabasePostgres {
     #[expect(clippy::unused_async)]

@@ -4,7 +4,7 @@ use sea_query_binder::SqlxValues;
 
 use crate::db::sea_query_db::impl_sea_query_db_backend;
 
-impl_sea_query_db_backend!(DatabaseSqlite: sqlx::sqlite::Sqlite, sqlx::sqlite::SqlitePool, SqliteRow, SqliteValueRef, sea_query::SqliteQueryBuilder);
+impl_sea_query_db_backend!(DatabaseSqlite: sqlx::sqlite::Sqlite, sqlx::sqlite::SqlitePool, SqliteRow, SqliteValueRef, sea_query::SqliteQueryBuilder, unique_violation_codes = ["2067"]);
 
 impl DatabaseSqlite {
     async fn init(&self) -> crate::db::Result<()> {

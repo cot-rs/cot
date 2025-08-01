@@ -64,11 +64,11 @@ backtrace = "0.3"
 bytes = "1.10"
 cargo_toml = "0.22"
 chrono = { version = "0.4.41", default-features = false }
-chrono-tz = { version = "0.10.3", default-features = false }
+chrono-tz = { version = "0.10.4", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
-clap_mangen = "0.2.27"
+clap_mangen = "0.2.29"
 cot = { version = "0.3.1", path = "cot" }
 cot_codegen = { version = "0.3.1", path = "cot-codegen" }
 cot_macros = { version = "0.3.1", path = "cot-macros" }
@@ -126,8 +126,8 @@ sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
 time = { version = "0.3.41", default-features = false }
-tokio = { version = "1.45", default-features = false }
-toml = { version = "0.8", default-features = false }
+tokio = { version = "1.47", default-features = false }
+toml = { version = "0.9", default-features = false }
 tower = "0.5.2"
 tower-livereload = "0.9.6"
 tower-sessions = { version = "0.14", default-features = false }

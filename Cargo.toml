@@ -110,7 +110,7 @@ quote = { version = "1", default-features = false }
 rand = { version = "0.9", default-features = false }
 redis = { version = "0.31", default-features = false }
 rustversion = "1"
-schemars = { version = "0.9", default-features = false }
+schemars = { version = "1.0", default-features = false }
 sea-query = { version = "0.32", default-features = false }
 sea-query-binder = { version = "0.7", default-features = false }
 serde = "1"

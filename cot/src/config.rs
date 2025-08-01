@@ -986,7 +986,7 @@ pub(crate) fn time_offsetdatetime_to_chrono_datetime(dt: OffsetDateTime) -> Date
     fixed_tz
         .timestamp_opt(secs, nsecs)
         .single()
-        .expect("OffsetDateTime should convert to FixedOffset DateTime");
+        .expect("OffsetDateTime should convert to FixedOffset DateTime")
 }
 
 pub(crate) fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDateTime {

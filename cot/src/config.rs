@@ -18,14 +18,14 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use chrono::{DateTime, FixedOffset, TimeZone};
+use chrono::{DateTime, FixedOffset};
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
-use time::{OffsetDateTime, UtcOffset};
 
+use crate::common_types;
 use crate::error::error_impl::impl_into_cot_error;
 
 /// The configuration for a project.
@@ -972,37 +972,6 @@ impl From<SameSite> for tower_sessions::cookie::SameSite {
     }
 }
 
-pub(crate) fn time_offsetdatetime_to_chrono_datetime(dt: OffsetDateTime) -> DateTime<FixedOffset> {
-    let utc_time = dt
-        .checked_to_utc()
-        .expect("OffsetDateTime should be convertible to UTC");
-    let secs = utc_time.unix_timestamp();
-    let nsecs = utc_time.nanosecond();
-
-    let offset_secs = dt.offset().whole_seconds();
-    let fixed_tz =
-        FixedOffset::east_opt(offset_secs).expect("OffsetDateTime should have a valid offset");
-
-    fixed_tz
-        .timestamp_opt(secs, nsecs)
-        .single()
-        .expect("OffsetDateTime should convert to FixedOffset DateTime")
-}
-
-pub(crate) fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDateTime {
-    let total_nanos = dt
-        .timestamp_nanos_opt()
-        .expect("timestamp_nanos is not in a valid range");
-
-    let offset_secs = dt.offset().local_minus_utc();
-    let offset =
-        UtcOffset::from_whole_seconds(offset_secs).expect("offset is not within valid range");
-
-    OffsetDateTime::from_unix_timestamp_nanos(total_nanos as i128)
-        .expect("timestamp_nanos is not in a valid range")
-        .to_offset(offset)
-}
-
 /// Session expiry configuration.
 /// The [`Expiry`] attribute of a cookie determines its lifetime. When not
 /// explicitly configured, cookies default to `OnSessionEnd` behavior.
@@ -1070,9 +1039,9 @@ impl From<Expiry> for tower_sessions::Expiry {
                     panic!("could not convert {duration:?} into a valid time::Duration: {e:?}",)
                 }))
             }
-            Expiry::AtDateTime(time) => {
-                Self::AtDateTime(chrono_datetime_to_time_offsetdatetime(time))
-            }
+            Expiry::AtDateTime(time) => Self::AtDateTime(
+                common_types::DateTimeWithOffsetAdapter::new(time).into_offsetdatetime(),
+            ),
         }
     }
 }
@@ -1667,6 +1636,8 @@ impl std::fmt::Display for CacheUrl {
 
 #[cfg(test)]
 mod tests {
+    use time::OffsetDateTime;
+
     use super::*;
 
     #[test]

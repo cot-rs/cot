@@ -8,6 +8,7 @@
 use std::fmt::{Debug, Display};
 use std::str::FromStr;
 
+use chrono::{DateTime, FixedOffset, TimeZone};
 #[cfg(feature = "mysql")]
 use cot::db::impl_mysql::MySqlValueRef;
 #[cfg(feature = "postgres")]
@@ -16,7 +17,9 @@ use cot::db::impl_postgres::PostgresValueRef;
 use cot::db::impl_sqlite::SqliteValueRef;
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use time::{OffsetDateTime, UtcOffset};
 
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
@@ -695,6 +698,60 @@ impl Display for Email {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct DateTimeWithOffsetAdapter(DateTime<FixedOffset>);
+
+impl DateTimeWithOffsetAdapter {
+    pub(crate) fn new(dt: DateTime<FixedOffset>) -> Self {
+        Self(dt)
+    }
+
+    pub(crate) fn into_chrono(self) -> DateTime<FixedOffset> {
+        self.0
+    }
+
+    pub(crate) fn into_offsetdatetime(self) -> OffsetDateTime {
+        self.into()
+    }
+}
+
+impl From<DateTimeWithOffsetAdapter> for OffsetDateTime {
+    fn from(adapter: DateTimeWithOffsetAdapter) -> Self {
+        let total_nanos = adapter
+            .0
+            .timestamp_nanos_opt()
+            .expect("timestamp_nanos is not in a valid range");
+
+        let offset_secs = adapter.0.offset().local_minus_utc();
+        let offset =
+            UtcOffset::from_whole_seconds(offset_secs).expect("offset is not within valid range");
+
+        OffsetDateTime::from_unix_timestamp_nanos(total_nanos as i128)
+            .expect("timestamp_nanos is not in a valid range")
+            .to_offset(offset)
+    }
+}
+
+impl From<OffsetDateTime> for DateTimeWithOffsetAdapter {
+    fn from(dt: OffsetDateTime) -> Self {
+        let utc_time = dt
+            .checked_to_utc()
+            .expect("OffsetDateTime should be convertible to UTC");
+        let secs = utc_time.unix_timestamp();
+        let nsecs = utc_time.nanosecond();
+
+        let offset_secs = dt.offset().whole_seconds();
+        let fixed_tz =
+            FixedOffset::east_opt(offset_secs).expect("OffsetDateTime should have a valid offset");
+
+        let fixed_dt = fixed_tz
+            .timestamp_opt(secs, nsecs)
+            .single()
+            .expect("OffsetDateTime should convert to FixedOffset DateTime");
+
+        Self(fixed_dt)
+    }
+}
 #[cfg(test)]
 mod tests {
     use std::convert::TryFrom;
@@ -702,6 +759,46 @@ mod tests {
     use askama::Template;
 
     use super::*;
+
+    fn parse_both(s: &str) -> (DateTime<FixedOffset>, OffsetDateTime) {
+        let chrono_dt = DateTime::parse_from_rfc3339(s).unwrap();
+        let time_dt =
+            OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339).unwrap();
+        (chrono_dt, time_dt)
+    }
+
+    #[test]
+    fn test_new_and_into_chrono() {
+        let (chrono_dt, _) = parse_both("2025-08-01T12:34:56.789123456+02:00");
+        let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
+        assert_eq!(adapter.into_chrono(), chrono_dt);
+    }
+
+    #[test]
+    fn test_into_offsetdatetime_roundtrip() {
+        let (chrono_dt, time_dt) = parse_both("2025-08-01T12:34:56.789123456-04:00");
+        let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
+        let back: OffsetDateTime = adapter.into_offsetdatetime();
+        assert_eq!(back, time_dt);
+    }
+
+    #[test]
+    fn test_from_offsetdatetime_roundtrip() {
+        let (_, time_dt) = parse_both("2021-12-31T23:59:59.999999999+00:00");
+        let adapter: DateTimeWithOffsetAdapter = time_dt.into();
+        let back: OffsetDateTime = adapter.into();
+        assert_eq!(back, time_dt);
+    }
+
+    #[test]
+    fn test_chrono_to_time_and_back_via_from() {
+        let (chrono_dt, _) = parse_both("2000-01-01T00:00:00.000000001+05:30");
+        let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
+        let time_dt: OffsetDateTime = adapter.into();
+
+        let adapter2: DateTimeWithOffsetAdapter = time_dt.into();
+        assert_eq!(adapter2.into_chrono(), chrono_dt);
+    }
 
     #[test]
     fn url_new() {

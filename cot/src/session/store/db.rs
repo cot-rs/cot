@@ -30,6 +30,7 @@ use thiserror::Error;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
+use crate::common_types;
 use crate::db::{Auto, Database, DatabaseError, Model, query};
 use crate::session::db::Session;
 
@@ -116,7 +117,8 @@ impl SessionStore for DbStore {
             let key = record.id.to_string();
 
             let data = serde_json::to_string(&record.data).unwrap();
-            let expiry = crate::config::time_offsetdatetime_to_chrono_datetime(record.expiry_date);
+            let expiry =
+                common_types::DateTimeWithOffsetAdapter::from(record.expiry_date).into_chrono();
             let mut model = Session {
                 id: Auto::auto(),
                 key,
@@ -174,7 +176,8 @@ impl SessionStore for DbStore {
                 .key
                 .parse::<Id>()
                 .expect("Could not convert session key to Id");
-            let expiry_date = crate::config::chrono_datetime_to_time_offsetdatetime(session.expiry);
+            let expiry_date =
+                common_types::DateTimeWithOffsetAdapter::new(session.expiry).into_offsetdatetime();
 
             let rec = Record {
                 id,

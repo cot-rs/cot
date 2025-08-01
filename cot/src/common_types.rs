@@ -726,7 +726,7 @@ impl From<DateTimeWithOffsetAdapter> for OffsetDateTime {
         let offset =
             UtcOffset::from_whole_seconds(offset_secs).expect("offset is not within valid range");
 
-        OffsetDateTime::from_unix_timestamp_nanos(total_nanos as i128)
+        OffsetDateTime::from_unix_timestamp_nanos(i128::from(total_nanos))
             .expect("timestamp_nanos is not in a valid range")
             .to_offset(offset)
     }

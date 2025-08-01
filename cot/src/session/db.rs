@@ -95,7 +95,6 @@ mod tests {
     use crate::App;
 
     #[test]
-    #[expect(clippy::default_constructed_unit_structs)]
     fn test_session_app_basic_behavior() {
         let app1 = SessionApp::new();
 

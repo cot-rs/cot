@@ -178,7 +178,10 @@ pub(crate) fn map_sqlx_error(
     err: sqlx::Error,
     unique_violation_codes: &[&str],
 ) -> crate::db::DatabaseError {
-    if let Some(code) = err.as_database_error().and_then(|e| e.code()) {
+    if let Some(code) = err
+        .as_database_error()
+        .and_then(sqlx::error::DatabaseError::code)
+    {
         if unique_violation_codes.iter().any(|&u| code == u) {
             return crate::db::DatabaseError::UniqueConstraintViolation;
         }

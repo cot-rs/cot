@@ -18,7 +18,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, TimeZone};
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
@@ -972,11 +972,34 @@ impl From<SameSite> for tower_sessions::cookie::SameSite {
     }
 }
 
-fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDateTime {
-    let offset = UtcOffset::from_whole_seconds(dt.offset().local_minus_utc())
-        .expect("offset within valid range");
-    OffsetDateTime::from_unix_timestamp(dt.timestamp())
-        .expect("timestamp in valid range")
+pub(crate) fn time_offsetdatetime_to_chrono_datetime(dt: OffsetDateTime) -> DateTime<FixedOffset> {
+    let utc_time = dt
+        .checked_to_utc()
+        .expect("OffsetDateTime should be convertible to UTC");
+    let secs = utc_time.unix_timestamp();
+    let nsecs = utc_time.nanosecond();
+
+    let offset_secs = dt.offset().whole_seconds();
+    let fixed_tz =
+        FixedOffset::east_opt(offset_secs).expect("OffsetDateTime should have a valid offset");
+
+    fixed_tz
+        .timestamp_opt(secs, nsecs)
+        .single()
+        .expect("OffsetDateTime should convert to FixedOffset DateTime");
+}
+
+pub(crate) fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDateTime {
+    let total_nanos = dt
+        .timestamp_nanos_opt()
+        .expect("timestamp_nanos is not in a valid range");
+
+    let offset_secs = dt.offset().local_minus_utc();
+    let offset =
+        UtcOffset::from_whole_seconds(offset_secs).expect("offset is not within valid range");
+
+    OffsetDateTime::from_unix_timestamp_nanos(total_nanos as i128)
+        .expect("timestamp_nanos is not in a valid range")
         .to_offset(offset)
 }
 

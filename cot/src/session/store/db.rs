@@ -21,6 +21,7 @@
 //! }
 //! ```
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -114,11 +115,13 @@ impl SessionStore for DbStore {
         loop {
             let key = record.id.to_string();
 
-            let data = serde_json::to_string(&record).unwrap();
+            let data = serde_json::to_string(&record.data).unwrap();
+            let expiry = crate::config::time_offsetdatetime_to_chrono_datetime(record.expiry_date);
             let mut model = Session {
                 id: Auto::auto(),
                 key,
                 data,
+                expiry,
             };
             let res = self.connection.insert(&mut model).await;
             match res {
@@ -137,7 +140,8 @@ impl SessionStore for DbStore {
     async fn save(&self, record: &Record) -> session_store::Result<()> {
         // TODO: use transactions when implemented
         let key = record.id.to_string();
-        let data = serde_json::to_string(&record).unwrap();
+        let data = serde_json::to_string(&record.data)
+            .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
 
         let query = query!(Session, $key == key)
             .get(&self.connection)
@@ -162,9 +166,22 @@ impl SessionStore for DbStore {
             .get(&self.connection)
             .await
             .map_err(DbStoreError::DatabaseError)?;
-        if let Some(data) = query {
-            let rec = serde_json::from_str::<Record>(&data.data)
+        if let Some(session) = query {
+            let data = serde_json::from_str::<HashMap<String, serde_json::Value>>(&session.data)
                 .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
+
+            let id = session
+                .key
+                .parse::<Id>()
+                .expect("Could not convert session key to Id");
+            let expiry_date = crate::config::chrono_datetime_to_time_offsetdatetime(session.expiry);
+
+            let rec = Record {
+                id,
+                data,
+                expiry_date,
+            };
+
             Ok(Some(rec))
         } else {
             Ok(None)

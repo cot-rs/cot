@@ -3,7 +3,7 @@
 use crate::db::ColumnType;
 use crate::db::sea_query_db::impl_sea_query_db_backend;
 
-impl_sea_query_db_backend!(DatabaseMySql: sqlx::mysql::MySql, sqlx::mysql::MySqlPool, MySqlRow, MySqlValueRef, sea_query::MysqlQueryBuilder,  unique_violation_codes = ["1062"]);
+impl_sea_query_db_backend!(DatabaseMySql: sqlx::mysql::MySql, sqlx::mysql::MySqlPool, MySqlRow, MySqlValueRef, sea_query::MysqlQueryBuilder);
 
 impl DatabaseMySql {
     #[expect(clippy::unused_async)]

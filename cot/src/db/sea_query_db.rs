@@ -5,7 +5,7 @@
 /// * `prepare_values`
 /// * `sea_query_column_type_for`
 macro_rules! impl_sea_query_db_backend {
-    ($db_name:ident : $sqlx_db_ty:ty, $pool_ty:ty, $row_name:ident, $value_ref_name:ident, $query_builder:expr, unique_violation_codes = [$($uniq:expr),* $(,)?]) => {
+    ($db_name:ident : $sqlx_db_ty:ty, $pool_ty:ty, $row_name:ident, $value_ref_name:ident, $query_builder:expr) => {
         /// A wrapper over [`$sqlx_db_ty`] that serves an in internal implementation of
         /// `Database` using `SeaQuery`.
         #[derive(Debug)]
@@ -35,9 +35,7 @@ macro_rules! impl_sea_query_db_backend {
 
                 let row = Self::sqlx_query_with(&sql, values)
                     .fetch_optional(&self.db_connection)
-                    .await.map_err(|err| {
-                        crate::db::sea_query_db::map_sqlx_error(err, &[$($uniq),*])
-                    })?;
+                    .await?;
                 Ok(row.map($row_name::new))
             }
 
@@ -91,9 +89,7 @@ macro_rules! impl_sea_query_db_backend {
             where
                 A: 'a + sqlx::IntoArguments<'a, $sqlx_db_ty>,
             {
-                let result = sqlx_statement.execute(&self.db_connection).await.map_err(|err| {
-                    crate::db::sea_query_db::map_sqlx_error(err, &[$($uniq),*])
-                })?;
+                let result = sqlx_statement.execute(&self.db_connection).await?;
                 let result = crate::db::StatementResult {
                     rows_affected: crate::db::RowsNum(result.rows_affected()),
                     last_inserted_row_id: Self::last_inserted_row_id_for(&result),
@@ -172,21 +168,6 @@ macro_rules! impl_sea_query_db_backend {
             }
         }
     };
-}
-
-pub(crate) fn map_sqlx_error(
-    err: sqlx::Error,
-    unique_violation_codes: &[&str],
-) -> crate::db::DatabaseError {
-    if let Some(code) = err
-        .as_database_error()
-        .and_then(sqlx::error::DatabaseError::code)
-    {
-        if unique_violation_codes.iter().any(|&u| code == u) {
-            return crate::db::DatabaseError::UniqueConstraintViolation;
-        }
-    }
-    crate::db::DatabaseError::from(err)
 }
 
 pub(super) use impl_sea_query_db_backend;

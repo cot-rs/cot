@@ -117,8 +117,9 @@ impl SessionStore for DbStore {
             let key = record.id.to_string();
 
             let data = serde_json::to_string(&record.data).unwrap();
-            let expiry =
-                common_types::DateTimeWithOffsetAdapter::from(record.expiry_date).into_chrono();
+            let expiry = common_types::DateTimeWithOffsetAdapter::try_from(record.expiry_date)
+                .expect("Failed to convert expiry date to a valid datetime")
+                .into_chrono();
             let mut model = Session {
                 id: Auto::auto(),
                 key,
@@ -130,7 +131,11 @@ impl SessionStore for DbStore {
                 Ok(()) => {
                     break Ok(());
                 }
-                Err(DatabaseError::UniqueConstraintViolation) => {
+                Err(DatabaseError::DatabaseEngineError(err))
+                    if err
+                        .as_database_error()
+                        .is_some_and(sqlx::error::DatabaseError::is_unique_violation) =>
+                {
                     // If a unique constraint violation occurs, we need to generate a new ID
                     record.id = Id::default();
                 }
@@ -175,7 +180,8 @@ impl SessionStore for DbStore {
             let id = session
                 .key
                 .parse::<Id>()
-                .expect("Could not convert session key to Id");
+                .map_err(|err| DbStoreError::Deserialize(Box::new(err)))?;
+
             let expiry_date =
                 common_types::DateTimeWithOffsetAdapter::new(session.expiry).into_offsetdatetime();
 

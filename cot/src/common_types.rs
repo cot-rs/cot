@@ -698,6 +698,16 @@ impl Display for Email {
     }
 }
 
+#[derive(Debug, Error)]
+pub(crate) enum DateTimeWithOffsetConversionError {
+    #[error("nanoseconds out of range")]
+    NanosecondsOutOfRange,
+    #[error("offset not in valid range")]
+    InvalidOffset,
+    #[error("datetime out of range for conversion")]
+    TimestampOutOfRange,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct DateTimeWithOffsetAdapter(DateTime<FixedOffset>);
 
@@ -711,45 +721,53 @@ impl DateTimeWithOffsetAdapter {
     }
 
     pub(crate) fn into_offsetdatetime(self) -> OffsetDateTime {
-        self.into()
+        self.try_into()
+            .expect("Failed to convert DateTimeWithOffsetAdapter to OffsetDateTime")
     }
 }
 
-impl From<DateTimeWithOffsetAdapter> for OffsetDateTime {
-    fn from(adapter: DateTimeWithOffsetAdapter) -> Self {
-        let total_nanos = adapter
+impl TryFrom<DateTimeWithOffsetAdapter> for OffsetDateTime {
+    type Error = DateTimeWithOffsetConversionError;
+
+    fn try_from(value: DateTimeWithOffsetAdapter) -> Result<Self, Self::Error> {
+        let total_nanos = value
             .0
             .timestamp_nanos_opt()
-            .expect("timestamp_nanos is not in a valid range");
+            .ok_or(DateTimeWithOffsetConversionError::NanosecondsOutOfRange)?;
 
-        let offset_secs = adapter.0.offset().local_minus_utc();
-        let offset =
-            UtcOffset::from_whole_seconds(offset_secs).expect("offset is not within valid range");
+        let offset_secs = value.0.offset().local_minus_utc();
+        let offset = UtcOffset::from_whole_seconds(offset_secs)
+            .map_err(|_| DateTimeWithOffsetConversionError::InvalidOffset)?;
 
-        OffsetDateTime::from_unix_timestamp_nanos(i128::from(total_nanos))
-            .expect("timestamp_nanos is not in a valid range")
-            .to_offset(offset)
+        let dt = OffsetDateTime::from_unix_timestamp_nanos(i128::from(total_nanos))
+            .map_err(|_| DateTimeWithOffsetConversionError::TimestampOutOfRange)?
+            .to_offset(offset);
+
+        Ok(dt)
     }
 }
 
-impl From<OffsetDateTime> for DateTimeWithOffsetAdapter {
-    fn from(dt: OffsetDateTime) -> Self {
-        let utc_time = dt
+impl TryFrom<OffsetDateTime> for DateTimeWithOffsetAdapter {
+    type Error = DateTimeWithOffsetConversionError;
+
+    fn try_from(value: OffsetDateTime) -> Result<Self, Self::Error> {
+        let utc_time = value
             .checked_to_utc()
-            .expect("OffsetDateTime should be convertible to UTC");
+            .ok_or(DateTimeWithOffsetConversionError::TimestampOutOfRange)?;
         let secs = utc_time.unix_timestamp();
         let nsecs = utc_time.nanosecond();
 
-        let offset_secs = dt.offset().whole_seconds();
-        let fixed_tz =
-            FixedOffset::east_opt(offset_secs).expect("OffsetDateTime should have a valid offset");
+        let offset_secs = value.offset().whole_seconds();
+        let fixed_offset = FixedOffset::east_opt(offset_secs)
+            .ok_or(DateTimeWithOffsetConversionError::InvalidOffset)?;
 
-        let fixed_dt = fixed_tz
+        let fixed_dt = fixed_offset
             .timestamp_opt(secs, nsecs)
+            // OffsetDatetime has no ambiguity, so this should be fine.
             .single()
-            .expect("OffsetDateTime should convert to FixedOffset DateTime");
+            .ok_or(DateTimeWithOffsetConversionError::TimestampOutOfRange)?;
 
-        Self(fixed_dt)
+        Ok(Self(fixed_dt))
     }
 }
 #[cfg(test)]
@@ -785,8 +803,8 @@ mod tests {
     #[test]
     fn test_from_offsetdatetime_roundtrip() {
         let (_, time_dt) = parse_both("2021-12-31T23:59:59.999999999+00:00");
-        let adapter: DateTimeWithOffsetAdapter = time_dt.into();
-        let back: OffsetDateTime = adapter.into();
+        let adapter: DateTimeWithOffsetAdapter = time_dt.try_into().unwrap();
+        let back: OffsetDateTime = adapter.try_into().unwrap();
         assert_eq!(back, time_dt);
     }
 
@@ -794,9 +812,9 @@ mod tests {
     fn test_chrono_to_time_and_back_via_from() {
         let (chrono_dt, _) = parse_both("2000-01-01T00:00:00.000000001+05:30");
         let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
-        let time_dt: OffsetDateTime = adapter.into();
+        let time_dt: OffsetDateTime = adapter.try_into().unwrap();
 
-        let adapter2: DateTimeWithOffsetAdapter = time_dt.into();
+        let adapter2: DateTimeWithOffsetAdapter = time_dt.try_into().unwrap();
         assert_eq!(adapter2.into_chrono(), chrono_dt);
     }
 

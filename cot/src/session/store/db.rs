@@ -1,0 +1,390 @@
+//! Database-backed session store.
+//!
+//! This module provides a session store implementation that persists session
+//! records in a database using the Cot ORM. The database connection is
+//! typically set via the [`cot::config::DatabaseConfig`] in the project
+//! configuration and then passed to the `DbStore` constructor.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use std::sync::Arc;
+//!
+//! use cot::db::Database;
+//! use cot::session::store::db::DbStore;
+//!
+//! #[tokio::main]
+//! async fn main() -> cot::Result<()> {
+//!     let db = Arc::new(Database::new("sqlite://:memory:").await?);
+//!     let store = DbStore::new(db);
+//!     Ok(())
+//! }
+//! ```
+
+use std::collections::HashMap;
+use std::error::Error;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use thiserror::Error;
+use tower_sessions::session::{Id, Record};
+use tower_sessions::{SessionStore, session_store};
+
+use crate::common_types;
+use crate::db::{Auto, Database, DatabaseError, Model, query};
+use crate::session::db::Session;
+
+/// Errors that can occur while interacting with the database session store.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum DbStoreError {
+    /// An error occurred while interacting with the database.
+    #[error(transparent)]
+    DatabaseError(#[from] DatabaseError),
+    /// An error occurred during JSON serialization.
+    #[error("JSON serialization error: {0}")]
+    Serialize(Box<dyn Error + Send + Sync>),
+    /// An error occurred during JSON deserialization.
+    #[error("JSON serialization error: {0}")]
+    Deserialize(Box<dyn Error + Send + Sync>),
+}
+
+impl From<DbStoreError> for session_store::Error {
+    fn from(err: DbStoreError) -> Self {
+        match err {
+            DbStoreError::DatabaseError(db_err) => {
+                session_store::Error::Backend(db_err.to_string())
+            }
+            DbStoreError::Serialize(ser_err) => session_store::Error::Encode(ser_err.to_string()),
+            DbStoreError::Deserialize(de_err) => session_store::Error::Decode(de_err.to_string()),
+        }
+    }
+}
+
+/// A database-backed session store.
+///
+/// This store uses a database to persist session records, allowing for
+/// session data to be stored across application restarts.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::sync::Arc;
+///
+/// use cot::db::Database;
+/// use cot::session::store::db::DbStore;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), cot::session::store::db::DbStoreError> {
+///     let db = Arc::new(Database::new("sqlite://:memory:").await?);
+///     let store = DbStore::new(db);
+///     Ok(())
+/// }
+/// ```
+#[derive(Clone, Debug)]
+pub struct DbStore {
+    connection: Arc<Database>,
+}
+
+impl DbStore {
+    /// Creates a new `DbStore` instance with the provided database connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::sync::Arc;
+    ///
+    /// use cot::db::Database;
+    /// use cot::session::store::db::DbStore;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), cot::session::store::db::DbStoreError> {
+    ///     let db = Arc::new(Database::new("sqlite://:memory:").await?);
+    ///     let store = DbStore::new(db);
+    ///     Ok(())
+    /// }
+    /// ```
+    #[must_use]
+    pub fn new(connection: Arc<Database>) -> DbStore {
+        DbStore { connection }
+    }
+}
+
+#[async_trait]
+impl SessionStore for DbStore {
+    async fn create(&self, record: &mut Record) -> session_store::Result<()> {
+        loop {
+            let key = record.id.to_string();
+
+            let data = serde_json::to_string(&record.data).unwrap();
+            let expiry = common_types::DateTimeWithOffsetAdapter::try_from(record.expiry_date)
+                .expect("Failed to convert expiry date to a valid datetime")
+                .into_chrono();
+            let mut model = Session {
+                id: Auto::auto(),
+                key,
+                data,
+                expiry,
+            };
+            let res = self.connection.insert(&mut model).await;
+            match res {
+                Ok(()) => {
+                    break Ok(());
+                }
+                Err(DatabaseError::DatabaseEngineError(err))
+                    if err
+                        .as_database_error()
+                        .is_some_and(sqlx::error::DatabaseError::is_unique_violation) =>
+                {
+                    // If a unique constraint violation occurs, we need to generate a new ID
+                    record.id = Id::default();
+                }
+                Err(err) => return Err(DbStoreError::DatabaseError(err))?,
+            }
+        }
+    }
+
+    async fn save(&self, record: &Record) -> session_store::Result<()> {
+        // TODO: use transactions when implemented
+        let key = record.id.to_string();
+        let data = serde_json::to_string(&record.data)
+            .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
+
+        let query = query!(Session, $key == key)
+            .get(&self.connection)
+            .await
+            .map_err(DbStoreError::DatabaseError)?;
+        if let Some(mut model) = query {
+            model.data = data;
+            model
+                .update(&self.connection)
+                .await
+                .map_err(DbStoreError::DatabaseError)?;
+        } else {
+            let mut record = record.clone();
+            self.create(&mut record).await?;
+        }
+        Ok(())
+    }
+
+    async fn load(&self, session_id: &Id) -> session_store::Result<Option<Record>> {
+        let key = session_id.to_string();
+        let query = query!(Session, $key == key)
+            .get(&self.connection)
+            .await
+            .map_err(DbStoreError::DatabaseError)?;
+        if let Some(session) = query {
+            let data = serde_json::from_str::<HashMap<String, serde_json::Value>>(&session.data)
+                .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
+
+            let id = session
+                .key
+                .parse::<Id>()
+                .map_err(|err| DbStoreError::Deserialize(Box::new(err)))?;
+
+            let expiry_date =
+                common_types::DateTimeWithOffsetAdapter::new(session.expiry).into_offsetdatetime();
+
+            let rec = Record {
+                id,
+                data,
+                expiry_date,
+            };
+
+            Ok(Some(rec))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
+        let key = session_id.to_string();
+        query!(Session, $key == key)
+            .delete(&self.connection)
+            .await
+            .map_err(DbStoreError::DatabaseError)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::io;
+    use std::path::PathBuf;
+    use std::sync::OnceLock;
+
+    use tempfile::TempDir;
+    use time::{Duration, OffsetDateTime};
+    use tokio::sync::OnceCell;
+    use tower_sessions::session::{Id, Record};
+
+    use super::*;
+    use crate::App;
+    use crate::db::DatabaseError;
+    use crate::db::migrations::MigrationEngine;
+    use crate::session::db::SessionApp;
+
+    struct TestContext {
+        _temp_dir: TempDir,
+        db_folder: PathBuf,
+        db_store: OnceCell<DbStore>,
+    }
+
+    impl TestContext {
+        fn get() -> &'static Self {
+            static CTX: OnceLock<TestContext> = OnceLock::new();
+            CTX.get_or_init(|| {
+                let td = TempDir::new().expect("TempDir");
+                let db_folder = td.path().join("dbstore");
+                std::fs::create_dir_all(&db_folder).expect("mkdir dbstore");
+                TestContext {
+                    _temp_dir: td,
+                    db_folder,
+                    db_store: OnceCell::const_new(),
+                }
+            })
+        }
+
+        fn db_uri(&self) -> String {
+            format!(
+                "sqlite://{}/db_store.sqlite3?mode=rwc",
+                self.db_folder.display()
+            )
+        }
+
+        async fn db_store(&self) -> &DbStore {
+            self.db_store
+                .get_or_init(|| async {
+                    let uri = self.db_uri();
+                    let engine = MigrationEngine::new(SessionApp.migrations())
+                        .expect("Failed to create migration engine");
+                    let db = Database::new(&uri).await.expect("Failed to open database");
+                    engine.run(&db).await.expect("Failed to run migrations");
+                    DbStore::new(Arc::new(db))
+                })
+                .await
+        }
+    }
+
+    async fn make_db_store() -> &'static DbStore {
+        TestContext::get().db_store().await
+    }
+
+    fn make_record() -> Record {
+        Record {
+            id: Id::default(),
+            data: HashMap::default(),
+            expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
+        }
+    }
+
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    #[cot::test]
+    async fn test_create_and_load() {
+        let store = make_db_store().await;
+        let mut rec = make_record();
+        store.create(&mut rec).await.expect("create failed");
+        let loaded = store.load(&rec.id).await.expect("load err");
+        assert_eq!(Some(rec.clone()), loaded);
+    }
+
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    #[cot::test]
+    async fn test_save_overwrites() {
+        let store = make_db_store().await;
+        let mut rec = make_record();
+        store.create(&mut rec).await.unwrap();
+
+        let mut rec2 = rec.clone();
+        rec2.data.insert("foo".into(), "bar".into());
+        store.save(&rec2).await.expect("save failed");
+
+        let loaded = store.load(&rec.id).await.unwrap().unwrap();
+        assert_eq!(rec2.data, loaded.data);
+    }
+
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    #[cot::test]
+    async fn test_save_creates_if_missing() {
+        let store = make_db_store().await;
+        let rec = make_record();
+        store.save(&rec).await.expect("save failed");
+        let loaded = store.load(&rec.id).await.unwrap();
+        assert_eq!(Some(rec), loaded);
+    }
+
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    #[cot::test]
+    async fn test_delete() {
+        let store = make_db_store().await;
+        let mut rec = make_record();
+        store.create(&mut rec).await.unwrap();
+
+        store.delete(&rec.id).await.expect("delete failed");
+        let loaded = store.load(&rec.id).await.unwrap();
+        assert!(loaded.is_none());
+
+        store.delete(&rec.id).await.expect("second delete");
+    }
+
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    #[cot::test]
+    async fn test_create_id_collision() {
+        let store = make_db_store().await;
+        let expiry = OffsetDateTime::now_utc() + Duration::minutes(30);
+
+        let mut r1 = Record {
+            id: Id::default(),
+            data: HashMap::default(),
+            expiry_date: expiry,
+        };
+        store.create(&mut r1).await.unwrap();
+
+        let mut r2 = Record {
+            id: r1.id,
+            data: HashMap::default(),
+            expiry_date: expiry,
+        };
+        store.create(&mut r2).await.unwrap();
+
+        assert_ne!(r1.id, r2.id, "ID collision not resolved");
+
+        let loaded1 = store.load(&r1.id).await.unwrap();
+        let loaded2 = store.load(&r2.id).await.unwrap();
+        assert!(loaded1.is_some() && loaded2.is_some());
+    }
+
+    #[test]
+    fn test_from_db_store_error_to_session_store_error() {
+        let sqlx_err = sqlx::Error::Protocol("protocol error".into());
+        let db_err = DatabaseError::DatabaseEngineError(sqlx_err);
+        let sess_err: session_store::Error = DbStoreError::DatabaseError(db_err).into();
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
+
+        let io_err = io::Error::other("oops");
+        let serialize_err: session_store::Error = DbStoreError::Serialize(Box::new(io_err)).into();
+
+        assert!(matches!(serialize_err, session_store::Error::Encode(_)));
+
+        let parse_err = serde_json::from_str::<Record>("not a json").unwrap_err();
+        let deserialize_err: session_store::Error =
+            DbStoreError::Deserialize(Box::new(parse_err)).into();
+        assert!(matches!(deserialize_err, session_store::Error::Decode(_)));
+    }
+}

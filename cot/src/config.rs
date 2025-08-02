@@ -24,8 +24,8 @@ use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
-use time::{OffsetDateTime, UtcOffset};
 
+use crate::common_types;
 use crate::error::error_impl::impl_into_cot_error;
 
 /// The configuration for a project.
@@ -806,7 +806,7 @@ pub enum SessionStoreTypeConfig {
     ///
     /// This stores session data in the configured database. This requires the
     /// "db" feature to be enabled.
-    #[cfg(feature = "db")]
+    #[cfg(all(feature = "db", feature = "json"))]
     Database,
 
     /// File-based session storage.
@@ -972,14 +972,6 @@ impl From<SameSite> for tower_sessions::cookie::SameSite {
     }
 }
 
-fn chrono_datetime_to_time_offsetdatetime(dt: DateTime<FixedOffset>) -> OffsetDateTime {
-    let offset = UtcOffset::from_whole_seconds(dt.offset().local_minus_utc())
-        .expect("offset within valid range");
-    OffsetDateTime::from_unix_timestamp(dt.timestamp())
-        .expect("timestamp in valid range")
-        .to_offset(offset)
-}
-
 /// Session expiry configuration.
 /// The [`Expiry`] attribute of a cookie determines its lifetime. When not
 /// explicitly configured, cookies default to `OnSessionEnd` behavior.
@@ -1047,9 +1039,9 @@ impl From<Expiry> for tower_sessions::Expiry {
                     panic!("could not convert {duration:?} into a valid time::Duration: {e:?}",)
                 }))
             }
-            Expiry::AtDateTime(time) => {
-                Self::AtDateTime(chrono_datetime_to_time_offsetdatetime(time))
-            }
+            Expiry::AtDateTime(time) => Self::AtDateTime(
+                common_types::DateTimeWithOffsetAdapter::new(time).into_offsetdatetime(),
+            ),
         }
     }
 }
@@ -1644,6 +1636,8 @@ impl std::fmt::Display for CacheUrl {
 
 #[cfg(test)]
 mod tests {
+    use time::OffsetDateTime;
+
     use super::*;
 
     #[test]
@@ -1817,7 +1811,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "cache")]
     fn session_store_valid_toml() {
         let toml_content = r#"
             debug = true
@@ -1845,6 +1838,7 @@ mod tests {
             "#,
                 SessionStoreTypeConfig::Memory,
             ),
+            #[cfg(feature = "cache")]
             (
                 r#"
             [middlewares.session.store]
@@ -1864,6 +1858,14 @@ mod tests {
                 SessionStoreTypeConfig::File {
                     path: PathBuf::from("session/path"),
                 },
+            ),
+            #[cfg(all(feature = "db", feature = "json"))]
+            (
+                r#"
+            [middlewares.session.store]
+            type = "database"
+            "#,
+                SessionStoreTypeConfig::Database,
             ),
         ];
 

@@ -1,3 +1,7 @@
+#[rustversion::attr(
+    not(nightly),
+    ignore = "only test on nightly for consistent error messages"
+)]
 #[test]
 #[cfg_attr(
     miri,

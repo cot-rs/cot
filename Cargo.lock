@@ -660,6 +660,7 @@ dependencies = [
  "password-auth",
  "pin-project-lite",
  "redis",
+ "rustversion",
  "schemars",
  "sea-query",
  "sea-query-binder",

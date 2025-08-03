@@ -63,7 +63,7 @@ sync_wrapper.workspace = true
 thiserror.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs", "io-util"] }
-toml = { workspace = true, features = ["parse"] }
+toml = { workspace = true, features = ["parse", "serde"] }
 tower = { workspace = true, features = ["util"] }
 tower-livereload = { workspace = true, optional = true }
 tower-sessions = { workspace = true, features = ["memory-store"] }

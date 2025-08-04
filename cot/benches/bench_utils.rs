@@ -13,6 +13,7 @@ use cot::router::Router;
 use cot::{App, AppBuilder, Project};
 use criterion::{Criterion, Throughput};
 use futures_util::future::join_all;
+use reqwest::{Client, Request};
 
 pub(crate) struct ProjectBenchmarkBuilder<'a> {
     #[allow(clippy::allow_attributes, dead_code)]
@@ -44,7 +45,11 @@ macro_rules! builder_method {
     };
 }
 
-#[allow(clippy::allow_attributes, dead_code)]
+#[allow(clippy::allow_attributes, reason = "For the dead_code allowance")]
+#[allow(
+    dead_code,
+    reason = "Clippy warns about unused code despite using it in benchmarks"
+)]
 pub(crate) fn bench<'a>(
     criterion: &'a mut Criterion,
     name: &'static str,
@@ -52,7 +57,8 @@ pub(crate) fn bench<'a>(
     ProjectBenchmarkBuilder::new(criterion, name)
 }
 
-#[allow(clippy::allow_attributes, dead_code)]
+#[allow(clippy::allow_attributes, reason = "For the dead_code allowance")]
+#[allow(dead_code, reason = "For the benchmark functions not used yet")]
 impl<'a> ProjectBenchmarkBuilder<'a> {
     pub(crate) fn new(criterion: &'a mut Criterion, name: &'static str) -> Self {
         Self {
@@ -106,7 +112,7 @@ impl<'a> ProjectBenchmarkBuilder<'a> {
     {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         let _server_handle = std::thread::spawn(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
+            let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .expect("Failed to create tokio runtime");
@@ -142,52 +148,52 @@ impl<'a> ProjectBenchmarkBuilder<'a> {
             .build()
             .expect("Failed to create tokio runtime");
 
+        let client = Client::new();
+        let base_url = format!("http://127.0.0.1:{local_port}");
+        let request = self.build_request(&client, &base_url);
+
         self.criterion
             .benchmark_group(self.name)
             .throughput(Throughput::Elements(self.requests_per_iteration))
             .bench_function(self.name, |b| {
-                let client = reqwest::Client::new();
-                let base_url = format!("http://127.0.0.1:{local_port}");
-
-                let request_builder = client.request(
-                    self.method.clone(),
-                    format!("{}{}", base_url, self.path.unwrap_or("/")),
-                );
-
-                let request_builder = if let Some(body) = &self.body {
-                    request_builder.body(body.clone())
-                } else {
-                    request_builder
-                };
-
-                let request_builder = if let Some(content_type) = self.content_type {
-                    request_builder.header("Content-Type", content_type)
-                } else {
-                    request_builder
-                };
-
-                let request = request_builder.build().expect("Failed to build request");
-
-                let iterations = self.requests_per_iteration;
-                let expected_status_code = self.expected_status_code;
-
                 b.to_async(&runtime).iter(|| {
-                    let futures: Vec<_> = (0..iterations)
+                    let futures: Vec<_> = (0..self.requests_per_iteration)
                         .map(|_| {
                             let request = request.try_clone().expect("Failed to clone request");
                             client.execute(request)
                         })
                         .collect();
-                    let outputs = join_all(futures);
 
                     async move {
+                        let outputs = join_all(futures);
                         for response in outputs.await {
                             let response = response.expect("Failed to execute request");
-                            assert_eq!(response.status(), expected_status_code);
+                            assert_eq!(response.status(), self.expected_status_code);
                         }
                     }
                 });
             });
+    }
+
+    fn build_request(&self, client: &Client, base_url: &str) -> Request {
+        let request_builder = client.request(
+            self.method.clone(),
+            format!("{}{}", base_url, self.path.unwrap_or("/")),
+        );
+
+        let request_builder = if let Some(body) = &self.body {
+            request_builder.body(body.clone())
+        } else {
+            request_builder
+        };
+
+        let request_builder = if let Some(content_type) = self.content_type {
+            request_builder.header("Content-Type", content_type)
+        } else {
+            request_builder
+        };
+
+        request_builder.build().expect("Failed to build request")
     }
 }
 

@@ -77,9 +77,9 @@ fake.workspace = true
 fantoccini.workspace = true
 futures.workspace = true
 mockall.workspace = true
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { workspace = true, features = ["json"] }
 rustversion.workspace = true
-serde_urlencoded = "0.7"
+serde_urlencoded.workspace = true
 tempfile.workspace = true
 tracing-test.workspace = true
 trybuild.workspace = true

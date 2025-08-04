@@ -37,7 +37,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .path("/")
         .run_with_router(|| Router::with_urls([Route::with_handler("/", hello_world)]));
 
-    bench(c, "single_root_route-burst")
+    bench(c, "single_root_route_burst")
         .path("/")
         .requests_per_iteration(1000)
         .run_with_router(|| Router::with_urls([Route::with_handler("/", hello_world)]));

@@ -72,11 +72,14 @@ url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 async-stream.workspace = true
+criterion = { workspace = true, features = ["async_tokio"] }
 fake.workspace = true
 fantoccini.workspace = true
 futures.workspace = true
 mockall.workspace = true
+reqwest = { workspace = true, features = ["json"] }
 rustversion.workspace = true
+serde_urlencoded.workspace = true
 tempfile.workspace = true
 tracing-test.workspace = true
 trybuild.workspace = true
@@ -113,3 +116,11 @@ swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
 cache = []
 test = []
+
+[lib]
+bench = false
+
+[[bench]]
+name = "router"
+harness = false
+required-features = ["test"]

@@ -1,6 +1,9 @@
 use askama::Template;
 use cot::cli::CliMetadata;
-use cot::config::ProjectConfig;
+use cot::config::{
+    DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig, SessionStoreConfig,
+    SessionStoreTypeConfig,
+};
 use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::SessionMiddleware;
@@ -9,6 +12,7 @@ use cot::request::Request;
 use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router, Urls};
 use cot::session::Session;
+use cot::session::db::SessionApp;
 use cot::{App, AppBuilder, Project, reverse_redirect};
 
 #[derive(Debug, Template)]
@@ -80,11 +84,32 @@ impl Project for SessionsProject {
     }
 
     fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
-        Ok(ProjectConfig::dev_default())
+        Ok(ProjectConfig::builder()
+            .database(
+                DatabaseConfig::builder()
+                    .url("sqlite://example-session.sqlite3?mode=rwc")
+                    .build(),
+            )
+            .middlewares(
+                MiddlewareConfig::builder()
+                    .session(
+                        SessionMiddlewareConfig::builder()
+                            .secure(false)
+                            .store(
+                                SessionStoreConfig::builder()
+                                    .store_type(SessionStoreTypeConfig::Database)
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build())
     }
 
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views(HelloApp, "");
+        apps.register(SessionApp::new());
     }
 
     fn middlewares(

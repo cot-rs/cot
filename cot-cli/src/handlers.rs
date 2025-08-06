@@ -2,16 +2,48 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::CommandFactory;
+use dialoguer::Confirm;
 
 use crate::args::{
     Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, ProjectNewArgs,
 };
 use crate::migration_generator::{MigrationGeneratorOptions, list_migrations, make_migrations};
 use crate::new_project::{CotSource, new_project};
+use crate::utils::{StatusType, print_status_msg};
 
 pub fn handle_new_project(
-    ProjectNewArgs { path, name, source }: ProjectNewArgs,
+    ProjectNewArgs {
+        path,
+        name,
+        source,
+        yes,
+    }: ProjectNewArgs,
 ) -> anyhow::Result<()> {
+    let path = path
+        .canonicalize()
+        .with_context(|| format!("unable to canonicalize path: {}", path.display()))?;
+
+    if path.exists() && path.join("Cargo.toml").exists() {
+        if !yes {
+            let confirmed = Confirm::new()
+                .with_prompt(format!(
+                    "Directory '{}' is not empty. Overwrite?",
+                    path.display()
+                ))
+                .default(false)
+                .interact()?;
+            if !confirmed {
+                print_status_msg(StatusType::Error, "Aborted: directory not empty");
+                std::process::exit(0);
+            }
+        } else {
+            print_status_msg(
+                StatusType::Warning,
+                &format!("Overwriting existing files in `{}`", path.display()),
+            );
+        }
+    }
+
     let project_name = match name {
         None => {
             let dir_name = path
@@ -29,6 +61,10 @@ pub fn handle_new_project(
     } else {
         CotSource::PublishedCrate
     };
+    print_status_msg(
+        StatusType::Creating,
+        &format!("Creating project '{}' in: {}", project_name, path.display()),
+    );
     new_project(&path, &project_name, &cot_source).with_context(|| "unable to create project")
 }
 
@@ -96,6 +132,7 @@ mod tests {
                 use_git: false,
                 cot_path: None,
             },
+            yes: false,
         };
 
         let result = handle_new_project(args);

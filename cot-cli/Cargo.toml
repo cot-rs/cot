@@ -31,6 +31,7 @@ clap-verbosity-flag = { workspace = true, features = ["tracing"] }
 darling.workspace = true
 cot.workspace = true
 cot_codegen = { workspace = true, features = ["symbol-resolver"] }
+dialoguer.workspace = true
 glob.workspace = true
 heck.workspace = true
 hex.workspace = true

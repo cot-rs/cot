@@ -26,7 +26,7 @@ use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 use crate::error::error_impl::impl_into_cot_error;
-use crate::form::fields::chrono::DateTimeWithOffsetAdapter;
+use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
 /// The configuration for a project.
 ///

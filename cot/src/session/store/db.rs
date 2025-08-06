@@ -31,8 +31,8 @@ use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
 use crate::db::{Auto, Database, DatabaseError, Model, query};
-use crate::form::fields::chrono::DateTimeWithOffsetAdapter;
 use crate::session::db::Session;
+use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
 // TODO: make this a config knob.
 const MAX_COLLISION_RETRIES: u32 = 32;

@@ -30,9 +30,12 @@ use thiserror::Error;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
-use crate::common_types;
 use crate::db::{Auto, Database, DatabaseError, Model, query};
+use crate::form::fields::chrono::DateTimeWithOffsetAdapter;
 use crate::session::db::Session;
+
+// TODO: make this a config knob.
+const MAX_COLLISION_RETRIES: u32 = 32;
 
 /// Errors that can occur while interacting with the database session store.
 #[derive(Debug, Error)]
@@ -41,6 +44,9 @@ pub enum DbStoreError {
     /// An error occurred while interacting with the database.
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
+    /// The record ID collided too many times while saving in the database.
+    #[error("session‐id collision retried too many times ({0})")]
+    TooManyIdCollisions(u32),
     /// An error occurred during JSON serialization.
     #[error("JSON serialization error: {0}")]
     Serialize(Box<dyn Error + Send + Sync>),
@@ -57,6 +63,7 @@ impl From<DbStoreError> for session_store::Error {
             }
             DbStoreError::Serialize(ser_err) => session_store::Error::Encode(ser_err.to_string()),
             DbStoreError::Deserialize(de_err) => session_store::Error::Decode(de_err.to_string()),
+            other => session_store::Error::Backend(other.to_string()),
         }
     }
 }
@@ -113,11 +120,11 @@ impl DbStore {
 #[async_trait]
 impl SessionStore for DbStore {
     async fn create(&self, record: &mut Record) -> session_store::Result<()> {
-        loop {
+        for _ in 0..=MAX_COLLISION_RETRIES {
             let key = record.id.to_string();
 
             let data = serde_json::to_string(&record.data).unwrap();
-            let expiry = common_types::DateTimeWithOffsetAdapter::try_from(record.expiry_date)
+            let expiry = DateTimeWithOffsetAdapter::try_from(record.expiry_date)
                 .expect("Failed to convert expiry date to a valid datetime")
                 .into_chrono();
             let mut model = Session {
@@ -126,22 +133,20 @@ impl SessionStore for DbStore {
                 data,
                 expiry,
             };
+
             let res = self.connection.insert(&mut model).await;
             match res {
                 Ok(()) => {
-                    break Ok(());
+                    return Ok(());
                 }
-                Err(DatabaseError::DatabaseEngineError(err))
-                    if err
-                        .as_database_error()
-                        .is_some_and(sqlx::error::DatabaseError::is_unique_violation) =>
-                {
+                Err(DatabaseError::UniqueViolation) => {
                     // If a unique constraint violation occurs, we need to generate a new ID
                     record.id = Id::default();
                 }
                 Err(err) => return Err(DbStoreError::DatabaseError(err))?,
             }
         }
+        Err(DbStoreError::TooManyIdCollisions(MAX_COLLISION_RETRIES))?
     }
 
     async fn save(&self, record: &Record) -> session_store::Result<()> {
@@ -182,8 +187,7 @@ impl SessionStore for DbStore {
                 .parse::<Id>()
                 .map_err(|err| DbStoreError::Deserialize(Box::new(err)))?;
 
-            let expiry_date =
-                common_types::DateTimeWithOffsetAdapter::new(session.expiry).into_offsetdatetime();
+            let expiry_date = DateTimeWithOffsetAdapter::new(session.expiry).into_offsetdatetime();
 
             let rec = Record {
                 id,
@@ -370,8 +374,8 @@ mod tests {
         assert!(loaded1.is_some() && loaded2.is_some());
     }
 
-    #[test]
-    fn test_from_db_store_error_to_session_store_error() {
+    #[cot::test]
+    async fn test_from_db_store_error_to_session_store_error() {
         let sqlx_err = sqlx::Error::Protocol("protocol error".into());
         let db_err = DatabaseError::DatabaseEngineError(sqlx_err);
         let sess_err: session_store::Error = DbStoreError::DatabaseError(db_err).into();

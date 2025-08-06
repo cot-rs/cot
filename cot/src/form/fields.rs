@@ -1,5 +1,5 @@
 mod attrs;
-mod chrono;
+pub(crate) mod chrono;
 mod files;
 mod select;
 

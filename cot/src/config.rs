@@ -25,8 +25,8 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
-use crate::common_types;
 use crate::error::error_impl::impl_into_cot_error;
+use crate::form::fields::chrono::DateTimeWithOffsetAdapter;
 
 /// The configuration for a project.
 ///
@@ -1039,9 +1039,9 @@ impl From<Expiry> for tower_sessions::Expiry {
                     panic!("could not convert {duration:?} into a valid time::Duration: {e:?}",)
                 }))
             }
-            Expiry::AtDateTime(time) => Self::AtDateTime(
-                common_types::DateTimeWithOffsetAdapter::new(time).into_offsetdatetime(),
-            ),
+            Expiry::AtDateTime(time) => {
+                Self::AtDateTime(DateTimeWithOffsetAdapter::new(time).into_offsetdatetime())
+            }
         }
     }
 }

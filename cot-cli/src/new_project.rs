@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use anyhow::Context;
 use heck::ToPascalCase;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
@@ -60,8 +61,9 @@ pub fn new_project(
         &format!("Cot project `{project_name}`"),
     );
 
-    if path.exists() {
-        anyhow::bail!("destination `{}` already exists", path.display());
+    if !path.exists() {
+        std::fs::create_dir_all(path)
+            .with_context(|| format!("failed to create directory `{}`", path.display()))?;
     }
 
     let project_struct_name = format!("{}Project", project_name.to_pascal_case());
@@ -69,22 +71,28 @@ pub fn new_project(
     let cot_source = cot_source.as_cargo_toml_source();
     let dev_secret_key = generate_secret_key();
 
-    for (file_name, content) in PROJECT_FILES {
+    for (template_name, content) in PROJECT_FILES {
         // Cargo reads and parses all files that are named "Cargo.toml" in a repository,
         // so we need a different name so that it doesn't fail on build.
-        let file_name = file_name.replace(".template", "");
+        let file_name = template_name.replace(".template", "");
+        let file_path = path.join(&file_name);
 
-        let file_path = path.join(file_name);
-        trace!("Writing file: {:?}", file_path);
+        if file_path.exists() {
+            print_status_msg(
+                StatusType::Warning,
+                &format!("Overwriting `{}`", file_path.display()),
+            );
+        } else {
+            trace!("Writing file: {:?}", file_path);
+        }
 
-        std::fs::create_dir_all(
-            file_path
-                .parent()
-                .expect("joined path should always have a parent"),
-        )?;
+        if let Some(dir) = file_path.parent() {
+            std::fs::create_dir_all(dir)
+                .with_context(|| format!("failed to create directory `{}`", dir.display()))?;
+        }
 
         std::fs::write(
-            file_path,
+            &file_path,
             content
                 .replace("{{ project_name }}", project_name)
                 .replace("{{ project_struct_name }}", &project_struct_name)

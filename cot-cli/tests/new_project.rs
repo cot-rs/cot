@@ -18,6 +18,7 @@ fn new_project_compile_test() {
         &project_path,
         "my_project",
         &CotSource::Path(&cot_workspace_path),
+        false,
     )
     .unwrap();
 

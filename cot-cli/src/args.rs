@@ -40,6 +40,9 @@ pub struct ProjectNewArgs {
     pub name: Option<String>,
     #[command(flatten)]
     pub source: CotSourceArgs,
+    /// Skip interactive prompts and use defaults
+    #[arg(short, long)]
+    pub yes: bool,
 }
 
 #[derive(Debug, Subcommand)]

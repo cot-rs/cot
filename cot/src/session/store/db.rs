@@ -213,12 +213,8 @@ impl SessionStore for DbStore {
 mod tests {
     use std::collections::HashMap;
     use std::io;
-    use std::path::PathBuf;
-    use std::sync::OnceLock;
 
-    use tempfile::TempDir;
     use time::{Duration, OffsetDateTime};
-    use tokio::sync::OnceCell;
     use tower_sessions::session::{Id, Record};
 
     use super::*;
@@ -227,52 +223,13 @@ mod tests {
     use crate::session::db::SessionApp;
     use crate::test::TestDatabase;
 
-    struct TestContext {
-        _temp_dir: TempDir,
-        db_folder: PathBuf,
-        db_store: OnceCell<DbStore>,
-    }
-
-    impl TestContext {
-        fn get() -> &'static Self {
-            static CTX: OnceLock<TestContext> = OnceLock::new();
-            CTX.get_or_init(|| {
-                let td = TempDir::new().expect("TempDir");
-                let db_folder = td.path().join("dbstore");
-                std::fs::create_dir_all(&db_folder).expect("mkdir dbstore");
-                TestContext {
-                    _temp_dir: td,
-                    db_folder,
-                    db_store: OnceCell::const_new(),
-                }
-            })
-        }
-
-        fn db_uri(&self) -> String {
-            format!(
-                "sqlite://{}/db_store.sqlite3?mode=rwc",
-                self.db_folder.display()
-            )
-        }
-
-        async fn db_store(&self) -> &DbStore {
-            self.db_store
-                .get_or_init(|| async {
-                    let uri = self.db_uri();
-
-                    let mut test_db = TestDatabase::new_sqlite(uri)
-                        .await
-                        .expect("Failed to open database");
-                    test_db.add_migrations(SessionApp.migrations());
-                    test_db.run_migrations().await;
-                    DbStore::new(test_db.database())
-                })
-                .await
-        }
-    }
-
-    async fn make_db_store() -> &'static DbStore {
-        TestContext::get().db_store().await
+    async fn make_db_store() -> DbStore {
+        let mut test_db = TestDatabase::new_sqlite()
+            .await
+            .expect("Failed to open database");
+        test_db.add_migrations(SessionApp.migrations());
+        test_db.run_migrations().await;
+        DbStore::new(test_db.database())
     }
 
     fn make_record() -> Record {

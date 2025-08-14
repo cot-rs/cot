@@ -24,18 +24,23 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
+use crate::session::store::{ERROR_PREFIX, MAX_COLLISION_RETRIES};
+
 /// Errors that can occur when using the File session store.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum FileStoreError {
     /// An error occurred during an I/O operation.
-    #[error(transparent)]
+    #[error("{ERROR_PREFIX} I/O error: {0}")]
     Io(#[from] Box<dyn Error + Send + Sync>),
+    /// The record ID collided too many times while saving in the database.
+    #[error("{ERROR_PREFIX} session‐id collision retried too many times ({0})")]
+    TooManyIdCollisions(u32),
     /// An error occurred during JSON serialization.
-    #[error("JSON serialization error: {0}")]
+    #[error("{ERROR_PREFIX} JSON serialization error: {0}")]
     Serialize(Box<dyn Error + Send + Sync>),
     /// An error occurred during JSON deserialization.
-    #[error("JSON serialization error: {0}")]
+    #[error("{ERROR_PREFIX} JSON serialization error: {0}")]
     Deserialize(Box<dyn Error + Send + Sync>),
 }
 
@@ -45,6 +50,7 @@ impl From<FileStoreError> for session_store::Error {
             FileStoreError::Io(inner) => session_store::Error::Backend(inner.to_string()),
             FileStoreError::Serialize(inner) => session_store::Error::Encode(inner.to_string()),
             FileStoreError::Deserialize(inner) => session_store::Error::Decode(inner.to_string()),
+            other => session_store::Error::Backend(other.to_string()),
         }
     }
 }
@@ -105,7 +111,7 @@ impl FileStore {
 #[async_trait]
 impl SessionStore for FileStore {
     async fn create(&self, record: &mut Record) -> session_store::Result<()> {
-        loop {
+        for _ in 0..=MAX_COLLISION_RETRIES {
             let file_path = self.dir_path.join(record.id.to_string());
             let file = OpenOptions::new()
                 .create_new(true)
@@ -120,7 +126,7 @@ impl SessionStore for FileStore {
                     file.write_all(json_data.as_bytes())
                         .await
                         .map_err(|err| FileStoreError::Io(Box::new(err)))?;
-                    break;
+                    return Ok(());
                 }
                 Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
                     // On collision, recycle the ID and try again.
@@ -133,7 +139,7 @@ impl SessionStore for FileStore {
             }
         }
 
-        Ok(())
+        Err(FileStoreError::TooManyIdCollisions(MAX_COLLISION_RETRIES))?
     }
 
     async fn save(&self, record: &Record) -> session_store::Result<()> {

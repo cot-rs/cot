@@ -592,7 +592,7 @@ impl TestRequestBuilder {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let mut test_database = TestDatabase::new_sqlite().await?;
+    /// let mut test_database = TestDatabase::new_sqlite("sqlite::memory:").await?;
     /// test_database.with_auth().run_migrations().await;
     /// let request = TestRequestBuilder::get("/")
     ///     .with_db_auth(test_database.database())
@@ -813,7 +813,7 @@ impl TestRequestBuilder {
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
-/// let mut test_database = TestDatabase::new_sqlite().await?;
+/// let mut test_database = TestDatabase::new_sqlite("sqlite::memory:").await?;
 /// let request = TestRequestBuilder::get("/")
 ///     .database(test_database.database())
 ///     .build();
@@ -856,7 +856,7 @@ impl TestDatabase {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let mut test_database = TestDatabase::new_sqlite().await?;
+    /// let mut test_database = TestDatabase::new_sqlite("sqlite::memory:").await?;
     /// let request = TestRequestBuilder::get("/")
     ///     .database(test_database.database())
     ///     .build();
@@ -867,8 +867,8 @@ impl TestDatabase {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn new_sqlite() -> Result<Self> {
-        let database = Database::new("sqlite::memory:").await?;
+    pub async fn new_sqlite<U: Into<String>>(url: U) -> Result<Self> {
+        let database = Database::new(url.into()).await?;
         Ok(Self::new(database, TestDatabaseKind::Sqlite))
     }
 
@@ -1019,7 +1019,7 @@ impl TestDatabase {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let mut test_database = TestDatabase::new_sqlite().await?;
+    /// let mut test_database = TestDatabase::new_sqlite("sqlite::memory:").await?;
     /// test_database.with_auth().run_migrations().await;
     ///
     /// let request = TestRequestBuilder::get("/")
@@ -1048,7 +1048,7 @@ impl TestDatabase {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let mut test_database = TestDatabase::new_sqlite().await?;
+    /// let mut test_database = TestDatabase::new_sqlite("sqlite::memory:").await?;
     ///
     /// test_database.add_migrations(vec![TestMigration::new(
     ///     "auth",
@@ -1082,7 +1082,7 @@ impl TestDatabase {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let mut test_database = TestDatabase::new_sqlite().await?;
+    /// let mut test_database = TestDatabase::new_sqlite("sqlite::memory:").await?;
     /// test_database.add_migrations(vec![TestMigration::new(
     ///     "auth",
     ///     "create_users",
@@ -1115,7 +1115,7 @@ impl TestDatabase {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let database = TestDatabase::new_sqlite().await?;
+    /// let database = TestDatabase::new_sqlite("sqlite::memory:").await?;
     ///
     /// let request = TestRequestBuilder::get("/")
     ///     .database(database.database())
@@ -1146,7 +1146,7 @@ impl TestDatabase {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let mut test_database = TestDatabase::new_sqlite().await?;
+    /// let mut test_database = TestDatabase::new_sqlite("sqlite::memory:").await?;
     /// test_database.cleanup().await?;
     /// # Ok(())
     /// # }

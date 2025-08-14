@@ -22,29 +22,34 @@ use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
 use crate::config::CacheUrl;
+use crate::session::store::{ERROR_PREFIX, MAX_COLLISION_RETRIES};
 
 #[derive(Debug, Error)]
 /// Errors that can occur when using the Redis session store.
 #[non_exhaustive]
 pub enum RedisStoreError {
     /// An error occurred during a pool connection or checkout.
-    #[error(transparent)]
+    #[error("{ERROR_PREFIX} pool connection error: {0}")]
     PoolConnection(Box<dyn Error + Send + Sync>),
 
     /// An error occurred during Redis connection pool creation.
-    #[error(transparent)]
+    #[error("{ERROR_PREFIX} pool creation error: {0}")]
     PoolCreation(Box<dyn Error + Send + Sync>),
 
     /// An error occurred during a Redis command execution.
-    #[error(transparent)]
+    #[error("{ERROR_PREFIX} command error: {0}")]
     Command(Box<dyn Error + Send + Sync>),
 
+    /// The record ID collided too many times while saving in the store.
+    #[error("{ERROR_PREFIX} session-id collision retried too many times ({0})")]
+    TooManyIdCollisions(u32),
+
     /// An error occurred during JSON serialization.
-    #[error("serialization error: {0}")]
+    #[error("{ERROR_PREFIX} serialization error: {0}")]
     Serialize(Box<dyn Error + Send + Sync>),
 
     /// An error occurred during JSON deserialization.
-    #[error("deserialization error: {0}")]
+    #[error("{ERROR_PREFIX} deserialization error: {0}")]
     Deserialize(Box<dyn Error + Send + Sync>),
 }
 
@@ -57,6 +62,7 @@ impl From<RedisStoreError> for session_store::Error {
             RedisStoreError::Command(inner) => session_store::Error::Backend(inner.to_string()),
             RedisStoreError::Serialize(inner) => session_store::Error::Encode(inner.to_string()),
             RedisStoreError::Deserialize(inner) => session_store::Error::Decode(inner.to_string()),
+            other => session_store::Error::Backend(other.to_string()),
         }
     }
 }
@@ -165,19 +171,19 @@ impl SessionStore for RedisStore {
             .conditional_set(ExistenceCheck::NX) // only create if the key does not exist.
             .with_expiration(SetExpiry::EX(get_expiry_as_u64(session_record.expiry_date)));
 
-        loop {
+        for _ in 0..=MAX_COLLISION_RETRIES {
             let key = session_record.id.to_string();
             let set_ok: bool = conn
                 .set_options(key, &data, options)
                 .await
                 .map_err(|err| RedisStoreError::Command(Box::new(err)))?;
             if set_ok {
-                break;
+                return Ok(());
             }
             // On collision, recycle the ID and try again.
             session_record.id = Id::default();
         }
-        Ok(())
+        Err(RedisStoreError::TooManyIdCollisions(MAX_COLLISION_RETRIES))?
     }
     async fn save(&self, session_record: &Record) -> session_store::Result<()> {
         let mut conn = self.get_connection().await?;

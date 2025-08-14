@@ -805,7 +805,7 @@ pub enum SessionStoreTypeConfig {
     /// Database-backed session storage.
     ///
     /// This stores session data in the configured database. This requires the
-    /// "db" feature to be enabled.
+    /// "db" and "json" features enabled.
     #[cfg(all(feature = "db", feature = "json"))]
     Database,
 

@@ -32,26 +32,24 @@ use tower_sessions::{SessionStore, session_store};
 
 use crate::db::{Auto, Database, DatabaseError, Model, query};
 use crate::session::db::Session;
+use crate::session::store::{ERROR_PREFIX, MAX_COLLISION_RETRIES};
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
-
-// TODO: make this a config knob.
-const MAX_COLLISION_RETRIES: u32 = 32;
 
 /// Errors that can occur while interacting with the database session store.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum DbStoreError {
     /// An error occurred while interacting with the database.
-    #[error(transparent)]
+    #[error("{ERROR_PREFIX} {0} ")]
     DatabaseError(#[from] DatabaseError),
     /// The record ID collided too many times while saving in the database.
-    #[error("session‐id collision retried too many times ({0})")]
+    #[error("{ERROR_PREFIX} session‐id collision retried too many times ({0})")]
     TooManyIdCollisions(u32),
     /// An error occurred during JSON serialization.
-    #[error("JSON serialization error: {0}")]
+    #[error("{ERROR_PREFIX} JSON serialization error: {0}")]
     Serialize(Box<dyn Error + Send + Sync>),
     /// An error occurred during JSON deserialization.
-    #[error("JSON serialization error: {0}")]
+    #[error("{ERROR_PREFIX} JSON serialization error: {0}")]
     Deserialize(Box<dyn Error + Send + Sync>),
 }
 
@@ -226,8 +224,8 @@ mod tests {
     use super::*;
     use crate::App;
     use crate::db::DatabaseError;
-    use crate::db::migrations::MigrationEngine;
     use crate::session::db::SessionApp;
+    use crate::test::TestDatabase;
 
     struct TestContext {
         _temp_dir: TempDir,
@@ -261,11 +259,13 @@ mod tests {
             self.db_store
                 .get_or_init(|| async {
                     let uri = self.db_uri();
-                    let engine = MigrationEngine::new(SessionApp.migrations())
-                        .expect("Failed to create migration engine");
-                    let db = Database::new(&uri).await.expect("Failed to open database");
-                    engine.run(&db).await.expect("Failed to run migrations");
-                    DbStore::new(Arc::new(db))
+
+                    let mut test_db = TestDatabase::new_sqlite(uri)
+                        .await
+                        .expect("Failed to open database");
+                    test_db.add_migrations(SessionApp.migrations());
+                    test_db.run_migrations().await;
+                    DbStore::new(test_db.database())
                 })
                 .await
         }

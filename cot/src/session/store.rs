@@ -22,6 +22,9 @@ use async_trait::async_trait;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
+pub(crate) const MAX_COLLISION_RETRIES: u32 = 32;
+pub(crate) const ERROR_PREFIX: &str = "session store:";
+
 /// A wrapper that provides a concrete type for
 /// [`tower_session::SessionManagerLayer`] while delegating to a boxed
 /// [`SessionStore`] trait object.

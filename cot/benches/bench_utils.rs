@@ -16,9 +16,7 @@ use futures_util::future::join_all;
 use reqwest::{Client, Request};
 
 pub(crate) struct ProjectBenchmarkBuilder<'a> {
-    #[allow(clippy::allow_attributes, dead_code)]
     name: &'static str,
-    #[allow(clippy::allow_attributes, dead_code)]
     criterion: &'a mut Criterion,
     method: reqwest::Method,
     path: Option<&'static str>,

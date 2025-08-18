@@ -21,13 +21,23 @@ impl DateTimeWithOffsetAdapter {
         Self(dt)
     }
 
-    pub(crate) fn into_chrono(self) -> DateTime<FixedOffset> {
+    /// Return a chrono datetime truncated to microsecond precision,
+    /// safe for databases(Postgres, Mysql) that only support up to 6 fractional
+    /// digits.
+    pub(crate) fn into_chrono_db_safe(self) -> DateTime<FixedOffset> {
+        let secs = self.0.timestamp();
+        let nsecs = self.0.timestamp_subsec_micros() * 1_000;
+
         self.0
+            .timezone()
+            .timestamp_opt(secs, nsecs)
+            .single()
+            .expect("could not convert DateTimeWithOffsetAdapter to DateTime<FixedOffset>")
     }
 
     pub(crate) fn into_offsetdatetime(self) -> OffsetDateTime {
         self.try_into()
-            .expect("Failed to convert DateTimeWithOffsetAdapter to OffsetDateTime")
+            .expect("could not convert DateTimeWithOffsetAdapter to OffsetDateTime")
     }
 }
 
@@ -88,13 +98,6 @@ mod tests {
     }
 
     #[cot::test]
-    async fn test_new_and_into_chrono() {
-        let (chrono_dt, _) = parse_both("2025-08-01T12:34:56.789123456+02:00");
-        let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
-        assert_eq!(adapter.into_chrono(), chrono_dt);
-    }
-
-    #[cot::test]
     async fn test_into_offsetdatetime_roundtrip() {
         let (chrono_dt, time_dt) = parse_both("2025-08-01T12:34:56.789123456-04:00");
         let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
@@ -111,12 +114,36 @@ mod tests {
     }
 
     #[cot::test]
-    async fn test_chrono_to_time_and_back_via_from() {
-        let (chrono_dt, _) = parse_both("2000-01-01T00:00:00.000000001+05:30");
+    async fn test_into_chrono_db_safe_truncates_to_micros() {
+        let (chrono_dt, _) = parse_both("2025-08-01T12:34:56.789123456+02:00");
         let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
-        let time_dt: OffsetDateTime = adapter.try_into().unwrap();
 
-        let adapter2: DateTimeWithOffsetAdapter = time_dt.try_into().unwrap();
-        assert_eq!(adapter2.into_chrono(), chrono_dt);
+        let db_dt = adapter.into_chrono_db_safe();
+
+        assert_eq!(format!("{db_dt:?}"), "2025-08-01T12:34:56.789123+02:00");
+    }
+
+    #[cot::test]
+    async fn test_into_chrono_db_safe_idempotent_if_already_micros() {
+        let (chrono_dt, _) = parse_both("2025-08-01T12:34:56.789123+02:00");
+        let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
+
+        let db_dt = adapter.into_chrono_db_safe();
+
+        assert_eq!(format!("{db_dt:?}"), "2025-08-01T12:34:56.789123+02:00");
+    }
+
+    #[cot::test]
+    async fn test_into_chrono_db_safe_roundtrip_to_offsetdatetime_has_only_micros() {
+        let (chrono_dt, _) = parse_both("2025-08-01T12:34:56.789123456+02:00");
+        let adapter = DateTimeWithOffsetAdapter::new(chrono_dt);
+
+        let db_dt = adapter.into_chrono_db_safe();
+        let db_adapter = DateTimeWithOffsetAdapter::new(db_dt);
+        let back: OffsetDateTime = db_adapter.into_offsetdatetime();
+
+        assert_eq!(format!("{db_dt:?}"), "2025-08-01T12:34:56.789123+02:00");
+
+        assert_eq!(back.nanosecond(), db_dt.timestamp_subsec_nanos());
     }
 }

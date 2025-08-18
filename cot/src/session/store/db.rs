@@ -124,7 +124,7 @@ impl SessionStore for DbStore {
             let data = serde_json::to_string(&record.data).unwrap();
             let expiry = DateTimeWithOffsetAdapter::try_from(record.expiry_date)
                 .expect("Failed to convert expiry date to a valid datetime")
-                .into_chrono();
+                .into_chrono_db_safe();
             let mut model = Session {
                 id: Auto::auto(),
                 key,

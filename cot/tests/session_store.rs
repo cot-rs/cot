@@ -23,13 +23,22 @@ fn make_record() -> Record {
     }
 }
 
+fn truncate_record_expiry(record: &Record) -> Record {
+    let mut record = record.clone();
+    let mut exp = record.expiry_date;
+    exp.replace_nanosecond(exp.microsecond() * 1_000)
+        .expect("could not replace nano seconds.");
+    record
+}
+
 #[cot_macros::dbtest]
 async fn test_create_and_load(test_db: &mut TestDatabase) {
     let store = make_db_store(test_db).await;
     let mut rec = make_record();
     store.create(&mut rec).await.expect("create failed");
     let loaded = store.load(&rec.id).await.expect("load err");
-    assert_eq!(Some(rec.clone()), loaded);
+    let expected = truncate_record_expiry(&mut rec.clone());
+    assert_eq!(Some(expected), loaded);
 }
 
 #[cot_macros::dbtest]
@@ -52,7 +61,8 @@ async fn test_save_creates_if_missing(test_db: &mut TestDatabase) {
     let rec = make_record();
     store.save(&rec).await.expect("save failed");
     let loaded = store.load(&rec.id).await.unwrap();
-    assert_eq!(Some(rec), loaded);
+    let expected = truncate_record_expiry(&mut rec.clone());
+    assert_eq!(Some(expected), loaded);
 }
 
 #[cot_macros::dbtest]

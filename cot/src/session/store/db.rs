@@ -125,7 +125,7 @@ impl SessionStore for DbStore {
             let expiry = DateTimeWithOffsetAdapter::try_from(record.expiry_date)
                 .expect("Failed to convert expiry date to a valid datetime")
                 .into_chrono_db_safe();
-            println!("======= \n expiry : {expiry:?}");
+
             let mut model = Session {
                 id: Auto::auto(),
                 key,

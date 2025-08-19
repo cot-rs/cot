@@ -40,7 +40,7 @@ async fn test_create_and_load(test_db: &mut TestDatabase) {
     let mut rec = make_record();
     store.create(&mut rec).await.expect("create failed");
     let loaded = store.load(&rec.id).await.expect("load err");
-    let expected = truncate_record_expiry(&rec.clone());
+    let expected = truncate_record_expiry(&rec);
     assert_eq!(Some(expected), loaded);
 }
 
@@ -64,7 +64,7 @@ async fn test_save_creates_if_missing(test_db: &mut TestDatabase) {
     let rec = make_record();
     store.save(&rec).await.expect("save failed");
     let loaded = store.load(&rec.id).await.unwrap();
-    let expected = truncate_record_expiry(&mut rec.clone());
+    let expected = truncate_record_expiry(&rec);
     assert_eq!(Some(expected), loaded);
 }
 

@@ -19,7 +19,7 @@ fn make_record() -> Record {
     Record {
         id: Id::default(),
         data: HashMap::default(),
-        expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
+        expiry_date: OffsetDateTime::now_utc() //+ Duration::minutes(30),
     }
 }
 
@@ -38,6 +38,12 @@ async fn test_create_and_load(test_db: &mut TestDatabase) {
     store.create(&mut rec).await.expect("create failed");
     let loaded = store.load(&rec.id).await.expect("load err");
     let expected = truncate_record_expiry(&mut rec.clone());
+    let tn = OffsetDateTime::now_utc();
+    println!("time now: {tn:?}");
+    println!("rec: {rec:?}");
+    println!("expected: {expected:?}");
+    println!("actual: {loaded:?}");
+    assert!(false);
     assert_eq!(Some(expected), loaded);
 }
 

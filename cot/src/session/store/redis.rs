@@ -234,7 +234,7 @@ impl SessionStore for RedisStore {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::env;
+    use std::{env, io};
 
     use time::{Duration, OffsetDateTime};
     use tower_sessions::session::{Id, Record};
@@ -335,5 +335,34 @@ mod tests {
         let loaded1 = store.load(&r1.id).await.unwrap();
         let loaded2 = store.load(&r2.id).await.unwrap();
         assert!(loaded1.is_some() && loaded2.is_some());
+    }
+
+    #[cot::test]
+    async fn test_from_redis_store_error_to_session_store_error() {
+        let pool_err = io::Error::other("pool conn failure");
+        let sess_err: session_store::Error =
+            RedisStoreError::PoolConnection(Box::new(pool_err)).into();
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
+
+        let create_err = io::Error::other("pool creation failure");
+        let sess_err: session_store::Error =
+            RedisStoreError::PoolCreation(Box::new(create_err)).into();
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
+
+        let cmd_err = io::Error::other("redis command failure");
+        let sess_err: session_store::Error = RedisStoreError::Command(Box::new(cmd_err)).into();
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
+
+        let ser_err = io::Error::other("serialization oops");
+        let sess_err: session_store::Error = RedisStoreError::Serialize(Box::new(ser_err)).into();
+        assert!(matches!(sess_err, session_store::Error::Encode(_)));
+
+        let parse_err = serde_json::from_str::<Record>("not a json").unwrap_err();
+        let sess_err: session_store::Error =
+            RedisStoreError::Deserialize(Box::new(parse_err)).into();
+        assert!(matches!(sess_err, session_store::Error::Decode(_)));
+
+        let sess_err: session_store::Error = RedisStoreError::TooManyIdCollisions(99).into();
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
     }
 }

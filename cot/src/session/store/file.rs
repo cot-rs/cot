@@ -378,4 +378,27 @@ mod tests {
         let p2 = store.dir_path.join(r2.id.to_string());
         assert!(p1.is_file() && p2.is_file());
     }
+
+    #[cot::test]
+    async fn test_from_file_store_error_to_session_store_error() {
+        use std::io;
+
+        use tower_sessions::session::Record;
+
+        let io_err = io::Error::other("io problem");
+        let sess_err: session_store::Error = FileStoreError::Io(Box::new(io_err)).into();
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
+
+        let ser_err = io::Error::other("serialize fail");
+        let sess_err: session_store::Error = FileStoreError::Serialize(Box::new(ser_err)).into();
+        assert!(matches!(sess_err, session_store::Error::Encode(_)));
+
+        let parse_err = serde_json::from_str::<Record>("not a json").unwrap_err();
+        let sess_err: session_store::Error =
+            FileStoreError::Deserialize(Box::new(parse_err)).into();
+        assert!(matches!(sess_err, session_store::Error::Decode(_)));
+
+        let sess_err: session_store::Error = FileStoreError::TooManyIdCollisions(42).into();
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
+    }
 }

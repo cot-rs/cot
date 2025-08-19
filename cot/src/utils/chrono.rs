@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, SubsecRound, TimeZone, Timelike};
+use chrono::{DateTime, FixedOffset, SubsecRound, TimeZone};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::{OffsetDateTime, UtcOffset};

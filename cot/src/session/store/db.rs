@@ -235,5 +235,8 @@ mod tests {
         let deserialize_err: session_store::Error =
             DbStoreError::Deserialize(Box::new(parse_err)).into();
         assert!(matches!(deserialize_err, session_store::Error::Decode(_)));
+
+        let sess_err: session_store::Error = DbStoreError::TooManyIdCollisions(99).into();
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
     }
 }

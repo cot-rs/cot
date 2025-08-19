@@ -19,15 +19,18 @@ fn make_record() -> Record {
     Record {
         id: Id::default(),
         data: HashMap::default(),
-        expiry_date: OffsetDateTime::now_utc(), //+ Duration::minutes(30),
+        expiry_date: OffsetDateTime::now_utc() + Duration::minutes(30),
     }
 }
 
 fn truncate_record_expiry(record: &Record) -> Record {
     let mut record = record.clone();
-    let mut exp = record.expiry_date;
-    exp.replace_nanosecond(exp.microsecond() * 1_000)
+    let exp = record.expiry_date;
+    let exp = exp
+        .replace_nanosecond(exp.microsecond() * 1_000)
         .expect("could not replace nano seconds.");
+
+    record.expiry_date = exp;
     record
 }
 
@@ -38,12 +41,6 @@ async fn test_create_and_load(test_db: &mut TestDatabase) {
     store.create(&mut rec).await.expect("create failed");
     let loaded = store.load(&rec.id).await.expect("load err");
     let expected = truncate_record_expiry(&mut rec.clone());
-    let tn = OffsetDateTime::now_utc();
-    println!("time now: {tn:?}");
-    println!("rec: {rec:?}");
-    println!("expected: {expected:?}");
-    println!("actual: {loaded:?}");
-    assert!(false);
     assert_eq!(Some(expected), loaded);
 }
 

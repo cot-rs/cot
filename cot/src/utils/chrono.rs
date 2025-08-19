@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, TimeZone};
+use chrono::{DateTime, FixedOffset, SubsecRound, TimeZone, Timelike};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::{OffsetDateTime, UtcOffset};
@@ -25,14 +25,7 @@ impl DateTimeWithOffsetAdapter {
     /// safe for databases(Postgres, Mysql) that only support up to 6 fractional
     /// digits.
     pub(crate) fn into_chrono_db_safe(self) -> DateTime<FixedOffset> {
-        let secs = self.0.timestamp();
-        let nsecs = self.0.timestamp_subsec_micros() * 1_000;
-
-        self.0
-            .timezone()
-            .timestamp_opt(secs, nsecs)
-            .single()
-            .expect("could not convert DateTimeWithOffsetAdapter to DateTime<FixedOffset>")
+        self.0.trunc_subsecs(6)
     }
 
     pub(crate) fn into_offsetdatetime(self) -> OffsetDateTime {

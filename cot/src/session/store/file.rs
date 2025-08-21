@@ -381,9 +381,6 @@ mod tests {
 
     #[cot::test]
     async fn test_from_file_store_error_to_session_store_error() {
-        use std::io;
-
-        use tower_sessions::session::Record;
 
         let io_err = io::Error::other("io problem");
         let sess_err: session_store::Error = FileStoreError::Io(Box::new(io_err)).into();
@@ -399,9 +396,6 @@ mod tests {
         assert!(matches!(sess_err, session_store::Error::Decode(_)));
 
         let sess_err: session_store::Error = FileStoreError::TooManyIdCollisions(42).into();
-        match sess_err {
-            session_store::Error::Backend(_) => {}
-            other => panic!("expected Backend variant, got: {:?}", other),
-        }
+        assert!(matches!(sess_err, session_store::Error::Backend(_)));
     }
 }

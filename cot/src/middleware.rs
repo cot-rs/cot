@@ -734,7 +734,7 @@ mod tests {
     use crate::{AppBuilder, Bootstrapper, Project};
 
     async fn drive_service_with_request(
-        mut svc: impl tower::Service<Request<Body>, Response = Response, Error = Error>,
+        mut svc: impl Service<Request<Body>, Response = Response, Error = Error>,
     ) {
         let request = TestRequestBuilder::get("/").build();
         svc.ready().await.unwrap().call(request).await.unwrap();
@@ -748,7 +748,7 @@ mod tests {
         });
         let store = MemoryStore::default();
         let mut svc = SessionMiddleware::new(store).layer(svc);
-        drive_service_with_request(&mut svc).await
+        drive_service_with_request(&mut svc).await;
     }
 
     #[cot::test]
@@ -891,7 +891,7 @@ mod tests {
         });
 
         let svc = SessionMiddleware { inner: layer }.layer(svc);
-        drive_service_with_request(svc).await
+        drive_service_with_request(svc).await;
     }
 
     #[cot::test]
@@ -906,10 +906,10 @@ mod tests {
 
         let store =
             SessionMiddleware::config_to_session_store(SessionStoreTypeConfig::Memory, context);
-        create_svc_and_drive_with_req(store).await
+        create_svc_and_drive_with_req(store).await;
     }
 
-    #[cfg(all(feature = "json"))]
+    #[cfg(feature = "json")]
     #[cot::test]
     async fn session_middleware_file_config_to_session_store() {
         let bootstrapper = Bootstrapper::new(TestProject)
@@ -926,7 +926,7 @@ mod tests {
             SessionStoreTypeConfig::File { path },
             context,
         );
-        create_svc_and_drive_with_req(store).await
+        create_svc_and_drive_with_req(store).await;
     }
 
     #[cfg(all(feature = "cache", feature = "redis"))]
@@ -950,7 +950,7 @@ mod tests {
             context,
         );
 
-        create_svc_and_drive_with_req(store).await
+        create_svc_and_drive_with_req(store).await;
     }
 
     #[cfg(all(feature = "db", feature = "json"))]
@@ -970,6 +970,6 @@ mod tests {
 
         let store =
             SessionMiddleware::config_to_session_store(SessionStoreTypeConfig::Database, context);
-        create_svc_and_drive_with_req(store).await
+        create_svc_and_drive_with_req(store).await;
     }
 }

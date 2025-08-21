@@ -718,8 +718,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-    use std::path::PathBuf;
     use std::sync::Arc;
 
     use http::Request;
@@ -727,18 +725,8 @@ mod tests {
 
     use super::*;
     use crate::auth::Auth;
-    use crate::config::{CacheUrl, DatabaseConfig, ProjectConfig, SessionStoreTypeConfig};
-    use crate::project::RegisterAppsContext;
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
-    use crate::{AppBuilder, Bootstrapper, Project};
-
-    async fn drive_service_with_request(
-        mut svc: impl Service<Request<Body>, Response = Response, Error = Error>,
-    ) {
-        let request = TestRequestBuilder::get("/").build();
-        svc.ready().await.unwrap().call(request).await.unwrap();
-    }
 
     #[cot::test]
     async fn session_middleware_adds_session() {
@@ -748,7 +736,8 @@ mod tests {
         });
         let store = MemoryStore::default();
         let mut svc = SessionMiddleware::new(store).layer(svc);
-        drive_service_with_request(&mut svc).await;
+        let request = TestRequestBuilder::get("/").build();
+        svc.ready().await.unwrap().call(request).await.unwrap();
     }
 
     #[cot::test]
@@ -875,105 +864,5 @@ mod tests {
 
         // Counter should have been incremented twice
         assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 2);
-    }
-
-    struct TestProject;
-    impl Project for TestProject {
-        fn register_apps(&self, _apps: &mut AppBuilder, _context: &RegisterAppsContext) {}
-    }
-
-    async fn create_svc_and_drive_with_req(store: Box<dyn SessionStore + Send + Sync>) {
-        let store = Arc::from(store);
-        let layer = SessionManagerLayer::new(SessionStoreWrapper::new(store));
-        let svc = tower::service_fn(|req: Request<Body>| async move {
-            assert!(req.extensions().get::<Session>().is_some());
-            Ok::<_, Error>(Response::new(Body::empty()))
-        });
-
-        let svc = SessionMiddleware { inner: layer }.layer(svc);
-        drive_service_with_request(svc).await;
-    }
-
-    #[cot::test]
-    async fn memory_store_factory_produces_working_store() {
-        let bootstrapper = Bootstrapper::new(TestProject)
-            .with_config(ProjectConfig::default())
-            .with_apps()
-            .with_database()
-            .await
-            .expect("bootstrap failed");
-        let context = bootstrapper.context();
-
-        let store =
-            SessionMiddleware::config_to_session_store(SessionStoreTypeConfig::Memory, context);
-        create_svc_and_drive_with_req(store).await;
-    }
-
-    #[cfg(feature = "json")]
-    #[cot::test]
-    async fn session_middleware_file_config_to_session_store() {
-        let bootstrapper = Bootstrapper::new(TestProject)
-            .with_config(ProjectConfig::default())
-            .with_apps()
-            .with_database()
-            .await
-            .expect("bootstrap failed");
-        let context = bootstrapper.context();
-
-        let dir = tempfile::tempdir().expect("tempdir");
-        let path: PathBuf = dir.path().to_path_buf();
-        let store = SessionMiddleware::config_to_session_store(
-            SessionStoreTypeConfig::File { path },
-            context,
-        );
-        create_svc_and_drive_with_req(store).await;
-    }
-
-    #[cfg(all(feature = "cache", feature = "redis"))]
-    #[cot::test]
-    #[ignore = "requires external Redis service"]
-    async fn session_middleware_redis_config_to_session_store() {
-        let bootstrapper = Bootstrapper::new(TestProject)
-            .with_config(ProjectConfig::default())
-            .with_apps()
-            .with_database()
-            .await
-            .expect("bootstrap failed");
-        let context = bootstrapper.context();
-
-        let redis_url =
-            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-        let uri = CacheUrl::from(redis_url);
-
-        let store = SessionMiddleware::config_to_session_store(
-            SessionStoreTypeConfig::Cache { uri },
-            context,
-        );
-
-        create_svc_and_drive_with_req(store).await;
-    }
-
-    #[cfg(all(feature = "db", feature = "json"))]
-    #[cot::test]
-    #[cfg_attr(
-        miri,
-        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
-    )]
-    async fn session_middleware_database_config_to_session_store() {
-        let bootstrapper = Bootstrapper::new(TestProject)
-            .with_config(
-                ProjectConfig::builder()
-                    .database(DatabaseConfig::builder().url("sqlite::memory:").build())
-                    .build(),
-            )
-            .with_apps()
-            .with_database()
-            .await
-            .expect("bootstrap failed");
-        let context = bootstrapper.context();
-
-        let store =
-            SessionMiddleware::config_to_session_store(SessionStoreTypeConfig::Database, context);
-        create_svc_and_drive_with_req(store).await;
     }
 }

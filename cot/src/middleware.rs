@@ -955,6 +955,10 @@ mod tests {
 
     #[cfg(all(feature = "db", feature = "json"))]
     #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     async fn session_middleware_database_config_to_session_store() {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(

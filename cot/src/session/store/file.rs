@@ -381,7 +381,6 @@ mod tests {
 
     #[cot::test]
     async fn test_from_file_store_error_to_session_store_error() {
-
         let io_err = io::Error::other("io problem");
         let sess_err: session_store::Error = FileStoreError::Io(Box::new(io_err)).into();
         assert!(matches!(sess_err, session_store::Error::Backend(_)));

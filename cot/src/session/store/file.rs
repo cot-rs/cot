@@ -399,6 +399,9 @@ mod tests {
         assert!(matches!(sess_err, session_store::Error::Decode(_)));
 
         let sess_err: session_store::Error = FileStoreError::TooManyIdCollisions(42).into();
-        assert!(matches!(sess_err, session_store::Error::Backend(_)));
+        match sess_err {
+            session_store::Error::Backend(_) => {}
+            other => panic!("expected Backend variant, got: {:?}", other),
+        }
     }
 }

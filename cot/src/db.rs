@@ -81,6 +81,9 @@ pub enum DatabaseError {
     /// was not found.
     #[error("{ERROR_PREFIX} error retrieving a Foreign Key from the database: record not found")]
     ForeignKeyNotFound,
+    /// Error when a unique constraint is violated in the database.
+    #[error("{ERROR_PREFIX} unique constraint violation")]
+    UniqueViolation,
 }
 impl_into_cot_error!(DatabaseError, INTERNAL_SERVER_ERROR);
 

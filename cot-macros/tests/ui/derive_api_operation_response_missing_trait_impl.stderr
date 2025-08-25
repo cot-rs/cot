@@ -1,0 +1,27 @@
+error[E0599]: no method named `into_response` found for struct `Dummy` in the current scope
+ --> tests/ui/derive_api_operation_response_missing_trait_impl.rs:3:10
+  |
+3 | #[derive(DeriveApiOperationResponse)]
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `Dummy`
+...
+8 | struct Dummy;
+  | ------------ method `into_response` not found for this struct
+  |
+  = help: items from traits can only be used if the trait is implemented and in scope
+  = note: the following traits define an item `into_response`, perhaps you need to implement one of them:
+          candidate #1: `IntoResponse`
+          candidate #2: `axum_core::response::into_response::IntoResponse`
+  = note: this error originates in the derive macro `DeriveApiOperationResponse` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Dummy: ApiOperationResponse` is not satisfied
+ --> tests/ui/derive_api_operation_response_missing_trait_impl.rs:5:7
+  |
+5 |     A(Dummy),
+  |       ^^^^^ the trait `ApiOperationResponse` is not implemented for `Dummy`
+  |
+  = help: the following other types implement trait `ApiOperationResponse`:
+            Json<S>
+            MyResponse
+            Result<T, E>
+            Result<cot::http::Response<Body>, cot::Error>
+            WithExtension<T, D>

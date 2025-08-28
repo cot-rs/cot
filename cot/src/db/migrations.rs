@@ -1564,10 +1564,13 @@ impl RemoveModelBuilder {
     }
 }
 
+/// Returns a builder for an operation that alters a field in a model.
 pub const fn alter_field() -> AlterFieldBuilder {
     AlterFieldBuilder::new()
 }
 
+/// A builder for altering a field in a model.
+#[must_use]
 #[derive(Debug, Copy, Clone)]
 pub struct AlterFieldBuilder {
     table_name: Option<Identifier>,
@@ -1584,21 +1587,26 @@ impl AlterFieldBuilder {
         }
     }
 
+    /// Sets the name of the table to alter the field in.
     pub const fn table_name(mut self, table_name: Identifier) -> Self {
         self.table_name = Some(table_name);
         self
     }
 
+    /// Sets the old field definition.
     pub const fn old_field(mut self, field: Field) -> Self {
         self.old_field = Some(field);
         self
     }
 
+    /// Sets the new field definition.
     pub const fn new_field(mut self, field: Field) -> Self {
         self.new_field = Some(field);
         self
     }
 
+    /// Builds the operation.
+    #[must_use]
     pub const fn build(self) -> Operation {
         Operation::new(OperationInner::AlterField {
             table_name: unwrap_builder_option!(self, table_name),

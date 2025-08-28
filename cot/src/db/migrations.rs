@@ -4,9 +4,7 @@ mod sorter;
 
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use std::future::Future;
 
-pub use cot_macros::migration_op;
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::{Level, info};
@@ -22,13 +20,9 @@ pub enum MigrationEngineError {
     /// An error occurred while determining the correct order of migrations.
     #[error("error while determining the correct order of migrations")]
     MigrationSortError(#[from] MigrationSorterError),
-    /// A custom error occurred during a migration.
-    #[error("error running migration: {0}")]
-    Custom(String),
 }
 
-/// A migration engine responsible for managing and applying database
-/// migrations.
+/// A migration engine that can run migrations.
 ///
 /// # Examples
 ///
@@ -139,7 +133,7 @@ impl MigrationEngine {
     ///
     /// # Errors
     ///
-    /// Returns an error if any of the migrations fail to apply, or if there is
+    /// Throws an error if any of the migrations fail to apply, or if there is
     /// an error while interacting with the database, or if there is an
     /// error while marking a migration as applied.
     ///
@@ -430,32 +424,11 @@ impl Operation {
         RemoveModelBuilder::new()
     }
 
-    /// Returns a builder for a custom operation.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::db::Result;
-    /// use cot::db::migrations::{MigrationContext, Operation, migration_op};
-    ///
-    /// #[migration_op]
-    /// async fn forwards(ctx: MigrationContext<'_>) -> Result<()> {
-    ///     // do something
-    ///     Ok(())
-    /// }
-    ///
-    /// const OPERATION: Operation = Operation::custom(forwards).build();
-    /// ```
-    #[must_use]
-    pub const fn custom(forwards: CustomOperationFn) -> CustomBuilder {
-        CustomBuilder::new(forwards)
-    }
-
     /// Runs the operation forwards.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails to apply.
+    /// Throws an error if the operation fails to apply.
     ///
     /// # Examples
     ///
@@ -539,13 +512,6 @@ impl Operation {
                 let query = sea_query::Table::drop().table(*table_name).to_owned();
                 database.execute_schema(query).await?;
             }
-            OperationInner::Custom {
-                forwards,
-                backwards: _,
-            } => {
-                let context = MigrationContext::new(database);
-                forwards(context).await?;
-            }
         }
         Ok(())
     }
@@ -555,7 +521,7 @@ impl Operation {
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails to apply.
+    /// Throws an error if the operation fails to apply.
     ///
     /// # Examples
     ///
@@ -635,49 +601,10 @@ impl Operation {
                 }
                 database.execute_schema(query).await?;
             }
-            OperationInner::Custom {
-                forwards: _,
-                backwards,
-            } => {
-                if let Some(backwards) = backwards {
-                    let context = MigrationContext::new(database);
-                    backwards(context).await?;
-                } else {
-                    return Err(crate::db::DatabaseError::MigrationError(
-                        MigrationEngineError::Custom("Backwards migration not implemented".into()),
-                    ));
-                }
-            }
         }
         Ok(())
     }
 }
-
-/// A context for a custom migration operation.
-///
-/// This structure provides access to the database and other information that
-/// might be needed during a migration.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct MigrationContext<'a> {
-    /// The database connection to run the migration against.
-    pub db: &'a Database,
-}
-
-impl<'a> MigrationContext<'a> {
-    fn new(db: &'a Database) -> Self {
-        Self { db }
-    }
-}
-
-/// A type alias for a custom migration operation function.
-///
-/// Typically, you should use the [`migration_op`] attribute macro to define
-/// functions of this type.
-pub type CustomOperationFn =
-    for<'a> fn(
-        MigrationContext<'a>,
-    ) -> std::pin::Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>;
 
 #[derive(Debug, Copy, Clone)]
 enum OperationInner {
@@ -702,16 +629,10 @@ enum OperationInner {
         table_name: Identifier,
         fields: &'static [Field],
     },
-<<<<<<< HEAD
-    Custom {
-        forwards: CustomOperationFn,
-        backwards: Option<CustomOperationFn>,
-=======
     AlterField {
         table_name: Identifier,
         old_field: Field,
         new_field: Field,
->>>>>>> 09f0c87 (feat: Add `AlterField` Operation to Migration Generator)
     },
 }
 
@@ -765,12 +686,6 @@ impl Field {
     }
 
     /// Marks the field as a foreign key to the given model and field.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if `on_delete` or `on_update` is set to
-    /// [`SetNone`](ForeignKeyOnDeletePolicy::SetNone) and the field is not
-    /// nullable.
     ///
     /// # Cot CLI Usage
     ///
@@ -1643,62 +1558,13 @@ impl RemoveModelBuilder {
     }
 }
 
-<<<<<<< HEAD
-/// A builder for a custom operation.
-///
-/// # Examples
-///
-/// ```
-/// use cot::db::Result;
-/// use cot::db::migrations::{MigrationContext, Operation, migration_op};
-///
-/// #[migration_op]
-/// async fn forwards(ctx: MigrationContext<'_>) -> Result<()> {
-///     // do something
-///     Ok(())
-/// }
-///
-/// #[migration_op]
-/// async fn backwards(ctx: MigrationContext<'_>) -> Result<()> {
-///     // undo something
-///     Ok(())
-/// }
-///
-/// const OPERATION: Operation = Operation::custom(forwards).backwards(backwards).build();
-/// ```
-#[derive(Debug, Copy, Clone)]
-pub struct CustomBuilder {
-    forwards: CustomOperationFn,
-    backwards: Option<CustomOperationFn>,
-}
-
-impl CustomBuilder {
-    #[must_use]
-    const fn new(forwards: CustomOperationFn) -> Self {
-        Self {
-            forwards,
-            backwards: None,
-        }
-    }
-
-    /// Sets the backwards operation.
-    #[must_use]
-    pub const fn backwards(mut self, backwards: CustomOperationFn) -> Self {
-        self.backwards = Some(backwards);
-        self
-    }
-
-    /// Builds the operation.
-    #[must_use]
-    pub const fn build(self) -> Operation {
-        Operation::new(OperationInner::Custom {
-            forwards: self.forwards,
-            backwards: self.backwards,
-=======
+/// Returns a builder for an operation that alters a field in a model.
 pub const fn alter_field() -> AlterFieldBuilder {
     AlterFieldBuilder::new()
 }
 
+/// A builder for altering a field in a model.
+#[must_use]
 #[derive(Debug, Copy, Clone)]
 pub struct AlterFieldBuilder {
     table_name: Option<Identifier>,
@@ -1715,27 +1581,31 @@ impl AlterFieldBuilder {
         }
     }
 
+    /// Sets the name of the table to alter the field in.
     pub const fn table_name(mut self, table_name: Identifier) -> Self {
         self.table_name = Some(table_name);
         self
     }
 
+    /// Sets the old field definition.
     pub const fn old_field(mut self, field: Field) -> Self {
         self.old_field = Some(field);
         self
     }
 
+    /// Sets the new field definition.
     pub const fn new_field(mut self, field: Field) -> Self {
         self.new_field = Some(field);
         self
     }
 
+    /// Builds the operation.
+    #[must_use]
     pub const fn build(self) -> Operation {
         Operation::new(OperationInner::AlterField {
             table_name: unwrap_builder_option!(self, table_name),
             old_field: unwrap_builder_option!(self, old_field),
             new_field: unwrap_builder_option!(self, new_field),
->>>>>>> 09f0c87 (feat: Add `AlterField` Operation to Migration Generator)
         })
     }
 }
@@ -2216,86 +2086,6 @@ mod tests {
         } else {
             panic!("Expected OperationInner::AddField");
         }
-    }
-
-    #[cot::test]
-    #[cfg_attr(
-        miri,
-        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
-    )]
-    async fn operation_custom() {
-        // test only on SQLite because we are using raw SQL
-        let test_db = TestDatabase::new_sqlite().await.unwrap();
-
-        #[migration_op]
-        async fn forwards(ctx: MigrationContext<'_>) -> Result<()> {
-            ctx.db
-                .raw("CREATE TABLE custom_test (id INTEGER PRIMARY KEY)")
-                .await?;
-            Ok(())
-        }
-
-        let operation = Operation::custom(forwards).build();
-        operation.forwards(&test_db.database()).await.unwrap();
-
-        let result = test_db.database().raw("SELECT * FROM custom_test").await;
-        assert!(result.is_ok());
-    }
-
-    #[cot::test]
-    #[cfg_attr(
-        miri,
-        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
-    )]
-    async fn operation_custom_backwards() {
-        // test only on SQLite because we are using raw SQL
-        let test_db = TestDatabase::new_sqlite().await.unwrap();
-
-        #[migration_op]
-        async fn forwards(_ctx: MigrationContext<'_>) -> Result<()> {
-            panic!("this should not be called");
-        }
-
-        #[migration_op]
-        async fn backwards(ctx: MigrationContext<'_>) -> Result<()> {
-            ctx.db.raw("DROP TABLE custom_test_back").await?;
-            Ok(())
-        }
-
-        test_db
-            .database()
-            .raw("CREATE TABLE custom_test_back (id INTEGER PRIMARY KEY)")
-            .await
-            .unwrap();
-
-        let operation = Operation::custom(forwards).backwards(backwards).build();
-        operation.backwards(&test_db.database()).await.unwrap();
-
-        let result = test_db
-            .database()
-            .raw("SELECT * FROM custom_test_back")
-            .await;
-        assert!(result.is_err());
-    }
-
-    #[cot::test]
-    #[cfg_attr(
-        miri,
-        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
-    )]
-    async fn operation_custom_backwards_not_implemented() {
-        // test only on SQLite because we are using raw SQL
-        let test_db = TestDatabase::new_sqlite().await.unwrap();
-
-        #[migration_op]
-        async fn forwards(_ctx: MigrationContext<'_>) -> Result<()> {
-            Ok(())
-        }
-
-        let operation = Operation::custom(forwards).build();
-        let result = operation.backwards(&test_db.database()).await;
-
-        assert!(result.is_err());
     }
 
     #[test]

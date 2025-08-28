@@ -1,0 +1,54 @@
+name: Benchmarking for Pull Requests
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+env:
+  BENCHER_PROJECT: cot-sz6h20wh
+  BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+
+jobs:
+  benchmark_pr_branch:
+    name: Continuous Benchmarking
+    # DO NOT REMOVE: For handling Fork PRs see Pull Requests from Forks
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      pull-requests: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Bencher
+        uses: bencherdev/bencher@main
+
+      - name: Track PR benchmarks with Bencher
+        run: |
+          bencher run \
+            --branch "$GITHUB_HEAD_REF" \
+            --start-point "$GITHUB_BASE_REF" \
+            --start-point-hash '${{ github.event.pull_request.base.sha }}' \
+            --start-point-clone-thresholds \
+            --start-point-reset \
+            --testbed github-ubuntu-latest \
+            --err \
+            --adapter rust_criterion \
+            --github-actions '${{ secrets.GITHUB_TOKEN }}' \
+            "cargo bench --package cot --features test"

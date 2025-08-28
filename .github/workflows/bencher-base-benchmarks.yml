@@ -1,0 +1,53 @@
+name: Continuous Benchmarking for Base Branch
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  BENCHER_PROJECT: cot-sz6h20wh
+  BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+
+jobs:
+  benchmark_base_branch:
+    name: Continuous Benchmarking
+    permissions:
+      checks: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: 'rust-ci'
+          cache-bin: 'false'
+          save-if: 'false'
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Bencher
+        uses: bencherdev/bencher@main
+
+      - name: Track base branch benchmarks with Bencher
+        run: |
+          bencher run \
+            --branch master \
+            --testbed github-ubuntu-latest \
+            --threshold-measure latency \
+            --threshold-test t_test \
+            --threshold-max-sample-size 64 \
+            --threshold-upper-boundary 0.99 \
+            --thresholds-reset \
+            --err \
+            --adapter rust_criterion \
+            --github-actions '${{ secrets.GITHUB_TOKEN }}' \
+            "cargo bench --package cot --features test"

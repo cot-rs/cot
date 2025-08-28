@@ -1,0 +1,28 @@
+name: Archive closed PR branch with Bencher
+
+on:
+  pull_request:
+    types: [closed]
+
+env:
+  BENCHER_PROJECT: cot-sz6h20wh
+  BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+
+jobs:
+  archive_pr_branch:
+    name: Continuous Benchmarking
+    # DO NOT REMOVE: For handling Fork PRs see Pull Requests from Forks
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      pull-requests: write
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Bencher
+        uses: bencherdev/bencher@main
+
+      - name: Archive closed PR branch with Bencher
+        run: bencher archive --branch "$GITHUB_HEAD_REF"

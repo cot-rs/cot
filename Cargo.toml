@@ -72,6 +72,7 @@ clap_mangen = "0.2.29"
 cot = { version = "0.3.1", path = "cot" }
 cot_codegen = { version = "0.3.1", path = "cot-codegen" }
 cot_macros = { version = "0.3.1", path = "cot-macros" }
+criterion = "0.6"
 darling = "0.21"
 deadpool-redis = { version = "0.22", default-features = false }
 derive_builder = "0.20"
@@ -109,6 +110,7 @@ proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 rand = { version = "0.9", default-features = false }
 redis = { version = "0.32", default-features = false }
+reqwest = { version = "0.12", default-features = false }
 rustversion = "1"
 schemars = { version = "0.9", default-features = false }
 sea-query = { version = "0.32", default-features = false }
@@ -117,6 +119,7 @@ serde = "1"
 serde_html_form = "0.2"
 serde_json = "1"
 serde_path_to_error = "0.1.17"
+serde_urlencoded = "0.7"
 sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false }
 subtle = { version = "2", default-features = false }

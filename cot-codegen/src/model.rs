@@ -92,7 +92,7 @@ impl ModelOpts {
         let table_name = if let Some(table_name) = &args.table_name {
             table_name.clone()
         } else {
-            original_name.to_string().to_snake_case()
+            original_name.clone().to_snake_case()
         };
 
         let primary_key_field = self.get_primary_key_field(&fields)?;

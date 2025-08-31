@@ -6,6 +6,8 @@
 //!
 //! This is not a public API and should not be used directly.
 
+#[cfg(feature = "openapi")]
+pub use aide::openapi::{Operation, RequestBody, Response as OpenApiResponse, StatusCode};
 /// Askama's macros don't work when Askama is re-exported, so there's no point
 /// in re-exporting it publicly. However, we need to re-export it here so that
 /// our macros can implement traits from Askama.

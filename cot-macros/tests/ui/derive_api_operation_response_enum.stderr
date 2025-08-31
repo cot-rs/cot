@@ -1,0 +1,7 @@
+error: only enums can derive `ApiOperationResponse`
+ --> tests/ui/derive_api_operation_response_enum.rs:3:10
+  |
+3 | #[derive(ApiOperationResponse)]
+  |          ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the derive macro `ApiOperationResponse` (in Nightly builds, run with -Z macro-backtrace for more info)

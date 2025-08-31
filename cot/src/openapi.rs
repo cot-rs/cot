@@ -113,6 +113,94 @@ use aide::openapi::{
     MediaType, Operation, Parameter, ParameterData, ParameterSchemaOrContent, PathItem, PathStyle,
     QueryStyle, ReferenceOr, RequestBody, StatusCode,
 };
+/// Derive macro for the [`ApiOperationResponse`] trait.
+///
+/// This macro can be applied to enums to automatically implement the
+/// [`ApiOperationResponse`] trait for OpenAPI documentation generation.
+/// The enum must consist of tuple variants with exactly one field each,
+/// where each field type implements [`ApiOperationResponse`].
+///
+/// **Note**: This macro only implements [`ApiOperationResponse`]. If you also
+/// need [`IntoResponse`], you must derive it separately or implement it
+/// manually.
+///
+/// # Requirements
+///
+/// - **Only enums are supported**: This macro will produce a compile error if
+///   applied to structs or unions.
+/// - **Tuple variants with one field**: Each enum variant must be a tuple
+///   variant with exactly one field (e.g., `Variant(Type)`).
+/// - **Field types must implement `ApiOperationResponse`**: Each field type
+///   must implement the [`ApiOperationResponse`] trait.
+///
+/// # Generated Implementation
+///
+/// The macro generates an implementation that aggregates OpenAPI responses
+/// from all the wrapped types:
+///
+/// ```compile_fail
+/// impl ApiOperationResponse for MyEnum {
+///     fn api_operation_responses(
+///         operation: &mut Operation,
+///         route_context: &RouteContext<'_>,
+///         schema_generator: &mut SchemaGenerator,
+///     ) -> Vec<(Option<StatusCode>, Response)> {
+///         let mut responses = Vec::new();
+///         responses.extend(Type1::api_operation_responses(operation, route_context, schema_generator));
+///         responses.extend(Type2::api_operation_responses(operation, route_context, schema_generator));
+///         // ... for each variant type
+///         responses
+///     }
+/// }
+/// ```
+///
+/// # Examples
+///
+/// Basic usage (you'll also need to implement or derive [`IntoResponse`]):
+///
+/// ```
+/// use cot::json::Json;
+/// use cot::openapi::ApiOperationResponse;
+/// use cot::response::IntoResponse;
+///
+/// #[derive(IntoResponse, ApiOperationResponse)]
+/// enum MyResponse {
+///     Success(Json<String>),
+///     Error(Json<ErrorResponse>),
+/// }
+///
+/// #[derive(serde::Serialize, schemars::JsonSchema)]
+/// struct ErrorResponse {
+///     message: String,
+/// }
+/// ```
+///
+/// # Relationship with [`IntoResponse`]
+///
+/// This derive macro **only** implements [`ApiOperationResponse`]. If you need
+/// both traits (which is common for response enums), you should derive both (or
+/// implement [`IntoResponse`] manually).
+///
+/// ```
+/// use cot::json::Json;
+/// use cot::openapi::ApiOperationResponse;
+/// use cot::response::IntoResponse;
+///
+/// #[derive(IntoResponse, ApiOperationResponse)]
+/// enum MyResponse {
+///     Success(Json<String>),
+///     Error(Json<ErrorResponse>),
+/// }
+///
+/// # #[derive(serde::Serialize, schemars::JsonSchema)]
+/// # struct ErrorResponse {
+/// #     message: String,
+/// # }
+/// ```
+///
+/// [`ApiOperationResponse`]: crate::openapi::ApiOperationResponse
+/// [`IntoResponse`]: crate::response::IntoResponse
+pub use cot_macros::ApiOperationResponse;
 use indexmap::IndexMap;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde_json::Value;

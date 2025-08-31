@@ -16,6 +16,55 @@ use crate::{Body, StatusCode};
 
 mod into_response;
 
+/// Derive macro for the [`IntoResponse`] trait.
+///
+/// This macro can be applied to enums to automatically implement the
+/// [`IntoResponse`] trait. The enum must consist of tuple variants with
+/// exactly one field each, where each field type implements [`IntoResponse`].
+///
+/// # Requirements
+///
+/// - **Only enums are supported**: This macro will produce a compile error if
+///   applied to structs or unions.
+/// - **Tuple variants with one field**: Each enum variant must be a tuple
+///   variant with exactly one field (e.g., `Variant(Type)`).
+/// - **Field types must implement `IntoResponse`**: Each field type must
+///   implement the [`IntoResponse`] trait.
+///
+/// # Generated Implementation
+///
+/// The macro generates an implementation that matches on the enum variants and
+/// calls `into_response()` on the inner value:
+///
+/// ```compile_fail
+/// impl IntoResponse for MyEnum {
+///     fn into_response(self) -> cot::Result<cot::response::Response> {
+///         use cot::response::IntoResponse;
+///         match self {
+///             Self::Variant1(inner) => inner.into_response(),
+///             Self::Variant2(inner) => inner.into_response(),
+///             // ... for each variant
+///         }
+///     }
+/// }
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// use cot::html::Html;
+/// use cot::json::Json;
+/// use cot::response::IntoResponse;
+///
+/// #[derive(IntoResponse)]
+/// enum MyResponse {
+///     Json(Json<String>),
+///     Html(Html),
+/// }
+/// ```
+///
+/// [`IntoResponse`]: crate::response::IntoResponse
+pub use cot_macros::IntoResponse;
 pub use into_response::{
     IntoResponse, WithBody, WithContentType, WithExtension, WithHeader, WithStatus,
 };

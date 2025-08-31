@@ -112,3 +112,41 @@ fn derive_select_choice() {
     t.compile_fail("tests/ui/derive_select_choice_struct.rs");
     t.compile_fail("tests/ui/derive_select_choice_empty_enum.rs");
 }
+
+#[rustversion::attr(
+    not(nightly),
+    ignore = "only test on nightly for consistent error messages"
+)]
+#[test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
+fn derive_into_response() {
+    let t = trybuild::TestCases::new();
+    t.pass("tests/ui/derive_into_response.rs");
+    t.compile_fail("tests/ui/derive_into_response_struct.rs");
+    t.compile_fail("tests/ui/derive_into_response_missing_trait_impl.rs");
+    t.compile_fail("tests/ui/derive_into_response_invalid_variant_unit.rs");
+    t.compile_fail("tests/ui/derive_into_response_invalid_variant_multi_tuple.rs");
+    t.compile_fail("tests/ui/derive_into_response_invalid_variant_struct.rs");
+}
+
+#[rustversion::attr(
+    not(nightly),
+    ignore = "only test on nightly for consistent error messages"
+)]
+#[test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
+fn derive_api_operation_response() {
+    let t = trybuild::TestCases::new();
+    t.pass("tests/ui/derive_api_operation_response.rs");
+    t.compile_fail("tests/ui/derive_api_operation_response_enum.rs");
+    t.compile_fail("tests/ui/derive_api_operation_response_missing_trait_impl.rs");
+    t.compile_fail("tests/ui/derive_api_operation_response_invalid_variant_unit.rs");
+    t.compile_fail("tests/ui/derive_api_operation_response_invalid_variant_multi_tuple.rs");
+    t.compile_fail("tests/ui/derive_api_operation_response_invalid_variant_struct.rs");
+}

@@ -128,7 +128,7 @@ syn = { version = "2", default-features = false }
 sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
-time = { version = "0.3.41", default-features = false }
+time = { version = "0.3.42", default-features = false }
 tokio = { version = "1.47", default-features = false }
 toml = { version = "0.9", default-features = false }
 tower = "0.5.2"

@@ -494,6 +494,17 @@ impl Operation {
                     .to_owned();
                 database.execute_schema(query).await?;
             }
+            OperationInner::AlterField {
+                table_name,
+                old_field: _,
+                new_field,
+            } => {
+                let query = sea_query::Table::alter()
+                    .table(*table_name)
+                    .modify_column(new_field.as_column_def(database))
+                    .to_owned();
+                database.execute_schema(query).await?;
+            }
             OperationInner::RemoveModel {
                 table_name,
                 fields: _,
@@ -560,6 +571,18 @@ impl Operation {
                     .to_owned();
                 database.execute_schema(query).await?;
             }
+            OperationInner::AlterField {
+                table_name,
+                old_field,
+                new_field: _,
+            } => {
+                // To reverse an alteration, set the column back to the old definition
+                let query = sea_query::Table::alter()
+                    .table(*table_name)
+                    .modify_column(old_field.as_column_def(database))
+                    .to_owned();
+                database.execute_schema(query).await?;
+            }
             OperationInner::RemoveModel { table_name, fields } => {
                 let mut query = sea_query::Table::create().table(*table_name).to_owned();
                 for field in *fields {
@@ -605,6 +628,11 @@ enum OperationInner {
     RemoveModel {
         table_name: Identifier,
         fields: &'static [Field],
+    },
+    AlterField {
+        table_name: Identifier,
+        old_field: Field,
+        new_field: Field,
     },
 }
 
@@ -1526,6 +1554,58 @@ impl RemoveModelBuilder {
         Operation::new(OperationInner::RemoveModel {
             table_name: unwrap_builder_option!(self, table_name),
             fields: unwrap_builder_option!(self, fields),
+        })
+    }
+}
+
+/// Returns a builder for an operation that alters a field in a model.
+pub const fn alter_field() -> AlterFieldBuilder {
+    AlterFieldBuilder::new()
+}
+
+/// A builder for altering a field in a model.
+#[must_use]
+#[derive(Debug, Copy, Clone)]
+pub struct AlterFieldBuilder {
+    table_name: Option<Identifier>,
+    old_field: Option<Field>,
+    new_field: Option<Field>,
+}
+
+impl AlterFieldBuilder {
+    const fn new() -> Self {
+        Self {
+            table_name: None,
+            old_field: None,
+            new_field: None,
+        }
+    }
+
+    /// Sets the name of the table to alter the field in.
+    pub const fn table_name(mut self, table_name: Identifier) -> Self {
+        self.table_name = Some(table_name);
+        self
+    }
+
+    /// Sets the old field definition.
+    pub const fn old_field(mut self, field: Field) -> Self {
+        self.old_field = Some(field);
+        self
+    }
+
+    /// Sets the new field definition.
+    pub const fn new_field(mut self, field: Field) -> Self {
+        self.new_field = Some(field);
+        self
+    }
+
+    /// Builds the operation.
+    #[must_use]
+    pub const fn build(self) -> Operation {
+        Operation::new(OperationInner::AlterField {
+            table_name: unwrap_builder_option!(self, table_name),
+            old_field: unwrap_builder_option!(self, old_field),
+            new_field: unwrap_builder_option!(self, new_field),
         })
     }
 }

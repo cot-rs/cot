@@ -57,7 +57,6 @@ impl Project for {{ project_struct_name }} {
         apps.register_with_views({{ app_name }}, "");
         apps.register(DatabaseUserApp::new());
         apps.register(SessionApp::new());
-
     }
 
     fn middlewares(

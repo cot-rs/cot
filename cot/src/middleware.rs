@@ -25,6 +25,8 @@ use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
 use crate::session::store::SessionStoreWrapper;
+#[cfg(all(feature = "db", feature = "json"))]
+use crate::session::store::db::DbStore;
 #[cfg(feature = "json")]
 use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
@@ -313,7 +315,7 @@ impl SessionMiddleware {
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let session_cfg = &context.config().middlewares.session;
         let store_type = session_cfg.store.store_type.clone();
-        let boxed_store = Self::config_to_session_store(store_type);
+        let boxed_store = Self::config_to_session_store(store_type, context);
         let arc_store = Arc::from(boxed_store);
         let layer = SessionManagerLayer::new(SessionStoreWrapper::new(arc_store));
         let mut middleware = SessionMiddleware { inner: layer }
@@ -487,6 +489,7 @@ impl SessionMiddleware {
     /// [`SessionStore`]
     fn config_to_session_store(
         config: SessionStoreTypeConfig,
+        context: &MiddlewareContext,
     ) -> Box<dyn SessionStore + Send + Sync> {
         match config {
             SessionStoreTypeConfig::Memory => Box::new(MemoryStore::new()),
@@ -508,10 +511,8 @@ impl SessionMiddleware {
                     }
                 }
             }
-            #[cfg(feature = "db")]
-            SessionStoreTypeConfig::Database => {
-                unimplemented!();
-            }
+            #[cfg(all(feature = "db", feature = "json"))]
+            SessionStoreTypeConfig::Database => Box::new(DbStore::new(context.database().clone())),
         }
     }
 }
@@ -717,15 +718,25 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use http::Request;
-    use tower::{Layer, ServiceExt};
+    use tower::{Layer, Service, ServiceExt};
 
     use super::*;
     use crate::auth::Auth;
+    use crate::config::{
+        CacheUrl, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
+        SessionStoreConfig, SessionStoreTypeConfig,
+    };
+    use crate::middleware::SessionMiddleware;
+    use crate::project::{RegisterAppsContext, WithDatabase};
+    use crate::response::Response;
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
+    use crate::{AppBuilder, Body, Bootstrapper, Error, Project, ProjectContext};
 
     #[cot::test]
     async fn session_middleware_adds_session() {
@@ -735,9 +746,7 @@ mod tests {
         });
         let store = MemoryStore::default();
         let mut svc = SessionMiddleware::new(store).layer(svc);
-
         let request = TestRequestBuilder::get("/").build();
-
         svc.ready().await.unwrap().call(request).await.unwrap();
     }
 
@@ -865,5 +874,116 @@ mod tests {
 
         // Counter should have been incremented twice
         assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    async fn create_svc_and_call_with_req(context: &ProjectContext<WithDatabase>) {
+        let store = SessionMiddleware::from_context(context);
+        let svc = tower::service_fn(|req: Request<Body>| async move {
+            assert!(req.extensions().get::<Session>().is_some());
+            Ok::<_, Error>(Response::new(Body::empty()))
+        });
+        let mut svc = store.layer(svc);
+        let request = TestRequestBuilder::get("/").build();
+        svc.ready().await.unwrap().call(request).await.unwrap();
+    }
+
+    fn create_project_config(store: SessionStoreTypeConfig) -> ProjectConfig {
+        let mut project = ProjectConfig::builder();
+        let project = match store {
+            SessionStoreTypeConfig::Database => project.database(
+                DatabaseConfig::builder()
+                    .url("sqlite::memory:".to_string())
+                    .build(),
+            ),
+            _ => &mut project,
+        };
+
+        project
+            .middlewares(
+                MiddlewareConfig::builder()
+                    .session(
+                        SessionMiddlewareConfig::builder()
+                            .store(SessionStoreConfig::builder().store_type(store).build())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build()
+    }
+
+    struct TestProject;
+
+    impl Project for TestProject {
+        fn register_apps(&self, _apps: &mut AppBuilder, _context: &RegisterAppsContext) {}
+    }
+
+    #[cot::test]
+    async fn memory_store_factory_produces_working_store() {
+        let config = create_project_config(SessionStoreTypeConfig::Memory);
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(feature = "json")]
+    #[cot::test]
+    async fn session_middleware_file_config_to_session_store() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path: PathBuf = dir.path().to_path_buf();
+        let config = create_project_config(SessionStoreTypeConfig::File { path });
+
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(all(feature = "cache", feature = "redis"))]
+    #[cot::test]
+    #[ignore = "requires external Redis service"]
+    async fn session_middleware_redis_config_to_session_store() {
+        let redis_url =
+            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let uri = CacheUrl::from(redis_url);
+        let config = create_project_config(SessionStoreTypeConfig::Cache { uri });
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(all(feature = "db", feature = "json"))]
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    async fn session_middleware_database_config_to_session_store() {
+        let config = create_project_config(SessionStoreTypeConfig::Database);
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
     }
 }

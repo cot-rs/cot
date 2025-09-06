@@ -355,7 +355,7 @@ impl CliTask for CollectStatic {
         let dir = matches
             .get_one::<PathBuf>(COLLECT_STATIC_DIR_PARAM)
             .expect("required argument");
-        println!("Collecting static files into {:?}", dir);
+        println!("Collecting static files into {}", dir.display());
 
         let bootstrapper = bootstrapper.with_apps().with_database().await?;
         StaticFiles::from(bootstrapper.context()).collect_into(dir)?;

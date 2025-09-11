@@ -83,12 +83,16 @@ This command aggregates all static files into the specified directory (in this c
 If you prefer not to serve static files through the Cot server, you can disable this functionality by removing the `StaticFilesMiddleware` from your project configuration:
 
 ```rust
-let project = CotProject::builder()
-    // ...
-    .middleware_with_context(StaticFilesMiddleware::from_app_context)
-    .middleware(LiveReloadMiddleware::new())
-    .build()
-    .await?;
+fn middlewares(
+    &self,
+    handler: RootHandlerBuilder,
+    context: &MiddlewareContext,
+) -> RootHandler {
+    handler
+        .middleware(StaticFilesMiddleware::from_context(context))
+        // ...
+        .build()
+}
 ```
 
-Simply remove the `.middleware_with_context(StaticFilesMiddleware ...)` line to disable static file serving.
+Simply remove the `.middleware(StaticFilesMiddleware ...)` line to disable static file serving.

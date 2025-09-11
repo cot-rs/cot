@@ -6,6 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/cot-rs/cot/compare/cot-v0.3.1...cot-v0.4.0) - 2025-09-11
+
+[View diff on diff.rs](https://diff.rs/cot/0.3.1/cot/0.4.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Add support for file fields in forms ([#334](https://github.com/cot-rs/cot/pull/334)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Add `SelectField`; support more chrono form fields ([#345](https://github.com/cot-rs/cot/pull/345)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Error handling overhaul, more powerful custom error handlers ([#373](https://github.com/cot-rs/cot/pull/373)) (by [@m4tx](https://github.com/m4tx))
+- Support multiple session stores ([#277](https://github.com/cot-rs/cot/pull/277)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Support more chrono datatypes in the framework ([#332](https://github.com/cot-rs/cot/pull/332)) (by [@seqre](https://github.com/seqre))
+- Add simple `AsFormField` impl for `ForeignKey`s ([#335](https://github.com/cot-rs/cot/pull/335)) (by [@m4tx](https://github.com/m4tx))
+- FromRequestParts derive macro ([#336](https://github.com/cot-rs/cot/pull/336)) (by [@kumarUjjawal](https://github.com/kumarUjjawal))
+- More Session config knobs ([#337](https://github.com/cot-rs/cot/pull/337)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- AsFormField for Date, Time, DateTime ([#342](https://github.com/cot-rs/cot/pull/342)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add validated `Url` type ([#339](https://github.com/cot-rs/cot/pull/339)) (by [@kingzcheung](https://github.com/kingzcheung))
+- *(macros)* Derive macro for `SelectChoice` trait ([#351](https://github.com/cot-rs/cot/pull/351)) (by [@kumarUjjawal](https://github.com/kumarUjjawal))
+- `ToDbValue` for `Url` and bug fixes for `Url` and `Email` ([#353](https://github.com/cot-rs/cot/pull/353)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- DB session store implementation ([#360](https://github.com/cot-rs/cot/pull/360)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Basic benchmarking ([#378](https://github.com/cot-rs/cot/pull/378)) (by [@seqre](https://github.com/seqre))
+- IntoResponse and ApiOperationResponse derive macro for enum ([#388](https://github.com/cot-rs/cot/pull/388)) (by [@kumarUjjawal](https://github.com/kumarUjjawal))
+
+### Fixes
+
+- [**breaking**] OpenAPI specs with item references ([#333](https://github.com/cot-rs/cot/pull/333)) (by [@m4tx](https://github.com/m4tx))
+- Clippy warning in the latest nightly ([#346](https://github.com/cot-rs/cot/pull/346)) (by [@m4tx](https://github.com/m4tx))
+- Ignored doctest ([#372](https://github.com/cot-rs/cot/pull/372)) (by [@m4tx](https://github.com/m4tx))
+- Swagger not working when static files weren't served at `/static/` ([#383](https://github.com/cot-rs/cot/pull/383)) (by [@m4tx](https://github.com/m4tx))
+- Trybuild tests on the latest nightly ([#386](https://github.com/cot-rs/cot/pull/386)) (by [@m4tx](https://github.com/m4tx))
+
+### Other
+
+- [**breaking**] Remove deprecated items ([#349](https://github.com/cot-rs/cot/pull/349)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Add `#[non_exhaustive]` to config structs ([#354](https://github.com/cot-rs/cot/pull/354)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] *(deps)* Bump all dependencies ([#361](https://github.com/cot-rs/cot/pull/361)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- [**breaking**] Add `#[non_exhaustive]` to `FormError` variants ([#374](https://github.com/cot-rs/cot/pull/374)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] `FromRequest(Parts)` only gets immutable request parts ([#377](https://github.com/cot-rs/cot/pull/377)) (by [@m4tx](https://github.com/m4tx))
+- Tiny doc and code consistency fixes ([#348](https://github.com/cot-rs/cot/pull/348)) (by [@m4tx](https://github.com/m4tx))
+- Fix clippy warnings on Rust 1.88 ([#355](https://github.com/cot-rs/cot/pull/355)) (by [@m4tx](https://github.com/m4tx))
+- Custom `Default` impl for `SessionMiddlewareConfig` ([#359](https://github.com/cot-rs/cot/pull/359)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Warn on `clippy::allow_attributes`; fix clippy warnings ([#363](https://github.com/cot-rs/cot/pull/363)) (by [@m4tx](https://github.com/m4tx))
+- Fix warning on stable clippy ([#364](https://github.com/cot-rs/cot/pull/364)) (by [@m4tx](https://github.com/m4tx))
+- *(pre-commit)* Add HTML/Jinja2 linter & formatter ([#365](https://github.com/cot-rs/cot/pull/365)) (by [@melroy12](https://github.com/melroy12))
+- Style fixes; replace todo!() with unimplemented!() ([#370](https://github.com/cot-rs/cot/pull/370)) (by [@m4tx](https://github.com/m4tx))
+- Extract `LiveReloadMiddleware` to a separate file ([#375](https://github.com/cot-rs/cot/pull/375)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump the dependencies group with 11 updates ([#384](https://github.com/cot-rs/cot/pull/384)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- *(deps)* Bump all deps ([#396](https://github.com/cot-rs/cot/pull/396)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.3.1](https://github.com/cot-rs/cot/compare/cot-v0.3.0...cot-v0.3.1) - 2025-05-16
 
 ### <!-- 1 -->New features

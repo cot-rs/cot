@@ -25,85 +25,53 @@ Now, when you visit a non-existing page, or if your code raises an error or pani
 
 ## Default error pages
 
-When the debug mode is disabled, Cot provides default error pages that do not share any information about what happened to the user. To match your service's look and feel, you'll typically want to customize them. The two types of error pages that can be customized are:
-
-* 404 Not Found
-* 500 Internal Server Error
+When the debug mode is disabled, Cot provides default error pages that do not share any information about what happened to the user. To match your service's look and feel, you'll typically want to customize them.
 
 ## Custom error handlers
 
-Let's implement custom error handlers in your project:
+Let's implement a custom error handler in your project:
 
 ```rust
-use cot::project::{ErrorPageHandler, Project};
-use cot::response::{Response, ResponseExt};
-use cot::{Body, StatusCode};
+use askama::Template;
+use cot::html::Html;
+use cot::response::{IntoResponse, Response};
+use cot::error::handler::{DynErrorPageHandler, RequestError};
 
-struct CustomNotFound;
-impl ErrorPageHandler for CustomNotFound {
-    fn handle(&self) -> cot::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::NOT_FOUND,
-            Body::fixed(include_str!("404.html")),
-        ))
+async fn error_page_handler(error: RequestError) -> cot::Result<impl IntoResponse> {
+    #[derive(Template)]
+    #[template(path = "error.html")]
+    struct ErrorTemplate {
+        error: RequestError,
     }
-}
 
-struct CustomServerError;
-impl ErrorPageHandler for CustomServerError {
-    fn handle(&self) -> cot::Result<Response> {
-        Ok(Response::new_html(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Body::fixed(include_str!("500.html")),
-        ))
-    }
+    let status_code = error.status_code();
+    let error_template = ErrorTemplate { error };
+    let rendered = error_template.render()?;
+
+    Ok(Html::new(rendered).with_status(status_code))
 }
 
 struct MyProject;
 
 impl Project for MyProject {
-    fn not_found_handler(&self) -> Box<dyn ErrorPageHandler> {
-        Box::new(CustomNotFound)
-    }
-
-    fn server_error_handler(&self) -> Box<dyn ErrorPageHandler> {
-        Box::new(CustomServerError)
+    fn error_handler(&self) -> DynErrorPageHandler {
+        DynErrorPageHandler::new(error_page_handler)
     }
 }
 ```
 
-Create `404.html`:
+Create `templates/error.html`:
 
 ```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>404 Not Found</title>
+    <title>Error</title>
 </head>
 <body>
-    <h1 class="error-code">404</h1>
-    <h2>Page Not Found</h2>
-    <p>Oopsies! The page you're looking for doesn't exist.</p>
-    <p><a href="/">Return to Homepage</a></p>
-</body>
-</html>
-```
-
-Create `500.html`:
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>500 Server Error</title>
-</head>
-<body>
-    <h1 class="error-code">500</h1>
-    <h2>Server Error</h2>
-    <p>Oopsies! Something went wrong on our end. Please try again later.</p>
-    <p><a href="/">Return to Homepage</a></p>
+    <h1 class="error-code">{{ error.status_code().as_u16() }}</h1>
+    <h2>{{ error.status_code().canonical_reason().unwrap_or("Error") }}</h2>
 </body>
 </html>
 ```
@@ -115,57 +83,33 @@ Now, try to visit an undefined route or raise an error in your code. You should 
 Cot provides several ways to raise errors in your views:
 
 ```rust
+use cot::Error;
+use cot::error::NotFound;
+use cot::request::Request;
+use cot::response::Response;
+
 async fn view(request: Request) -> cot::Result<Response> {
     // 404 Not Found
-    return Err(cot::Error::not_found());
+    return Err(NotFound::new())?;
 
     // 404 with custom message
-    return Err(cot::Error::not_found_message(
+    return Err(NotFound::with_message(
         "The article you're looking for doesn't exist".to_string()
-    ));
+    ))?;
 
-    // Custom error
-    return Err(cot::Error::custom("Something went wrong"));
+    // 500 Internal Server Error
+    return Err(Error::internal("Something went wrong"));
+    // or, by re-raising a custom error:
+    return Err(Error::internal(std::io::Error::other("oh no!")));
+    // or, by panicking:
+    panic!("Something went wrong");
 }
 ```
 
-Note that any messages that you pass to the `Error` structure will only be displayed in debug mode. In production, the user will see your custom error pages that do not have access to the error message.
-
-## Handling specific errors
-
-You can handle specific errors in your views:
-
-```rust
-async fn view_article(RequestDb(db): RequestDb, Path(article_id): Path<i32>) -> cot::Result<Response> {
-    // will display a 404 error page if the article ID is below 0
-    if article_id < 0 {
-        return Error::not_found_message("Invalid article ID".to_string());
-    }
-
-    // will display a 404 page if the article is not found in the database
-    let article = query!(Article, $id == article_id)
-        .get(request.db())
-        .await?
-        .ok_or_else(|| Error::not_found_message(
-            format!("Article {} not found", article_id)
-        ))?;
-
-   if article.name.is_empty() {
-       // both of these will display a 500 error page:
-       return Err(Error::custom("Article name should never be empty!"));
-       // or:
-       panic!("Article name should never be empty!");
-   }
-
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(render_article(&article)?),
-    ))
-}
-```
+Note that any messages that you pass to the `Error` structure will only be displayed in debug mode by default. In production, the user will see your custom error pages (which may or may not retrieve the underlying error message, depending on how you implemented them).
 
 ## Summary
 
-In this chapter, you learned how to handle errors in Cot applications. You can create custom error pages, raise errors in your views, and be able to handle specific errors.
+In this chapter, you learned how to handle errors in Cot applications. You can create custom error pages, raise errors in your views, and overall provide a better user experience when something goes wrong.
 
 Next chapter, we'll explore automatic testing in Cot applications.

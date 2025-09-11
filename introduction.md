@@ -223,7 +223,7 @@ impl Project for CotTutorialProject {
 This defines the project and sets the CLI metadata (like the name, version, and description) that will be displayed when you run `cargo run -- --help` by using the metadata from your Cargo crate.
 
 ```rust
-    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views(CotTutorialApp, "");
     }
 ```
@@ -234,8 +234,8 @@ This registers all the apps that your project is using.
     fn middlewares(
         &self,
         handler: RootHandlerBuilder,
-        context: &ProjectContext<WithApps>,
-    ) -> BoxedHandler {
+        context: &MiddlewareContext,
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_app_context(context))
             .middleware(LiveReloadMiddleware::from_app_context(context))

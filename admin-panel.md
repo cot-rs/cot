@@ -11,14 +11,14 @@ First, add the admin app and the dependencies required to your project in `src/m
 ```rust
 use cot::admin::AdminApp;
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
-use cot::middleware::{SessionMiddleware, LiveReloadMiddleware};
-use cot::project::{WithApps, WithConfig};
+use cot::middleware::SessionMiddleware;
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::static_files::StaticFilesMiddleware;
 
 struct MyProject;
 
 impl Project for MyProject {
-    fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register(DatabaseUserApp::new());  // Needed for admin authentication
         apps.register_with_views(AdminApp::new(), "/admin"); // Register the admin app
         apps.register_with_views(MyApp, "");
@@ -26,9 +26,9 @@ impl Project for MyProject {
 
     fn middlewares(
         &self,
-        handler: cot::project::RootHandlerBuilder,
-        app_context: &ProjectContext<WithApps>,
-    ) -> BoxedHandler {
+        handler: RootHandlerBuilder,
+        app_context: &MiddlewareContext,
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_app_context(app_context))
             .middleware(SessionMiddleware::new())  // Required for admin login

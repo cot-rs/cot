@@ -54,7 +54,7 @@ struct IndexTemplate {
     items: Vec<Item>,
 }
 
-async fn index() -> cot::Result<Response> {
+async fn index() -> cot::Result<Html> {
     let items = vec![
         Item { title: "first item".to_string() },
         Item { title: "second item".to_string() },
@@ -64,7 +64,7 @@ async fn index() -> cot::Result<Response> {
     let context = IndexTemplate { items };
     let rendered = context.render()?;
 
-    Ok(Response::new_html(StatusCode::OK, Body::fixed(rendered)))
+    Ok(Html::new(rendered))
 }
 ```
 
@@ -175,13 +175,10 @@ struct IndexTemplate<'a> {
     urls: &'a Urls,
 }
 
-async fn index(urls: Urls) -> cot::Result<Response> {
+async fn index(urls: Urls) -> cot::Result<Html> {
     let template = IndexTemplate { urls: &urls };
 
-    Ok(Response::new_html(
-        StatusCode::OK,
-        Body::fixed(template.render()?),
-    ))
+    Ok(Html::new(template.render()?))
 }
 
 async fn user() -> cot::Result<Response> {

@@ -1,6 +1,27 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use askama::filters::HtmlSafe;
+/// Derive helper that implements `AsFormField` for select-like enums and common
+/// collections.
+///
+/// Apply this together with [`SelectChoice`] to your enum to enable using it
+/// directly as a form field (`SelectField<T>`) and as multi-select via common
+/// collections (`Vec<T>`, `VecDeque<T>`, `LinkedList<T>`, `HashSet<T>`, and
+/// `indexmap::IndexSet<T>`).
+///
+/// ```
+/// use cot::form::fields::{SelectAsFormField, SelectChoice, SelectField, SelectMultipleField};
+///
+/// #[derive(SelectChoice, SelectAsFormField, Debug, Clone, PartialEq, Eq, Hash)]
+/// enum Status {
+///     Draft,
+///     Published,
+///     Archived,
+/// }
+///
+/// // `Status` works with `SelectField<Status>` and `SelectMultipleField<Status>`.
+/// ```
+pub use cot_macros::SelectAsFormField;
 /// Derive the [`SelectChoice`] trait for an enum.
 ///
 /// This macro automatically implements the [`SelectChoice`] trait for enums,
@@ -313,6 +334,91 @@ pub(crate) fn check_required_multiple<T>(
         Err(FormFieldValidationError::Required)
     } else {
         Ok(&field.value)
+    }
+}
+
+impl<T: SelectChoice + Send> crate::form::AsFormField for ::std::vec::Vec<T> {
+    type Type = SelectMultipleField<T>;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
+        let values = check_required_multiple(field)?;
+        values.iter().map(|id| T::from_str(id)).collect()
+    }
+
+    fn to_field_value(&self) -> String {
+        String::new()
+    }
+}
+
+impl<T: SelectChoice + Send> crate::form::AsFormField for ::std::collections::VecDeque<T> {
+    type Type = SelectMultipleField<T>;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
+        let values = check_required_multiple(field)?;
+        let mut out = ::std::collections::VecDeque::new();
+        for id in values {
+            out.push_back(T::from_str(id)?);
+        }
+        Ok(out)
+    }
+
+    fn to_field_value(&self) -> String {
+        String::new()
+    }
+}
+
+impl<T: SelectChoice + Send> crate::form::AsFormField for ::std::collections::LinkedList<T> {
+    type Type = SelectMultipleField<T>;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
+        let values = check_required_multiple(field)?;
+        let mut out = ::std::collections::LinkedList::new();
+        for id in values {
+            out.push_back(T::from_str(id)?);
+        }
+        Ok(out)
+    }
+
+    fn to_field_value(&self) -> String {
+        String::new()
+    }
+}
+
+impl<T: SelectChoice + Eq + ::std::hash::Hash + Send, S: ::std::hash::BuildHasher + Default>
+    crate::form::AsFormField for ::std::collections::HashSet<T, S>
+{
+    type Type = SelectMultipleField<T>;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
+        let values = check_required_multiple(field)?;
+        let mut out = ::std::collections::HashSet::default();
+        for id in values {
+            out.insert(T::from_str(id)?);
+        }
+        Ok(out)
+    }
+
+    fn to_field_value(&self) -> String {
+        String::new()
+    }
+}
+
+impl<T: SelectChoice + Eq + ::std::hash::Hash + Send> crate::form::AsFormField
+    for ::indexmap::IndexSet<T>
+{
+    type Type = SelectMultipleField<T>;
+
+    fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
+        let values = check_required_multiple(field)?;
+        let mut out = ::indexmap::IndexSet::new();
+        for id in values {
+            out.insert(T::from_str(id)?);
+        }
+        Ok(out)
+    }
+
+    fn to_field_value(&self) -> String {
+        String::new()
     }
 }
 

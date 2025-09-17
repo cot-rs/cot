@@ -33,11 +33,11 @@ struct ExampleFormItem {
 
 #[derive(Debug, Form)]
 struct ExampleForm {
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     title: String,
     datetime: NaiveDateTime,
     #[form(
-        opt(
+        opts(
             timezone=Tz::America__New_York,
             step=Step::Value(Duration::seconds(70)),
             prefer_latest = true
@@ -45,7 +45,7 @@ struct ExampleForm {
     )]
     datetime_tz: DateTime<FixedOffset>,
     #[form(
-        opt(
+        opts(
             min = NaiveTime::parse_from_str("11:00:00", "%H:%M:%S").unwrap(),
             max = NaiveTime::parse_from_str("11:30:40", "%H:%M:%S").unwrap(),
             step = Step::Value(Duration::seconds(70))
@@ -53,7 +53,7 @@ struct ExampleForm {
     )]
     time: NaiveTime,
     #[form(
-        opt(
+        opts(
             min = NaiveDate::parse_from_str("2025-01-01", "%Y-%m-%d").unwrap(),
             max = NaiveDate::parse_from_str("2025-12-31", "%Y-%m-%d").unwrap(),
             step = Step::Value(Duration::days(7))

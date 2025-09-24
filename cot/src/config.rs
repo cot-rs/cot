@@ -2253,7 +2253,7 @@ mod tests {
             timeout = 60
             namespace = "my-app"
             prefix = "v1"
-            
+
             [cache.store]
             type = "memory"
         "#;
@@ -2278,7 +2278,7 @@ mod tests {
             max_retries = 10
             timeout = 120
             namespace = "production"
-            
+
             [cache.store]
             type = "redis"
             url = "redis://localhost:6379"
@@ -2309,7 +2309,7 @@ mod tests {
             max_retries = 3
             timeout = 30
             prefix = "dev"
-            
+
             [cache.store]
             type = "file"
             path = "/tmp/cache"

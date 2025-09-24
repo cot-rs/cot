@@ -170,6 +170,9 @@ pub struct ProjectConfig {
     /// ```
     #[cfg(feature = "db")]
     pub database: DatabaseConfig,
+
+    #[cfg(feature = "cache")]
+    pub cache: CacheConfig,
     /// Configuration related to the static files.
     ///
     /// # Examples
@@ -323,6 +326,8 @@ impl ProjectConfigBuilder {
             auth_backend: self.auth_backend.unwrap_or_default(),
             #[cfg(feature = "db")]
             database: self.database.clone().unwrap_or_default(),
+            #[cfg(feature = "cache")]
+            cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
         }
@@ -427,6 +432,267 @@ impl DatabaseConfig {
     pub fn builder() -> DatabaseConfigBuilder {
         DatabaseConfigBuilder::default()
     }
+}
+
+#[cfg(feature = "cache")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+#[non_exhaustive]
+pub struct CacheConfig {
+    /// Maximum number of retries for cache operations.
+    ///
+    /// This controls how many times the cache will attempt to retry failed
+    /// operations before giving up. The default is 3 retries.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    ///
+    /// let config = CacheConfig::builder().max_retries(5).build();
+    /// assert_eq!(config.max_retries, 5);
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache]
+    /// max_retries = 5
+    /// ```
+    #[builder(default = "3")]
+    pub max_retries: u32,
+
+    /// Timeout for cache operations in seconds.
+    ///
+    /// This controls how long to wait for cache operations to complete before
+    /// timing out. The default is 30 seconds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    ///
+    /// let config = CacheConfig::builder().timeout(60).build();
+    /// assert_eq!(config.timeout, 60);
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache]
+    /// timeout = 60
+    /// ```
+    #[builder(default = "30")]
+    pub timeout: u64,
+
+    /// Namespace for cache keys.
+    ///
+    /// This prefix is added to all cache keys to provide isolation between
+    /// different applications or environments using the same cache backend.
+    /// When not specified, no namespace is used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    ///
+    /// let config = CacheConfig::builder()
+    ///     .namespace("my-app".to_string())
+    ///     .build();
+    /// assert_eq!(config.namespace, Some("my-app".to_string()));
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache]
+    /// namespace = "my-app"
+    /// ```
+    #[builder(setter(into, strip_option), default)]
+    pub namespace: Option<String>,
+
+    /// Prefix for cache keys.
+    ///
+    /// This prefix is added to all cache keys in addition to the namespace.
+    /// It's useful for versioning or categorizing cache entries.
+    /// When not specified, no prefix is used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    ///
+    /// let config = CacheConfig::builder().prefix("v1".to_string()).build();
+    /// assert_eq!(config.prefix, Some("v1".to_string()));
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache]
+    /// prefix = "v1"
+    /// ```
+    #[builder(setter(into, strip_option), default)]
+    pub prefix: Option<String>,
+
+    /// The cache store configuration.
+    ///
+    /// This determines which type of cache backend to use (memory, redis, file)
+    /// and its specific configuration options.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig};
+    ///
+    /// let config = CacheConfig::builder()
+    ///     .store(Some(CacheStoreConfig {
+    ///         store_type: CacheStoreTypeConfig::Memory,
+    ///     }))
+    ///     .build();
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache.store]
+    /// type = "memory"
+    ///
+    /// # Or for Redis:
+    /// # [cache.store]
+    /// # type = "redis"
+    /// # url = "redis://localhost:6379"
+    /// # pool_size = 20
+    ///
+    /// # Or for file-based cache:
+    /// # [cache.store]
+    /// # type = "file"
+    /// # path = "/tmp/cache"
+    /// ```
+    #[builder(default)]
+    pub store: Option<CacheStoreConfig>,
+}
+
+#[cfg(feature = "cache")]
+impl CacheConfigBuilder {
+    /// Builds the cache configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    ///
+    /// let config = CacheConfig::builder()
+    ///     .max_retries(5)
+    ///     .timeout(60)
+    ///     .namespace("my-app".to_string())
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> CacheConfig {
+        CacheConfig {
+            max_retries: self.max_retries.unwrap_or(3),
+            timeout: self.timeout.unwrap_or(30),
+            namespace: self.namespace.clone().unwrap_or_default(),
+            prefix: self.prefix.clone().unwrap_or_default(),
+            store: self.store.clone().unwrap_or_default(),
+        }
+    }
+}
+
+#[cfg(feature = "cache")]
+impl CacheConfig {
+    /// Create a new [`CacheConfigBuilder`] to build a [`CacheConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    /// ```
+    #[must_use]
+    pub fn builder() -> CacheConfigBuilder {
+        CacheConfigBuilder::default()
+    }
+}
+
+#[cfg(feature = "cache")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct CacheStoreConfig {
+    #[serde(flatten)]
+    pub store_type: CacheStoreTypeConfig,
+}
+
+#[cfg(feature = "cache")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum CacheStoreTypeConfig {
+    /// In-memory cache store.
+    ///
+    /// This uses a simple in-memory store that does not persist data across
+    /// application restarts. This is suitable for development or testing
+    /// environments where persistence is not required.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheStoreTypeConfig;
+    ///
+    /// let config = CacheStoreTypeConfig::Memory;
+    /// ```
+    #[default]
+    Memory,
+
+    /// Redis cache store.
+    ///
+    /// This stores cache data in a Redis instance. The URL to the Redis server
+    /// must be specified, and additional Redis-specific options can be
+    /// configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheStoreTypeConfig, CacheUrl};
+    ///
+    /// let config = CacheStoreTypeConfig::Redis {
+    ///     url: CacheUrl::from("redis://localhost:6379"),
+    ///     pool_size: Some(20),
+    /// };
+    /// ```
+    Redis {
+        /// The URL of the Redis server.
+        url: CacheUrl,
+        /// Connection pool size for Redis connections.
+        ///
+        /// This controls how many connections to maintain in the connection
+        /// pool. When not specified, a default pool size is used.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pool_size: Option<u32>,
+    },
+
+    /// File-based cache store.
+    ///
+    /// This stores cache data in files on the local filesystem. The path to
+    /// the directory where the cache files will be stored must be specified.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    ///
+    /// use cot::config::CacheStoreTypeConfig;
+    ///
+    /// let config = CacheStoreTypeConfig::File {
+    ///     path: PathBuf::from("/tmp/cache"),
+    /// };
+    /// ```
+    File {
+        /// The path to the directory where cache files will be stored.
+        path: PathBuf,
+    },
 }
 
 /// The configuration for serving static files.
@@ -1976,5 +2242,174 @@ mod tests {
         let concealed = conceal_url_parts(&parsed);
         assert_eq!(concealed.username(), "********");
         assert_eq!(concealed.password(), Some("********"));
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_from_toml_memory() {
+        let toml_content = r#"
+            [cache]
+            max_retries = 5
+            timeout = 60
+            namespace = "my-app"
+            prefix = "v1"
+            
+            [cache.store]
+            type = "memory"
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(config.cache.max_retries, 5);
+        assert_eq!(config.cache.timeout, 60);
+        assert_eq!(config.cache.namespace, Some("my-app".to_string()));
+        assert_eq!(config.cache.prefix, Some("v1".to_string()));
+        assert_eq!(
+            config.cache.store.unwrap().store_type,
+            CacheStoreTypeConfig::Memory
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_from_toml_redis() {
+        let toml_content = r#"
+            [cache]
+            max_retries = 10
+            timeout = 120
+            namespace = "production"
+            
+            [cache.store]
+            type = "redis"
+            url = "redis://localhost:6379"
+            pool_size = 20
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(config.cache.max_retries, 10);
+        assert_eq!(config.cache.timeout, 120);
+        assert_eq!(config.cache.namespace, Some("production".to_string()));
+        assert_eq!(config.cache.prefix, None);
+
+        match config.cache.store.unwrap().store_type {
+            CacheStoreTypeConfig::Redis { url, pool_size } => {
+                assert_eq!(url.as_str(), "redis://localhost:6379");
+                assert_eq!(pool_size, Some(20));
+            }
+            _ => panic!("Expected Redis store type"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_from_toml_file() {
+        let toml_content = r#"
+            [cache]
+            max_retries = 3
+            timeout = 30
+            prefix = "dev"
+            
+            [cache.store]
+            type = "file"
+            path = "/tmp/cache"
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(config.cache.max_retries, 3);
+        assert_eq!(config.cache.timeout, 30);
+        assert_eq!(config.cache.namespace, None);
+        assert_eq!(config.cache.prefix, Some("dev".to_string()));
+
+        match config.cache.store.unwrap().store_type {
+            CacheStoreTypeConfig::File { path } => {
+                assert_eq!(path, PathBuf::from("/tmp/cache"));
+            }
+            _ => panic!("Expected File store type"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_defaults() {
+        let toml_content = r#"
+            [cache]
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(config.cache.max_retries, 3);
+        assert_eq!(config.cache.timeout, 30);
+        assert_eq!(config.cache.namespace, None);
+        assert_eq!(config.cache.prefix, None);
+        assert_eq!(
+            config.cache.store.unwrap().store_type,
+            CacheStoreTypeConfig::Memory
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_builder() {
+        let config = CacheConfig::builder()
+            .max_retries(7)
+            .timeout(90)
+            .namespace("test-app".to_string())
+            .prefix("v2".to_string())
+            .store(Some(CacheStoreConfig {
+                store_type: CacheStoreTypeConfig::Memory,
+            }))
+            .build();
+
+        assert_eq!(config.max_retries, 7);
+        assert_eq!(config.timeout, 90);
+        assert_eq!(config.namespace, Some("test-app".to_string()));
+        assert_eq!(config.prefix, Some("v2".to_string()));
+        assert_eq!(
+            config.store.unwrap().store_type,
+            CacheStoreTypeConfig::Memory
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_builder_defaults() {
+        let config = CacheConfig::builder().build();
+
+        assert_eq!(config.max_retries, 3);
+        assert_eq!(config.timeout, 30);
+        assert_eq!(config.namespace, None);
+        assert_eq!(config.prefix, None);
+        assert_eq!(
+            config.store.unwrap().store_type,
+            CacheStoreTypeConfig::Memory
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_store_config_builder() {
+        let config = CacheStoreConfig {
+            store_type: CacheStoreTypeConfig::Redis {
+                url: CacheUrl::from("redis://localhost:6379"),
+                pool_size: Some(15),
+            },
+        };
+
+        match config.store_type {
+            CacheStoreTypeConfig::Redis { url, pool_size } => {
+                assert_eq!(url.as_str(), "redis://localhost:6379");
+                assert_eq!(pool_size, Some(15));
+            }
+            _ => panic!("Expected Redis store type"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_store_config_default() {
+        let config = CacheStoreConfig::default();
+        assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
     }
 }

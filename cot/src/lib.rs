@@ -53,6 +53,9 @@
 
 extern crate self as cot;
 
+#[cfg(feature = "cache")]
+pub mod cache;
+
 #[cfg(feature = "db")]
 pub mod db;
 /// Error handling types and utilities for Cot applications.

@@ -53,8 +53,8 @@ allow_attributes = "warn"
 [workspace.dependencies]
 ahash = { version = "0.8.12", default-features = false }
 aide = { version = "0.15", default-features = false }
-anstyle = "1.0.11"
-anyhow = "1.0.98"
+anstyle = "1.0.13"
+anyhow = "1.0.100"
 askama = { version = "0.14", default-features = false }
 assert_cmd = "2"
 async-stream = "0.3"
@@ -63,7 +63,7 @@ axum = { version = "0.8", default-features = false }
 backtrace = "0.3"
 bytes = "1.10"
 cargo_toml = "0.22"
-chrono = { version = "0.4.41", default-features = false }
+chrono = { version = "0.4.42", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
 clap = { version = "4", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
@@ -118,7 +118,7 @@ sea-query-binder = { version = "0.7", default-features = false }
 serde = "1"
 serde_html_form = "0.2"
 serde_json = "1"
-serde_path_to_error = "0.1.17"
+serde_path_to_error = "0.1.20"
 serde_urlencoded = "0.7"
 sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false }
@@ -128,7 +128,7 @@ syn = { version = "2", default-features = false }
 sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
-time = { version = "0.3.42", default-features = false }
+time = { version = "0.3.44", default-features = false }
 tokio = { version = "1.47", default-features = false }
 toml = { version = "0.9", default-features = false }
 tower = "0.5.2"

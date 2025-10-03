@@ -29,7 +29,7 @@ struct NameTemplate<'a> {
 
 #[derive(Debug, Form)]
 struct NameForm {
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     name: String,
 }
 

@@ -15,7 +15,7 @@
 //!
 //! #[derive(Form)]
 //! struct MyForm {
-//!     #[form(opt(max_length = 100))]
+//!     #[form(opts(max_length = 100))]
 //!     name: String,
 //! }
 //! ```
@@ -279,7 +279,7 @@ pub enum FormErrorTarget<'a> {
 ///
 /// #[derive(Form)]
 /// struct MyForm {
-///     #[form(opt(max_length = 100))]
+///     #[form(opts(max_length = 100))]
 ///     name: String,
 /// }
 /// ```

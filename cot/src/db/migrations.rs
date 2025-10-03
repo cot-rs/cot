@@ -659,6 +659,12 @@ impl Field {
 
     /// Marks the field as a foreign key to the given model and field.
     ///
+    /// # Panics
+    ///
+    /// This function will panic if `on_delete` or `on_update` is set to
+    /// [`SetNone`](ForeignKeyOnDeletePolicy::SetNone) and the field is not
+    /// nullable.
+    ///
     /// # Cot CLI Usage
     ///
     /// Typically, you shouldn't need to use this directly. Instead, in most

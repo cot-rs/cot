@@ -18,7 +18,8 @@ pub use chrono::{
 pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
 pub(crate) use select::check_required_multiple;
 pub use select::{
-    SelectChoice, SelectField, SelectFieldOptions, SelectMultipleField, SelectMultipleFieldOptions,
+    SelectAsFormField, SelectChoice, SelectField, SelectFieldOptions, SelectMultipleField,
+    SelectMultipleFieldOptions,
 };
 
 use crate::auth::PasswordHash;

@@ -15,7 +15,7 @@ pub use askama;
 pub use async_trait::async_trait;
 pub use bytes::Bytes;
 pub use cot_macros::ModelHelper;
-pub use tokio;
+pub use {indexmap, tokio};
 
 // used in the CLI
 #[cfg(feature = "db")]

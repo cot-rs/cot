@@ -60,7 +60,6 @@ macro_rules! impl_as_form_field_mult_collection {
     };
 }
 
-impl_as_form_field_mult!(Weekday);
 impl_as_form_field_mult_collection!(WeekdaySet, Weekday);
 
 const MONDAY_ID: &str = "mon";

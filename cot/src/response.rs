@@ -146,8 +146,9 @@ impl ResponseExt for Response {
 
 #[cfg(test)]
 mod tests {
+    use cot_core::body::BodyInner;
+
     use super::*;
-    use crate::body::BodyInner;
     use crate::headers::JSON_CONTENT_TYPE;
     use crate::response::{Response, ResponseExt};
 

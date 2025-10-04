@@ -63,7 +63,6 @@ mod headers;
 pub mod __private;
 pub mod admin;
 pub mod auth;
-mod body;
 pub mod cli;
 pub mod common_types;
 pub mod config;
@@ -89,13 +88,12 @@ pub(crate) mod utils;
 
 #[cfg(feature = "openapi")]
 pub use aide;
-pub use body::Body;
-pub use cot_core::Method;
 /// A type alias for a result that can return a [`cot::Error`].
 pub use cot_core::Result;
 /// A type alias for an HTTP status code.
 pub use cot_core::StatusCode;
 pub use cot_core::error::error_impl::Error;
+pub use cot_core::{Body, Method};
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
 ///

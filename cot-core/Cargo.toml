@@ -17,11 +17,24 @@ workspace = true
 
 [dependencies]
 askama = { workspace = true, features = ["derive", "std"] }
+axum = { workspace = true, features = ["http1", "tokio"] }
 backtrace.workspace = true
+bytes.workspace = true
+cot_macros.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
+futures-core.workspace = true
+futures-util.workspace = true
+http-body-util.workspace = true
+http-body.workspace = true
 http.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
+sync_wrapper.workspace = true
 thiserror.workspace = true
 tower = { workspace = true, features = ["util"] }
 tower-sessions = { workspace = true, features = ["memory-store"] }
+
+[dev-dependencies]
+async-stream.workspace = true
+futures.workspace = true
+tokio = { workspace = true, features = ["macros"] }

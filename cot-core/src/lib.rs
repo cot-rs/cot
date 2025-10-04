@@ -1,5 +1,6 @@
 use crate::error::error_impl::Error;
 
+pub mod body;
 /// Error handling types and utilities for Cot applications.
 ///
 /// This module provides error types, error handlers, and utilities for
@@ -15,3 +16,5 @@ pub type StatusCode = http::StatusCode;
 
 /// A type alias for an HTTP method.
 pub type Method = http::Method;
+
+pub use crate::body::Body;

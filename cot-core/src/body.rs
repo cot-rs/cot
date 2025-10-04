@@ -4,13 +4,12 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use cot_core::error::error_impl::impl_into_cot_error;
 use futures_core::Stream;
 use http_body::{Frame, SizeHint};
 use http_body_util::combinators::BoxBody;
 use sync_wrapper::SyncWrapper;
 
-use crate::{Error, Result};
+use crate::impl_into_cot_error;
 
 /// A type that represents an HTTP request or response body.
 ///
@@ -21,21 +20,21 @@ use crate::{Error, Result};
 /// # Examples
 ///
 /// ```
-/// use cot::Body;
+/// use cot_core::Body;
 ///
 /// let body = Body::fixed("Hello, world!");
 /// let body = Body::streaming(futures::stream::once(async { Ok("Hello, world!".into()) }));
 /// ```
 #[derive(Debug)]
 pub struct Body {
-    pub(crate) inner: BodyInner,
+    pub inner: BodyInner,
 }
 
-pub(crate) enum BodyInner {
+pub enum BodyInner {
     Fixed(Bytes),
-    Streaming(SyncWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>>),
+    Streaming(SyncWrapper<Pin<Box<dyn Stream<Item = crate::Result<Bytes>> + Send>>>),
     Axum(SyncWrapper<axum::body::Body>),
-    Wrapper(BoxBody<Bytes, Error>),
+    Wrapper(BoxBody<Bytes, crate::Error>),
 }
 
 impl Debug for BodyInner {
@@ -60,7 +59,7 @@ impl Body {
     /// # Examples
     ///
     /// ```
-    /// use cot::Body;
+    /// use cot_core::Body;
     ///
     /// let body = Body::empty();
     /// ```
@@ -74,7 +73,7 @@ impl Body {
     /// # Examples
     ///
     /// ```
-    /// use cot::Body;
+    /// use cot_core::Body;
     ///
     /// let body = Body::fixed("Hello, world!");
     /// ```
@@ -89,7 +88,7 @@ impl Body {
     ///
     /// ```
     /// use async_stream::stream;
-    /// use cot::Body;
+    /// use cot_core::Body;
     ///
     /// let stream = stream! {
     ///    yield Ok("Hello, ".into());
@@ -98,7 +97,7 @@ impl Body {
     /// let body = Body::streaming(stream);
     /// ```
     #[must_use]
-    pub fn streaming<T: Stream<Item = Result<Bytes>> + Send + 'static>(stream: T) -> Self {
+    pub fn streaming<T: Stream<Item = crate::Result<Bytes>> + Send + 'static>(stream: T) -> Self {
         Self::new(BodyInner::Streaming(SyncWrapper::new(Box::pin(stream))))
     }
 
@@ -116,17 +115,17 @@ impl Body {
     /// # Examples
     ///
     /// ```
-    /// use cot::Body;
+    /// use cot_core::Body;
     ///
     /// # #[tokio::main]
-    /// # async fn main() -> cot::Result<()> {
+    /// # async fn main() -> cot_core::Result<()> {
     /// let body = Body::fixed("Hello, world!");
     /// let bytes = body.into_bytes().await?;
     /// assert_eq!(bytes, "Hello, world!".as_bytes());
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn into_bytes(self) -> Result<Bytes> {
+    pub async fn into_bytes(self) -> crate::Result<Bytes> {
         self.into_bytes_limited(usize::MAX).await
     }
 
@@ -145,17 +144,17 @@ impl Body {
     /// # Examples
     ///
     /// ```
-    /// use cot::Body;
+    /// use cot_core::Body;
     ///
     /// # #[tokio::main]
-    /// # async fn main() -> cot::Result<()> {
+    /// # async fn main() -> cot_core::Result<()> {
     /// let body = Body::fixed("Hello, world!");
     /// let bytes = body.into_bytes_limited(32).await?;
     /// assert_eq!(bytes, "Hello, world!".as_bytes());
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn into_bytes_limited(self, limit: usize) -> Result<Bytes> {
+    pub async fn into_bytes_limited(self, limit: usize) -> crate::Result<Bytes> {
         use http_body_util::BodyExt;
 
         Ok(http_body_util::Limited::new(self, limit)
@@ -166,12 +165,12 @@ impl Body {
     }
 
     #[must_use]
-    pub(crate) fn axum(inner: axum::body::Body) -> Self {
+    pub fn axum(inner: axum::body::Body) -> Self {
         Self::new(BodyInner::Axum(SyncWrapper::new(inner)))
     }
 
     #[must_use]
-    pub(crate) fn wrapper(inner: BoxBody<Bytes, Error>) -> Self {
+    pub fn wrapper(inner: BoxBody<Bytes, crate::Error>) -> Self {
         Self::new(BodyInner::Wrapper(inner))
     }
 }
@@ -184,7 +183,7 @@ impl Default for Body {
 
 impl http_body::Body for Body {
     type Data = Bytes;
-    type Error = Error;
+    type Error = crate::Error;
 
     fn poll_frame(
         self: Pin<&mut Self>,
@@ -290,7 +289,7 @@ mod tests {
         }
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn body_streaming() {
         let stream = stream::once(async { Ok(Bytes::from("Hello, world!")) });
         let body = Body::streaming(stream);
@@ -301,7 +300,7 @@ mod tests {
         }
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn http_body_poll_frame_fixed() {
         let content = "Hello, world!";
         let mut body = Body::fixed(content);
@@ -320,7 +319,7 @@ mod tests {
         }
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn http_body_poll_frame_streaming() {
         let content = "Hello, world!";
         let mut body = Body::streaming(stream::once(async move { Ok(Bytes::from(content)) }));

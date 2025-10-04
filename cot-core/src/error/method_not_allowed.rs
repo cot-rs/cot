@@ -11,7 +11,7 @@ use crate::error::error_impl::impl_into_cot_error;
 /// # Examples
 ///
 /// ```
-/// use cot::error::MethodNotAllowed;
+/// use cot_core::error::MethodNotAllowed;
 ///
 /// let error = MethodNotAllowed::new(cot::Method::POST);
 /// assert_eq!(error.method, &cot::Method::POST);
@@ -33,7 +33,7 @@ impl MethodNotAllowed {
     /// # Examples
     ///
     /// ```
-    /// use cot::error::MethodNotAllowed;
+    /// use cot_core::error::MethodNotAllowed;
     ///
     /// let error = MethodNotAllowed::new(cot::Method::POST);
     /// assert_eq!(error.method, cot::Method::POST);

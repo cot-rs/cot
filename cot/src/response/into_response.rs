@@ -1,8 +1,8 @@
 use bytes::{Bytes, BytesMut};
-use cot::error::error_impl::impl_into_cot_error;
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use cot::response::Response;
 use cot::{Body, Error, StatusCode};
+use cot_core::error::error_impl::impl_into_cot_error;
 use http;
 
 #[cfg(feature = "json")]
@@ -390,10 +390,10 @@ mod tests {
     use bytes::{Bytes, BytesMut};
     use cot::response::Response;
     use cot::{Body, StatusCode};
+    use cot_core::error::NotFound;
     use http::{self, HeaderMap, HeaderValue};
 
     use super::*;
-    use crate::error::NotFound;
     use crate::html::Html;
 
     #[cot::test]

@@ -28,6 +28,9 @@ use std::sync::Arc;
 use askama::Template;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
+use cot_core::error::UncaughtPanic;
+use cot_core::error::error_impl::impl_into_cot_error;
+use cot_core::error::handler::{DynErrorPageHandler, RequestOuterError};
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;
@@ -47,9 +50,6 @@ use crate::config::{AuthBackendConfig, ProjectConfig};
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
-use crate::error::UncaughtPanic;
-use crate::error::error_impl::impl_into_cot_error;
-use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
 use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
 use crate::html::Html;
@@ -407,9 +407,9 @@ pub trait Project {
     ///
     /// ```
     /// use cot::Project;
-    /// use cot::error::handler::{DynErrorPageHandler, RequestError};
     /// use cot::html::Html;
     /// use cot::response::IntoResponse;
+    /// use cot_core::error::handler::{DynErrorPageHandler, RequestError};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -2137,6 +2137,7 @@ async fn shutdown_signal() {
 mod tests {
     use std::task::{Context, Poll};
 
+    use cot_core::error::handler::{RequestError, RequestOuterError};
     use tower::util::MapResultLayer;
     use tower::{ServiceExt, service_fn};
 
@@ -2144,7 +2145,6 @@ mod tests {
     use crate::StatusCode;
     use crate::auth::UserId;
     use crate::config::SecretKey;
-    use crate::error::handler::{RequestError, RequestOuterError};
     use crate::html::Html;
     use crate::request::extractors::FromRequestHead;
     use crate::test::serial_guard;

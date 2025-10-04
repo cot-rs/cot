@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
+use cot_core::error::NotFound;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.
@@ -22,7 +23,6 @@ use serde::Deserialize;
 
 use crate::auth::Auth;
 use crate::common_types::Password;
-use crate::error::NotFound;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };

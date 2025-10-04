@@ -22,7 +22,7 @@ use crate::error::error_impl::impl_into_cot_error;
 /// # Examples
 ///
 /// ```
-/// use cot::error::UncaughtPanic;
+/// use cot_core::error::UncaughtPanic;
 ///
 /// // This would typically be created internally by Cot when catching panics
 /// let panic = UncaughtPanic::new(Box::new("something went wrong"));
@@ -43,7 +43,7 @@ impl UncaughtPanic {
     /// # Examples
     ///
     /// ```
-    /// use cot::error::UncaughtPanic;
+    /// use cot_core::error::UncaughtPanic;
     ///
     /// let panic = UncaughtPanic::new(Box::new("a panic occurred"));
     /// ```
@@ -66,7 +66,7 @@ impl UncaughtPanic {
     /// # Examples
     ///
     /// ```
-    /// use cot::error::UncaughtPanic;
+    /// use cot_core::error::UncaughtPanic;
     ///
     /// let panic = UncaughtPanic::new(Box::new("test panic"));
     /// let payload = panic.payload();

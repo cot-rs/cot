@@ -7,13 +7,13 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+use cot::handle_all_parameters;
+use cot::request::{Request, RequestHead};
+use cot::response::Response;
 use derive_more::with_trait::Debug;
 
 use crate::Error;
-use crate::handler::handle_all_parameters;
 use crate::request::extractors::FromRequestHead;
-use crate::request::{Request, RequestHead};
-use crate::response::Response;
 
 /// A trait for handling error pages in Cot applications.
 ///
@@ -26,9 +26,9 @@ use crate::response::Response;
 ///
 /// ```
 /// use cot::Project;
-/// use cot::error::handler::{DynErrorPageHandler, RequestError};
 /// use cot::html::Html;
 /// use cot::response::IntoResponse;
+/// use cot_core::error::handler::{DynErrorPageHandler, RequestError};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -64,7 +64,7 @@ pub trait ErrorPageHandler<T = ()> {
     fn handle(&self, head: &RequestHead) -> impl Future<Output = crate::Result<Response>> + Send;
 }
 
-pub(crate) trait BoxErrorPageHandler: Send + Sync {
+pub trait BoxErrorPageHandler: Send + Sync {
     fn handle<'a>(
         &'a self,
         head: &'a RequestHead,
@@ -87,15 +87,15 @@ impl DynErrorPageHandler {
     ///
     /// This method wraps a concrete error page handler in a type-erased
     /// wrapper, allowing it to be used in
-    /// [`crate::project::Project::error_handler`].
+    /// [`cot::project::Project::error_handler`].
     ///
     /// # Examples
     ///
     /// ```
     /// use cot::Project;
-    /// use cot::error::handler::{DynErrorPageHandler, RequestError};
     /// use cot::html::Html;
     /// use cot::response::IntoResponse;
+    /// use cot_core::error::handler::{DynErrorPageHandler, RequestError};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -120,7 +120,7 @@ impl DynErrorPageHandler {
             fn handle<'a>(
                 &'a self,
                 head: &'a RequestHead,
-            ) -> Pin<Box<dyn Future<Output = cot::Result<Response>> + Send + 'a>> {
+            ) -> Pin<Box<dyn Future<Output = crate::Result<Response>> + Send + 'a>> {
                 Box::pin(self.0.handle(head))
             }
         }
@@ -134,7 +134,7 @@ impl DynErrorPageHandler {
 impl tower::Service<Request> for DynErrorPageHandler {
     type Response = Response;
     type Error = Error;
-    type Future = Pin<Box<dyn Future<Output = cot::Result<Self::Response>> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = crate::Result<Self::Response>> + Send>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -189,7 +189,7 @@ pub struct RequestOuterError(Arc<Error>);
 
 impl RequestOuterError {
     #[must_use]
-    pub(crate) fn new(error: Error) -> Self {
+    pub fn new(error: Error) -> Self {
         Self(Arc::new(error))
     }
 }
@@ -278,7 +278,7 @@ mod tests {
         assert_eq!(format!("{request_error}"), "Test error");
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn request_outer_error_from_request_head() {
         let request = Request::default();
         let (mut head, _) = request.into_parts();
@@ -289,7 +289,7 @@ mod tests {
         assert_eq!(format!("{extracted_error}"), "Test error");
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn request_error_from_request_head() {
         let request = Request::default();
         let (mut head, _) = request.into_parts();

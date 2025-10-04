@@ -1,5 +1,5 @@
-pub(crate) mod backtrace;
-pub(crate) mod error_impl;
+pub mod backtrace;
+pub mod error_impl;
 pub mod handler;
 mod method_not_allowed;
 mod not_found;

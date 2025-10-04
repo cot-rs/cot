@@ -1,6 +1,5 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
-use cot::error::handler::{DynErrorPageHandler, RequestError};
 use cot::json::Json;
 use cot::openapi::swagger_ui::SwaggerUi;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
@@ -9,6 +8,7 @@ use cot::router::method::openapi::api_post;
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Project};
+use cot_core::error::handler::{DynErrorPageHandler, RequestError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]

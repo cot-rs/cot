@@ -71,6 +71,7 @@ clap_complete = "4"
 clap_mangen = "0.2.29"
 cot = { version = "0.4.0", path = "cot" }
 cot_codegen = { version = "0.4.0", path = "cot-codegen" }
+cot_core = { version = "0.4.0", path = "cot-core" }
 cot_macros = { version = "0.4.0", path = "cot-macros" }
 criterion = "0.6"
 darling = "0.21"

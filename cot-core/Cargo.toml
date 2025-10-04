@@ -16,3 +16,12 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
+askama = { workspace = true, features = ["derive", "std"] }
+backtrace.workspace = true
+derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
+http.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
+thiserror.workspace = true
+tower = { workspace = true, features = ["util"] }
+tower-sessions = { workspace = true, features = ["memory-store"] }

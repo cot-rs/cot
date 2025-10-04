@@ -216,7 +216,7 @@ impl Error {
     }
 
     #[must_use]
-    pub(crate) fn backtrace(&self) -> &CotBacktrace {
+    pub fn backtrace(&self) -> &CotBacktrace {
         &self.repr.backtrace
     }
 
@@ -319,6 +319,7 @@ impl From<Error> for askama::Error {
     }
 }
 
+#[macro_export]
 macro_rules! impl_into_cot_error {
     ($error_ty:ty) => {
         impl From<$error_ty> for $crate::Error {
@@ -335,7 +336,8 @@ macro_rules! impl_into_cot_error {
         }
     };
 }
-pub(crate) use impl_into_cot_error;
+
+pub use impl_into_cot_error;
 
 #[derive(Debug, thiserror::Error)]
 #[error("failed to render template: {0}")]

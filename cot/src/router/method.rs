@@ -5,7 +5,8 @@ pub mod openapi;
 
 use std::fmt::{Debug, Formatter};
 
-use crate::error::MethodNotAllowed;
+use cot_core::error::MethodNotAllowed;
+
 use crate::handler::{BoxRequestHandler, into_box_request_handler};
 use crate::request::Request;
 use crate::response::Response;

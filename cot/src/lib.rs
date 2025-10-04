@@ -55,12 +55,6 @@ extern crate self as cot;
 
 #[cfg(feature = "db")]
 pub mod db;
-/// Error handling types and utilities for Cot applications.
-///
-/// This module provides error types, error handlers, and utilities for
-/// handling various types of errors that can occur in Cot applications,
-/// including 404 Not Found errors, uncaught panics, and custom error pages.
-pub mod error;
 pub mod form;
 mod headers;
 // Not public API. Referenced by macro-generated code.
@@ -96,6 +90,12 @@ pub(crate) mod utils;
 #[cfg(feature = "openapi")]
 pub use aide;
 pub use body::Body;
+pub use cot_core::Method;
+/// A type alias for a result that can return a [`cot::Error`].
+pub use cot_core::Result;
+/// A type alias for an HTTP status code.
+pub use cot_core::StatusCode;
+pub use cot_core::error::error_impl::Error;
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
 ///
@@ -159,7 +159,6 @@ pub use cot_macros::e2e_test;
 /// ```
 pub use cot_macros::main;
 pub use cot_macros::test;
-pub use error::error_impl::Error;
 #[cfg(feature = "openapi")]
 pub use schemars;
 pub use {bytes, http};
@@ -168,12 +167,3 @@ pub use crate::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{
     App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };
-
-/// A type alias for a result that can return a [`cot::Error`].
-pub type Result<T> = std::result::Result<T, Error>;
-
-/// A type alias for an HTTP status code.
-pub type StatusCode = http::StatusCode;
-
-/// A type alias for an HTTP method.
-pub type Method = http::Method;

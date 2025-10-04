@@ -19,13 +19,13 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset};
+use cot_core::error::error_impl::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
-use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
 /// The configuration for a project.

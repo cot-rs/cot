@@ -15,12 +15,12 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use cot_core::error::error_impl::impl_into_cot_error;
 use http::Extensions;
 use indexmap::IndexMap;
 
 #[cfg(feature = "db")]
 use crate::db::Database;
-use crate::error::error_impl::impl_into_cot_error;
 use crate::request::extractors::FromRequestHead;
 use crate::router::Router;
 use crate::{Body, Result};

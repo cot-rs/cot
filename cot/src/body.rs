@@ -4,12 +4,12 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
+use cot_core::error::error_impl::impl_into_cot_error;
 use futures_core::Stream;
 use http_body::{Frame, SizeHint};
 use http_body_util::combinators::BoxBody;
 use sync_wrapper::SyncWrapper;
 
-use crate::error::error_impl::impl_into_cot_error;
 use crate::{Error, Result};
 
 /// A type that represents an HTTP request or response body.

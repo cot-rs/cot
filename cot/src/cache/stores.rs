@@ -72,4 +72,3 @@ pub trait CacheStore: Send + Sync + 'static {
     /// Returns `true` if the cache contains the specified key.
     async fn contains_key(&self, key: &Self::Key) -> CacheStoreResult<bool>;
 }
-

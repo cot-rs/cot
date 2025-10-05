@@ -80,7 +80,7 @@ pub(crate) mod cache_timeout {
     use serde::{Deserialize, Deserializer, Serializer};
     use crate::config::Timeout;
     use chrono::DateTime;
-    
+
     pub(crate) fn serialize<S>(timeout: &Timeout, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -91,7 +91,7 @@ pub(crate) mod cache_timeout {
             Timeout::AtDateTime(time) => serializer.serialize_str(&time.to_string()),
         }
     }
-    
+
     pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Timeout, D::Error>
     where
         D: Deserializer<'de>,

@@ -31,6 +31,8 @@ use crate::router::Router;
 use crate::session::Session;
 use crate::static_files::{StaticFile, StaticFiles};
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
+#[cfg(feature = "cache")]
+use crate::cache::Cache;
 
 /// A test client for making requests to a Cot project.
 ///
@@ -216,6 +218,8 @@ pub struct TestRequestBuilder {
     #[cfg(feature = "json")]
     json_data: Option<String>,
     static_files: Vec<StaticFile>,
+    #[cfg(feature = "cache")]
+    cache: Option<Arc<Cache>>
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -269,6 +273,8 @@ impl Default for TestRequestBuilder {
             #[cfg(feature = "json")]
             json_data: None,
             static_files: Vec::new(),
+            #[cfg(feature = "cache")]
+            cache: None,
         }
     }
 }
@@ -751,6 +757,8 @@ impl TestRequestBuilder {
             auth_backend,
             #[cfg(feature = "db")]
             self.database.clone(),
+            #[cfg(feature = "cache")] // TODO: use a sensible default
+            self.cache.clone().expect("Cache missing. Did you forget to add the cache when configuring CotProject?")
         );
         prepare_request(&mut request, Arc::new(context));
 

@@ -6,12 +6,12 @@
 //! map is sufficient.
 
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::Arc;
 
-use cot::cache::stores::{CacheStore, CacheStoreError, CacheStoreResult, Expiry};
+use cot::cache::stores::{CacheStore, CacheStoreError, CacheStoreResult};
 use thiserror::Error;
 use tokio::sync::Mutex;
+use crate::config::Timeout;
 
 /// Errors specific to the in-memory cache store.
 #[derive(Debug, Error, Clone, Copy)]
@@ -28,11 +28,11 @@ impl From<MemoryCacheStoreError> for CacheStoreError {
 }
 
 /// A simple in-memory cache backed by a `Mutex<HashMap<..>>`.
-pub struct Memory<K, V> {
-    map: Arc<Mutex<HashMap<K, (V, Option<Expiry>)>>>,
+pub struct Memory {
+    map: Arc<Mutex<HashMap<String, (serde_json::Value, Option<Timeout>)>>>,
 }
 
-impl<K, V> Memory<K, V> {
+impl Memory {
     /// Create a new, empty `Memory` cache store.
     #[must_use]
     pub fn new() -> Self {
@@ -43,83 +43,30 @@ impl<K, V> Memory<K, V> {
 }
 
 #[async_trait::async_trait]
-impl<K, V> CacheStore<K, V> for Memory<K, V>
-where
-    K: Eq + std::hash::Hash + Clone + Send + Sync + 'static,
-    V: serde::Serialize + serde::de::DeserializeOwned + Clone + Send + Sync + 'static,
-{
+impl CacheStore for Memory {
+    type Key = String;
+    type Value = serde_json::Value;
     /// Get a value by key.
-    async fn get(&self, key: &K) -> CacheStoreResult<Option<V>> {
+    async fn get(&self, key: &Self::Key) -> CacheStoreResult<Option<Self::Value>> {
         let map = self.map.lock().await;
         let value = map.get(key).map(|(v, _)| v.clone());
         Ok(value)
     }
 
     /// Insert a value without expiry.
-    async fn insert(&self, key: K, value: V) -> CacheStoreResult<()> {
-        let mut map = self.map.lock().await;
-        map.insert(key, (value, None));
-        Ok(())
-    }
-
-    /// Insert a lazily computed value without expiry.
-    async fn insert_with<F, Fut>(&self, key: K, f: F) -> CacheStoreResult<()>
-    where
-        F: FnOnce() -> Fut + Send,
-        Fut: Future<Output = CacheStoreResult<V>> + Send,
-    {
-        let mut map = self.map.lock().await;
-        map.insert(key, (f().await?, None));
-        Ok(())
-    }
-
-    /// Insert a value with the provided expiry policy.
-    async fn insert_expiring(&self, key: K, value: V, expiry: Expiry) -> CacheStoreResult<()> {
+    async fn insert(
+        &self,
+        key: Self::Key,
+        value: Self::Value,
+        expiry: Timeout,
+    ) -> CacheStoreResult<()> {
         let mut map = self.map.lock().await;
         map.insert(key, (value, Some(expiry)));
         Ok(())
     }
 
-    /// Get the value for `key`, or compute, insert, and return it without
-    /// expiry.
-    async fn get_or_insert_with<F, Fut>(&self, key: K, f: F) -> CacheStoreResult<V>
-    where
-        F: FnOnce() -> Fut + Send,
-        Fut: Future<Output = CacheStoreResult<V>> + Send,
-    {
-        let mut map = self.map.lock().await;
-        if let Some(value) = map.get(&key) {
-            return Ok(value.0.clone());
-        }
-        let value = f().await?;
-        map.insert(key, (value.clone(), None));
-        Ok(value)
-    }
-
-    /// Get the value for `key`, or compute and insert it with the provided
-    /// expiry.
-    async fn get_or_insert_expiring_with<F, Fut>(
-        &self,
-        key: K,
-        f: F,
-        expiry: Expiry,
-    ) -> CacheStoreResult<V>
-    where
-        F: FnOnce() -> Fut + Send,
-        Fut: Future<Output = CacheStoreResult<V>> + Send,
-    {
-        let mut map = self.map.lock().await;
-        if let Some((value, _existing_expiry)) = map.get(&key) {
-            return Ok(value.clone());
-        }
-
-        let value = f().await?;
-        map.insert(key, (value.clone(), Some(expiry)));
-        Ok(value)
-    }
-
     /// Remove a value by key.
-    async fn remove(&self, key: &K) -> CacheStoreResult<()> {
+    async fn remove(&self, key: &Self::Key) -> CacheStoreResult<()> {
         let mut map = self.map.lock().await;
         map.remove(key);
         Ok(())
@@ -145,7 +92,7 @@ where
     }
 
     /// Check if a given key is present.
-    async fn contains_key(&self, key: &K) -> CacheStoreResult<bool> {
+    async fn contains_key(&self, key: &Self::Key) -> CacheStoreResult<bool> {
         let map = self.map.lock().await;
         Ok(map.contains_key(key))
     }

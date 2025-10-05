@@ -923,6 +923,9 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(config)
             .with_apps()
+            .with_cache()
+            .await
+            .expect("bootstrap failed")
             .with_database()
             .await
             .expect("bootstrap failed");
@@ -941,6 +944,9 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(config)
             .with_apps()
+            .with_cache()
+            .await
+            .expect("bootstrap failed")
             .with_database()
             .await
             .expect("bootstrap failed");
@@ -960,6 +966,9 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(config)
             .with_apps()
+            .with_cache()
+            .await
+            .expect("bootstrap failed")
             .with_database()
             .await
             .expect("bootstrap failed");
@@ -979,6 +988,9 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(config)
             .with_apps()
+            .with_cache()
+            .await
+            .expect("bootstrap failed")
             .with_database()
             .await
             .expect("bootstrap failed");

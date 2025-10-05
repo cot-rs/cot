@@ -25,6 +25,10 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
+#[cfg(feature = "cache")]
+use crate::cache;
+#[cfg(feature = "cache")]
+use crate::cache::stores;
 use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
@@ -483,34 +487,8 @@ pub struct CacheConfig {
     /// [cache]
     /// timeout = 60
     /// ```
-    #[builder(default = "30")]
-    pub timeout: u64,
-
-    /// Namespace for cache keys.
-    ///
-    /// This prefix is added to all cache keys to provide isolation between
-    /// different applications or environments using the same cache backend.
-    /// When not specified, no namespace is used.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::config::CacheConfig;
-    ///
-    /// let config = CacheConfig::builder()
-    ///     .namespace("my-app".to_string())
-    ///     .build();
-    /// assert_eq!(config.namespace, Some("my-app".to_string()));
-    /// ```
-    ///
-    /// # TOML Configuration
-    ///
-    /// ```toml
-    /// [cache]
-    /// namespace = "my-app"
-    /// ```
-    #[builder(setter(into, strip_option), default)]
-    pub namespace: Option<String>,
+    #[serde(with = "crate::serializers::cache_timeout")]
+    pub timeout: Timeout,
 
     /// Prefix for cache keys.
     ///
@@ -571,7 +549,7 @@ pub struct CacheConfig {
     /// # path = "/tmp/cache"
     /// ```
     #[builder(default)]
-    pub store: Option<CacheStoreConfig>,
+    pub store: CacheStoreConfig,
 }
 
 #[cfg(feature = "cache")]
@@ -593,8 +571,7 @@ impl CacheConfigBuilder {
     pub fn build(&self) -> CacheConfig {
         CacheConfig {
             max_retries: self.max_retries.unwrap_or(3),
-            timeout: self.timeout.unwrap_or(30),
-            namespace: self.namespace.clone().unwrap_or_default(),
+            timeout: self.timeout.unwrap_or_default(),
             prefix: self.prefix.clone().unwrap_or_default(),
             store: self.store.clone().unwrap_or_default(),
         }
@@ -623,6 +600,24 @@ impl CacheConfig {
 pub struct CacheStoreConfig {
     #[serde(flatten)]
     pub store_type: CacheStoreTypeConfig,
+}
+
+#[cfg(feature = "cache")]
+impl CacheStoreConfig {
+    #[must_use]
+    pub fn builder() -> CacheStoreConfigBuilder {
+        CacheStoreConfigBuilder::default()
+    }
+}
+
+#[cfg(feature = "cache")]
+impl CacheStoreConfigBuilder {
+    #[must_use]
+    pub fn build(&self) -> CacheStoreConfig {
+        CacheStoreConfig {
+            store_type: self.store_type.clone().unwrap_or_default(),
+        }
+    }
 }
 
 #[cfg(feature = "cache")]
@@ -2250,8 +2245,7 @@ mod tests {
         let toml_content = r#"
             [cache]
             max_retries = 5
-            timeout = 60
-            namespace = "my-app"
+            timeout = "60s"
             prefix = "v1"
 
             [cache.store]
@@ -2261,11 +2255,10 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 5);
-        assert_eq!(config.cache.timeout, 60);
-        assert_eq!(config.cache.namespace, Some("my-app".to_string()));
+        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_secs(60)));
         assert_eq!(config.cache.prefix, Some("v1".to_string()));
         assert_eq!(
-            config.cache.store.unwrap().store_type,
+            config.cache.store.store_type,
             CacheStoreTypeConfig::Memory
         );
     }
@@ -2276,8 +2269,7 @@ mod tests {
         let toml_content = r#"
             [cache]
             max_retries = 10
-            timeout = 120
-            namespace = "production"
+            timeout = "120s"
 
             [cache.store]
             type = "redis"
@@ -2288,11 +2280,10 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 10);
-        assert_eq!(config.cache.timeout, 120);
-        assert_eq!(config.cache.namespace, Some("production".to_string()));
+        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_secs(120)));
         assert_eq!(config.cache.prefix, None);
 
-        match config.cache.store.unwrap().store_type {
+        match config.cache.store.store_type {
             CacheStoreTypeConfig::Redis { url, pool_size } => {
                 assert_eq!(url.as_str(), "redis://localhost:6379");
                 assert_eq!(pool_size, Some(20));
@@ -2307,7 +2298,7 @@ mod tests {
         let toml_content = r#"
             [cache]
             max_retries = 3
-            timeout = 30
+            timeout = "30s"
             prefix = "dev"
 
             [cache.store]
@@ -2318,11 +2309,10 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 3);
-        assert_eq!(config.cache.timeout, 30);
-        assert_eq!(config.cache.namespace, None);
+        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_secs(30)));
         assert_eq!(config.cache.prefix, Some("dev".to_string()));
 
-        match config.cache.store.unwrap().store_type {
+        match config.cache.store.store_type {
             CacheStoreTypeConfig::File { path } => {
                 assert_eq!(path, PathBuf::from("/tmp/cache"));
             }
@@ -2340,11 +2330,10 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 3);
-        assert_eq!(config.cache.timeout, 30);
-        assert_eq!(config.cache.namespace, None);
+        assert_eq!(config.cache.timeout, Timeout::default());
         assert_eq!(config.cache.prefix, None);
         assert_eq!(
-            config.cache.store.unwrap().store_type,
+            config.cache.store.store_type,
             CacheStoreTypeConfig::Memory
         );
     }
@@ -2354,20 +2343,18 @@ mod tests {
     fn cache_config_builder() {
         let config = CacheConfig::builder()
             .max_retries(7)
-            .timeout(90)
-            .namespace("test-app".to_string())
+            .timeout(Timeout::After(Duration::from_secs(90)))
             .prefix("v2".to_string())
-            .store(Some(CacheStoreConfig {
+            .store(CacheStoreConfig {
                 store_type: CacheStoreTypeConfig::Memory,
-            }))
+            })
             .build();
 
         assert_eq!(config.max_retries, 7);
-        assert_eq!(config.timeout, 90);
-        assert_eq!(config.namespace, Some("test-app".to_string()));
+        assert_eq!(config.timeout, Timeout::After(Duration::from_secs(90)));
         assert_eq!(config.prefix, Some("v2".to_string()));
         assert_eq!(
-            config.store.unwrap().store_type,
+            config.store.store_type,
             CacheStoreTypeConfig::Memory
         );
     }
@@ -2378,11 +2365,10 @@ mod tests {
         let config = CacheConfig::builder().build();
 
         assert_eq!(config.max_retries, 3);
-        assert_eq!(config.timeout, 30);
-        assert_eq!(config.namespace, None);
+        assert_eq!(config.timeout, Timeout::default());
         assert_eq!(config.prefix, None);
         assert_eq!(
-            config.store.unwrap().store_type,
+            config.store.store_type,
             CacheStoreTypeConfig::Memory
         );
     }
@@ -2411,5 +2397,25 @@ mod tests {
     fn cache_store_config_default() {
         let config = CacheStoreConfig::default();
         assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    }
+}
+
+/// Expiration policy for cached values.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Timeout {
+    /// Never expire the value.
+    Never,
+    /// Expire after the specified duration from the insertion time.
+    After(Duration),
+    /// Expire at the specific UTC datetime.
+    AtDateTime(DateTime<chrono::FixedOffset>),
+}
+
+impl Default for Timeout {
+    fn default() -> Self {
+        // expire after 5 mins.
+        Self::After(Duration::from_secs(300))
     }
 }

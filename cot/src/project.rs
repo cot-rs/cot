@@ -28,6 +28,8 @@ use std::sync::Arc;
 use askama::Template;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
+#[cfg(feature = "cache")]
+use crate::config::CacheConfig;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;
@@ -39,6 +41,8 @@ use crate::admin::AdminModelManager;
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{AuthBackend, NoAuthBackend};
+#[cfg(feature = "cache")]
+use crate::cache::Cache;
 use crate::cli::Cli;
 #[cfg(feature = "db")]
 use crate::config::DatabaseConfig;
@@ -1166,6 +1170,31 @@ impl Bootstrapper<WithApps> {
     // Send not needed; Bootstrapper is run async in a single thread
     #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
+        self.with_cache().await?.with_database().await?.boot().await
+    }
+
+    pub(crate) async fn with_cache(self) -> cot::Result<Bootstrapper<WithCache>> {
+        #[cfg(feature = "cache")]
+        let cache = Self::init_cache(&self.context.config.cache).await?;
+
+        let context = self.context.with_cache(#[cfg(feature = "cache")] cache);
+
+        Ok(Bootstrapper {
+            project: self.project,
+            context,
+            handler: self.handler,
+            error_handler: self.error_handler,
+        })
+    }
+
+    #[cfg(feature = "cache")]
+    async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
+        Cache::try_from(config).map(|cache| Arc::new(cache)).map_err(|err| cot::Error::from(err))
+    }
+}
+
+impl Bootstrapper<WithCache> {
+    async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_database().await?.boot().await
     }
 
@@ -1428,6 +1457,8 @@ pub trait BootstrapPhase: sealed::Sealed {
     type Database: Debug;
     /// The type of the auth backend.
     type AuthBackend;
+    #[cfg(feature = "cache")]
+    type Cache: Debug;
 }
 
 /// First phase of bootstrapping a Cot project, the uninitialized phase.
@@ -1449,6 +1480,8 @@ impl BootstrapPhase for Uninitialized {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    #[cfg(feature = "cache")]
+    type Cache = ();
 }
 
 /// Second phase of bootstrapping a Cot project, the with-config phase.
@@ -1470,6 +1503,8 @@ impl BootstrapPhase for WithConfig {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    #[cfg(feature = "cache")]
+    type Cache = ();
 }
 
 /// Third phase of bootstrapping a Cot project, the with-apps phase.
@@ -1491,6 +1526,25 @@ impl BootstrapPhase for WithApps {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    #[cfg(feature = "cache")]
+    type Cache = ();
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum WithCache {}
+
+impl sealed::Sealed for WithCache {}
+impl BootstrapPhase for WithCache {
+    type RequestHandler = ();
+    type ErrorHandler = ();
+    type Config = <WithApps as BootstrapPhase>::Config;
+    type Apps = <WithApps as BootstrapPhase>::Apps;
+    type Router = <WithApps as BootstrapPhase>::Router;
+    #[cfg(feature = "db")]
+    type Database = ();
+    type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
+    #[cfg(feature = "cache")]
+    type Cache = Arc<Cache>;
 }
 
 /// Fourth phase of bootstrapping a Cot project, the with-database phase.
@@ -1512,6 +1566,8 @@ impl BootstrapPhase for WithDatabase {
     #[cfg(feature = "db")]
     type Database = Option<Arc<Database>>;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
+    #[cfg(feature = "cache")]
+    type Cache = Arc<Cache>;
 }
 
 /// The final phase of bootstrapping a Cot project, the initialized phase.
@@ -1533,6 +1589,8 @@ impl BootstrapPhase for Initialized {
     #[cfg(feature = "db")]
     type Database = <WithDatabase as BootstrapPhase>::Database;
     type AuthBackend = Arc<dyn AuthBackend>;
+    #[cfg(feature = "cache")]
+    type Cache = <WithCache as BootstrapPhase>::Cache;
 }
 
 /// Shared context and configs for all apps. Used in conjunction with the
@@ -1547,6 +1605,8 @@ pub struct ProjectContext<S: BootstrapPhase = Initialized> {
     database: S::Database,
     #[debug("..")]
     auth_backend: S::AuthBackend,
+    #[cfg(feature = "cache")]
+    cache: S::Cache,
 }
 
 impl ProjectContext<Uninitialized> {
@@ -1559,6 +1619,8 @@ impl ProjectContext<Uninitialized> {
             #[cfg(feature = "db")]
             database: (),
             auth_backend: (),
+            #[cfg(feature = "cache")]
+            cache: (),
         }
     }
 
@@ -1570,6 +1632,8 @@ impl ProjectContext<Uninitialized> {
             #[cfg(feature = "db")]
             database: self.database,
             auth_backend: self.auth_backend,
+            #[cfg(feature = "cache")]
+            cache: self.cache,
         }
     }
 }
@@ -1610,6 +1674,8 @@ impl ProjectContext<WithConfig> {
             #[cfg(feature = "db")]
             database: self.database,
             auth_backend: self.auth_backend,
+            #[cfg(feature = "cache")]
+            cache: self.cache,
         }
     }
 }
@@ -1637,6 +1703,23 @@ impl<S: BootstrapPhase<Apps = Vec<Box<dyn App>>>> ProjectContext<S> {
 }
 
 impl ProjectContext<WithApps> {
+
+    #[must_use]
+    fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
+        ProjectContext {
+            config: self.config,
+            apps: self.apps,
+            router: self.router,
+            auth_backend: self.auth_backend,
+            #[cfg(feature = "db")]
+            database: self.database,
+            #[cfg(feature = "cache")]
+            cache,
+        }
+    }
+}
+
+impl ProjectContext<WithCache> {
     #[must_use]
     fn with_database(
         self,
@@ -1649,6 +1732,8 @@ impl ProjectContext<WithApps> {
             #[cfg(feature = "db")]
             database,
             auth_backend: self.auth_backend,
+            #[cfg(feature = "cache")]
+            cache: self.cache,
         }
     }
 }
@@ -1663,6 +1748,8 @@ impl ProjectContext<WithDatabase> {
             auth_backend,
             #[cfg(feature = "db")]
             database: self.database,
+            #[cfg(feature = "cache")]
+            cache: self.cache,
         }
     }
 }
@@ -1675,6 +1762,7 @@ impl ProjectContext<Initialized> {
         router: <Initialized as BootstrapPhase>::Router,
         auth_backend: <Initialized as BootstrapPhase>::AuthBackend,
         #[cfg(feature = "db")] database: <Initialized as BootstrapPhase>::Database,
+        #[cfg(feature = "cache")] cache: <Initialized as BootstrapPhase>::Cache,
     ) -> Self {
         Self {
             config,
@@ -1683,6 +1771,8 @@ impl ProjectContext<Initialized> {
             #[cfg(feature = "db")]
             database,
             auth_backend,
+            #[cfg(feature = "cache")]
+            cache,
         }
     }
 }
@@ -2139,7 +2229,8 @@ mod tests {
 
     use tower::util::MapResultLayer;
     use tower::{ServiceExt, service_fn};
-
+    use cot::cache::stores::memory::Memory;
+    use cot::config::Timeout;
     use super::*;
     use crate::StatusCode;
     use crate::auth::UserId;
@@ -2323,6 +2414,8 @@ mod tests {
 
     #[cot::test]
     async fn default_auth_backend() {
+        let cache = Cache::new(Arc::new(Memory::new()), None, Timeout::Never);
+
         let context = ProjectContext::new()
             .with_config(
                 ProjectConfig::builder()
@@ -2330,6 +2423,7 @@ mod tests {
                     .build(),
             )
             .with_apps(vec![], Arc::new(Router::empty()))
+            .with_cache(Arc::new(cache))
             .with_database(None);
 
         let auth_backend = TestProject.auth_backend(&context);

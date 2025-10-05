@@ -569,6 +569,9 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(ProjectConfig::default())
             .with_apps()
+            .with_cache()
+            .await
+            .unwrap()
             .with_database()
             .await
             .unwrap();

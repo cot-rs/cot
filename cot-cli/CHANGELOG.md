@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1](https://github.com/cot-rs/cot/compare/cot-cli-v0.4.0...cot-cli-v0.4.1) - 2025-10-05
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.4.0/cot-cli/0.4.1/Cargo.toml)
+
+### Other
+
+- *(deps)* Bump the dependencies group with 22 updates ([#401](https://github.com/cot-rs/cot/pull/401)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+
 ## [0.4.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.3.1...cot-cli-v0.4.0) - 2025-09-11
 
 [View diff on diff.rs](https://diff.rs/cot-cli/0.3.1/cot-cli/0.4.0/Cargo.toml)

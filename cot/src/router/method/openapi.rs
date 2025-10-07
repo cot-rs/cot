@@ -9,8 +9,8 @@ use std::fmt::{Debug, Formatter};
 use aide::openapi::Operation;
 use cot::openapi::RouteContext;
 use cot::request::Request;
-use cot::response::Response;
 use cot::router::method::InnerHandler;
+use cot_core::response::Response;
 use schemars::SchemaGenerator;
 
 use crate::RequestHandler;
@@ -518,12 +518,12 @@ where
 #[cfg(test)]
 mod tests {
     use cot_core::error::MethodNotAllowed;
+    use cot_core::response::{IntoResponse, Response};
 
     use super::*;
     use crate::html::Html;
     use crate::json::Json;
     use crate::request::extractors::Path;
-    use crate::response::{IntoResponse, Response};
     use crate::test::TestRequestBuilder;
     use crate::{Method, StatusCode};
 

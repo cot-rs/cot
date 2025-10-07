@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use cot_core::error::error_impl::impl_into_cot_error;
+use cot_core::response::{Response, ResponseExt};
 use digest::Digest;
 use futures_core::ready;
 use http::{Request, header};
@@ -23,7 +24,6 @@ use tower::Service;
 use crate::Body;
 use crate::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
 use crate::project::MiddlewareContext;
-use crate::response::{Response, ResponseExt};
 
 /// Macro to define static files by specifying their paths.
 ///

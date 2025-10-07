@@ -32,6 +32,7 @@ use cot_core::error::UncaughtPanic;
 use cot_core::error::error_impl::impl_into_cot_error;
 use cot_core::error::handler::{DynErrorPageHandler, RequestOuterError};
 use cot_core::request::{AppName, Request, RequestExt, RequestHead};
+use cot_core::response::{IntoResponse, Response};
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;
@@ -55,7 +56,6 @@ use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;
 use crate::utils::accept_header_parser::AcceptHeaderParser;
@@ -408,8 +408,8 @@ pub trait Project {
     /// ```
     /// use cot::Project;
     /// use cot::html::Html;
-    /// use cot::response::IntoResponse;
     /// use cot_core::error::handler::{DynErrorPageHandler, RequestError};
+    /// use cot_core::response::IntoResponse;
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -1580,8 +1580,8 @@ impl<S: BootstrapPhase<Config = Arc<ProjectConfig>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::Response;
     /// use cot_core::request::{Request, RequestExt};
+    /// use cot_core::response::Response;
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let config = request.context().config();
@@ -1620,8 +1620,8 @@ impl<S: BootstrapPhase<Apps = Vec<Box<dyn App>>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::Response;
     /// use cot_core::request::{Request, RequestExt};
+    /// use cot_core::response::Response;
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let apps = request.context().apps();
@@ -1693,8 +1693,8 @@ impl<S: BootstrapPhase<Router = Arc<Router>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::Response;
     /// use cot_core::request::{Request, RequestExt};
+    /// use cot_core::response::Response;
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let router = request.context().config();
@@ -1718,8 +1718,8 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::Response;
     /// use cot_core::request::{Request, RequestExt};
+    /// use cot_core::response::Response;
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let auth_backend = request.context().auth_backend();
@@ -1740,8 +1740,8 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::Response;
     /// use cot_core::request::{Request, RequestExt};
+    /// use cot_core::response::Response;
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let database = request.context().try_database();
@@ -1768,8 +1768,8 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::Response;
     /// use cot_core::request::{Request, RequestExt};
+    /// use cot_core::response::Response;
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let database = request.context().database();

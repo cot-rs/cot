@@ -10,6 +10,8 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
+use cot_core::request::Request;
+use cot_core::response::Response;
 use futures_core::future::BoxFuture;
 use futures_util::TryFutureExt;
 use http_body_util::BodyExt;
@@ -22,8 +24,6 @@ use tower_sessions::{SessionManagerLayer, SessionStore};
 use crate::config::CacheType;
 use crate::config::{Expiry, SameSite, SessionStoreTypeConfig};
 use crate::project::MiddlewareContext;
-use crate::request::Request;
-use crate::response::Response;
 use crate::session::store::SessionStoreWrapper;
 #[cfg(all(feature = "db", feature = "json"))]
 use crate::session::store::db::DbStore;
@@ -41,7 +41,7 @@ mod live_reload;
 pub use live_reload::LiveReloadMiddleware;
 
 /// Middleware that converts a any [`http::Response`] generic type to a
-/// [`cot::response::Response`].
+/// [`cot_core::response::Response`].
 ///
 /// This is useful for converting a response from a middleware that is
 /// compatible with the `tower` crate to a response that is compatible with
@@ -104,7 +104,7 @@ impl<S> tower::Layer<S> for IntoCotResponseLayer {
 }
 
 /// Service struct that converts any [`http::Response`] generic type to
-/// [`cot::response::Response`].
+/// [`cot_core::response::Response`].
 ///
 /// Used by [`IntoCotResponseLayer`].
 ///
@@ -722,6 +722,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
+    use cot_core::response::Response;
     use http::Request;
     use tower::{Layer, Service, ServiceExt};
 
@@ -733,7 +734,6 @@ mod tests {
     };
     use crate::middleware::SessionMiddleware;
     use crate::project::{RegisterAppsContext, WithDatabase};
-    use crate::response::Response;
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
     use crate::{AppBuilder, Body, Bootstrapper, Error, Project, ProjectContext};

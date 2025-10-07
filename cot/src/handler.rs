@@ -4,9 +4,9 @@ use std::pin::Pin;
 
 use cot_core::request::Request;
 use cot_core::request::extractors::{FromRequest, FromRequestHead};
+use cot_core::response::{IntoResponse, Response};
 use tower::util::BoxCloneSyncService;
 
-use crate::response::{IntoResponse, Response};
 use crate::{Error, Result};
 
 /// A function that takes a request and returns a response.

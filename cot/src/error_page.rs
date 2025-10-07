@@ -327,7 +327,7 @@ fn build_response(
             .status(status_code)
             .header(
                 http::header::CONTENT_TYPE,
-                crate::headers::HTML_CONTENT_TYPE,
+                cot_core::headers::HTML_CONTENT_TYPE,
             )
             .body(axum::body::Body::new(error_str))
             .unwrap_or_else(|_| build_cot_failure_page()),

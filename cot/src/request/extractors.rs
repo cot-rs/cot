@@ -22,9 +22,9 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
             .headers
             .get(http::header::CONTENT_TYPE)
             .map_or("".into(), |value| String::from_utf8_lossy(value.as_bytes()));
-        if content_type != cot::headers::JSON_CONTENT_TYPE {
+        if content_type != cot_core::headers::JSON_CONTENT_TYPE {
             return Err(InvalidContentType {
-                expected: cot::headers::JSON_CONTENT_TYPE,
+                expected: cot_core::headers::JSON_CONTENT_TYPE,
                 actual: content_type.into_owned(),
             }
             .into());
@@ -207,7 +207,10 @@ mod tests {
     async fn json() {
         let request = http::Request::builder()
             .method(http::Method::POST)
-            .header(http::header::CONTENT_TYPE, cot::headers::JSON_CONTENT_TYPE)
+            .header(
+                http::header::CONTENT_TYPE,
+                cot_core::headers::JSON_CONTENT_TYPE,
+            )
             .body(Body::fixed(r#"{"hello":"world"}"#))
             .unwrap();
 
@@ -224,7 +227,10 @@ mod tests {
 
         let request = http::Request::builder()
             .method(http::Method::POST)
-            .header(http::header::CONTENT_TYPE, cot::headers::JSON_CONTENT_TYPE)
+            .header(
+                http::header::CONTENT_TYPE,
+                cot_core::headers::JSON_CONTENT_TYPE,
+            )
             .body(Body::fixed("{}"))
             .unwrap();
 
@@ -248,7 +254,10 @@ mod tests {
 
         let request = http::Request::builder()
             .method(http::Method::POST)
-            .header(http::header::CONTENT_TYPE, cot::headers::JSON_CONTENT_TYPE)
+            .header(
+                http::header::CONTENT_TYPE,
+                cot_core::headers::JSON_CONTENT_TYPE,
+            )
             .body(Body::fixed(r#"{"inner":{"hello":"world"}}"#))
             .unwrap();
 

@@ -5,11 +5,11 @@ use cot::config::{
     SessionStoreTypeConfig,
 };
 use cot::core::request::Request;
+use cot::core::response::{IntoResponse, Response};
 use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::SessionMiddleware;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
-use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router, Urls};
 use cot::session::Session;
 use cot::session::db::SessionApp;

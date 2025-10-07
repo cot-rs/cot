@@ -7,6 +7,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use cot_core::response::Response;
 use derive_more::Debug;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -26,7 +27,6 @@ use crate::db::migrations::{
 use crate::handler::BoxedHandler;
 use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
 use crate::request::Request;
-use crate::response::Response;
 use crate::router::Router;
 use crate::session::Session;
 use crate::static_files::{StaticFile, StaticFiles};
@@ -447,9 +447,9 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::request::Request;
-    /// use cot::response::Response;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::response::Response;
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()

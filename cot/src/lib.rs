@@ -56,7 +56,6 @@ extern crate self as cot;
 #[cfg(feature = "db")]
 pub mod db;
 pub mod form;
-mod headers;
 // Not public API. Referenced by macro-generated code.
 #[doc(hidden)]
 #[path = "private.rs"]
@@ -77,7 +76,7 @@ pub mod middleware;
 pub mod openapi;
 pub mod project;
 pub mod request;
-pub mod response;
+mod response;
 pub mod router;
 mod serializers;
 pub mod session;

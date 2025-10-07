@@ -12,6 +12,7 @@ use bytes::Bytes;
 use cot_core::error::NotFound;
 use cot_core::request::extractors::{FromRequestHead, Path, StaticFiles, UrlQuery};
 use cot_core::request::{Request, RequestExt, RequestHead};
+use cot_core::response::{IntoResponse, Response};
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.
@@ -29,7 +30,6 @@ use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
 use crate::html::Html;
-use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
 use crate::static_files::StaticFile;
 use crate::{App, Error, Method, RequestHandler, reverse_redirect};

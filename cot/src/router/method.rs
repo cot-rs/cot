@@ -6,10 +6,10 @@ pub mod openapi;
 use std::fmt::{Debug, Formatter};
 
 use cot_core::error::MethodNotAllowed;
+use cot_core::response::Response;
 
 use crate::handler::{BoxRequestHandler, into_box_request_handler};
 use crate::request::Request;
-use crate::response::Response;
 use crate::{Method, RequestHandler};
 
 /// A router that routes requests based on the HTTP method.
@@ -206,10 +206,10 @@ impl MethodRouter {
     /// ```
     /// use cot::StatusCode;
     /// use cot::html::Html;
-    /// use cot::response::IntoResponse;
     /// use cot::router::method::MethodRouter;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::response::IntoResponse;
     ///
     /// async fn fallback_handler() -> impl IntoResponse {
     ///     Html::new("Method Not Allowed").with_status(StatusCode::METHOD_NOT_ALLOWED)

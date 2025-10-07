@@ -1759,20 +1759,6 @@ impl ProjectContext<WithApps> {
             cache: self.cache,
         }
     }
-
-    // #[must_use]
-    // fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
-    //     ProjectContext {
-    //         config: self.config,
-    //         apps: self.apps,
-    //         router: self.router,
-    //         auth_backend: self.auth_backend,
-    //         #[cfg(feature = "db")]
-    //         database: self.database,
-    //         #[cfg(feature = "cache")]
-    //         cache,
-    //     }
-    // }
 }
 
 impl ProjectContext<WithDatabase> {
@@ -1789,39 +1775,9 @@ impl ProjectContext<WithDatabase> {
             cache,
         }
     }
-
-    // #[must_use]
-    // fn with_auth(self, auth_backend: Arc<dyn AuthBackend>) -> ProjectContext<Initialized> {
-    //     ProjectContext {
-    //         config: self.config,
-    //         apps: self.apps,
-    //         router: self.router,
-    //         auth_backend,
-    //         #[cfg(feature = "db")]
-    //         database: self.database,
-    //         #[cfg(feature = "cache")]
-    //         cache: self.cache,
-    //     }
-    // }
 }
 
 impl ProjectContext<WithCache> {
-    // #[must_use]
-    // fn with_database(
-    //     self,
-    //     #[cfg(feature = "db")] database: Option<Arc<Database>>,
-    // ) -> ProjectContext<WithDatabase> {
-    //     ProjectContext {
-    //         config: self.config,
-    //         apps: self.apps,
-    //         router: self.router,
-    //         #[cfg(feature = "db")]
-    //         database,
-    //         auth_backend: self.auth_backend,
-    //         #[cfg(feature = "cache")]
-    //         cache: self.cache,
-    //     }
-    // }
     #[must_use]
     fn with_auth(self, auth_backend: Arc<dyn AuthBackend>) -> ProjectContext<Initialized> {
         ProjectContext {

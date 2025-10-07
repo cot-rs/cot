@@ -722,9 +722,6 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    use http::Request;
-    use tower::{Layer, Service, ServiceExt};
-    use cot::project::WithCache;
     use super::*;
     use crate::auth::Auth;
     use crate::config::{
@@ -737,6 +734,9 @@ mod tests {
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
     use crate::{AppBuilder, Body, Bootstrapper, Error, Project, ProjectContext};
+    use cot::project::WithCache;
+    use http::Request;
+    use tower::{Layer, Service, ServiceExt};
 
     #[cot::test]
     async fn session_middleware_adds_session() {

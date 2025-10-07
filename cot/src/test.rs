@@ -16,6 +16,8 @@ use tower_sessions::MemoryStore;
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
+#[cfg(feature = "cache")]
+use crate::cache::Cache;
 use crate::config::ProjectConfig;
 #[cfg(feature = "db")]
 use crate::db::Database;
@@ -31,8 +33,6 @@ use crate::router::Router;
 use crate::session::Session;
 use crate::static_files::{StaticFile, StaticFiles};
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
-#[cfg(feature = "cache")]
-use crate::cache::Cache;
 
 /// A test client for making requests to a Cot project.
 ///
@@ -219,7 +219,7 @@ pub struct TestRequestBuilder {
     json_data: Option<String>,
     static_files: Vec<StaticFile>,
     #[cfg(feature = "cache")]
-    cache: Option<Arc<Cache>>
+    cache: Option<Arc<Cache>>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -758,7 +758,9 @@ impl TestRequestBuilder {
             #[cfg(feature = "db")]
             self.database.clone(),
             #[cfg(feature = "cache")] // TODO: use a sensible default
-            self.cache.clone().expect("Cache missing. Did you forget to add the cache when configuring CotProject?")
+            self.cache.clone().expect(
+                "Cache missing. Did you forget to add the cache when configuring CotProject?",
+            ),
         );
         prepare_request(&mut request, Arc::new(context));
 

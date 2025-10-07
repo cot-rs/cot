@@ -21,7 +21,6 @@ pub enum CacheError {
     Store(#[from] stores::CacheStoreError),
 }
 
-
 impl_into_cot_error!(CacheError, INTERNAL_SERVER_ERROR);
 #[derive(Clone)]
 pub struct Cache {
@@ -149,7 +148,7 @@ impl TryFrom<&CacheConfig> for Cache {
         let store = match store_cfg.store_type {
             CacheStoreTypeConfig::Memory => {
                 let mem_store = Memory::new();
-                Arc::new(mem_store)  as Arc<(dyn CacheStore<Key = String, Value = Value>)>
+                Arc::new(mem_store) as Arc<(dyn CacheStore<Key = String, Value = Value>)>
             }
             _ => {
                 unimplemented!();
@@ -160,7 +159,6 @@ impl TryFrom<&CacheConfig> for Cache {
         Ok(this)
     }
 }
-
 
 impl std::fmt::Debug for Cache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -231,11 +229,17 @@ mod tests {
             let cache = memory_cache();
             let key = "lazy";
             let value = json!(123);
-            cache.insert_with(key.to_string(), || async { Ok(value.clone()) }).await.unwrap();
+            cache
+                .insert_with(key.to_string(), || async { Ok(value.clone()) })
+                .await
+                .unwrap();
             let got = cache.get(key).await.unwrap();
             assert_eq!(got, Some(value.clone()));
             // get_or_insert_with should return the existing value
-            let got2 = cache.get_or_insert_with(key, || async { Ok(json!(999)) }).await.unwrap();
+            let got2 = cache
+                .get_or_insert_with(key, || async { Ok(json!(999)) })
+                .await
+                .unwrap();
             assert_eq!(got2, value);
         });
     }
@@ -248,7 +252,10 @@ mod tests {
             let key = "expiring";
             let value = json!(456);
             let expiry = Timeout::default();
-            let got = cache.get_or_insert_expiring_with(key, || async { Ok(value.clone()) }, expiry).await.unwrap();
+            let got = cache
+                .get_or_insert_expiring_with(key, || async { Ok(value.clone()) }, expiry)
+                .await
+                .unwrap();
             assert_eq!(got, value);
         });
     }

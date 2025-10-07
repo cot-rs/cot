@@ -7,9 +7,9 @@
 
 pub(crate) mod memory;
 
-use thiserror::Error;
 use crate::config::Timeout;
 use crate::error::error_impl::impl_into_cot_error;
+use thiserror::Error;
 
 const CACHE_STORE_ERROR_PREFIX: &str = "Cache store error: ";
 

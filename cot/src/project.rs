@@ -25,11 +25,11 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[cfg(feature = "cache")]
+use crate::config::CacheConfig;
 use askama::Template;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
-#[cfg(feature = "cache")]
-use crate::config::CacheConfig;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;
@@ -1173,7 +1173,6 @@ impl Bootstrapper<WithApps> {
         self.with_database().await?.boot().await
     }
 
-
     /// Moves forward to the next phase of bootstrapping, the with-database
     /// phase.
     ///
@@ -1234,8 +1233,6 @@ impl Bootstrapper<WithApps> {
             None => Ok(None),
         }
     }
-
-
 }
 
 impl Bootstrapper<WithDatabase> {
@@ -1319,7 +1316,10 @@ impl Bootstrapper<WithDatabase> {
         #[cfg(feature = "cache")]
         let cache = Self::init_cache(&self.context.config.cache).await?;
 
-        let context = self.context.with_cache(#[cfg(feature = "cache")] cache);
+        let context = self.context.with_cache(
+            #[cfg(feature = "cache")]
+            cache,
+        );
 
         Ok(Bootstrapper {
             project: self.project,
@@ -1331,7 +1331,9 @@ impl Bootstrapper<WithDatabase> {
 
     #[cfg(feature = "cache")]
     async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
-        Cache::try_from(config).map(|cache| Arc::new(cache)).map_err(|err| cot::Error::from(err))
+        Cache::try_from(config)
+            .map(|cache| Arc::new(cache))
+            .map_err(|err| cot::Error::from(err))
     }
 }
 
@@ -1354,7 +1356,6 @@ impl Bootstrapper<WithCache> {
             error_handler: handler.error_handler,
         })
     }
-
 }
 
 impl Bootstrapper<Initialized> {
@@ -1592,7 +1593,6 @@ impl BootstrapPhase for WithDatabase {
     type Cache = ();
 }
 
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum WithCache {}
 
@@ -1743,7 +1743,6 @@ impl<S: BootstrapPhase<Apps = Vec<Box<dyn App>>>> ProjectContext<S> {
 }
 
 impl ProjectContext<WithApps> {
-
     #[must_use]
     fn with_database(
         self,
@@ -1777,7 +1776,6 @@ impl ProjectContext<WithApps> {
 }
 
 impl ProjectContext<WithDatabase> {
-
     #[must_use]
     fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
         ProjectContext {
@@ -1806,7 +1804,6 @@ impl ProjectContext<WithDatabase> {
     //     }
     // }
 }
-
 
 impl ProjectContext<WithCache> {
     // #[must_use]
@@ -1838,7 +1835,6 @@ impl ProjectContext<WithCache> {
             cache: self.cache,
         }
     }
-
 }
 
 impl ProjectContext<Initialized> {
@@ -2339,15 +2335,17 @@ async fn shutdown_signal() {
 mod tests {
     //! Unit tests for the Cot project core traits and builder types.
     use super::*;
-    use std::sync::Arc;
     use crate::auth::NoAuthBackend;
     use crate::cli::CliMetadata;
-    use crate::router::Router;
     use crate::error::handler::DynErrorPageHandler;
+    use crate::router::Router;
+    use std::sync::Arc;
 
     struct DummyApp;
     impl App for DummyApp {
-        fn name(&self) -> &str { "dummy_app" }
+        fn name(&self) -> &str {
+            "dummy_app"
+        }
     }
 
     struct DummyProject;

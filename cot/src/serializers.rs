@@ -75,11 +75,10 @@ pub(crate) mod session_expiry_time {
     }
 }
 
-
 pub(crate) mod cache_timeout {
-    use serde::{Deserialize, Deserializer, Serializer};
     use crate::config::Timeout;
     use chrono::DateTime;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub(crate) fn serialize<S>(timeout: &Timeout, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -115,7 +114,6 @@ pub(crate) mod cache_timeout {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

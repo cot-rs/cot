@@ -436,7 +436,6 @@ impl DatabaseConfig {
     }
 }
 
-
 /// Expiration policy for cached values.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -456,7 +455,6 @@ impl Default for Timeout {
         Self::After(Duration::from_secs(300))
     }
 }
-
 
 #[cfg(feature = "cache")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
@@ -2275,12 +2273,12 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 5);
-        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_secs(60)));
-        assert_eq!(config.cache.prefix, Some("v1".to_string()));
         assert_eq!(
-            config.cache.store.store_type,
-            CacheStoreTypeConfig::Memory
+            config.cache.timeout,
+            Timeout::After(Duration::from_secs(60))
         );
+        assert_eq!(config.cache.prefix, Some("v1".to_string()));
+        assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
     }
 
     #[test]
@@ -2300,7 +2298,10 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 10);
-        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_secs(120)));
+        assert_eq!(
+            config.cache.timeout,
+            Timeout::After(Duration::from_secs(120))
+        );
         assert_eq!(config.cache.prefix, None);
 
         match config.cache.store.store_type {
@@ -2329,7 +2330,10 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 3);
-        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_secs(30)));
+        assert_eq!(
+            config.cache.timeout,
+            Timeout::After(Duration::from_secs(30))
+        );
         assert_eq!(config.cache.prefix, Some("dev".to_string()));
 
         match config.cache.store.store_type {
@@ -2352,10 +2356,7 @@ mod tests {
         assert_eq!(config.cache.max_retries, 3);
         assert_eq!(config.cache.timeout, Timeout::default());
         assert_eq!(config.cache.prefix, None);
-        assert_eq!(
-            config.cache.store.store_type,
-            CacheStoreTypeConfig::Memory
-        );
+        assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
     }
 
     #[test]
@@ -2373,10 +2374,7 @@ mod tests {
         assert_eq!(config.max_retries, 7);
         assert_eq!(config.timeout, Timeout::After(Duration::from_secs(90)));
         assert_eq!(config.prefix, Some("v2".to_string()));
-        assert_eq!(
-            config.store.store_type,
-            CacheStoreTypeConfig::Memory
-        );
+        assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
     }
 
     #[test]
@@ -2387,10 +2385,7 @@ mod tests {
         assert_eq!(config.max_retries, 3);
         assert_eq!(config.timeout, Timeout::default());
         assert_eq!(config.prefix, None);
-        assert_eq!(
-            config.store.store_type,
-            CacheStoreTypeConfig::Memory
-        );
+        assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
     }
 
     #[test]
@@ -2419,6 +2414,3 @@ mod tests {
         assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
     }
 }
-
-
-

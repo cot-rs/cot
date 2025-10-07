@@ -8,10 +8,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::config::Timeout;
 use cot::cache::stores::{CacheStore, CacheStoreError, CacheStoreResult};
 use thiserror::Error;
 use tokio::sync::Mutex;
-use crate::config::Timeout;
 
 /// Errors specific to the in-memory cache store.
 #[derive(Debug, Error, Clone, Copy)]
@@ -101,9 +101,9 @@ impl CacheStore for Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Timeout;
     use serde_json::json;
     use tokio::runtime::Runtime;
-    use crate::config::Timeout;
 
     fn rt() -> Runtime {
         Runtime::new().unwrap()
@@ -118,7 +118,10 @@ mod tests {
             let value = json!({"bar": 42});
             let expiry = Timeout::default();
 
-            store.insert(key.clone(), value.clone(), expiry.clone()).await.unwrap();
+            store
+                .insert(key.clone(), value.clone(), expiry.clone())
+                .await
+                .unwrap();
             let got = store.get(&key).await.unwrap();
             assert_eq!(got, Some(value.clone()));
 
@@ -136,8 +139,14 @@ mod tests {
         rt.block_on(async {
             let store = Memory::new();
             let expiry = Timeout::default();
-            store.insert("a".to_string(), json!(1), expiry.clone()).await.unwrap();
-            store.insert("b".to_string(), json!(2), expiry.clone()).await.unwrap();
+            store
+                .insert("a".to_string(), json!(1), expiry.clone())
+                .await
+                .unwrap();
+            store
+                .insert("b".to_string(), json!(2), expiry.clone())
+                .await
+                .unwrap();
             assert_eq!(store.len().await.unwrap(), 2);
             assert!(!store.is_empty().await.unwrap());
             store.clear().await.unwrap();

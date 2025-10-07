@@ -8,10 +8,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::config::Timeout;
 use cot::cache::stores::{CacheStore, CacheStoreError, CacheStoreResult};
 use thiserror::Error;
 use tokio::sync::Mutex;
+
+use crate::config::Timeout;
 
 /// Errors specific to the in-memory cache store.
 #[derive(Debug, Error, Clone, Copy)]
@@ -100,10 +101,11 @@ impl CacheStore for Memory {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::config::Timeout;
     use serde_json::json;
     use tokio::runtime::Runtime;
+
+    use super::*;
+    use crate::config::Timeout;
 
     fn rt() -> Runtime {
         Runtime::new().unwrap()

@@ -87,7 +87,7 @@ impl Cache {
         self.store.is_empty().await
     }
 
-    //Insert a lazily computed value under the given key.
+    // Insert a lazily computed value under the given key.
     pub async fn insert_with<F, Fut>(&self, key: String, f: F) -> CacheStoreResult<()>
     where
         F: FnOnce() -> Fut + Send,
@@ -172,10 +172,11 @@ impl std::fmt::Debug for Cache {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::config::{CacheConfig, CacheStoreTypeConfig, Timeout};
     use serde_json::json;
     use tokio::runtime::Runtime;
+
+    use super::*;
+    use crate::config::{CacheConfig, CacheStoreTypeConfig, Timeout};
 
     fn rt() -> Runtime {
         Runtime::new().unwrap()

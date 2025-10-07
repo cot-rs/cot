@@ -25,8 +25,6 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-#[cfg(feature = "cache")]
-use crate::config::CacheConfig;
 use askama::Template;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
@@ -44,6 +42,8 @@ use crate::auth::{AuthBackend, NoAuthBackend};
 #[cfg(feature = "cache")]
 use crate::cache::Cache;
 use crate::cli::Cli;
+#[cfg(feature = "cache")]
+use crate::config::CacheConfig;
 #[cfg(feature = "db")]
 use crate::config::DatabaseConfig;
 use crate::config::{AuthBackendConfig, ProjectConfig};
@@ -2290,12 +2290,13 @@ async fn shutdown_signal() {
 #[cfg(test)]
 mod tests {
     //! Unit tests for the Cot project core traits and builder types.
+    use std::sync::Arc;
+
     use super::*;
     use crate::auth::NoAuthBackend;
     use crate::cli::CliMetadata;
     use crate::error::handler::DynErrorPageHandler;
     use crate::router::Router;
-    use std::sync::Arc;
 
     struct DummyApp;
     impl App for DummyApp {

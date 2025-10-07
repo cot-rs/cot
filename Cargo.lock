@@ -768,6 +768,32 @@ dependencies = [
 [[package]]
 name = "cot_core"
 version = "0.4.0"
+dependencies = [
+ "askama",
+ "async-stream",
+ "axum",
+ "backtrace",
+ "bytes",
+ "cot_macros",
+ "derive_more",
+ "form_urlencoded",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "http 1.3.1",
+ "http-body",
+ "http-body-util",
+ "indexmap",
+ "serde",
+ "serde_html_form",
+ "serde_json",
+ "serde_path_to_error",
+ "sync_wrapper",
+ "thiserror 2.0.17",
+ "tokio",
+ "tower",
+ "tower-sessions",
+]
 
 [[package]]
 name = "cot_macros"

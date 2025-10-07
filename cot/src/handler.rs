@@ -2,10 +2,10 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
+use cot_core::request::Request;
+use cot_core::request::extractors::{FromRequest, FromRequestHead};
 use tower::util::BoxCloneSyncService;
 
-use crate::request::Request;
-use crate::request::extractors::{FromRequest, FromRequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::{Error, Result};
 

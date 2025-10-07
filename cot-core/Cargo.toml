@@ -22,13 +22,17 @@ backtrace.workspace = true
 bytes.workspace = true
 cot_macros.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
+form_urlencoded.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
 http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
+indexmap.workspace = true
 serde = { workspace = true, features = ["derive"] }
+serde_html_form = { workspace = true }
 serde_json = { workspace = true, optional = true }
+serde_path_to_error = { workspace = true }
 sync_wrapper.workspace = true
 thiserror.workspace = true
 tower = { workspace = true, features = ["util"] }

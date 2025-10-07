@@ -8,7 +8,7 @@ use crate::request::PathParams;
 
 /// An error that occurs when deserializing path parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
-pub(super) enum PathParamsDeserializerError {
+pub enum PathParamsDeserializerError {
     /// Invalid number of path parameters
     #[error("invalid number of path parameters: expected {expected}, got {actual}")]
     InvalidParamNumber {
@@ -57,13 +57,13 @@ impl serde::de::Error for PathParamsDeserializerError {
 }
 
 #[derive(Debug)]
-pub(super) struct PathParamsDeserializer<'de> {
+pub struct PathParamsDeserializer<'de> {
     path_params: &'de PathParams,
 }
 
 impl<'de> PathParamsDeserializer<'de> {
     #[must_use]
-    pub(super) fn new(path_params: &'de PathParams) -> Self {
+    pub fn new(path_params: &'de PathParams) -> Self {
         Self { path_params }
     }
 

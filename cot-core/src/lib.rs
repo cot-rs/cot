@@ -7,6 +7,7 @@ pub mod body;
 /// handling various types of errors that can occur in Cot applications,
 /// including 404 Not Found errors, uncaught panics, and custom error pages.
 pub mod error;
+pub mod request;
 
 /// A type alias for a result that can return a [`cot_core::Error`].
 pub type Result<T> = std::result::Result<T, Error>;

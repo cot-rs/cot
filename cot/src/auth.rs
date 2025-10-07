@@ -17,6 +17,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 use cot_core::error::error_impl::impl_into_cot_error;
+use cot_core::request::{Request, RequestExt};
 use derive_more::with_trait::Debug;
 #[cfg(test)]
 use mockall::automock;
@@ -28,7 +29,6 @@ use thiserror::Error;
 use crate::config::SecretKey;
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
-use crate::request::{Request, RequestExt};
 use crate::session::Session;
 
 const ERROR_PREFIX: &str = "failed to authenticate user:";
@@ -982,7 +982,7 @@ pub trait AuthBackend: Send + Sync {
     ///
     /// ```
     /// use cot::auth::UserId;
-    /// use cot::request::{Request, RequestExt};
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn view_user_profile(request: &Request) {
     ///     let user = request

@@ -159,7 +159,7 @@ pub use cot_macros::main;
 pub use cot_macros::test;
 #[cfg(feature = "openapi")]
 pub use schemars;
-pub use {bytes, http};
+pub use {bytes, cot_core as core, http};
 
 pub use crate::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{

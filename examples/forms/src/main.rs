@@ -5,6 +5,8 @@ use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, NaiveTim
 use chrono_tz::Tz;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
+use cot::core::request::Request;
+use cot::core::request::extractors::RequestForm;
 use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model};
 use cot::form::Form;
@@ -12,8 +14,7 @@ use cot::form::fields::Step;
 use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
-use cot::request::Request;
-use cot::request::extractors::{RequestDb, RequestForm, StaticFiles};
+use cot::request::extractors::{RequestDb, StaticFiles};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};

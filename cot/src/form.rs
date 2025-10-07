@@ -32,6 +32,7 @@ use bytes::Bytes;
 use chrono::NaiveDateTime;
 use chrono_tz::Tz;
 use cot_core::error::error_impl::impl_into_cot_error;
+use cot_core::request::{Request, RequestExt};
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
 /// This macro will generate an implementation of the [`Form`] trait for the
@@ -63,7 +64,6 @@ use http_body_util::BodyExt;
 use thiserror::Error;
 
 use crate::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
-use crate::request::{Request, RequestExt};
 
 const ERROR_PREFIX: &str = "failed to process a form:";
 /// Error occurred while processing a form.

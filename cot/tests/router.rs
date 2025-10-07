@@ -2,10 +2,10 @@ use bytes::Bytes;
 use cot::config::ProjectConfig;
 use cot::html::Html;
 use cot::project::RegisterAppsContext;
-use cot::request::{Request, RequestExt};
 use cot::router::{Route, Router};
 use cot::test::Client;
 use cot::{App, AppBuilder, Project, StatusCode};
+use cot_core::request::{Request, RequestExt};
 
 async fn index() -> Html {
     Html::new("Hello world!")

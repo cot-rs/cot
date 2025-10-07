@@ -1,6 +1,6 @@
 use cot::http::Request;
-use cot::request::RequestHead;
-use cot::request::extractors::FromRequestHead;
+use cot_core::request::RequestHead;
+use cot_core::request::extractors::FromRequestHead;
 
 #[derive(FromRequestHead)]
 #[expect(dead_code)]

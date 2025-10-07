@@ -3,9 +3,9 @@
 //! # Examples
 //!
 //! ```
-//! use cot::request::Request;
 //! use cot::response::Response;
 //! use cot::router::{Route, Router};
+//! use cot_core::request::Request;
 //!
 //! async fn home(request: Request) -> cot::Result<Response> {
 //!     Ok(cot::reverse_redirect!(request, "get_page", page = 123)?)
@@ -50,9 +50,9 @@ pub mod path;
 /// # Examples
 ///
 /// ```
-/// use cot::request::Request;
 /// use cot::response::Response;
 /// use cot::router::{Route, Router};
+/// use cot_core::request::Request;
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
 ///     unimplemented!()
@@ -89,9 +89,9 @@ impl Router {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -299,9 +299,9 @@ impl Router {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -320,9 +320,9 @@ impl Router {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -477,9 +477,9 @@ impl RouterService {
     /// ```
     /// use std::sync::Arc;
     ///
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::{Route, Router, RouterService};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -528,9 +528,9 @@ pub fn split_view_name(view_name: &str) -> (Option<&str>, &str) {
 /// # Examples
 ///
 /// ```
-/// use cot::request::Request;
 /// use cot::response::Response;
 /// use cot::router::{Route, Router};
+/// use cot_core::request::Request;
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
 ///     unimplemented!()
@@ -551,9 +551,9 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     // ...
@@ -584,10 +584,10 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::method::openapi::api_get;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     // ...
@@ -617,10 +617,10 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::method::openapi::api_get;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     // ...
@@ -652,10 +652,10 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::method::openapi::api_post;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     // ...
@@ -686,9 +686,9 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -711,9 +711,9 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -733,9 +733,9 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::Request;
     /// use cot::response::Response;
     /// use cot::router::{Route, Router};
+    /// use cot_core::request::Request;
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -802,9 +802,9 @@ enum RouteInner {
 /// ```
 /// use cot::html::Html;
 /// use cot::project::RegisterAppsContext;
-/// use cot::request::Request;
 /// use cot::router::{Route, Router};
 /// use cot::{App, AppBuilder, Project, StatusCode, reverse};
+/// use cot_core::request::Request;
 ///
 /// async fn home(request: Request) -> cot::Result<Html> {
 ///     // any of below two lines returns the same:
@@ -904,10 +904,10 @@ impl Urls {
     ///
     /// ```
     /// use cot::html::Html;
-    /// use cot::request::Request;
     /// use cot::response::{Response, ResponseExt};
     /// use cot::router::Urls;
     /// use cot::{Body, StatusCode, reverse};
+    /// use cot_core::request::Request;
     ///
     /// async fn my_handler(request: Request) -> cot::Result<Html> {
     ///     let urls = Urls::from_request(&request);
@@ -941,9 +941,9 @@ impl Urls {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::{Request, RequestExt};
     /// use cot::response::Response;
     /// use cot::router::Urls;
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn my_handler(urls: Urls) -> cot::Result<Response> {
     ///     let app_name = urls.app_name();
@@ -961,9 +961,9 @@ impl Urls {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::{Request, RequestExt};
     /// use cot::response::Response;
     /// use cot::router::Urls;
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn my_handler(urls: Urls) -> cot::Result<Response> {
     ///     let router = urls.router();
@@ -1005,10 +1005,10 @@ impl Debug for RouteInner {
 /// # Examples
 ///
 /// ```
-/// use cot::request::Request;
 /// use cot::response::Response;
 /// use cot::reverse_redirect;
 /// use cot::router::{Route, Router};
+/// use cot_core::request::Request;
 ///
 /// async fn infinite_loop(request: Request) -> cot::Result<Response> {
 ///     Ok(reverse_redirect!(request, "home")?)

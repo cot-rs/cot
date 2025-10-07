@@ -31,6 +31,7 @@ use axum::handler::HandlerWithoutStateExt;
 use cot_core::error::UncaughtPanic;
 use cot_core::error::error_impl::impl_into_cot_error;
 use cot_core::error::handler::{DynErrorPageHandler, RequestOuterError};
+use cot_core::request::{AppName, Request, RequestExt, RequestHead};
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;
@@ -54,7 +55,6 @@ use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::request::{AppName, Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;
@@ -1580,8 +1580,8 @@ impl<S: BootstrapPhase<Config = Arc<ProjectConfig>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::{Request, RequestExt};
     /// use cot::response::Response;
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let config = request.context().config();
@@ -1620,8 +1620,8 @@ impl<S: BootstrapPhase<Apps = Vec<Box<dyn App>>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::{Request, RequestExt};
     /// use cot::response::Response;
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let apps = request.context().apps();
@@ -1693,8 +1693,8 @@ impl<S: BootstrapPhase<Router = Arc<Router>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::{Request, RequestExt};
     /// use cot::response::Response;
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let router = request.context().config();
@@ -1718,8 +1718,8 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::{Request, RequestExt};
     /// use cot::response::Response;
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let auth_backend = request.context().auth_backend();
@@ -1740,8 +1740,8 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::{Request, RequestExt};
     /// use cot::response::Response;
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let database = request.context().try_database();
@@ -1768,8 +1768,8 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     /// # Examples
     ///
     /// ```
-    /// use cot::request::{Request, RequestExt};
     /// use cot::response::Response;
+    /// use cot_core::request::{Request, RequestExt};
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let database = request.context().database();
@@ -2138,6 +2138,7 @@ mod tests {
     use std::task::{Context, Poll};
 
     use cot_core::error::handler::{RequestError, RequestOuterError};
+    use cot_core::request::extractors::FromRequestHead;
     use tower::util::MapResultLayer;
     use tower::{ServiceExt, service_fn};
 
@@ -2146,7 +2147,6 @@ mod tests {
     use crate::auth::UserId;
     use crate::config::SecretKey;
     use crate::html::Html;
-    use crate::request::extractors::FromRequestHead;
     use crate::test::serial_guard;
 
     struct TestApp;

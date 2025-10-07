@@ -6,30 +6,29 @@
 //! cached values, optionally with expiration policies.
 
 pub(crate) mod memory;
-mod redis;
 
 use thiserror::Error;
 use crate::config::Timeout;
+use crate::error::error_impl::impl_into_cot_error;
+
+const CACHE_STORE_ERROR_PREFIX: &str = "Cache store error: ";
 
 /// Errors that can occur when interacting with a cache store.
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum CacheStoreError {
-    /// The requested key was not found.
-    #[error("Key not found")]
-    NotFound,
     /// The underlying cache backend returned an error.
-    #[error("Cache store backend error: {0}")]
+    #[error("{CACHE_STORE_ERROR_PREFIX} Cache store backend error: {0}")]
     Backend(String),
     /// Failed to serialize a value for storage.
-    #[error("Serialization error: {0}")]
+    #[error("{CACHE_STORE_ERROR_PREFIX} Serialization error: {0}")]
     Serialize(String),
     /// Failed to deserialize a stored value.
-    #[error("Deserialization error: {0}")]
+    #[error("{CACHE_STORE_ERROR_PREFIX} Deserialization error: {0}")]
     Deserialize(String),
-    /// Any other error represented as a string.
-    #[error("Unknown error: {0}")]
-    Unknown(String),
 }
+
+impl_into_cot_error!(CacheStoreError, INTERNAL_SERVER_ERROR);
 
 /// Convenience alias for results returned by cache store operations.
 pub type CacheStoreResult<T> = Result<T, CacheStoreError>;

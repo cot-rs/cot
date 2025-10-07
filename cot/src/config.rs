@@ -26,8 +26,6 @@ use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 #[cfg(feature = "cache")]
-use crate::cache;
-#[cfg(feature = "cache")]
 use crate::cache::stores;
 use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
@@ -437,6 +435,28 @@ impl DatabaseConfig {
         DatabaseConfigBuilder::default()
     }
 }
+
+
+/// Expiration policy for cached values.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Timeout {
+    /// Never expire the value.
+    Never,
+    /// Expire after the specified duration from the insertion time.
+    After(Duration),
+    /// Expire at the specific UTC datetime.
+    AtDateTime(DateTime<FixedOffset>),
+}
+
+impl Default for Timeout {
+    fn default() -> Self {
+        // expire after 5 mins.
+        Self::After(Duration::from_secs(300))
+    }
+}
+
 
 #[cfg(feature = "cache")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
@@ -2400,22 +2420,5 @@ mod tests {
     }
 }
 
-/// Expiration policy for cached values.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum Timeout {
-    /// Never expire the value.
-    Never,
-    /// Expire after the specified duration from the insertion time.
-    After(Duration),
-    /// Expire at the specific UTC datetime.
-    AtDateTime(DateTime<chrono::FixedOffset>),
-}
 
-impl Default for Timeout {
-    fn default() -> Self {
-        // expire after 5 mins.
-        Self::After(Duration::from_secs(300))
-    }
-}
+

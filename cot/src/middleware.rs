@@ -724,7 +724,7 @@ mod tests {
 
     use http::Request;
     use tower::{Layer, Service, ServiceExt};
-
+    use cot::project::WithCache;
     use super::*;
     use crate::auth::Auth;
     use crate::config::{
@@ -876,7 +876,7 @@ mod tests {
         assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
 
-    async fn create_svc_and_call_with_req(context: &ProjectContext<WithDatabase>) {
+    async fn create_svc_and_call_with_req(context: &ProjectContext<WithCache>) {
         let store = SessionMiddleware::from_context(context);
         let svc = tower::service_fn(|req: Request<Body>| async move {
             assert!(req.extensions().get::<Session>().is_some());
@@ -923,10 +923,10 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(config)
             .with_apps()
-            .with_cache()
+            .with_database()
             .await
             .expect("bootstrap failed")
-            .with_database()
+            .with_cache()
             .await
             .expect("bootstrap failed");
         let context = bootstrapper.context();
@@ -944,10 +944,10 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(config)
             .with_apps()
-            .with_cache()
+            .with_database()
             .await
             .expect("bootstrap failed")
-            .with_database()
+            .with_cache()
             .await
             .expect("bootstrap failed");
         let context = bootstrapper.context();
@@ -966,10 +966,10 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(config)
             .with_apps()
-            .with_cache()
+            .with_database()
             .await
             .expect("bootstrap failed")
-            .with_database()
+            .with_cache()
             .await
             .expect("bootstrap failed");
         let context = bootstrapper.context();
@@ -988,10 +988,10 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(config)
             .with_apps()
-            .with_cache()
+            .with_database()
             .await
             .expect("bootstrap failed")
-            .with_database()
+            .with_cache()
             .await
             .expect("bootstrap failed");
         let context = bootstrapper.context();

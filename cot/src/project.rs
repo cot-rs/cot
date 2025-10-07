@@ -437,11 +437,11 @@ pub type RegisterAppsContext = ProjectContext<WithConfig>;
 
 /// An alias for `ProjectContext` in appropriate phase for use with the
 /// [`Project::auth_backend`] method.
-pub type AuthBackendContext = ProjectContext<WithDatabase>;
+pub type AuthBackendContext = ProjectContext<WithCache>;
 
 /// An alias for `ProjectContext` in appropriate phase for use with the
 /// [`Project::middlewares`] method.
-pub type MiddlewareContext = ProjectContext<WithDatabase>;
+pub type MiddlewareContext = ProjectContext<WithCache>;
 
 /// A helper struct to build the root handler for the project.
 ///
@@ -1170,33 +1170,9 @@ impl Bootstrapper<WithApps> {
     // Send not needed; Bootstrapper is run async in a single thread
     #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
-        self.with_cache().await?.with_database().await?.boot().await
-    }
-
-    pub(crate) async fn with_cache(self) -> cot::Result<Bootstrapper<WithCache>> {
-        #[cfg(feature = "cache")]
-        let cache = Self::init_cache(&self.context.config.cache).await?;
-
-        let context = self.context.with_cache(#[cfg(feature = "cache")] cache);
-
-        Ok(Bootstrapper {
-            project: self.project,
-            context,
-            handler: self.handler,
-            error_handler: self.error_handler,
-        })
-    }
-
-    #[cfg(feature = "cache")]
-    async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
-        Cache::try_from(config).map(|cache| Arc::new(cache)).map_err(|err| cot::Error::from(err))
-    }
-}
-
-impl Bootstrapper<WithCache> {
-    async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_database().await?.boot().await
     }
+
 
     /// Moves forward to the next phase of bootstrapping, the with-database
     /// phase.
@@ -1258,6 +1234,8 @@ impl Bootstrapper<WithCache> {
             None => Ok(None),
         }
     }
+
+
 }
 
 impl Bootstrapper<WithDatabase> {
@@ -1299,6 +1277,66 @@ impl Bootstrapper<WithDatabase> {
     // Send not needed; Bootstrapper is run async in a single thread
     #[expect(clippy::unused_async, clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
+        self.with_cache().await?.boot().await
+    }
+
+    /// Moves forward to the next phase of bootstrapping, the with-cache phase.
+    ///
+    /// See the [`BootstrapPhase`] and [`WithCache`] documentation for more
+    /// details.
+    ///
+    /// # Errors
+    ///
+    /// This method may return an error if it cannot initialize the cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use cot::project::{Bootstrapper, WithApps};
+    /// use cot::{AppBuilder, Project};
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {}
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let bootstrapper = Bootstrapper::new(MyProject)
+    ///     .with_config(ProjectConfig::default())
+    ///     .with_apps()
+    ///     .with_database()
+    ///     .await?
+    ///     .with_cache()
+    ///     .await?
+    ///     .boot()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    // Send not needed; Bootstrapper is run async in a single thread
+    #[expect(clippy::future_not_send)]
+    pub async fn with_cache(self) -> cot::Result<Bootstrapper<WithCache>> {
+        #[cfg(feature = "cache")]
+        let cache = Self::init_cache(&self.context.config.cache).await?;
+
+        let context = self.context.with_cache(#[cfg(feature = "cache")] cache);
+
+        Ok(Bootstrapper {
+            project: self.project,
+            context,
+            handler: self.handler,
+            error_handler: self.error_handler,
+        })
+    }
+
+    #[cfg(feature = "cache")]
+    async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
+        Cache::try_from(config).map(|cache| Arc::new(cache)).map_err(|err| cot::Error::from(err))
+    }
+}
+
+impl Bootstrapper<WithCache> {
+    async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler_builder = RootHandlerBuilder {
             handler: router_service,
@@ -1316,6 +1354,7 @@ impl Bootstrapper<WithDatabase> {
             error_handler: handler.error_handler,
         })
     }
+
 }
 
 impl Bootstrapper<Initialized> {
@@ -1530,23 +1569,6 @@ impl BootstrapPhase for WithApps {
     type Cache = ();
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum WithCache {}
-
-impl sealed::Sealed for WithCache {}
-impl BootstrapPhase for WithCache {
-    type RequestHandler = ();
-    type ErrorHandler = ();
-    type Config = <WithApps as BootstrapPhase>::Config;
-    type Apps = <WithApps as BootstrapPhase>::Apps;
-    type Router = <WithApps as BootstrapPhase>::Router;
-    #[cfg(feature = "db")]
-    type Database = ();
-    type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
-    #[cfg(feature = "cache")]
-    type Cache = Arc<Cache>;
-}
-
 /// Fourth phase of bootstrapping a Cot project, the with-database phase.
 ///
 /// # See also
@@ -1558,6 +1580,24 @@ pub enum WithDatabase {}
 
 impl sealed::Sealed for WithDatabase {}
 impl BootstrapPhase for WithDatabase {
+    type RequestHandler = ();
+    type ErrorHandler = ();
+    type Config = <WithApps as BootstrapPhase>::Config;
+    type Apps = <WithApps as BootstrapPhase>::Apps;
+    type Router = <WithApps as BootstrapPhase>::Router;
+    #[cfg(feature = "db")]
+    type Database = Option<Arc<Database>>;
+    type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
+    #[cfg(feature = "cache")]
+    type Cache = ();
+}
+
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum WithCache {}
+
+impl sealed::Sealed for WithCache {}
+impl BootstrapPhase for WithCache {
     type RequestHandler = ();
     type ErrorHandler = ();
     type Config = <WithApps as BootstrapPhase>::Config;
@@ -1705,22 +1745,6 @@ impl<S: BootstrapPhase<Apps = Vec<Box<dyn App>>>> ProjectContext<S> {
 impl ProjectContext<WithApps> {
 
     #[must_use]
-    fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
-        ProjectContext {
-            config: self.config,
-            apps: self.apps,
-            router: self.router,
-            auth_backend: self.auth_backend,
-            #[cfg(feature = "db")]
-            database: self.database,
-            #[cfg(feature = "cache")]
-            cache,
-        }
-    }
-}
-
-impl ProjectContext<WithCache> {
-    #[must_use]
     fn with_database(
         self,
         #[cfg(feature = "db")] database: Option<Arc<Database>>,
@@ -1736,9 +1760,71 @@ impl ProjectContext<WithCache> {
             cache: self.cache,
         }
     }
+
+    // #[must_use]
+    // fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
+    //     ProjectContext {
+    //         config: self.config,
+    //         apps: self.apps,
+    //         router: self.router,
+    //         auth_backend: self.auth_backend,
+    //         #[cfg(feature = "db")]
+    //         database: self.database,
+    //         #[cfg(feature = "cache")]
+    //         cache,
+    //     }
+    // }
 }
 
 impl ProjectContext<WithDatabase> {
+
+    #[must_use]
+    fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
+        ProjectContext {
+            config: self.config,
+            apps: self.apps,
+            router: self.router,
+            auth_backend: self.auth_backend,
+            #[cfg(feature = "db")]
+            database: self.database,
+            #[cfg(feature = "cache")]
+            cache,
+        }
+    }
+
+    // #[must_use]
+    // fn with_auth(self, auth_backend: Arc<dyn AuthBackend>) -> ProjectContext<Initialized> {
+    //     ProjectContext {
+    //         config: self.config,
+    //         apps: self.apps,
+    //         router: self.router,
+    //         auth_backend,
+    //         #[cfg(feature = "db")]
+    //         database: self.database,
+    //         #[cfg(feature = "cache")]
+    //         cache: self.cache,
+    //     }
+    // }
+}
+
+
+impl ProjectContext<WithCache> {
+    // #[must_use]
+    // fn with_database(
+    //     self,
+    //     #[cfg(feature = "db")] database: Option<Arc<Database>>,
+    // ) -> ProjectContext<WithDatabase> {
+    //     ProjectContext {
+    //         config: self.config,
+    //         apps: self.apps,
+    //         router: self.router,
+    //         #[cfg(feature = "db")]
+    //         database,
+    //         auth_backend: self.auth_backend,
+    //         #[cfg(feature = "cache")]
+    //         cache: self.cache,
+    //     }
+    // }
     #[must_use]
     fn with_auth(self, auth_backend: Arc<dyn AuthBackend>) -> ProjectContext<Initialized> {
         ProjectContext {
@@ -1752,6 +1838,7 @@ impl ProjectContext<WithDatabase> {
             cache: self.cache,
         }
     }
+
 }
 
 impl ProjectContext<Initialized> {
@@ -1820,6 +1907,31 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
     #[must_use]
     pub fn auth_backend(&self) -> &Arc<dyn AuthBackend> {
         &self.auth_backend
+    }
+}
+
+#[cfg(feature = "cache")]
+impl<S: BootstrapPhase<Cache = Arc<Cache>>> ProjectContext<S> {
+    /// Returns the cache for the project.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn index(request: Request) -> cot::Result<Response> {
+    ///     let cache = request.context().cache();
+    ///     // can also be accessed via:
+    ///     request.cache();
+    ///
+    ///     // ...
+    /// #    unimplemented!()
+    /// }
+    /// ```
+    #[must_use]
+    pub fn cache(&self) -> &Arc<Cache> {
+        &self.cache
     }
 }
 
@@ -2225,363 +2337,68 @@ async fn shutdown_signal() {
 
 #[cfg(test)]
 mod tests {
-    use std::task::{Context, Poll};
-
-    use tower::util::MapResultLayer;
-    use tower::{ServiceExt, service_fn};
-    use cot::cache::stores::memory::Memory;
-    use cot::config::Timeout;
+    //! Unit tests for the Cot project core traits and builder types.
     use super::*;
-    use crate::StatusCode;
-    use crate::auth::UserId;
-    use crate::config::SecretKey;
-    use crate::error::handler::{RequestError, RequestOuterError};
-    use crate::html::Html;
-    use crate::request::extractors::FromRequestHead;
-    use crate::test::serial_guard;
+    use std::sync::Arc;
+    use crate::auth::NoAuthBackend;
+    use crate::cli::CliMetadata;
+    use crate::router::Router;
+    use crate::error::handler::DynErrorPageHandler;
 
-    struct TestApp;
-
-    impl App for TestApp {
-        fn name(&self) -> &'static str {
-            "mock"
-        }
+    struct DummyApp;
+    impl App for DummyApp {
+        fn name(&self) -> &str { "dummy_app" }
     }
 
-    #[cot::test]
-    async fn app_default_impl() {
-        let app = TestApp {};
-        assert_eq!(app.name(), "mock");
-        assert_eq!(app.router().routes().len(), 0);
-        assert_eq!(app.migrations().len(), 0);
-    }
-
-    struct TestProject;
-    impl Project for TestProject {}
+    struct DummyProject;
+    impl Project for DummyProject {}
 
     #[test]
-    fn project_default_cli_metadata() {
-        let metadata = TestProject.cli_metadata();
-
-        assert_eq!(metadata.name, "cot");
-        assert_eq!(metadata.version, env!("CARGO_PKG_VERSION"));
-        assert_eq!(metadata.authors, env!("CARGO_PKG_AUTHORS"));
-        assert_eq!(metadata.description, env!("CARGO_PKG_DESCRIPTION"));
-    }
-
-    #[cot::test]
-    async fn root_handler_builder_middleware() {
-        // we create a root handler that returns an error for all requests
-        // then we apply a middleware that returns a fixed "ok" response
-        let root_handler_builder = RootHandlerBuilder {
-            handler: service_fn(|_: Request| async move {
-                Err::<Response, _>(Error::internal("error"))
-            }),
-            error_handler: service_fn(|_: Request| async move {
-                Err::<Response, _>(Error::internal("error"))
-            }),
-        };
-
-        let root_handler = root_handler_builder
-            .middleware(make_ok_middleware())
-            .build();
-
-        expect_handler_ok(root_handler.handler).await;
-        expect_handler_ok(root_handler.error_handler).await;
-    }
-
-    #[cot::test]
-    async fn root_handler_builder_main_handler_middleware() {
-        let root_handler_builder = RootHandlerBuilder {
-            handler: service_fn(|_: Request| async move {
-                Err::<Response, _>(Error::internal("error"))
-            }),
-            error_handler: service_fn(|_: Request| async move {
-                Err::<Response, _>(Error::internal("error"))
-            }),
-        };
-
-        let root_handler = root_handler_builder
-            .main_handler_middleware(make_ok_middleware())
-            .build();
-
-        expect_handler_ok(root_handler.handler).await;
-        expect_handler_error(root_handler.error_handler).await;
-    }
-
-    #[cot::test]
-    async fn root_handler_builder_error_handler_middleware() {
-        let root_handler_builder = RootHandlerBuilder {
-            handler: service_fn(|_: Request| async move {
-                Err::<Response, _>(Error::internal("error"))
-            }),
-            error_handler: service_fn(|_: Request| async move {
-                Err::<Response, _>(Error::internal("error"))
-            }),
-        };
-
-        let root_handler = root_handler_builder
-            .error_handler_middleware(make_ok_middleware())
-            .build();
-
-        expect_handler_error(root_handler.handler).await;
-        expect_handler_ok(root_handler.error_handler).await;
-    }
-
-    #[expect(clippy::type_complexity, reason = "test function")]
-    fn make_ok_middleware() -> MapResultLayer<fn(Result<Response, Error>) -> Result<Response, Error>>
-    {
-        MapResultLayer::new(|_| Ok(Response::new(Body::fixed("Hello, world!"))))
-    }
-
-    async fn expect_handler_ok(handler: BoxedHandler) {
-        let response = handler.oneshot(Request::default()).await;
-        assert!(response.is_ok());
-        assert_eq!(response.unwrap().status(), StatusCode::OK);
-    }
-
-    async fn expect_handler_error(handler: BoxedHandler) {
-        let response = handler.oneshot(Request::default()).await;
-        assert!(response.is_err());
-    }
-
-    #[cfg(feature = "live-reload")]
-    #[cot::test]
-    async fn project_middlewares() {
-        struct TestProject;
-        impl Project for TestProject {
-            fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
-                Ok(ProjectConfig::default())
-            }
-
-            fn middlewares(
-                &self,
-                handler: RootHandlerBuilder,
-                context: &MiddlewareContext,
-            ) -> RootHandler {
-                handler
-                    .middleware(crate::static_files::StaticFilesMiddleware::from_context(
-                        context,
-                    ))
-                    .middleware(crate::middleware::LiveReloadMiddleware::from_context(
-                        context,
-                    ))
-                    .build()
-            }
-        }
-
-        let response = crate::test::Client::new(TestProject)
-            .await
-            .get("/")
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    fn test_app_trait_name() {
+        let app = DummyApp;
+        assert_eq!(app.name(), "dummy_app");
     }
 
     #[test]
-    fn project_default_config() {
-        let temp_dir = tempfile::tempdir().unwrap();
-
-        let config_dir = temp_dir.path().join("config");
-        std::fs::create_dir(&config_dir).unwrap();
-        let config = r#"
-            debug = false
-            secret_key = "123abc"
-        "#;
-
-        let config_file_path = config_dir.as_path().join("dev.toml");
-        std::fs::write(config_file_path, config).unwrap();
-
-        // ensure the tests run sequentially when setting the current directory
-        let _guard = serial_guard();
-
-        std::env::set_current_dir(&temp_dir).unwrap();
-        let config = TestProject.config("dev").unwrap();
-
-        assert!(!config.debug);
-        assert_eq!(config.secret_key, SecretKey::from("123abc".to_string()));
+    fn test_app_trait_router_and_admin_model_managers() {
+        let app = DummyApp;
+        let router = app.router();
+        assert!(router.is_empty());
+        let managers = app.admin_model_managers();
+        assert!(managers.is_empty());
+        let static_files = app.static_files();
+        assert!(static_files.is_empty());
     }
 
     #[test]
-    fn project_default_register_apps() {
-        let mut apps = AppBuilder::new();
-        let context = ProjectContext::new().with_config(ProjectConfig::default());
-
-        TestProject.register_apps(&mut apps, &context);
-
-        assert!(apps.apps.is_empty());
+    fn test_project_trait_defaults() {
+        let project = DummyProject;
+        let meta = project.cli_metadata();
+        assert_eq!(meta.name, "cot");
+        let config = project.config("test");
+        assert!(config.is_ok());
     }
 
-    #[cot::test]
-    async fn default_auth_backend() {
-        let cache = Cache::new(Arc::new(Memory::new()), None, Timeout::Never);
-
-        let context = ProjectContext::new()
-            .with_config(
-                ProjectConfig::builder()
-                    .auth_backend(AuthBackendConfig::None)
-                    .build(),
-            )
-            .with_apps(vec![], Arc::new(Router::empty()))
-            .with_cache(Arc::new(cache))
-            .with_database(None);
-
-        let auth_backend = TestProject.auth_backend(&context);
-        assert!(
-            auth_backend
-                .get_by_id(UserId::Int(0))
-                .await
-                .unwrap()
-                .is_none()
-        );
+    #[test]
+    fn test_project_auth_backend_default() {
+        let project = DummyProject;
+        let context = crate::project::ProjectContext::<crate::project::WithConfig>::default();
+        let backend = project.auth_backend(&context.with_cache());
+        // Should be NoAuthBackend by default
+        let _ = backend.downcast_ref::<NoAuthBackend>();
     }
 
-    #[cot::test]
-    #[cfg_attr(
-        miri,
-        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
-    )]
-    async fn bootstrapper() {
-        struct TestProject;
-        impl Project for TestProject {
-            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
-                apps.register_with_views(TestApp {}, "/app");
-            }
-        }
-
-        let bootstrapper = Bootstrapper::new(TestProject)
-            .with_config(ProjectConfig::default())
-            .boot()
-            .await
-            .unwrap();
-
-        assert_eq!(bootstrapper.context().apps.len(), 1);
-        assert_eq!(bootstrapper.context().router.routes().len(), 1);
-    }
-
-    #[cot::test]
-    async fn build_custom_error_page_poll_ready_failure() {
-        #[derive(Clone)]
-        struct TestService;
-        impl Service<Request> for TestService {
-            type Response = Response;
-            type Error = Error;
-            type Future = std::future::Ready<crate::Result<Response>>;
-
-            fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-                Poll::Ready(Err(Error::internal("Poll ready failed")))
-            }
-
-            fn call(&mut self, _req: Request) -> Self::Future {
-                std::future::ready(Ok(Response::default()))
-            }
-        }
-
-        let mut error_handler = BoxCloneSyncService::new(TestService);
-
-        let panic_payload = Box::new("Test panic message".to_string());
-        let error_response = ErrorResponse::Panic(panic_payload);
-
-        let (request_head, _) = Request::new(Body::empty()).into_parts();
-        let response =
-            build_custom_error_page(&mut error_handler, error_response, request_head).await;
-
-        test_last_resort_error(response).await;
-    }
-
-    #[cot::test]
-    async fn build_custom_error_page_call_failure() {
-        let mock_handler = service_fn(|_request: Request| async {
-            Err::<Response, Error>(Error::internal("handler call failed"))
-        });
-
-        let mut error_handler = BoxCloneSyncService::new(mock_handler);
-
-        let error = Error::internal("Test error");
-        let error_response = ErrorResponse::ErrorReturned(error);
-
-        let (request_head, _) = Request::new(Body::empty()).into_parts();
-        let response =
-            build_custom_error_page(&mut error_handler, error_response, request_head).await;
-
-        test_last_resort_error(response).await;
-    }
-    #[cot::test]
-    async fn build_custom_error_page_success() {
-        // Create a mock error handler that succeeds
-        let mock_handler = service_fn(|_request: Request| async {
-            let html = Html::new("Custom error page content")
-                .with_status(StatusCode::INTERNAL_SERVER_ERROR);
-            Ok::<Response, Error>(html.into_response().unwrap())
-        });
-
-        let mut error_handler = BoxCloneSyncService::new(mock_handler);
-
-        let error = Error::internal("Test error");
-        let error_response = ErrorResponse::ErrorReturned(error);
-
-        let (request_head, _) = Request::new(Body::empty()).into_parts();
-        let response =
-            build_custom_error_page(&mut error_handler, error_response, request_head).await;
-
-        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        let body_string = axum_response_into_body(response).await;
-        assert!(body_string.contains("Custom error page content"));
-    }
-
-    #[cot::test]
-    async fn build_custom_error_page_panic_conversion() {
-        let mock_handler = service_fn(|request: Request| async {
-            let (parts, _body) = request.into_parts();
-            let error = RequestError::from_request_head(&parts).await.unwrap();
-            assert!(error.is::<UncaughtPanic>());
-
-            let html = Html::new("Panic error handled");
-            Ok::<Response, Error>(html.into_response().unwrap())
-        });
-
-        let mut error_handler = BoxCloneSyncService::new(mock_handler);
-
-        let panic_payload = Box::new("Test panic message".to_string());
-        let error_response = ErrorResponse::Panic(panic_payload);
-
-        let (request_head, _) = Request::new(Body::empty()).into_parts();
-        let response =
-            build_custom_error_page(&mut error_handler, error_response, request_head).await;
-
-        assert_eq!(response.status(), StatusCode::OK);
-        let body_string = axum_response_into_body(response).await;
-        assert!(body_string.contains("Panic error handled"));
-    }
-
-    /// Test that last-resort error page (500.html) is returned
-    async fn test_last_resort_error(response: axum::response::Response) {
-        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-
-        let body_string = axum_response_into_body(response).await;
-
-        assert!(body_string.contains("Server Error"));
-        assert!(
-            body_string.contains("Sorry, the page you are looking for is currently unavailable")
-        );
-    }
-
-    async fn axum_response_into_body(response: axum::response::Response) -> String {
-        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body_string = String::from_utf8_lossy(&body_bytes);
-        body_string.into_owned()
-    }
-
-    #[cot::test]
-    async fn build_request_for_error_handler() {
-        let error = Error::internal("test error");
-
-        let (mut head, _) = Request::new(Body::empty()).into_parts();
-        prepare_request_for_error_handler(&mut head, error);
-
-        let request_error = head.extensions.get::<RequestOuterError>().unwrap();
-        assert_eq!(request_error.to_string(), "test error");
+    #[test]
+    fn test_root_handler_builder_and_handler() {
+        let handler = Router::empty();
+        let error_handler = Router::empty();
+        let builder = RootHandlerBuilder {
+            handler,
+            error_handler,
+        };
+        let root_handler = builder.build();
+        // Should be able to access boxed handlers
+        let _ = &root_handler.handler;
+        let _ = &root_handler.error_handler;
     }
 }

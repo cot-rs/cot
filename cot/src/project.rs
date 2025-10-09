@@ -2289,71 +2289,359 @@ async fn shutdown_signal() {
 
 #[cfg(test)]
 mod tests {
-    //! Unit tests for the Cot project core traits and builder types.
-    use std::sync::Arc;
+    use std::task::{Context, Poll};
+
+    use tower::util::MapResultLayer;
+    use tower::{ServiceExt, service_fn};
 
     use super::*;
-    use crate::auth::NoAuthBackend;
-    use crate::cli::CliMetadata;
-    use crate::error::handler::DynErrorPageHandler;
-    use crate::router::Router;
+    use crate::StatusCode;
+    use crate::auth::UserId;
+    use crate::config::SecretKey;
+    use crate::error::handler::{RequestError, RequestOuterError};
+    use crate::html::Html;
+    use crate::request::extractors::FromRequestHead;
+    use crate::test::serial_guard;
 
-    struct DummyApp;
-    impl App for DummyApp {
-        fn name(&self) -> &str {
-            "dummy_app"
+    struct TestApp;
+
+    impl App for TestApp {
+        fn name(&self) -> &'static str {
+            "mock"
         }
     }
 
-    struct DummyProject;
-    impl Project for DummyProject {}
-
-    #[test]
-    fn test_app_trait_name() {
-        let app = DummyApp;
-        assert_eq!(app.name(), "dummy_app");
+    #[cot::test]
+    async fn app_default_impl() {
+        let app = TestApp {};
+        assert_eq!(app.name(), "mock");
+        assert_eq!(app.router().routes().len(), 0);
+        assert_eq!(app.migrations().len(), 0);
     }
 
-    #[test]
-    fn test_app_trait_router_and_admin_model_managers() {
-        let app = DummyApp;
-        let router = app.router();
-        assert!(router.is_empty());
-        let managers = app.admin_model_managers();
-        assert!(managers.is_empty());
-        let static_files = app.static_files();
-        assert!(static_files.is_empty());
-    }
+    struct TestProject;
+    impl Project for TestProject {}
 
     #[test]
-    fn test_project_trait_defaults() {
-        let project = DummyProject;
-        let meta = project.cli_metadata();
-        assert_eq!(meta.name, "cot");
-        let config = project.config("test");
-        assert!(config.is_ok());
+    fn project_default_cli_metadata() {
+        let metadata = TestProject.cli_metadata();
+
+        assert_eq!(metadata.name, "cot");
+        assert_eq!(metadata.version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(metadata.authors, env!("CARGO_PKG_AUTHORS"));
+        assert_eq!(metadata.description, env!("CARGO_PKG_DESCRIPTION"));
     }
 
-    #[test]
-    fn test_project_auth_backend_default() {
-        let project = DummyProject;
-        let context = crate::project::ProjectContext::<crate::project::WithConfig>::default();
-        let backend = project.auth_backend(&context.with_cache());
-        // Should be NoAuthBackend by default
-        let _ = backend.downcast_ref::<NoAuthBackend>();
-    }
-
-    #[test]
-    fn test_root_handler_builder_and_handler() {
-        let handler = Router::empty();
-        let error_handler = Router::empty();
-        let builder = RootHandlerBuilder {
-            handler,
-            error_handler,
+    #[cot::test]
+    async fn root_handler_builder_middleware() {
+        // we create a root handler that returns an error for all requests
+        // then we apply a middleware that returns a fixed "ok" response
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
         };
-        let root_handler = builder.build();
-        // Should be able to access boxed handlers
-        let _ = &root_handler.handler;
-        let _ = &root_handler.error_handler;
+
+        let root_handler = root_handler_builder
+            .middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_ok(root_handler.handler).await;
+        expect_handler_ok(root_handler.error_handler).await;
+    }
+
+    #[cot::test]
+    async fn root_handler_builder_main_handler_middleware() {
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+        };
+
+        let root_handler = root_handler_builder
+            .main_handler_middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_ok(root_handler.handler).await;
+        expect_handler_error(root_handler.error_handler).await;
+    }
+
+    #[cot::test]
+    async fn root_handler_builder_error_handler_middleware() {
+        let root_handler_builder = RootHandlerBuilder {
+            handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+            error_handler: service_fn(|_: Request| async move {
+                Err::<Response, _>(Error::internal("error"))
+            }),
+        };
+
+        let root_handler = root_handler_builder
+            .error_handler_middleware(make_ok_middleware())
+            .build();
+
+        expect_handler_error(root_handler.handler).await;
+        expect_handler_ok(root_handler.error_handler).await;
+    }
+
+    #[expect(clippy::type_complexity, reason = "test function")]
+    fn make_ok_middleware() -> MapResultLayer<fn(Result<Response, Error>) -> Result<Response, Error>>
+    {
+        MapResultLayer::new(|_| Ok(Response::new(Body::fixed("Hello, world!"))))
+    }
+
+    async fn expect_handler_ok(handler: BoxedHandler) {
+        let response = handler.oneshot(Request::default()).await;
+        assert!(response.is_ok());
+        assert_eq!(response.unwrap().status(), StatusCode::OK);
+    }
+
+    async fn expect_handler_error(handler: BoxedHandler) {
+        let response = handler.oneshot(Request::default()).await;
+        assert!(response.is_err());
+    }
+
+    #[cfg(feature = "live-reload")]
+    #[cot::test]
+    async fn project_middlewares() {
+        struct TestProject;
+        impl Project for TestProject {
+            fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
+                Ok(ProjectConfig::default())
+            }
+
+            fn middlewares(
+                &self,
+                handler: RootHandlerBuilder,
+                context: &MiddlewareContext,
+            ) -> RootHandler {
+                handler
+                    .middleware(crate::static_files::StaticFilesMiddleware::from_context(
+                        context,
+                    ))
+                    .middleware(crate::middleware::LiveReloadMiddleware::from_context(
+                        context,
+                    ))
+                    .build()
+            }
+        }
+
+        let response = crate::test::Client::new(TestProject)
+            .await
+            .get("/")
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn project_default_config() {
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        let config_dir = temp_dir.path().join("config");
+        std::fs::create_dir(&config_dir).unwrap();
+        let config = r#"
+            debug = false
+            secret_key = "123abc"
+        "#;
+
+        let config_file_path = config_dir.as_path().join("dev.toml");
+        std::fs::write(config_file_path, config).unwrap();
+
+        // ensure the tests run sequentially when setting the current directory
+        let _guard = serial_guard();
+
+        std::env::set_current_dir(&temp_dir).unwrap();
+        let config = TestProject.config("dev").unwrap();
+
+        assert!(!config.debug);
+        assert_eq!(config.secret_key, SecretKey::from("123abc".to_string()));
+    }
+
+    #[test]
+    fn project_default_register_apps() {
+        let mut apps = AppBuilder::new();
+        let context = ProjectContext::new().with_config(ProjectConfig::default());
+
+        TestProject.register_apps(&mut apps, &context);
+
+        assert!(apps.apps.is_empty());
+    }
+
+    #[cot::test]
+    async fn default_auth_backend() {
+        let context = ProjectContext::new()
+            .with_config(
+                ProjectConfig::builder()
+                    .auth_backend(AuthBackendConfig::None)
+                    .build(),
+            )
+            .with_apps(vec![], Arc::new(Router::empty()))
+            .with_database(None);
+
+        let auth_backend = TestProject.auth_backend(&context);
+        assert!(
+            auth_backend
+                .get_by_id(UserId::Int(0))
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    async fn bootstrapper() {
+        struct TestProject;
+        impl Project for TestProject {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+                apps.register_with_views(TestApp {}, "/app");
+            }
+        }
+
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(ProjectConfig::default())
+            .boot()
+            .await
+            .unwrap();
+
+        assert_eq!(bootstrapper.context().apps.len(), 1);
+        assert_eq!(bootstrapper.context().router.routes().len(), 1);
+    }
+
+    #[cot::test]
+    async fn build_custom_error_page_poll_ready_failure() {
+        #[derive(Clone)]
+        struct TestService;
+        impl Service<Request> for TestService {
+            type Response = Response;
+            type Error = Error;
+            type Future = std::future::Ready<crate::Result<Response>>;
+
+            fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+                Poll::Ready(Err(Error::internal("Poll ready failed")))
+            }
+
+            fn call(&mut self, _req: Request) -> Self::Future {
+                std::future::ready(Ok(Response::default()))
+            }
+        }
+
+        let mut error_handler = BoxCloneSyncService::new(TestService);
+
+        let panic_payload = Box::new("Test panic message".to_string());
+        let error_response = ErrorResponse::Panic(panic_payload);
+
+        let (request_head, _) = Request::new(Body::empty()).into_parts();
+        let response =
+            build_custom_error_page(&mut error_handler, error_response, request_head).await;
+
+        test_last_resort_error(response).await;
+    }
+
+    #[cot::test]
+    async fn build_custom_error_page_call_failure() {
+        let mock_handler = service_fn(|_request: Request| async {
+            Err::<Response, Error>(Error::internal("handler call failed"))
+        });
+
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
+
+        let error = Error::internal("Test error");
+        let error_response = ErrorResponse::ErrorReturned(error);
+
+        let (request_head, _) = Request::new(Body::empty()).into_parts();
+        let response =
+            build_custom_error_page(&mut error_handler, error_response, request_head).await;
+
+        test_last_resort_error(response).await;
+    }
+    #[cot::test]
+    async fn build_custom_error_page_success() {
+        // Create a mock error handler that succeeds
+        let mock_handler = service_fn(|_request: Request| async {
+            let html = Html::new("Custom error page content")
+                .with_status(StatusCode::INTERNAL_SERVER_ERROR);
+            Ok::<Response, Error>(html.into_response().unwrap())
+        });
+
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
+
+        let error = Error::internal("Test error");
+        let error_response = ErrorResponse::ErrorReturned(error);
+
+        let (request_head, _) = Request::new(Body::empty()).into_parts();
+        let response =
+            build_custom_error_page(&mut error_handler, error_response, request_head).await;
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body_string = axum_response_into_body(response).await;
+        assert!(body_string.contains("Custom error page content"));
+    }
+
+    #[cot::test]
+    async fn build_custom_error_page_panic_conversion() {
+        let mock_handler = service_fn(|request: Request| async {
+            let (parts, _body) = request.into_parts();
+            let error = RequestError::from_request_head(&parts).await.unwrap();
+            assert!(error.is::<UncaughtPanic>());
+
+            let html = Html::new("Panic error handled");
+            Ok::<Response, Error>(html.into_response().unwrap())
+        });
+
+        let mut error_handler = BoxCloneSyncService::new(mock_handler);
+
+        let panic_payload = Box::new("Test panic message".to_string());
+        let error_response = ErrorResponse::Panic(panic_payload);
+
+        let (request_head, _) = Request::new(Body::empty()).into_parts();
+        let response =
+            build_custom_error_page(&mut error_handler, error_response, request_head).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body_string = axum_response_into_body(response).await;
+        assert!(body_string.contains("Panic error handled"));
+    }
+
+    /// Test that last-resort error page (500.html) is returned
+    async fn test_last_resort_error(response: axum::response::Response) {
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let body_string = axum_response_into_body(response).await;
+
+        assert!(body_string.contains("Server Error"));
+        assert!(
+            body_string.contains("Sorry, the page you are looking for is currently unavailable")
+        );
+    }
+
+    async fn axum_response_into_body(response: axum::response::Response) -> String {
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body_string = String::from_utf8_lossy(&body_bytes);
+        body_string.into_owned()
+    }
+
+    #[cot::test]
+    async fn build_request_for_error_handler() {
+        let error = Error::internal("test error");
+
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
+        prepare_request_for_error_handler(&mut head, error);
+
+        let request_error = head.extensions.get::<RequestOuterError>().unwrap();
+        assert_eq!(request_error.to_string(), "test error");
     }
 }

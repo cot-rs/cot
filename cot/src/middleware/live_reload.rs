@@ -189,6 +189,9 @@ mod tests {
             .with_apps()
             .with_database()
             .await
+            .unwrap()
+            .with_cache()
+            .await
             .unwrap();
 
         let middleware = super::LiveReloadMiddleware::from_context(bootstrapper.context());

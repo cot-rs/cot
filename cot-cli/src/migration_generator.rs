@@ -904,7 +904,7 @@ impl ModelInSource {
     ) -> anyhow::Result<Self> {
         let input: syn::DeriveInput = item.clone().into();
         let opts = ModelOpts::new_from_derive_input(&input)
-            .map_err(|e| anyhow::anyhow!("cannot parse model: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("cannot parse model: {e}"))?;
         let mut model = opts.as_model(args, symbol_resolver)?;
         model.table_name = format!("{}__{}", app_name.to_snake_case(), model.table_name);
 

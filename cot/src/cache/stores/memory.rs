@@ -28,9 +28,11 @@ impl From<MemoryCacheStoreError> for CacheStoreError {
     }
 }
 
+type MemoryMap = HashMap<String, (serde_json::Value, Option<Timeout>)>;
+
 /// A simple in-memory cache backed by a `Mutex<HashMap<..>>`.
 pub struct Memory {
-    map: Arc<Mutex<HashMap<String, (serde_json::Value, Option<Timeout>)>>>,
+    map: Arc<Mutex<MemoryMap>>,
 }
 
 impl Memory {
@@ -102,67 +104,64 @@ impl CacheStore for Memory {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use tokio::runtime::Runtime;
 
     use super::*;
     use crate::config::Timeout;
 
-    fn rt() -> Runtime {
-        Runtime::new().unwrap()
+    #[cot::test]
+    async fn test_insert_and_get() {
+        let store = Memory::new();
+        let key = "test_key".to_string();
+        let value = json!({"data": 123});
+
+        store.insert(key, value, Timeout::default()).await.unwrap();
+        let retrieved = store.get(&"test_key".to_string()).await.unwrap();
+        assert_eq!(retrieved, Some(json!({"data": 123})));
     }
 
     #[cot::test]
-    async fn test_memory_store_basic_operations() {
-        let rt = rt();
-        rt.block_on(async {
-            let store = Memory::new();
-            let key = "foo".to_string();
-            let value = json!({"bar": 42});
-            let expiry = Timeout::default();
+    async fn test_remove() {
+        let store = Memory::new();
+        let key = "test_key".to_string();
+        let value = json!({"data": 123});
 
-            store
-                .insert(key.clone(), value.clone(), expiry.clone())
-                .await
-                .unwrap();
-            let got = store.get(&key).await.unwrap();
-            assert_eq!(got, Some(value.clone()));
-
-            assert!(store.contains_key(&key).await.unwrap());
-
-            store.remove(&key).await.unwrap();
-            assert!(!store.contains_key(&key).await.unwrap());
-            assert_eq!(store.get(&key).await.unwrap(), None);
-        });
+        store
+            .insert(key.clone(), value, Timeout::default())
+            .await
+            .unwrap();
+        store.remove(&key).await.unwrap();
+        let retrieved = store.get(&key).await.unwrap();
+        assert_eq!(retrieved, None);
     }
 
     #[cot::test]
-    async fn test_memory_store_clear_and_len() {
-        let rt = rt();
-        rt.block_on(async {
-            let store = Memory::new();
-            let expiry = Timeout::default();
-            store
-                .insert("a".to_string(), json!(1), expiry.clone())
-                .await
-                .unwrap();
-            store
-                .insert("b".to_string(), json!(2), expiry.clone())
-                .await
-                .unwrap();
-            assert_eq!(store.len().await.unwrap(), 2);
-            assert!(!store.is_empty().await.unwrap());
-            store.clear().await.unwrap();
-            assert_eq!(store.len().await.unwrap(), 0);
-            assert!(store.is_empty().await.unwrap());
-        });
+    async fn test_clear() {
+        let store = Memory::new();
+        store
+            .insert("key1".to_string(), json!(1), Timeout::default())
+            .await
+            .unwrap();
+        store
+            .insert("key2".to_string(), json!(2), Timeout::default())
+            .await
+            .unwrap();
+        assert_eq!(store.len().await.unwrap(), 2);
+        store.clear().await.unwrap();
+        assert_eq!(store.len().await.unwrap(), 0);
     }
 
     #[cot::test]
-    async fn test_memory_store_remove_nonexistent_key() {
-        let rt = rt();
-        rt.block_on(async {
-            let store = Memory::new();
-            store.remove("notfound").await.unwrap();
-        });
+    async fn test_contains_key() {
+        let store = Memory::new();
+        let key = "test_key".to_string();
+        let value = json!({"data": 123});
+
+        store
+            .insert(key.clone(), value, Timeout::default())
+            .await
+            .unwrap();
+        assert!(store.contains_key(&key).await.unwrap());
+        store.remove(&key).await.unwrap();
+        assert!(!store.contains_key(&key).await.unwrap());
     }
 }

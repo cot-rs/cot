@@ -123,15 +123,22 @@ mod tests {
     use chrono::DateTime;
     use serde::Serialize;
 
-    use crate::config::Expiry;
+    use crate::config::{Expiry, Timeout};
 
     #[derive(Serialize)]
     struct Wrapper {
         #[serde(with = "crate::serializers::session_expiry_time")]
         expiry: Expiry,
     }
-    #[test]
-    fn json_serialize_session_expiry_time() {
+
+    #[derive(Serialize)]
+    struct CacheTimeoutWrapper {
+        #[serde(with = "crate::serializers::cache_timeout")]
+        timeout: Timeout,
+    }
+
+    #[cot::test]
+    async fn json_serialize_session_expiry_time() {
         let opts = [
             (
                 Wrapper {
@@ -152,6 +159,37 @@ mod tests {
                     ),
                 },
                 r#"{"expiry":"2025-12-31 23:59:59 +00:00"}"#,
+            ),
+        ];
+
+        for (wrapper, expected) in opts {
+            let json = serde_json::to_string(&wrapper).unwrap();
+            assert_eq!(json, expected);
+        }
+    }
+
+    #[cot::test]
+    async fn json_serialize_cache_timeout() {
+        let opts = [
+            (
+                CacheTimeoutWrapper {
+                    timeout: Timeout::Never,
+                },
+                r#"{"timeout":null}"#,
+            ),
+            (
+                CacheTimeoutWrapper {
+                    timeout: Timeout::After(Duration::from_secs(3600)),
+                },
+                r#"{"timeout":"1h"}"#,
+            ),
+            (
+                CacheTimeoutWrapper {
+                    timeout: Timeout::AtDateTime(
+                        DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap(),
+                    ),
+                },
+                r#"{"timeout":"2025-12-31 23:59:59 +00:00"}"#,
             ),
         ];
 

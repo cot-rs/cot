@@ -7,7 +7,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use derive_more::Debug;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
@@ -18,6 +17,8 @@ use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 #[cfg(feature = "cache")]
 use crate::cache::Cache;
+#[cfg(feature = "cache")]
+use crate::cache::stores::memory::Memory;
 use crate::config::ProjectConfig;
 #[cfg(feature = "db")]
 use crate::db::Database;
@@ -758,9 +759,13 @@ impl TestRequestBuilder {
             #[cfg(feature = "db")]
             self.database.clone(),
             #[cfg(feature = "cache")] // TODO: use a sensible default
-            self.cache.clone().expect(
-                "Cache missing. Did you forget to add the cache when configuring CotProject?",
-            ),
+            self.cache.clone().unwrap_or_else(|| {
+                Arc::new(Cache::new(
+                    Arc::new(Memory::new()),
+                    None,
+                    Timeout::default(),
+                ))
+            }),
         );
         prepare_request(&mut request, Arc::new(context));
 

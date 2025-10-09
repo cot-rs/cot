@@ -25,8 +25,6 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
-#[cfg(feature = "cache")]
-use crate::cache::stores;
 use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
@@ -172,7 +170,28 @@ pub struct ProjectConfig {
     /// ```
     #[cfg(feature = "db")]
     pub database: DatabaseConfig,
-
+    /// Configuration related to the cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheConfig, ProjectConfig};
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [cache]
+    /// prefix = "myapp"
+    /// max_retries = 3
+    /// timeout = "1h"
+    /// ```,
+    /// )?;
+    ///
+    /// assert_eq!(config.cache.prefix, Some("myapp".to_string()));
+    /// assert_eq!(config.cache.max_retries, 3);
+    /// assert_eq!(config.cache.timeout,
+    /// Timeout::After(Duration::from_secs(3600))); assert_eq!(config.cache.
+    /// store.store_type, CacheStoreTypeConfig::Memory); # Ok::<(), cot::Error>(())
+    /// ```
     #[cfg(feature = "cache")]
     pub cache: CacheConfig,
     /// Configuration related to the static files.
@@ -461,6 +480,22 @@ impl Default for Timeout {
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
+/// Configuration for the cache system.
+///
+/// This struct holds all configuration options related to caching, including
+/// the cache backend type, connection options, and cache key prefixing.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig};
+/// let config = CacheConfig::builder()
+///     .store(Some(CacheStoreConfig {
+///         store_type: CacheStoreTypeConfig::Memory,
+///     }))
+///     .build();
+/// assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
+/// ```
 pub struct CacheConfig {
     /// Maximum number of retries for cache operations.
     ///
@@ -547,6 +582,7 @@ pub struct CacheConfig {
     ///         store_type: CacheStoreTypeConfig::Memory,
     ///     }))
     ///     .build();
+    /// assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
     /// ```
     ///
     /// # TOML Configuration
@@ -588,7 +624,7 @@ impl CacheConfigBuilder {
     #[must_use]
     pub fn build(&self) -> CacheConfig {
         CacheConfig {
-            max_retries: self.max_retries.unwrap_or(3),
+            max_retries: self.max_retries.unwrap_or_default(),
             timeout: self.timeout.unwrap_or_default(),
             prefix: self.prefix.clone().unwrap_or_default(),
             store: self.store.clone().unwrap_or_default(),
@@ -615,13 +651,57 @@ impl CacheConfig {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+/// Configuration for the cache store backend.
+///
+/// This struct wraps a [`CacheStoreTypeConfig`] which specifies the actual
+/// type of store to use (memory, redis, or file-based).
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::{CacheStoreConfig, CacheStoreTypeConfig};
+/// let config = CacheStoreConfig {
+///     store_type: CacheStoreTypeConfig::Memory,
+/// };
+/// assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+/// ```
 pub struct CacheStoreConfig {
+    /// The type of cache store to use.
+    ///
+    /// This determines how and where cache data is stored. The default is
+    /// to use an in-memory store.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheStoreTypeConfig;
+    ///
+    /// let config = CacheStoreConfig::builder()
+    ///     .store_type(CacheStoreTypeConfig::Memory)
+    ///     .build();
+    ///
+    /// assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    /// ```
     #[serde(flatten)]
     pub store_type: CacheStoreTypeConfig,
 }
 
 #[cfg(feature = "cache")]
 impl CacheStoreConfig {
+    /// Create a new [`CacheStoreConfigBuilder`] to build a
+    /// [`CacheStoreConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheStoreConfig;
+    ///
+    /// let config = CacheStoreConfig::builder()
+    ///     .store_type(CacheStoreTypeConfig::Memory)
+    ///     .build();
+    ///
+    /// assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    /// ```
     #[must_use]
     pub fn builder() -> CacheStoreConfigBuilder {
         CacheStoreConfigBuilder::default()
@@ -630,6 +710,19 @@ impl CacheStoreConfig {
 
 #[cfg(feature = "cache")]
 impl CacheStoreConfigBuilder {
+    /// Builds the cache store configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheStoreConfig;
+    ///
+    /// let config = CacheStoreConfig::builder()
+    ///     .store_type(CacheStoreTypeConfig::Memory)
+    ///     .build();
+    ///
+    /// assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    /// ```
     #[must_use]
     pub fn build(&self) -> CacheStoreConfig {
         CacheStoreConfig {
@@ -638,17 +731,31 @@ impl CacheStoreConfigBuilder {
     }
 }
 
-#[cfg(feature = "cache")]
+/// The type of cache store backend to use.
+///
+/// This enum specifies which backend is used for caching: `in-memory`, `Redis`,
+/// or file-based`. It is used as part of the [`CacheStoreConfig`] struct.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::CacheStoreTypeConfig;
+///
+/// let mem = CacheStoreTypeConfig::Memory;
+///
+/// assert_eq!(mem, CacheStoreTypeConfig::Memory);
+/// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
+#[cfg(feature = "cache")]
 pub enum CacheStoreTypeConfig {
     /// In-memory cache store.
     ///
     /// This uses a simple in-memory store that does not persist data across
     /// application restarts. This is suitable for development or testing
     /// environments where persistence is not required.
-    ///
+    #[default]
     /// # Examples
     ///
     /// ```
@@ -656,60 +763,54 @@ pub enum CacheStoreTypeConfig {
     ///
     /// let config = CacheStoreTypeConfig::Memory;
     /// ```
-    #[default]
     Memory,
-
     /// Redis cache store.
-    ///
+
     /// This stores cache data in a Redis instance. The URL to the Redis server
     /// must be specified, and additional Redis-specific options can be
     /// configured.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::config::{CacheStoreTypeConfig, CacheUrl};
-    ///
-    /// let config = CacheStoreTypeConfig::Redis {
-    ///     url: CacheUrl::from("redis://localhost:6379"),
-    ///     pool_size: Some(20),
-    /// };
-    /// ```
     Redis {
+        /// # Examples
+        ///
+        /// ```
+        /// use cot::config::{CacheStoreTypeConfig, CacheUrl};
+        ///
+        /// let config = CacheStoreTypeConfig::Redis {
+        ///     url: CacheUrl::from("redis://localhost:6379"),
+        ///     pool_size: Some(20),
+        /// };
+        /// ```
         /// The URL of the Redis server.
         url: CacheUrl,
         /// Connection pool size for Redis connections.
-        ///
+        #[serde(skip_serializing_if = "Option::is_none")]
         /// This controls how many connections to maintain in the connection
         /// pool. When not specified, a default pool size is used.
-        #[serde(skip_serializing_if = "Option::is_none")]
         pool_size: Option<u32>,
     },
-
     /// File-based cache store.
-    ///
+
     /// This stores cache data in files on the local filesystem. The path to
     /// the directory where the cache files will be stored must be specified.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::path::PathBuf;
-    ///
-    /// use cot::config::CacheStoreTypeConfig;
-    ///
-    /// let config = CacheStoreTypeConfig::File {
-    ///     path: PathBuf::from("/tmp/cache"),
-    /// };
-    /// ```
     File {
+        /// # Examples
+        ///
+        /// ```
+        /// use std::path::PathBuf;
+        ///
+        /// use cot::config::CacheStoreTypeConfig;
+        ///
+        /// let config = CacheStoreTypeConfig::File {
+        ///     path: PathBuf::from("/tmp/cache"),
+        /// };
+        /// ```
         /// The path to the directory where cache files will be stored.
         path: PathBuf,
     },
 }
 
+/// The configuration for the static files.
 /// The configuration for serving static files.
-///
 /// This configuration controls how static files (like CSS, JavaScript, images,
 /// etc.) are served by the application. It allows you to customize the URL
 /// prefix, caching behavior, and URL rewriting strategy for static assets.

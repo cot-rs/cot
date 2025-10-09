@@ -1272,7 +1272,7 @@ impl Bootstrapper<WithDatabase> {
     /// ```
     // Function marked `async` to be consistent with the other `boot` methods
     // Send not needed; Bootstrapper is run async in a single thread
-    #[expect(clippy::unused_async, clippy::future_not_send)]
+    #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_cache().await?.boot().await
     }
@@ -1310,7 +1310,6 @@ impl Bootstrapper<WithDatabase> {
     /// # Ok(())
     /// # }
     /// ```
-    // Send not needed; Bootstrapper is run async in a single thread
     #[expect(clippy::future_not_send)]
     pub async fn with_cache(self) -> cot::Result<Bootstrapper<WithCache>> {
         #[cfg(feature = "cache")]
@@ -1331,13 +1330,13 @@ impl Bootstrapper<WithDatabase> {
 
     #[cfg(feature = "cache")]
     async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
-        Cache::try_from(config)
-            .map(|cache| Arc::new(cache))
-            .map_err(|err| cot::Error::from(err))
+        let cache = Cache::try_from(config).map(|cache| Arc::new(cache))?;
+        Ok(cache)
     }
 }
 
 impl Bootstrapper<WithCache> {
+    #[expect(clippy::unused_async, clippy::future_not_send)]
     async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler_builder = RootHandlerBuilder {
@@ -1448,7 +1447,8 @@ mod sealed {
 /// 2. [`WithConfig`]
 /// 3. [`WithApps`]
 /// 4. [`WithDatabase`]
-/// 5. [`Initialized`]
+/// 5. [`WithCache`]
+/// 6. [`Initialized`]
 ///
 /// # Sealed
 ///
@@ -1593,6 +1593,12 @@ impl BootstrapPhase for WithDatabase {
     type Cache = ();
 }
 
+/// Fifth phase of bootstrapping a Cot project, the with-cache phase.
+///
+/// # See also
+///
+/// See the details about the different bootstrap phases in the
+/// [`BootstrapPhase`] trait documentation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum WithCache {}
 
@@ -2291,13 +2297,14 @@ async fn shutdown_signal() {
 mod tests {
     use std::task::{Context, Poll};
 
+    use cot::cache;
     use tower::util::MapResultLayer;
     use tower::{ServiceExt, service_fn};
 
     use super::*;
     use crate::StatusCode;
     use crate::auth::UserId;
-    use crate::config::SecretKey;
+    use crate::config::{SecretKey, Timeout};
     use crate::error::handler::{RequestError, RequestOuterError};
     use crate::html::Html;
     use crate::request::extractors::FromRequestHead;
@@ -2477,6 +2484,12 @@ mod tests {
 
     #[cot::test]
     async fn default_auth_backend() {
+        let cache_memory = Arc::new(Cache::new(
+            Arc::new(cache::stores::memory::Memory::new()),
+            None,
+            Timeout::default(),
+        ));
+
         let context = ProjectContext::new()
             .with_config(
                 ProjectConfig::builder()
@@ -2484,7 +2497,8 @@ mod tests {
                     .build(),
             )
             .with_apps(vec![], Arc::new(Router::empty()))
-            .with_database(None);
+            .with_database(None)
+            .with_cache(cache_memory);
 
         let auth_backend = TestProject.auth_backend(&context);
         assert!(

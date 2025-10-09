@@ -722,7 +722,6 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    use cot::project::WithCache;
     use http::Request;
     use tower::{Layer, Service, ServiceExt};
 
@@ -733,7 +732,7 @@ mod tests {
         SessionStoreConfig, SessionStoreTypeConfig,
     };
     use crate::middleware::SessionMiddleware;
-    use crate::project::{RegisterAppsContext, WithDatabase};
+    use crate::project::{RegisterAppsContext, WithCache};
     use crate::response::Response;
     use crate::session::Session;
     use crate::test::TestRequestBuilder;

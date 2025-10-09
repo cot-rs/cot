@@ -569,10 +569,10 @@ mod tests {
         let bootstrapper = Bootstrapper::new(TestProject)
             .with_config(ProjectConfig::default())
             .with_apps()
-            .with_cache()
+            .with_database()
             .await
             .unwrap()
-            .with_database()
+            .with_cache()
             .await
             .unwrap();
         let middleware = StaticFilesMiddleware::from_context(bootstrapper.context());

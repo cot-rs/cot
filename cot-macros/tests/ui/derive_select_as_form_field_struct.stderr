@@ -1,0 +1,7 @@
+error: `SelectAsFormField` can only be derived for enums
+ --> tests/ui/derive_select_as_form_field_struct.rs:3:10
+  |
+3 | #[derive(SelectAsFormField)]
+  |          ^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the derive macro `SelectAsFormField` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -75,6 +75,7 @@ pub(crate) mod session_expiry_time {
     }
 }
 
+#[cfg(feature = "cache")]
 pub(crate) mod cache_timeout {
     use chrono::DateTime;
     use serde::{Deserialize, Deserializer, Serializer};

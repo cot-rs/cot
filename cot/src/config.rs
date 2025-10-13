@@ -175,7 +175,9 @@ pub struct ProjectConfig {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::{CacheConfig, ProjectConfig};
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::{CacheConfig, CacheStoreTypeConfig, ProjectConfig, Timeout};
     ///
     /// let config = ProjectConfig::from_toml(
     ///     r#"
@@ -183,15 +185,21 @@ pub struct ProjectConfig {
     /// prefix = "myapp"
     /// max_retries = 3
     /// timeout = "1h"
-    /// ```,
+    ///
+    /// [cache.store]
+    /// type = "memory"
+    /// "#,
     /// )?;
     ///
     /// assert_eq!(config.cache.prefix, Some("myapp".to_string()));
     /// assert_eq!(config.cache.max_retries, 3);
-    /// assert_eq!(config.cache.timeout,
-    /// Timeout::After(Duration::from_secs(3600))); assert_eq!(config.cache.
-    /// store.store_type, CacheStoreTypeConfig::Memory); # Ok::<(),
-    /// cot::Error>(()) ```
+    /// assert_eq!(
+    ///     config.cache.timeout,
+    ///     Timeout::After(Duration::from_secs(3600))
+    /// );
+    /// assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
+    /// Ok::<(), cot::Error>(())
+    /// ```
     #[cfg(feature = "cache")]
     pub cache: CacheConfig,
     /// Configuration related to the static files.
@@ -482,8 +490,8 @@ impl Timeout {
     ///
     /// let timeout = Timeout::After(Duration::from_secs(60));
     /// let insertion_time: DateTime<FixedOffset> =
-    ///     Utc::now().with_timezone(&FixedOffset::east_opt(0).single().unwrap());
-    /// assert_eq!(timeout.is_expired(Some(insertion_time)), false);
+    ///     Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
+    /// assert!(!timeout.is_expired(Some(insertion_time)));
     /// ```
     #[must_use]
     pub fn is_expired(&self, insertion_time: Option<DateTime<FixedOffset>>) -> bool {
@@ -511,12 +519,12 @@ impl Timeout {
     /// If you want to canonicalize with a particular insertion offset,
     /// consider providing that insertion time to the API instead.
     #[must_use]
+    #[expect(clippy::missing_panics_doc)]
     pub fn canonicalize(self) -> Self {
         match self {
             Timeout::Never => Timeout::Never,
             Timeout::After(duration) => {
-                let time_now = Utc::now()
-                    .with_timezone(&FixedOffset::east_opt(0).expect("cannot use offset of `0`")); // unwrap is safe here since this wont fail.
+                let time_now = Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()); // unwrap is safe here since this wont fail.
                 let expiry_time =
                     time_now + chrono::Duration::from_std(duration).unwrap_or_default();
                 Timeout::AtDateTime(expiry_time)
@@ -551,9 +559,11 @@ const MAX_RETRIES_DEFAULT: u32 = 3;
 /// ```
 /// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig};
 /// let config = CacheConfig::builder()
-///     .store(Some(CacheStoreConfig {
-///         store_type: CacheStoreTypeConfig::Memory,
-///     }))
+///     .store(
+///         CacheStoreConfig::builder()
+///             .store_type(CacheStoreTypeConfig::Memory)
+///             .build(),
+///     )
 ///     .build();
 /// assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
 /// ```
@@ -561,7 +571,7 @@ pub struct CacheConfig {
     /// Maximum number of retries for cache operations.
     ///
     /// This controls how many times the cache will attempt to retry failed
-    /// operations before giving up. The default is 3 retries.
+    /// operations before giving up. The default is `3` retries.
     ///
     /// # Examples
     ///
@@ -588,17 +598,21 @@ pub struct CacheConfig {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::CacheConfig;
+    /// use std::time::Duration;
     ///
-    /// let config = CacheConfig::builder().timeout(60).build();
-    /// assert_eq!(config.timeout, 60);
+    /// use cot::config::{CacheConfig, Timeout};
+    ///
+    /// let config = CacheConfig::builder()
+    ///     .timeout(Timeout::After(Duration::from_secs(7200)))
+    ///     .build();
+    /// assert_eq!(config.timeout, Timeout::After(Duration::from_secs(7200)));
     /// ```
     ///
     /// # TOML Configuration
     ///
     /// ```toml
     /// [cache]
-    /// timeout = 60
+    /// timeout = "2h"
     /// ```
     #[serde(with = "crate::serializers::cache_timeout")]
     pub timeout: Timeout,
@@ -629,8 +643,8 @@ pub struct CacheConfig {
 
     /// The cache store configuration.
     ///
-    /// This determines which type of cache backend to use (memory, redis, file)
-    /// and its specific configuration options.
+    /// This determines which type of cache backend to use (`memory`, `redis`,
+    /// `file`) and its specific configuration options.
     ///
     /// # Examples
     ///
@@ -638,10 +652,13 @@ pub struct CacheConfig {
     /// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig};
     ///
     /// let config = CacheConfig::builder()
-    ///     .store(Some(CacheStoreConfig {
-    ///         store_type: CacheStoreTypeConfig::Memory,
-    ///     }))
+    ///     .store(
+    ///         CacheStoreConfig::builder()
+    ///             .store_type(CacheStoreTypeConfig::Memory)
+    ///             .build(),
+    ///     )
     ///     .build();
+    ///
     /// assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
     /// ```
     ///
@@ -673,12 +690,12 @@ impl CacheConfigBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::CacheConfig;
+    /// use cot::config::{CacheConfig, Timeout};
     ///
     /// let config = CacheConfig::builder()
     ///     .max_retries(5)
-    ///     .timeout(60)
-    ///     .namespace("my-app".to_string())
+    ///     .timeout(Timeout::Never)
+    ///     .prefix("my-app".to_string())
     ///     .build();
     /// ```
     #[must_use]
@@ -741,7 +758,7 @@ pub struct CacheStoreConfig {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::CacheStoreTypeConfig;
+    /// use cot::config::{CacheStoreConfig, CacheStoreTypeConfig};
     ///
     /// let config = CacheStoreConfig::builder()
     ///     .store_type(CacheStoreTypeConfig::Memory)
@@ -761,7 +778,7 @@ impl CacheStoreConfig {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::CacheStoreConfig;
+    /// use cot::config::{CacheStoreConfig, CacheStoreTypeConfig};
     ///
     /// let config = CacheStoreConfig::builder()
     ///     .store_type(CacheStoreTypeConfig::Memory)
@@ -782,7 +799,7 @@ impl CacheStoreConfigBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::CacheStoreConfig;
+    /// use cot::config::{CacheStoreConfig, CacheStoreTypeConfig};
     ///
     /// let config = CacheStoreConfig::builder()
     ///     .store_type(CacheStoreTypeConfig::Memory)

@@ -19,23 +19,24 @@
 //!
 //! ```no_run
 //! use std::sync::Arc;
+//! use std::time::Duration;
 //!
 //! use cot::cache::Cache;
-//! use cot::config::{CacheConfig, CacheStoreTypeConfig, Timeout};
+//! use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig, Timeout};
 //!
 //! #[tokio::main]
 //! async fn main() -> cot::Result<()> {
-//!     // Create a cache configuration
-//!     let config = CacheConfig {
-//!         store: CacheStoreConfig {
-//!             store_type: CacheStoreTypeConfig::Memory,
-//!         },
-//!         prefix: Some("myapp".to_string()),
-//!         timeout: Timeout::Seconds(3600),
-//!     };
+//!     let config = CacheConfig::builder()
+//!         .store(
+//!             CacheStoreConfig::builder()
+//!                 .store_type(CacheStoreTypeConfig::Memory)
+//!                 .build(),
+//!         )
+//!         .prefix("v1")
+//!         .timeout(Timeout::After(Duration::from_secs(1800)))
+//!         .build();
 //!
-//!     // Create cache from configuration
-//!     let cache = Cache::try_from(&config)?;
+//!     let cache = Cache::from_config(&config).await?;
 //!
 //!     // Store a value
 //!     cache.insert("user:123", "John Doe").await?;
@@ -47,7 +48,7 @@
 //!     // Use lazy loading
 //!     let expensive_value: String = cache
 //!         .get_or_insert_with("expensive", || async {
-//!             // This expensive computation will only run once
+//!             // Some expensive computation
 //!             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 //!             Ok("computed result".to_string())
 //!         })
@@ -60,11 +61,13 @@
 //! # Advanced Usage
 //!
 //! ```no_run
+//! use std::time::Duration;
+//!
 //! use cot::cache::Cache;
-//! use cot::config::{CacheConfig, CacheStoreTypeConfig, Timeout};
+//! use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig, Timeout};
 //! use serde::{Deserialize, Serialize};
 //!
-//! #[derive(Serialize, Deserialize, Debug)]
+//! #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 //! struct User {
 //!     id: u32,
 //!     name: String,
@@ -73,15 +76,17 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> cot::Result<()> {
-//!     let config = CacheConfig {
-//!         store: CacheStoreConfig {
-//!             store_type: CacheStoreTypeConfig::Memory,
-//!         },
-//!         prefix: Some("users".to_string()),
-//!         timeout: Timeout::Seconds(1800),
-//!     };
+//!     let config = CacheConfig::builder()
+//!         .store(
+//!             CacheStoreConfig::builder()
+//!                 .store_type(CacheStoreTypeConfig::Memory)
+//!                 .build(),
+//!         )
+//!         .prefix("v1")
+//!         .timeout(Timeout::After(Duration::from_secs(3600)))
+//!         .build();
 //!
-//!     let cache = Cache::try_from(&config)?;
+//!     let cache = Cache::from_config(&config).await?;
 //!
 //!     // Store complex objects
 //!     let user = User {
@@ -93,11 +98,15 @@
 //!
 //!     // Retrieve complex objects
 //!     let cached_user: Option<User> = cache.get("user:123").await?;
-//!     println!("Cached user: {:?}", cached_user);
+//!     assert_eq!(cached_user, Some(user));
 //!
 //!     // Store with custom expiration
 //!     cache
-//!         .insert_expiring("temp:data", "temporary", Timeout::Minutes(5))
+//!         .insert_expiring(
+//!             "temp:data",
+//!             "temporary",
+//!             Timeout::After(Duration::from_secs(300)),
+//!         )
 //!         .await?;
 //!
 //!     // Check if key exists
@@ -137,20 +146,24 @@ use crate::error::error_impl::impl_into_cot_error;
 /// # Examples
 ///
 /// ```no_run
+/// use std::time::Duration;
+///
 /// use cot::cache::{Cache, CacheError};
-/// use cot::config::{CacheConfig, CacheStoreTypeConfig, Timeout};
+/// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig, Timeout};
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), CacheError> {
-///     let config = CacheConfig {
-///         store: CacheStoreConfig {
-///             store_type: CacheStoreTypeConfig::Memory,
-///         },
-///         prefix: None,
-///         timeout: Timeout::Seconds(60),
-///     };
+///     let config = CacheConfig::builder()
+///         .store(
+///             CacheStoreConfig::builder()
+///                 .store_type(CacheStoreTypeConfig::Memory)
+///                 .build(),
+///         )
+///         .prefix("v1")
+///         .timeout(Timeout::After(Duration::from_secs(3600)))
+///         .build();
 ///
-///     let cache = Cache::try_from(&config)?;
+///     let cache = Cache::from_config(&config).await?;
 ///
 ///     cache.insert("key", "value").await.unwrap();
 ///
@@ -194,6 +207,7 @@ pub type CacheResult<T> = Result<T, CacheError>;
 ///
 /// ```no_run
 /// use std::sync::Arc;
+/// use std::time::Duration;
 ///
 /// use cot::cache::Cache;
 /// use cot::cache::stores::memory::Memory;
@@ -201,15 +215,18 @@ pub type CacheResult<T> = Result<T, CacheError>;
 ///
 /// #[tokio::main]
 /// async fn main() -> cot::Result<()> {
-///     // Create a memory store
 ///     let store = Arc::new(Memory::new());
 ///
-///     let cache = Cache::new(store, Some("myapp".to_string()), Timeout::Seconds(3600));
+///     let cache = Cache::new(
+///         store,
+///         Some("myapp".to_string()),
+///         Timeout::After(Duration::from_secs(300)),
+///     );
 ///
 ///     cache.insert("user:123", "John Doe").await?;
 ///
 ///     let user: Option<String> = cache.get("user:123").await?;
-///     println!("User: {:?}", user);
+///     assert_eq!(user, Some("John Doe".to_string()));
 ///
 ///     Ok(())
 /// }
@@ -235,13 +252,18 @@ impl Cache {
     ///
     /// ```no_run
     /// use std::sync::Arc;
+    /// use std::time::Duration;
     ///
     /// use cot::cache::Cache;
     /// use cot::cache::stores::memory::Memory;
     /// use cot::config::Timeout;
     ///
     /// let store = Arc::new(Memory::new());
-    /// let cache = Cache::new(store, Some("myapp".to_string()), Timeout::Seconds(3600));
+    /// let cache = Cache::new(
+    ///     store,
+    ///     Some("myapp".to_string()),
+    ///     Timeout::After(Duration::from_secs(3600)),
+    /// );
     /// ```
     pub fn new(
         store: Arc<dyn CacheStore<Key = String, Value = Value>>,
@@ -285,6 +307,7 @@ impl Cache {
     ///
     /// ```no_run
     /// use std::sync::Arc;
+    /// use std::time::Duration;
     ///
     /// use cot::cache::Cache;
     /// use cot::cache::stores::memory::Memory;
@@ -293,15 +316,15 @@ impl Cache {
     /// #[tokio::main]
     /// async fn main() -> cot::Result<()> {
     ///     let store = Arc::new(Memory::new());
-    ///     let cache = Cache::new(store, None, Timeout::Seconds(60));
+    ///     let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
     ///     cache.insert("user:123", "John Doe").await?;
     ///
     ///     let user: Option<String> = cache.get("user:123").await?;
-    ///     println!("User: {:?}", user); // Some("John Doe")
+    ///     assert_eq!(user, Some("user:123".to_string()));
     ///
     ///     let missing: Option<String> = cache.get("nonexistent").await?;
-    ///     println!("Missing: {:?}", missing); // None
+    ///     assert!(missing.is_none());
     ///
     ///     Ok(())
     /// }
@@ -341,6 +364,7 @@ impl Cache {
     ///
     /// ```no_run
     /// use std::sync::Arc;
+    /// use std::time::Duration;
     ///
     /// use cot::cache::Cache;
     /// use cot::cache::stores::memory::Memory;
@@ -356,7 +380,7 @@ impl Cache {
     /// #[tokio::main]
     /// async fn main() -> cot::Result<()> {
     ///     let store = Arc::new(Memory::new());
-    ///     let cache = Cache::new(store, None, Timeout::Seconds(60));
+    ///     let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
     ///
     ///     cache.insert("greeting", "Hello, World!").await?;
     ///
@@ -401,21 +425,21 @@ impl Cache {
     ///
     /// ```no_run
     /// use std::sync::Arc;
+    /// use std::time::Duration;
     ///
+    /// use chrono::{DateTime, Utc};
     /// use cot::cache::Cache;
     /// use cot::cache::stores::memory::Memory;
     /// use cot::config::Timeout;
     ///
     /// #[tokio::main]
     /// async fn main() -> cot::Result<()> {
-    ///     use std::time::Duration;
     ///     let store = Arc::new(Memory::new());
     ///     let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(3600)));
     ///
     ///     // Store a value with custom expiration
-    ///     let dt = DateTime::parse_from_rfc3339("2025-11-21T22:00:00Z")
-    ///         .unwrap()
-    ///         .with_timezone(&Utc);
+    ///     let dt = DateTime::parse_from_rfc3339("2025-11-21T22:00:00Z").unwrap();
+    ///
     ///     cache
     ///         .insert_expiring("temp:data", "temporary", Timeout::AtDateTime(dt))
     ///         .await?;
@@ -457,6 +481,7 @@ impl Cache {
     ///
     /// ```no_run
     /// use std::sync::Arc;
+    /// use std::time::Duration;
     ///
     /// use cot::cache::Cache;
     /// use cot::cache::stores::memory::Memory;
@@ -464,14 +489,13 @@ impl Cache {
     ///
     /// #[tokio::main]
     /// async fn main() -> cot::Result<()> {
-    ///     use std::time::Duration;
     ///     let store = Arc::new(Memory::new());
     ///     let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(200)));
     ///
     ///     cache.insert("user:123", "John Doe").await?;
     ///     cache.remove("user:123").await?;
     ///     let user: Option<String> = cache.get("user:123").await?;
-    ///     assert!(!user); // None
+    ///     assert!(user.is_none());
     ///
     ///     Ok(())
     /// }
@@ -661,6 +685,7 @@ impl Cache {
     ///
     /// ```no_run
     /// use std::sync::Arc;
+    /// use std::time::Duration;
     ///
     /// use cot::cache::Cache;
     /// use cot::cache::stores::memory::Memory;
@@ -719,6 +744,7 @@ impl Cache {
     ///
     /// ```no_run
     /// use std::sync::Arc;
+    /// use std::time::Duration;
     ///
     /// use cot::cache::Cache;
     /// use cot::cache::stores::memory::Memory;
@@ -785,26 +811,35 @@ impl Cache {
     /// # Examples
     ///
     /// ```no_run
+    /// use std::sync::Arc;
+    /// use std::time::Duration;
+    ///
     /// use cot::cache::Cache;
     /// use cot::cache::stores::memory::Memory;
     /// use cot::config::Timeout;
-    /// use std::sync::Arc;
     ///
     /// #[tokio::main]
     /// async fn main() -> cot::Result<()> {
-    ///     use std::time::Duration;
-    /// let store = Arc::new(Memory::new());
-    ///     let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300));
+    ///     let store = Arc::new(Memory::new());
+    ///     let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
-    ///     let value: String = cache.get_or_insert_expiring_with("temp:data", || async {
-    ///         Ok("temporary result".to_string())
-    ///     }, Timeout::Minutes(5)).await?;
+    ///     let value = cache
+    ///         .get_or_insert_expiring_with(
+    ///             "temp:data",
+    ///             || async { Ok("temporary result".to_string()) },
+    ///             Timeout::After(Duration::from_secs(300)),
+    ///         )
+    ///         .await?;
     ///
     ///     assert_eq!(value, "temporary result".to_string());
     ///
-    ///     let session: String = cache.get_or_insert_expiring_with("user:session", || async {
-    ///         "session_data".to_string()
-    ///     }, Timeout::After(Duration::from_hours(2))).await?;
+    ///     let session = cache
+    ///         .get_or_insert_expiring_with(
+    ///             "user:session",
+    ///             || async { Ok("session_data".to_string()) },
+    ///             Timeout::After(Duration::from_secs(7200)),
+    ///         )
+    ///         .await?;
     ///
     ///     assert_eq!(session, "session_data".to_string());
     ///
@@ -834,12 +869,41 @@ impl Cache {
             .await?;
         Ok(computed_value)
     }
-}
 
-impl TryFrom<&CacheConfig> for Cache {
-    type Error = CacheError;
-
-    fn try_from(config: &CacheConfig) -> Result<Self, Self::Error> {
+    /// Creates a new cache instance from the provided configuration.
+    ///
+    /// This method initializes the cache store based on the configuration and
+    /// sets up the cache with the specified prefix and expiration time.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::time::Duration;
+    ///
+    /// use cot::cache::Cache;
+    /// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig, Timeout};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> cot::Result<()> {
+    ///     let config = CacheConfig::builder()
+    ///         .store(
+    ///             CacheStoreConfig::builder()
+    ///                 .store_type(CacheStoreTypeConfig::Memory)
+    ///                 .build(),
+    ///         )
+    ///         .prefix("v1")
+    ///         .timeout(Timeout::After(Duration::from_secs(3600)))
+    ///         .build();
+    ///
+    ///     let cache = Cache::from_config(&config).await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    /// # Errors
+    ///
+    /// Returns an error if there was a problem initializing the cache store.
+    #[expect(clippy::unused_async)]
+    pub async fn from_config(config: &CacheConfig) -> CacheResult<Self> {
         let store_cfg = &config.store;
 
         let store = match store_cfg.store_type {

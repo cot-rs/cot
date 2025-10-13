@@ -1330,14 +1330,47 @@ impl Bootstrapper<WithDatabase> {
 
     #[cfg(feature = "cache")]
     async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
-        let cache = Cache::try_from(config).map(Arc::new)?;
+        let cache = Cache::from_config(config).await.map(Arc::new)?;
         Ok(cache)
     }
 }
 
 impl Bootstrapper<WithCache> {
+    /// Builds the Cot project instance.
+    ///
+    /// This is the final step in the bootstrapping process. It initializes the
+    /// project with the given configuration and returns a [`Bootstrapper`]
+    /// instance that contains the project's context and handler.
+    /// /// You shouldn't have to use this method directly most of the time.
+    /// It's mainly useful for controlling the bootstrapping process in
+    /// custom [`CliTask`](cli::CliTask)s.
+    ///
+    /// # Errors
+    ///
+    /// This method may return an error if it cannot initialize any of the
+    /// project's components, such as the database.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use cot::{Bootstrapper, Project};
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {}
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let bootstrapper = Bootstrapper::new(MyProject)
+    ///     .with_config(ProjectConfig::default())
+    ///     .boot()
+    ///     .await?;
+    /// let bootstrapped_project = bootstrapper.finish();
+    /// # Ok(())
+    /// # }
+    /// ```
     #[expect(clippy::unused_async, clippy::future_not_send)]
-    async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
+    pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler_builder = RootHandlerBuilder {
             handler: router_service,
@@ -1881,14 +1914,12 @@ impl<S: BootstrapPhase<Cache = Arc<Cache>>> ProjectContext<S> {
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let cache = request.context().cache();
-    ///     // can also be accessed via:
-    ///     request.cache();
-    ///
     ///     // ...
     /// #    unimplemented!()
     /// }
     /// ```
     #[must_use]
+    #[cfg(feature = "cache")]
     pub fn cache(&self) -> &Arc<Cache> {
         &self.cache
     }

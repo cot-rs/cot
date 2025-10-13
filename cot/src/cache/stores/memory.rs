@@ -4,6 +4,31 @@
 //! implements the generic [`CacheStore`] trait. It is primarily intended for
 //! development, testing, and low-concurrency scenarios where a shared in-memory
 //! map is sufficient.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use cot::cache::stores::memory::Memory;
+//! use cot::cache::stores::CacheStore;
+//! use serde_json::json;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let store = Memory::new();
+//!     let key = "example_key".to_string();
+//!     let value = json!({"data": 42});
+//!
+//!     store.insert(key.clone(), value, Default::default()).await.unwrap();
+//!     let retrieved = store.get(&key).await.unwrap();
+//!
+//!     assert_eq!(retrieved, Some(json!({"data": 42})));
+//! }
+//! ```
+//!
+//! # Expiration Policies
+//!
+//! Keys are only removed eagerly when accessed via `get` or `has_expired`.
+//! There is no background task to clean up expired keys.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -30,7 +55,16 @@ impl From<MemoryCacheStoreError> for CacheStoreError {
 
 type InMemoryMap = HashMap<String, (serde_json::Value, Option<Timeout>)>;
 
-/// A simple in-memory cache backed by a `Mutex<HashMap<..>>`.
+/// An in-memory cache store implementation.
+///
+/// This store keeps all cache entries in memory using a thread-safe hashmap.
+/// It's primarily useful for development and testing environments.
+///
+/// # Examples
+/// /// ```
+/// use cot::cache::stores::memory::Memory;
+/// let store = Memory::new();
+/// ```
 
 #[derive(Debug, Clone, Default)]
 pub struct Memory {
@@ -105,13 +139,24 @@ impl CacheStore for Memory {
     }
 
     async fn contains_key(&self, key: &Self::Key) -> CacheStoreResult<bool> {
-        let map = self.map.lock().await;
-        Ok(map.contains_key(key))
+        let mut map = self.map.lock().await;
+        if let Some((_, Some(timeout))) = map.get(key) {
+            if timeout.is_expired(None) {
+                map.remove(key);
+                return Ok(false);
+            }
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     async fn has_expired(&self, key: Self::Key) -> CacheStoreResult<bool> {
-        if let Some((_, Some(timeout))) = self.map.lock().await.get(&key) {
-            return Ok(timeout.is_expired(None));
+        let mut map = self.map.lock().await;
+        if let Some((_, Some(timeout))) = map.get(&key) {
+            if timeout.is_expired(None) {
+                map.remove(&key);
+                return Ok(true);
+            }
         }
         Ok(false)
     }

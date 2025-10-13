@@ -590,10 +590,10 @@ pub struct CacheConfig {
     /// ```
     pub max_retries: u32,
 
-    /// Timeout for cache operations in seconds.
+    /// Timeout for cache operations.
     ///
     /// This controls how long to wait for cache operations to complete before
-    /// timing out. The default is 30 seconds.
+    /// timing out. The default is 300 seconds(5 minutes).
     ///
     /// # Examples
     ///
@@ -619,7 +619,7 @@ pub struct CacheConfig {
 
     /// Prefix for cache keys.
     ///
-    /// This prefix is added to all cache keys in addition to the namespace.
+    /// This prefix is added to all cache keys.
     /// It's useful for versioning or categorizing cache entries.
     /// When not specified, no prefix is used.
     ///
@@ -752,8 +752,8 @@ impl CacheConfig {
 pub struct CacheStoreConfig {
     /// The type of cache store to use.
     ///
-    /// This determines how and where cache data is stored. The default is
-    /// to use an in-memory store.
+    /// This determines how and where cache data is stored. This defaults
+    /// to the in-memory store.
     ///
     /// # Examples
     ///
@@ -817,8 +817,8 @@ impl CacheStoreConfigBuilder {
 
 /// The type of cache store backend to use.
 ///
-/// This enum specifies which backend is used for caching: `in-memory`, `Redis`,
-/// or `file-based`. It is used as part of the [`CacheStoreConfig`] struct.
+/// This specifies which backend is used for caching: `in-memory`, `Redis`,
+/// or `file-based`.
 ///
 /// # Examples
 ///

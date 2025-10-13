@@ -1,7 +1,7 @@
 //! Cache store abstractions and implementations.
 //!
 //! This module defines a generic `CacheStore` trait and common types used by
-//! in-memory and Redis-backed cache implementations. The main goal is to
+//! in-memory, file and Redis-backed cache implementations. The main goal is to
 //! provide a simple asynchronous interface for putting, getting, and managing
 //! cached values, optionally with expiration policies.
 

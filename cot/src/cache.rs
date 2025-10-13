@@ -5,15 +5,6 @@
 //! The cache is designed to be thread-safe and can be used across multiple
 //! async tasks concurrently.
 //!
-//! # Features
-//!
-//! - **Multiple Storage Backends**: Support for in-memory, Redis, and other
-//!   cache stores through a pluggable architecture
-//! - **Automatic Serialization**: Values are automatically serialized to JSON
-//!   for storage and deserialized when retrieved
-//! - **Key Prefixing**: Support for key namespacing to avoid collisions
-//! - **Expiration**: Configurable expiration times for cached values
-//! - **Lazy Loading**: Support for computing values on-demand and caching them
 //!
 //! # Basic Usage
 //!
@@ -26,6 +17,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> cot::Result<()> {
+//!     use sea_query::Iden;
 //!     let config = CacheConfig::builder()
 //!         .store(
 //!             CacheStoreConfig::builder()
@@ -39,7 +31,7 @@
 //!     let cache = Cache::from_config(&config).await?;
 //!
 //!     // Store a value
-//!     cache.insert("user:123", "John Doe").await?;
+//!     cache.insert("user:123", "John Doe".to_string()).await?;
 //!
 //!     // Retrieve a value
 //!     let user: Option<String> = cache.get("user:123").await?;
@@ -109,7 +101,6 @@
 //!         )
 //!         .await?;
 //!
-//!     // Check if key exists
 //!     let exists = cache.contains_key("user:123").await?;
 //!     println!("User exists in cache: {}", exists);
 //!
@@ -139,37 +130,6 @@ use crate::config::{CacheConfig, Timeout};
 use crate::error::error_impl::impl_into_cot_error;
 
 /// An error that can occur when interacting with the cache.
-///
-/// This error type encompasses all possible errors that can occur during cache
-/// operations, including serialization errors and store-specific errors.
-///
-/// # Examples
-///
-/// ```no_run
-/// use std::time::Duration;
-///
-/// use cot::cache::{Cache, CacheError};
-/// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig, Timeout};
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), CacheError> {
-///     let config = CacheConfig::builder()
-///         .store(
-///             CacheStoreConfig::builder()
-///                 .store_type(CacheStoreTypeConfig::Memory)
-///                 .build(),
-///         )
-///         .prefix("v1")
-///         .timeout(Timeout::After(Duration::from_secs(3600)))
-///         .build();
-///
-///     let cache = Cache::from_config(&config).await?;
-///
-///     cache.insert("key", "value").await.unwrap();
-///
-///     Ok(())
-/// }
-/// ```
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CacheError {
@@ -242,12 +202,6 @@ impl Cache {
     /// Creates a new cache instance with the specified store, prefix, and
     /// default expiration time.
     ///
-    /// # Arguments
-    ///
-    /// * `store` - The underlying cache store implementation
-    /// * `prefix` - An optional prefix for all keys to avoid collisions
-    /// * `expiry` - The default expiration time for cached values
-    ///
     /// # Examples
     ///
     /// ```no_run
@@ -277,10 +231,6 @@ impl Cache {
         }
     }
 
-    /// Formats a key with the cache prefix if one is set.
-    ///
-    /// This is an internal method used to ensure consistent key formatting
-    /// across all cache operations.
     fn format_key<K: AsRef<str>>(&self, key: K) -> String {
         let k = key.as_ref();
         if let Some(pref) = &self.prefix {
@@ -290,13 +240,6 @@ impl Cache {
     }
 
     /// Retrieves a value from the cache.
-    ///
-    /// Returns `Some(value)` if the key exists and the value can be
-    /// deserialized, or `None` if the key doesn't exist.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The key to retrieve the value for
     ///
     /// # Errors
     ///
@@ -349,11 +292,6 @@ impl Cache {
     ///
     /// The value will be serialized to JSON before storage. If the key already
     /// exists, the value will be overwritten.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The key to store the value under
-    /// * `value` - The value to store (must implement `Serialize`)
     ///
     /// # Errors
     ///
@@ -408,13 +346,7 @@ impl Cache {
     /// Stores a value in the cache with a custom expiration time.
     ///
     /// This method allows you to override the default expiration time for a
-    /// specific value. The value will be serialized to JSON before storage.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The key to store the value under
-    /// * `value` - The value to store (must implement `Serialize`)
-    /// * `expiry` - The custom expiration time for this value
+    /// specific value.
     ///
     /// # Errors
     ///
@@ -465,13 +397,6 @@ impl Cache {
     }
 
     /// Removes a value from the cache.
-    ///
-    /// If the key doesn't exist, this operation is a no-op and no error is
-    /// returned.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The key to remove from the cache
     ///
     /// # Errors
     ///
@@ -625,10 +550,6 @@ impl Cache {
 
     /// Returns `true` if the cache contains the specified key.
     ///
-    /// # Arguments
-    ///
-    /// * `key` - The key to check for existence
-    ///
     /// # Errors
     ///
     /// Returns an error if there was a problem accessing the cache store.
@@ -670,11 +591,6 @@ impl Cache {
     /// This method executes the provided closure to compute a value and then
     /// stores the result in the cache with the default expiration time. The
     /// computation is performed every time this method is called.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The key to store the computed value under
-    /// * `f` - A closure that computes the value to store
     ///
     /// # Errors
     ///
@@ -727,13 +643,6 @@ impl Cache {
     /// value, stores the result in the cache with the default expiration
     /// time, and returns the computed value.
     ///
-    /// This is useful for implementing the "cache-aside" pattern where
-    /// expensive computations are cached to avoid repeated work.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The key to retrieve or store the computed value under
-    /// * `f` - A closure that computes the value if it's not in the cache
     ///
     /// # Errors
     ///
@@ -796,12 +705,6 @@ impl Cache {
     ///
     /// This is useful when you need different expiration times for different
     /// types of cached values.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - The key to retrieve or store the computed value under
-    /// * `f` - A closure that computes the value if it's not in the cache
-    /// * `expiry` - The custom expiration time for the computed value
     ///
     /// # Errors
     ///
@@ -872,8 +775,6 @@ impl Cache {
 
     /// Creates a new cache instance from the provided configuration.
     ///
-    /// This method initializes the cache store based on the configuration and
-    /// sets up the cache with the specified prefix and expiration time.
     ///
     /// # Examples
     ///
@@ -920,16 +821,6 @@ impl Cache {
         Ok(this)
     }
 }
-
-// impl std::fmt::Debug for Cache {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         f.debug_struct("Cache")
-//             .field("store", &"<CacheStore>")
-//             .field("prefix", &self.prefix)
-//             .field("expiry", &self.expiry)
-//             .finish()
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

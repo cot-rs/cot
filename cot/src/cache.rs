@@ -231,7 +231,7 @@ pub type CacheResult<T> = Result<T, CacheError>;
 ///     Ok(())
 /// }
 /// ```
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Cache {
     store: Arc<dyn CacheStore<Key = String, Value = Value>>,
     prefix: Option<String>,
@@ -921,15 +921,15 @@ impl Cache {
     }
 }
 
-impl std::fmt::Debug for Cache {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Cache")
-            .field("store", &"<CacheStore>")
-            .field("prefix", &self.prefix)
-            .field("expiry", &self.expiry)
-            .finish()
-    }
-}
+// impl std::fmt::Debug for Cache {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("Cache")
+//             .field("store", &"<CacheStore>")
+//             .field("prefix", &self.prefix)
+//             .field("expiry", &self.expiry)
+//             .finish()
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -954,12 +954,10 @@ mod tests {
         let store = Arc::new(Memory::new());
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
-        // Test insert and get
         cache.insert("user:1", "John Doe").await.unwrap();
         let user: Option<String> = cache.get("user:1").await.unwrap();
         assert_eq!(user, Some("John Doe".to_string()));
 
-        // Test remove
         cache.remove("user:1").await.unwrap();
         let user: Option<String> = cache.get("user:1").await.unwrap();
         assert_eq!(user, None);
@@ -996,13 +994,30 @@ mod tests {
     }
 
     #[cot::test]
+    async fn test_cache_insert_expiring() {
+        let store = Arc::new(Memory::new());
+        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+
+        cache
+            .insert_expiring(
+                "temp:data",
+                "temporary",
+                Timeout::After(Duration::from_secs(300)),
+            )
+            .await
+            .unwrap();
+
+        let value: Option<String> = cache.get("temp:data").await.unwrap();
+        assert_eq!(value, Some("temporary".to_string()));
+    }
+
+    #[cot::test]
     async fn test_cache_get_or_insert_with() {
         let store = Arc::new(Memory::new());
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
         let mut call_count = 0;
 
-        // First call should compute the value
         let value1: String = cache
             .get_or_insert_with("expensive", || async {
                 call_count += 1;
@@ -1011,7 +1026,6 @@ mod tests {
             .await
             .unwrap();
 
-        // Second call should use cached value
         let value2: String = cache
             .get_or_insert_with("expensive", || async {
                 call_count += 1;
@@ -1021,7 +1035,42 @@ mod tests {
             .unwrap();
 
         assert_eq!(value1, value2);
-        assert_eq!(call_count, 1); // Should only be called once
+        assert_eq!(call_count, 1);
+    }
+
+    #[cot::test]
+    async fn test_cache_get_or_insert_with_expiring() {
+        let store = Arc::new(Memory::new());
+        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+
+        let mut call_count = 0;
+
+        let value1: String = cache
+            .get_or_insert_expiring_with(
+                "temp:data",
+                || async {
+                    call_count += 1;
+                    Ok("temporary".to_string())
+                },
+                Timeout::After(Duration::from_secs(300)),
+            )
+            .await
+            .unwrap();
+
+        let value2: String = cache
+            .get_or_insert_expiring_with(
+                "temp:data",
+                || async {
+                    call_count += 1;
+                    Ok("different".to_string())
+                },
+                Timeout::After(Duration::from_secs(300)),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(value1, value2);
+        assert_eq!(call_count, 1);
     }
 
     #[cot::test]
@@ -1029,18 +1078,15 @@ mod tests {
         let store = Arc::new(Memory::new());
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
-        // Initially empty
         assert!(cache.is_empty().await.unwrap());
         assert_eq!(cache.len().await.unwrap(), 0);
 
-        // Add some values
         cache.insert("key1", "value1").await.unwrap();
         cache.insert("key2", "value2").await.unwrap();
 
         assert!(!cache.is_empty().await.unwrap());
         assert_eq!(cache.len().await.unwrap(), 2);
 
-        // Clear cache
         cache.clear().await.unwrap();
         assert!(cache.is_empty().await.unwrap());
         assert_eq!(cache.len().await.unwrap(), 0);
@@ -1051,10 +1097,8 @@ mod tests {
         let store = Arc::new(Memory::new());
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
-        // Key doesn't exist
         assert!(!cache.contains_key("nonexistent").await.unwrap());
 
-        // Add key
         cache.insert("existing", "value").await.unwrap();
         assert!(cache.contains_key("existing").await.unwrap());
     }

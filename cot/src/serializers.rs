@@ -46,7 +46,7 @@ pub(crate) mod session_expiry_time {
         match expiry {
             Expiry::OnSessionEnd => serializer.serialize_none(),
             Expiry::OnInactivity(time) => super::humantime::serialize(&Some(*time), serializer),
-            Expiry::AtDateTime(time) => serializer.serialize_str(&time.to_string()),
+            Expiry::AtDateTime(time) => serializer.serialize_str(&time.to_rfc3339()),
         }
     }
 
@@ -89,7 +89,7 @@ pub(crate) mod cache_timeout {
         match timeout {
             Timeout::Never => serializer.serialize_none(),
             Timeout::After(duration) => super::humantime::serialize(&Some(*duration), serializer),
-            Timeout::AtDateTime(time) => serializer.serialize_str(&time.to_string()),
+            Timeout::AtDateTime(time) => serializer.serialize_str(&time.to_rfc3339()),
         }
     }
 
@@ -122,17 +122,17 @@ mod tests {
     use std::time::Duration;
 
     use chrono::DateTime;
-    use serde::Serialize;
+    use serde::{Deserialize, Serialize};
 
     use crate::config::{Expiry, Timeout};
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Deserialize)]
     struct Wrapper {
         #[serde(with = "crate::serializers::session_expiry_time")]
         expiry: Expiry,
     }
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Deserialize)]
     struct CacheTimeoutWrapper {
         #[serde(with = "crate::serializers::cache_timeout")]
         timeout: Timeout,
@@ -159,13 +159,16 @@ mod tests {
                         DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap(),
                     ),
                 },
-                r#"{"expiry":"2025-12-31 23:59:59 +00:00"}"#,
+                r#"{"expiry":"2025-12-31T23:59:59+00:00"}"#,
             ),
         ];
 
         for (wrapper, expected) in opts {
             let json = serde_json::to_string(&wrapper).unwrap();
             assert_eq!(json, expected);
+
+            let deserialized: Wrapper = serde_json::from_str(&json).unwrap();
+            assert_eq!(deserialized.expiry, wrapper.expiry);
         }
     }
 
@@ -190,13 +193,16 @@ mod tests {
                         DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap(),
                     ),
                 },
-                r#"{"timeout":"2025-12-31 23:59:59 +00:00"}"#,
+                r#"{"timeout":"2025-12-31T23:59:59+00:00"}"#,
             ),
         ];
 
         for (wrapper, expected) in opts {
             let json = serde_json::to_string(&wrapper).unwrap();
             assert_eq!(json, expected);
+
+            let deserialized: CacheTimeoutWrapper = serde_json::from_str(&json).unwrap();
+            assert_eq!(deserialized.timeout, wrapper.timeout);
         }
     }
 }

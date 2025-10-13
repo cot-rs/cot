@@ -7,6 +7,8 @@
 
 pub mod memory;
 
+use std::fmt::Debug;
+
 use thiserror::Error;
 
 use crate::config::Timeout;
@@ -37,7 +39,7 @@ pub type CacheStoreResult<T> = Result<T, CacheStoreError>;
 /// basic CRUD operations as well as helpers to lazily compute and insert
 /// values, with optional expiration policies.
 #[async_trait::async_trait]
-pub trait CacheStore: Send + Sync + 'static {
+pub trait CacheStore: Debug + Send + Sync + 'static {
     /// Concrete key type for this store.
     type Key: Eq + std::hash::Hash + Clone + Send + Sync + 'static;
     /// Concrete value type for this store.

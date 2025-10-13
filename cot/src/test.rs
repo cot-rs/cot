@@ -7,6 +7,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use derive_more::Debug;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
@@ -758,12 +759,12 @@ impl TestRequestBuilder {
             auth_backend,
             #[cfg(feature = "db")]
             self.database.clone(),
-            #[cfg(feature = "cache")] // TODO: use a sensible default
+            #[cfg(feature = "cache")]
             self.cache.clone().unwrap_or_else(|| {
                 Arc::new(Cache::new(
                     Arc::new(Memory::new()),
                     None,
-                    Timeout::default(),
+                    crate::config::Timeout::default(),
                 ))
             }),
         );

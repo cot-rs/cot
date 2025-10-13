@@ -1330,7 +1330,7 @@ impl Bootstrapper<WithDatabase> {
 
     #[cfg(feature = "cache")]
     async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
-        let cache = Cache::try_from(config).map(|cache| Arc::new(cache))?;
+        let cache = Cache::try_from(config).map(Arc::new)?;
         Ok(cache)
     }
 }
@@ -1497,6 +1497,7 @@ pub trait BootstrapPhase: sealed::Sealed {
     type Database: Debug;
     /// The type of the auth backend.
     type AuthBackend;
+    /// The type of the cache.
     #[cfg(feature = "cache")]
     type Cache: Debug;
 }

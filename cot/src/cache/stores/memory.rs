@@ -28,15 +28,23 @@ impl From<MemoryCacheStoreError> for CacheStoreError {
     }
 }
 
-type MemoryMap = HashMap<String, (serde_json::Value, Option<Timeout>)>;
+type InMemoryMap = HashMap<String, (serde_json::Value, Option<Timeout>)>;
 
 /// A simple in-memory cache backed by a `Mutex<HashMap<..>>`.
+
+#[derive(Debug, Clone, Default)]
 pub struct Memory {
-    map: Arc<Mutex<MemoryMap>>,
+    map: Arc<Mutex<InMemoryMap>>,
 }
 
 impl Memory {
     /// Create a new, empty `Memory` cache store.
+    ///
+    /// # Examples
+    /// ```
+    /// use cot::cache::stores::memory::Memory;
+    /// let store = Memory::new();
+    /// ```
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -49,14 +57,20 @@ impl Memory {
 impl CacheStore for Memory {
     type Key = String;
     type Value = serde_json::Value;
-    /// Get a value by key.
     async fn get(&self, key: &Self::Key) -> CacheStoreResult<Option<Self::Value>> {
-        let map = self.map.lock().await;
-        let value = map.get(key).map(|(v, _)| v.clone());
-        Ok(value)
+        let mut map = self.map.lock().await;
+        if let Some((value, timeout)) = map.get(key) {
+            if let Some(timeout) = timeout {
+                if timeout.is_expired(None) {
+                    map.remove(key);
+                    return Ok(None);
+                }
+            }
+            return Ok(Some(value.clone()));
+        }
+        Ok(None)
     }
 
-    /// Insert a value without expiry.
     async fn insert(
         &self,
         key: Self::Key,
@@ -64,40 +78,42 @@ impl CacheStore for Memory {
         expiry: Timeout,
     ) -> CacheStoreResult<()> {
         let mut map = self.map.lock().await;
-        map.insert(key, (value, Some(expiry)));
+        map.insert(key, (value, Some(expiry.canonicalize())));
         Ok(())
     }
 
-    /// Remove a value by key.
     async fn remove(&self, key: &Self::Key) -> CacheStoreResult<()> {
         let mut map = self.map.lock().await;
         map.remove(key);
         Ok(())
     }
 
-    /// Clear all entries.
     async fn clear(&self) -> CacheStoreResult<()> {
         let mut map = self.map.lock().await;
         map.clear();
         Ok(())
     }
 
-    /// Return the number of entries in the cache.
     async fn len(&self) -> CacheStoreResult<usize> {
         let map = self.map.lock().await;
         Ok(map.len())
     }
 
-    /// Check if the cache is empty.
     async fn is_empty(&self) -> CacheStoreResult<bool> {
         let map = self.map.lock().await;
         Ok(map.is_empty())
     }
 
-    /// Check if a given key is present.
     async fn contains_key(&self, key: &Self::Key) -> CacheStoreResult<bool> {
         let map = self.map.lock().await;
         Ok(map.contains_key(key))
+    }
+
+    async fn has_expired(&self, key: Self::Key) -> CacheStoreResult<bool> {
+        if let Some((_, Some(timeout))) = self.map.lock().await.get(&key) {
+            return Ok(timeout.is_expired(None));
+        }
+        Ok(false)
     }
 }
 
@@ -117,6 +133,21 @@ mod tests {
         store.insert(key, value, Timeout::default()).await.unwrap();
         let retrieved = store.get(&"test_key".to_string()).await.unwrap();
         assert_eq!(retrieved, Some(json!({"data": 123})));
+    }
+
+    #[cot::test]
+    async fn test_get_after_expiry() {
+        let store = Memory::new();
+        let key = "temp_key".to_string();
+        let value = json!({"data": "temporary"});
+        let short_timeout = Timeout::After(std::time::Duration::from_millis(100));
+        store
+            .insert(key.clone(), value, short_timeout)
+            .await
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        let retrieved = store.get(&key).await.unwrap();
+        assert_eq!(retrieved, None);
     }
 
     #[cot::test]

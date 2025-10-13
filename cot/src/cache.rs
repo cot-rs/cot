@@ -376,7 +376,7 @@ impl Cache {
     {
         let k = self.format_key(key.into());
         self.store
-            .insert(k, serde_json::to_value(value)?, self.expiry.clone())
+            .insert(k, serde_json::to_value(value)?, self.expiry)
             .await?;
         Ok(())
     }

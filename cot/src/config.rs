@@ -18,7 +18,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, Utc};
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
@@ -190,8 +190,8 @@ pub struct ProjectConfig {
     /// assert_eq!(config.cache.max_retries, 3);
     /// assert_eq!(config.cache.timeout,
     /// Timeout::After(Duration::from_secs(3600))); assert_eq!(config.cache.
-    /// store.store_type, CacheStoreTypeConfig::Memory); # Ok::<(), cot::Error>(())
-    /// ```
+    /// store.store_type, CacheStoreTypeConfig::Memory); # Ok::<(),
+    /// cot::Error>(()) ```
     #[cfg(feature = "cache")]
     pub cache: CacheConfig,
     /// Configuration related to the static files.
@@ -464,8 +464,66 @@ pub enum Timeout {
     Never,
     /// Expire after the specified duration from the insertion time.
     After(Duration),
-    /// Expire at the specific UTC datetime.
+    /// Expire at the specific datetime with a fixed offset.
     AtDateTime(DateTime<FixedOffset>),
+}
+
+impl Timeout {
+    /// Check if the timeout has expired, given the insertion time (with its
+    /// fixed offset).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use chrono::{DateTime, FixedOffset, Utc};
+    /// use cot::config::Timeout;
+    ///
+    /// let timeout = Timeout::After(Duration::from_secs(60));
+    /// let insertion_time: DateTime<FixedOffset> =
+    ///     Utc::now().with_timezone(&FixedOffset::east_opt(0).single().unwrap());
+    /// assert_eq!(timeout.is_expired(Some(insertion_time)), false);
+    /// ```
+    #[must_use]
+    pub fn is_expired(&self, insertion_time: Option<DateTime<FixedOffset>>) -> bool {
+        match self {
+            Timeout::Never => false,
+            Timeout::After(dur) => {
+                if let Some(time) = insertion_time {
+                    let expiry_time = time + chrono::Duration::from_std(*dur).unwrap_or_default();
+                    let now_in_offset = Utc::now().with_timezone(time.offset());
+                    return now_in_offset >= expiry_time;
+                }
+                false
+            }
+            Timeout::AtDateTime(dt) => {
+                let now_in_offset = Utc::now().with_timezone(dt.offset());
+                now_in_offset >= *dt
+            }
+        }
+    }
+
+    /// Convert `After(duration)` into `AtDateTime` anchored at "now" (UTC
+    /// offset 0).
+    ///
+    /// Note: `canonicalize` uses UTC (fixed offset 0) as the produced offset.
+    /// If you want to canonicalize with a particular insertion offset,
+    /// consider providing that insertion time to the API instead.
+    #[must_use]
+    pub fn canonicalize(self) -> Self {
+        match self {
+            Timeout::Never => Timeout::Never,
+            Timeout::After(duration) => {
+                let time_now = Utc::now()
+                    .with_timezone(&FixedOffset::east_opt(0).expect("cannot use offset of `0`")); // unwrap is safe here since this wont fail.
+                let expiry_time =
+                    time_now + chrono::Duration::from_std(duration).unwrap_or_default();
+                Timeout::AtDateTime(expiry_time)
+            }
+            Timeout::AtDateTime(dt) => Timeout::AtDateTime(dt),
+        }
+    }
 }
 
 impl Default for Timeout {
@@ -476,7 +534,10 @@ impl Default for Timeout {
 }
 
 #[cfg(feature = "cache")]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+const MAX_RETRIES_DEFAULT: u32 = 3;
+
+#[cfg(feature = "cache")]
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -517,7 +578,6 @@ pub struct CacheConfig {
     /// [cache]
     /// max_retries = 5
     /// ```
-    #[builder(default = "3")]
     pub max_retries: u32,
 
     /// Timeout for cache operations in seconds.
@@ -624,11 +684,18 @@ impl CacheConfigBuilder {
     #[must_use]
     pub fn build(&self) -> CacheConfig {
         CacheConfig {
-            max_retries: self.max_retries.unwrap_or_default(),
+            max_retries: self.max_retries.unwrap_or(MAX_RETRIES_DEFAULT),
             timeout: self.timeout.unwrap_or_default(),
             prefix: self.prefix.clone().unwrap_or_default(),
             store: self.store.clone().unwrap_or_default(),
         }
+    }
+}
+
+#[cfg(feature = "cache")]
+impl Default for CacheConfig {
+    fn default() -> Self {
+        CacheConfig::builder().build()
     }
 }
 
@@ -734,7 +801,7 @@ impl CacheStoreConfigBuilder {
 /// The type of cache store backend to use.
 ///
 /// This enum specifies which backend is used for caching: `in-memory`, `Redis`,
-/// or file-based`. It is used as part of the [`CacheStoreConfig`] struct.
+/// or `file-based`. It is used as part of the [`CacheStoreConfig`] struct.
 ///
 /// # Examples
 ///
@@ -2448,12 +2515,12 @@ mod tests {
     #[test]
     #[cfg(feature = "cache")]
     fn cache_config_defaults() {
-        let toml_content = r#"
+        let toml_content = r"
             [cache]
-        "#;
+        ";
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
-
+        println!("project cache {:#?}", config.cache);
         assert_eq!(config.cache.max_retries, 3);
         assert_eq!(config.cache.timeout, Timeout::default());
         assert_eq!(config.cache.prefix, None);
@@ -2513,5 +2580,87 @@ mod tests {
     fn cache_store_config_default() {
         let config = CacheStoreConfig::default();
         assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    }
+    #[test]
+    fn never_is_never_expired() {
+        let now_fixed: DateTime<FixedOffset> =
+            Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
+        assert!(!Timeout::Never.is_expired(Some(now_fixed)));
+        assert!(!Timeout::Never.is_expired(None));
+    }
+
+    #[test]
+    fn after_with_no_insertion_time_is_not_expired() {
+        let timeout = Timeout::After(Duration::from_secs(60));
+        assert!(!timeout.is_expired(None));
+    }
+
+    #[test]
+    fn after_is_expired_based_on_insertion_offset() {
+        // insertion_time is 1 hour in the past with +1h offset
+        let offset = FixedOffset::east_opt(3600).unwrap();
+        let insertion_time: DateTime<FixedOffset> =
+            (Utc::now() - chrono::Duration::hours(1)).with_timezone(&offset);
+        let timeout = Timeout::After(Duration::from_secs(60)); // 1 minute
+        assert!(timeout.is_expired(Some(insertion_time)));
+    }
+
+    #[test]
+    fn after_is_not_expired_when_not_yet_passed_with_offset() {
+        // insertion_time 10s ago with -2h offset
+        let offset = FixedOffset::east_opt(-2 * 3600).unwrap();
+        let insertion_time: DateTime<FixedOffset> =
+            (Utc::now() - chrono::Duration::seconds(10)).with_timezone(&offset);
+        let timeout = Timeout::After(Duration::from_secs(60));
+        assert!(!timeout.is_expired(Some(insertion_time)));
+    }
+
+    #[test]
+    fn atdatetime_respects_stored_offset_when_comparing() {
+        // Build a past and future instant and attach +1h offset
+        let offset = FixedOffset::east_opt(3600).unwrap();
+        let past: DateTime<FixedOffset> =
+            (Utc::now() - chrono::Duration::seconds(60)).with_timezone(&offset);
+        let future: DateTime<FixedOffset> =
+            (Utc::now() + chrono::Duration::seconds(60)).with_timezone(&offset);
+
+        assert!(Timeout::AtDateTime(past).is_expired(None));
+        assert!(!Timeout::AtDateTime(future).is_expired(None));
+    }
+
+    #[test]
+    fn canonicalize_after_produces_atdatetime_in_utc_offset_zero() {
+        let before = Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
+        let duration = Duration::from_secs(2);
+        let canon = Timeout::After(duration).canonicalize();
+
+        match canon {
+            Timeout::AtDateTime(dt) => {
+                // dt offset should be UTC (0)
+                assert_eq!(dt.offset().local_minus_utc(), 0);
+                // dt should be >= before
+                assert!(dt >= before);
+                // dt should be reasonably close to before + duration (allow 1s slack)
+                let max_allowed = before
+                    + chrono::Duration::from_std(duration).unwrap()
+                    + chrono::Duration::seconds(1);
+                assert!(
+                    dt <= max_allowed,
+                    "canonicalized datetime is unexpectedly far ahead"
+                );
+            }
+            other => panic!("expected AtDateTime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn canonicalize_preserves_atdatetime_and_never() {
+        let dt: DateTime<FixedOffset> = (Utc::now() + chrono::Duration::seconds(10))
+            .with_timezone(&FixedOffset::east_opt(0).unwrap());
+        let t = Timeout::AtDateTime(dt);
+        assert_eq!(t.canonicalize(), t);
+
+        let never = Timeout::Never;
+        assert_eq!(never.canonicalize(), Timeout::Never);
     }
 }

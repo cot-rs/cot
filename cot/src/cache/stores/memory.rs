@@ -31,9 +31,11 @@
 //! There is no background task to clean up expired keys.
 
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use cot::cache::stores::{CacheStore, CacheStoreError, CacheStoreResult};
+use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -53,7 +55,7 @@ impl From<MemoryCacheStoreError> for CacheStoreError {
     }
 }
 
-type InMemoryMap = HashMap<String, (serde_json::Value, Option<Timeout>)>;
+type InMemoryMap = HashMap<String, (Value, Option<Timeout>)>;
 
 /// An in-memory cache store implementation.
 ///
@@ -87,71 +89,112 @@ impl Memory {
     }
 }
 
-#[async_trait::async_trait]
 impl CacheStore for Memory {
-    async fn get(&self, key: &String) -> CacheStoreResult<Option<serde_json::Value>> {
-        let mut map = self.map.lock().await;
-        if let Some((value, timeout)) = map.get(key) {
-            if let Some(timeout) = timeout {
-                if timeout.is_expired(None) {
-                    map.remove(key);
-                    return Ok(None);
+    fn get(
+        &self,
+        key: &str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<Option<Value>>> + Send>> {
+        let key = key.to_owned();
+        let map = Arc::clone(&self.map);
+
+        Box::pin(async move {
+            let mut map = map.lock().await;
+            if let Some((value, timeout)) = map.get(&key) {
+                if let Some(timeout) = timeout {
+                    if timeout.is_expired(None) {
+                        map.remove(&key);
+                        return Ok(None);
+                    }
                 }
+                return Ok(Some(value.clone()));
             }
-            return Ok(Some(value.clone()));
-        }
-        Ok(None)
+            Ok(None)
+        })
     }
 
-    async fn insert(
+    fn insert(
         &self,
         key: String,
-        value: serde_json::Value,
+        value: Value,
         expiry: Timeout,
-    ) -> CacheStoreResult<()> {
-        let mut map = self.map.lock().await;
-        map.insert(key, (value, Some(expiry.canonicalize())));
-        Ok(())
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>> {
+        let key = key.clone();
+        let map = Arc::clone(&self.map);
+
+        Box::pin(async move {
+            let mut map = map.lock().await;
+            map.insert(key, (value, Some(expiry.canonicalize())));
+            Ok(())
+        })
     }
 
-    async fn remove(&self, key: &String) -> CacheStoreResult<()> {
-        let mut map = self.map.lock().await;
-        map.remove(key);
-        Ok(())
+    fn remove(&self, key: &str) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>> {
+        let key = key.to_owned();
+        let map = Arc::clone(&self.map);
+
+        Box::pin(async move {
+            let mut map = map.lock().await;
+            map.remove(&key);
+            Ok(())
+        })
     }
 
-    async fn clear(&self) -> CacheStoreResult<()> {
-        let mut map = self.map.lock().await;
-        map.clear();
-        Ok(())
+    fn clear(&self) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>> {
+        let map = Arc::clone(&self.map);
+
+        Box::pin(async move {
+            let mut map = map.lock().await;
+            map.clear();
+            Ok(())
+        })
     }
 
-    async fn approx_size(&self) -> CacheStoreResult<usize> {
-        let map = self.map.lock().await;
-        Ok(map.len())
+    fn approx_size(&self) -> Pin<Box<dyn Future<Output = CacheStoreResult<usize>> + Send>> {
+        let map = Arc::clone(&self.map);
+
+        Box::pin(async move {
+            let map = map.lock().await;
+            Ok(map.len())
+        })
     }
 
-    async fn contains_key(&self, key: &String) -> CacheStoreResult<bool> {
-        let mut map = self.map.lock().await;
-        if let Some((_, Some(timeout))) = map.get(key) {
-            if timeout.is_expired(None) {
-                map.remove(key);
-                return Ok(false);
-            }
-            return Ok(true);
-        }
-        Ok(false)
-    }
+    fn contains_key(
+        &self,
+        key: &str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send>> {
+        let key = key.to_owned();
+        let map = Arc::clone(&self.map);
 
-    async fn has_expired(&self, key: String) -> CacheStoreResult<bool> {
-        let mut map = self.map.lock().await;
-        if let Some((_, Some(timeout))) = map.get(&key) {
-            if timeout.is_expired(None) {
-                map.remove(&key);
+        Box::pin(async move {
+            let mut map = map.lock().await;
+            if let Some((_, Some(timeout))) = map.get(&key) {
+                if timeout.is_expired(None) {
+                    map.remove(&key);
+                    return Ok(false);
+                }
                 return Ok(true);
             }
-        }
-        Ok(false)
+            Ok(false)
+        })
+    }
+
+    fn has_expired(
+        &self,
+        key: String,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send>> {
+        let key = key.clone();
+        let map = Arc::clone(&self.map);
+
+        Box::pin(async move {
+            let mut map = map.lock().await;
+            if let Some((_, Some(timeout))) = map.get(&key) {
+                if timeout.is_expired(None) {
+                    map.remove(&key);
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        })
     }
 }
 
@@ -169,7 +212,7 @@ mod tests {
         let value = json!({"data": 123});
 
         store.insert(key, value, Timeout::default()).await.unwrap();
-        let retrieved = store.get(&"test_key".to_string()).await.unwrap();
+        let retrieved = store.get("test_key").await.unwrap();
         assert_eq!(retrieved, Some(json!({"data": 123})));
     }
 

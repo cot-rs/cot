@@ -8,6 +8,7 @@
 pub mod memory;
 
 use std::fmt::Debug;
+use std::pin::Pin;
 
 use serde_json::Value;
 use thiserror::Error;
@@ -39,14 +40,16 @@ pub type CacheStoreResult<T> = Result<T, CacheStoreError>;
 /// The `CacheStore` trait abstracts over different cache backends. It supports
 /// basic CRUD operations as well as helpers to lazily compute and insert
 /// values, with optional expiration policies.
-#[async_trait::async_trait]
 pub trait CacheStore: Debug + Send + Sync + 'static {
     /// Get a value by key. Returns `Ok(None)` if the key does not exist.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue retrieving the key.
-    async fn get(&self, key: &String) -> CacheStoreResult<Option<Value>>;
+    fn get(
+        &self,
+        key: &str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<Option<Value>>> + Send>>;
 
     /// Insert a value under the given key.
     ///
@@ -54,28 +57,33 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     ///
     /// This method can return error if there is an issue inserting the
     /// key-value pair.
-    async fn insert(&self, key: String, value: Value, expiry: Timeout) -> CacheStoreResult<()>;
+    fn insert(
+        &self,
+        key: String,
+        value: Value,
+        expiry: Timeout,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>>;
 
     /// Remove a value by key. Succeeds even if the key was absent.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue removing the key.
-    async fn remove(&self, key: &String) -> CacheStoreResult<()>;
+    fn remove(&self, key: &str) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>>;
 
     /// Clear all entries in the cache.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue clearing the cache.
-    async fn clear(&self) -> CacheStoreResult<()>;
+    fn clear(&self) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>>;
 
     /// Return the number of entries in the cache.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue retrieving the length.
-    async fn approx_size(&self) -> CacheStoreResult<usize>;
+    fn approx_size(&self) -> Pin<Box<dyn Future<Output = CacheStoreResult<usize>> + Send>>;
 
     /// Returns `true` if the cache contains the specified key.
     ///
@@ -83,7 +91,10 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     ///
     /// This method can return error if there is an issue checking the presence
     /// of the key.
-    async fn contains_key(&self, key: &String) -> CacheStoreResult<bool>;
+    fn contains_key(
+        &self,
+        key: &str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send>>;
 
     /// Check if the value associated with the key has expired.
     ///
@@ -91,5 +102,8 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     ///
     /// This method can return error if there is an issue checking the
     /// expiration status.
-    async fn has_expired(&self, key: String) -> CacheStoreResult<bool>;
+    fn has_expired(
+        &self,
+        key: String,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send>>;
 }

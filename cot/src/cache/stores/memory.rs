@@ -8,12 +8,12 @@
 //! # Examples
 //!
 //! ```no_run
-//! use cot::cache::stores::memory::Memory;
-//! use cot::cache::stores::CacheStore;
-//! use serde_json::json;
+//! # use cot::cache::stores::memory::Memory;
+//! # use cot::cache::stores::CacheStore;
+//! # use serde_json::json;
 //!
-//! #[tokio::main]
-//! async fn main() {
+//! # #[tokio::main]
+//! # async fn main() {
 //!     let store = Memory::new();
 //!     let key = "example_key".to_string();
 //!     let value = json!({"data": 42});
@@ -22,7 +22,7 @@
 //!     let retrieved = store.get(&key).await.unwrap();
 //!
 //!     assert_eq!(retrieved, Some(json!({"data": 42})));
-//! }
+//! # }
 //! ```
 //!
 //! # Expiration Policies
@@ -61,7 +61,7 @@ type InMemoryMap = HashMap<String, (serde_json::Value, Option<Timeout>)>;
 /// It's primarily useful for development and testing environments.
 ///
 /// # Examples
-/// /// ```
+/// ```
 /// use cot::cache::stores::memory::Memory;
 /// let store = Memory::new();
 /// ```
@@ -128,14 +128,9 @@ impl CacheStore for Memory {
         Ok(())
     }
 
-    async fn len(&self) -> CacheStoreResult<usize> {
+    async fn approx_size(&self) -> CacheStoreResult<usize> {
         let map = self.map.lock().await;
         Ok(map.len())
-    }
-
-    async fn is_empty(&self) -> CacheStoreResult<bool> {
-        let map = self.map.lock().await;
-        Ok(map.is_empty())
     }
 
     async fn contains_key(&self, key: &Self::Key) -> CacheStoreResult<bool> {
@@ -221,9 +216,9 @@ mod tests {
             .insert("key2".to_string(), json!(2), Timeout::default())
             .await
             .unwrap();
-        assert_eq!(store.len().await.unwrap(), 2);
+        assert_eq!(store.approx_size().await.unwrap(), 2);
         store.clear().await.unwrap();
-        assert_eq!(store.len().await.unwrap(), 0);
+        assert_eq!(store.approx_size().await.unwrap(), 0);
     }
 
     #[cot::test]

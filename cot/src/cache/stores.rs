@@ -84,15 +84,7 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     /// # Errors
     ///
     /// This method can return error if there is an issue retrieving the length.
-    async fn len(&self) -> CacheStoreResult<usize>;
-
-    /// Check whether the cache is empty.
-    ///
-    /// # Errors
-    ///
-    /// This method can return error if there is an issue checking the cache
-    /// state.
-    async fn is_empty(&self) -> CacheStoreResult<bool>;
+    async fn approx_size(&self) -> CacheStoreResult<usize>;
 
     /// Returns `true` if the cache contains the specified key.
     ///

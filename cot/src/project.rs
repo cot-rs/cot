@@ -1311,6 +1311,11 @@ impl Bootstrapper<WithDatabase> {
     /// # }
     /// ```
     #[expect(clippy::future_not_send)]
+    #[allow(
+        clippy::unused_async,
+        clippy::allow_attributes,
+        reason = "see https://github.com/cot-rs/cot/pull/399#discussion_r2430379966"
+    )]
     pub async fn with_cache(self) -> cot::Result<Bootstrapper<WithCache>> {
         #[cfg(feature = "cache")]
         let cache = Self::init_cache(&self.context.config.cache).await?;

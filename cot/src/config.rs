@@ -524,7 +524,7 @@ impl Timeout {
         match self {
             Timeout::Never => Timeout::Never,
             Timeout::After(duration) => {
-                let time_now = Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()); // unwrap is safe here since this wont fail.
+                let time_now = Utc::now().with_timezone(&FixedOffset::east_opt(0).expect("conversion to FixedOffset(0) should not fail since 0 is a valid timezone offset"));
                 let expiry_time =
                     time_now + chrono::Duration::from_std(duration).unwrap_or_default();
                 Timeout::AtDateTime(expiry_time)

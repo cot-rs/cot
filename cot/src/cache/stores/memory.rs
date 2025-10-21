@@ -89,9 +89,7 @@ impl Memory {
 
 #[async_trait::async_trait]
 impl CacheStore for Memory {
-    type Key = String;
-    type Value = serde_json::Value;
-    async fn get(&self, key: &Self::Key) -> CacheStoreResult<Option<Self::Value>> {
+    async fn get(&self, key: &String) -> CacheStoreResult<Option<serde_json::Value>> {
         let mut map = self.map.lock().await;
         if let Some((value, timeout)) = map.get(key) {
             if let Some(timeout) = timeout {
@@ -107,8 +105,8 @@ impl CacheStore for Memory {
 
     async fn insert(
         &self,
-        key: Self::Key,
-        value: Self::Value,
+        key: String,
+        value: serde_json::Value,
         expiry: Timeout,
     ) -> CacheStoreResult<()> {
         let mut map = self.map.lock().await;
@@ -116,7 +114,7 @@ impl CacheStore for Memory {
         Ok(())
     }
 
-    async fn remove(&self, key: &Self::Key) -> CacheStoreResult<()> {
+    async fn remove(&self, key: &String) -> CacheStoreResult<()> {
         let mut map = self.map.lock().await;
         map.remove(key);
         Ok(())
@@ -133,7 +131,7 @@ impl CacheStore for Memory {
         Ok(map.len())
     }
 
-    async fn contains_key(&self, key: &Self::Key) -> CacheStoreResult<bool> {
+    async fn contains_key(&self, key: &String) -> CacheStoreResult<bool> {
         let mut map = self.map.lock().await;
         if let Some((_, Some(timeout))) = map.get(key) {
             if timeout.is_expired(None) {
@@ -145,7 +143,7 @@ impl CacheStore for Memory {
         Ok(false)
     }
 
-    async fn has_expired(&self, key: Self::Key) -> CacheStoreResult<bool> {
+    async fn has_expired(&self, key: String) -> CacheStoreResult<bool> {
         let mut map = self.map.lock().await;
         if let Some((_, Some(timeout))) = map.get(&key) {
             if timeout.is_expired(None) {

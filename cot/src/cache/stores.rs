@@ -9,6 +9,7 @@ pub mod memory;
 
 use std::fmt::Debug;
 
+use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::Timeout;
@@ -40,17 +41,12 @@ pub type CacheStoreResult<T> = Result<T, CacheStoreError>;
 /// values, with optional expiration policies.
 #[async_trait::async_trait]
 pub trait CacheStore: Debug + Send + Sync + 'static {
-    /// Concrete key type for this store.
-    type Key: Eq + std::hash::Hash + Clone + Send + Sync + 'static;
-    /// Concrete value type for this store.
-    type Value: serde::Serialize + serde::de::DeserializeOwned + Clone + Send + Sync + 'static;
-
     /// Get a value by key. Returns `Ok(None)` if the key does not exist.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue retrieving the key.
-    async fn get(&self, key: &Self::Key) -> CacheStoreResult<Option<Self::Value>>;
+    async fn get(&self, key: &String) -> CacheStoreResult<Option<Value>>;
 
     /// Insert a value under the given key.
     ///
@@ -58,19 +54,14 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     ///
     /// This method can return error if there is an issue inserting the
     /// key-value pair.
-    async fn insert(
-        &self,
-        key: Self::Key,
-        value: Self::Value,
-        expiry: Timeout,
-    ) -> CacheStoreResult<()>;
+    async fn insert(&self, key: String, value: Value, expiry: Timeout) -> CacheStoreResult<()>;
 
     /// Remove a value by key. Succeeds even if the key was absent.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue removing the key.
-    async fn remove(&self, key: &Self::Key) -> CacheStoreResult<()>;
+    async fn remove(&self, key: &String) -> CacheStoreResult<()>;
 
     /// Clear all entries in the cache.
     ///
@@ -92,7 +83,7 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     ///
     /// This method can return error if there is an issue checking the presence
     /// of the key.
-    async fn contains_key(&self, key: &Self::Key) -> CacheStoreResult<bool>;
+    async fn contains_key(&self, key: &String) -> CacheStoreResult<bool>;
 
     /// Check if the value associated with the key has expired.
     ///
@@ -100,5 +91,5 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     ///
     /// This method can return error if there is an issue checking the
     /// expiration status.
-    async fn has_expired(&self, key: Self::Key) -> CacheStoreResult<bool>;
+    async fn has_expired(&self, key: String) -> CacheStoreResult<bool>;
 }

@@ -118,7 +118,6 @@ use std::sync::Arc;
 use cot::config::CacheStoreTypeConfig;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 use thiserror::Error;
 
 use crate::cache::stores::CacheStore;
@@ -189,7 +188,7 @@ pub type CacheResult<T> = Result<T, CacheError>;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Cache {
-    store: Arc<dyn CacheStore<Key = String, Value = Value>>,
+    store: Arc<dyn CacheStore>,
     prefix: Option<String>,
     expiry: Timeout,
 }
@@ -215,11 +214,7 @@ impl Cache {
     ///     Timeout::After(Duration::from_secs(3600)),
     /// );
     /// ```
-    pub fn new(
-        store: Arc<dyn CacheStore<Key = String, Value = Value>>,
-        prefix: Option<String>,
-        expiry: Timeout,
-    ) -> Self {
+    pub fn new(store: Arc<dyn CacheStore>, prefix: Option<String>, expiry: Timeout) -> Self {
         Self {
             store,
             prefix,

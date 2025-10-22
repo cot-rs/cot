@@ -2522,7 +2522,7 @@ mod tests {
     #[cot::test]
     async fn default_auth_backend() {
         let cache_memory = Arc::new(Cache::new(
-            Arc::new(cache::stores::memory::Memory::new()),
+            cache::stores::memory::Memory::new(),
             None,
             Timeout::default(),
         ));

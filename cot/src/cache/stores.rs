@@ -46,10 +46,7 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     /// # Errors
     ///
     /// This method can return error if there is an issue retrieving the key.
-    fn get(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<Option<Value>>> + Send>>;
+    fn get(&self, key: &str) -> impl Future<Output = CacheStoreResult<Option<Value>>> + Send;
 
     /// Insert a value under the given key.
     ///
@@ -62,28 +59,28 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
         key: String,
         value: Value,
         expiry: Timeout,
-    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>>;
+    ) -> impl Future<Output = CacheStoreResult<()>> + Send;
 
     /// Remove a value by key. Succeeds even if the key was absent.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue removing the key.
-    fn remove(&self, key: &str) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>>;
+    fn remove(&self, key: &str) -> impl Future<Output = CacheStoreResult<()>> + Send;
 
     /// Clear all entries in the cache.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue clearing the cache.
-    fn clear(&self) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send>>;
+    fn clear(&self) -> impl Future<Output = CacheStoreResult<()>> + Send;
 
     /// Return the number of entries in the cache.
     ///
     /// # Errors
     ///
     /// This method can return error if there is an issue retrieving the length.
-    fn approx_size(&self) -> Pin<Box<dyn Future<Output = CacheStoreResult<usize>> + Send>>;
+    fn approx_size(&self) -> impl Future<Output = CacheStoreResult<usize>> + Send;
 
     /// Returns `true` if the cache contains the specified key.
     ///
@@ -91,10 +88,7 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     ///
     /// This method can return error if there is an issue checking the presence
     /// of the key.
-    fn contains_key(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send>>;
+    fn contains_key(&self, key: &str) -> impl Future<Output = CacheStoreResult<bool>> + Send;
 
     /// Check if the value associated with the key has expired.
     ///
@@ -102,8 +96,89 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     ///
     /// This method can return error if there is an issue checking the
     /// expiration status.
-    fn has_expired(
-        &self,
+    fn has_expired(&self, key: &str) -> impl Future<Output = CacheStoreResult<bool>> + Send;
+}
+
+pub(crate) trait BoxCacheStore: Debug + Send + Sync + 'static {
+    fn get<'a>(
+        &'a self,
+        key: &'a str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<Option<Value>>> + Send + 'a>>;
+
+    fn insert<'a>(
+        &'a self,
         key: String,
-    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send>>;
+        value: Value,
+        expiry: Timeout,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send + 'a>>;
+
+    fn remove<'a>(
+        &'a self,
+        key: &'a str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send + 'a>>;
+
+    fn clear<'a>(&'a self) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send + 'a>>;
+
+    fn approx_size<'a>(
+        &'a self,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<usize>> + Send + 'a>>;
+
+    fn contains_key<'a>(
+        &'a self,
+        key: &'a str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>>;
+
+    fn has_expired<'a>(
+        &'a self,
+        key: &'a str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>>;
+}
+
+impl<T: CacheStore> BoxCacheStore for T {
+    fn get<'a>(
+        &'a self,
+        key: &'a str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<Option<Value>>> + Send + 'a>> {
+        Box::pin(async move { T::get(self, key).await })
+    }
+
+    fn insert<'a>(
+        &'a self,
+        key: String,
+        value: Value,
+        expiry: Timeout,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send + 'a>> {
+        Box::pin(async move { T::insert(self, key, value, expiry).await })
+    }
+
+    fn remove<'a>(
+        &'a self,
+        key: &'a str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send + 'a>> {
+        Box::pin(async move { T::remove(self, key).await })
+    }
+
+    fn clear<'a>(&'a self) -> Pin<Box<dyn Future<Output = CacheStoreResult<()>> + Send + 'a>> {
+        Box::pin(async move { T::clear(self).await })
+    }
+
+    fn approx_size<'a>(
+        &'a self,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<usize>> + Send + 'a>> {
+        Box::pin(async move { T::approx_size(self).await })
+    }
+
+    fn contains_key<'a>(
+        &'a self,
+        key: &'a str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>> {
+        Box::pin(async move { T::contains_key(self, key).await })
+    }
+
+    fn has_expired<'a>(
+        &'a self,
+        key: &'a str,
+    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>> {
+        Box::pin(async move { T::has_expired(self, key).await })
+    }
 }

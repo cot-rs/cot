@@ -762,7 +762,7 @@ impl TestRequestBuilder {
             #[cfg(feature = "cache")]
             self.cache.clone().unwrap_or_else(|| {
                 Arc::new(Cache::new(
-                    Arc::new(Memory::new()),
+                    Memory::new(),
                     None,
                     crate::config::Timeout::default(),
                 ))

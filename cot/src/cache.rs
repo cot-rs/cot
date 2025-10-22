@@ -120,8 +120,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 
-use crate::cache::stores::CacheStore;
 use crate::cache::stores::memory::Memory;
+use crate::cache::stores::{BoxCacheStore, CacheStore};
 use crate::config::{CacheConfig, Timeout};
 use crate::error::error_impl::impl_into_cot_error;
 
@@ -170,7 +170,7 @@ pub type CacheResult<T> = Result<T, CacheError>;
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
-/// let store = Arc::new(Memory::new());
+/// let store = Memory::new();
 ///
 /// let cache = Cache::new(
 ///     store,
@@ -188,7 +188,7 @@ pub type CacheResult<T> = Result<T, CacheError>;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Cache {
-    store: Arc<dyn CacheStore>,
+    store: Arc<dyn BoxCacheStore>,
     prefix: Option<String>,
     expiry: Timeout,
 }
@@ -207,14 +207,15 @@ impl Cache {
     /// use cot::cache::stores::memory::Memory;
     /// use cot::config::Timeout;
     ///
-    /// let store = Arc::new(Memory::new());
+    /// let store = Memory::new();
     /// let cache = Cache::new(
     ///     store,
     ///     Some("myapp".to_string()),
     ///     Timeout::After(Duration::from_secs(3600)),
     /// );
     /// ```
-    pub fn new(store: Arc<dyn CacheStore>, prefix: Option<String>, expiry: Timeout) -> Self {
+    pub fn new(store: impl CacheStore, prefix: Option<String>, expiry: Timeout) -> Self {
+        let store: Arc<dyn BoxCacheStore> = Arc::new(store);
         Self {
             store,
             prefix,
@@ -249,7 +250,7 @@ impl Cache {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let store = Arc::new(Memory::new());
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
     /// cache.insert("user:123", "John Doe").await?;
@@ -308,7 +309,7 @@ impl Cache {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let store = Arc::new(Memory::new());
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
     ///
     /// cache.insert("greeting", "Hello, World!").await?;
@@ -357,7 +358,7 @@ impl Cache {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let store = Arc::new(Memory::new());
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(3600)));
     ///
     /// // Store a value with custom expiration
@@ -405,7 +406,7 @@ impl Cache {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let store = Arc::new(Memory::new());
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(200)));
     ///
     /// cache.insert("user:123", "John Doe").await?;
@@ -434,14 +435,15 @@ impl Cache {
     ///
     /// ```no_run
     /// use std::sync::Arc;
+    /// use std::time::Duration;
     /// # use cot::cache::Cache;
     /// # use cot::cache::stores::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// use std::time::Duration;
-    /// let store = Arc::new(Memory::new());
+    ///
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
     /// // Store some values
@@ -473,15 +475,15 @@ impl Cache {
     ///
     /// ```no_run
     /// # use std::sync::Arc;
-    ///
+    /// # use std::time::Duration;
     /// # use cot::cache::Cache;
     /// # use cot::cache::stores::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// use std::time::Duration;
-    /// let store = Arc::new(Memory::new());
+    ///
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
     /// let size = cache.approx_size().await?;
@@ -511,15 +513,15 @@ impl Cache {
     ///
     /// ```no_run
     /// # use std::sync::Arc;
-    ///
+    /// # use std::time::Duration;
     /// # use cot::cache::Cache;
     /// # use cot::cache::stores::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// use std::time::Duration;
-    /// let store = Arc::new(Memory::new());
+    ///
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
     /// // Check for non-existent key
@@ -536,6 +538,42 @@ impl Cache {
     pub async fn contains_key<K: AsRef<str>>(&self, key: K) -> CacheResult<bool> {
         let k = self.format_key(key.as_ref());
         let result = self.store.contains_key(&k).await?;
+        Ok(result)
+    }
+
+    /// Checks if the value associated with the key has expired.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there was a problem accessing the cache store.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use std::sync::Arc;
+    /// # use std::time::Duration;
+    ///
+    /// # use cot::cache::Cache;
+    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::config::Timeout;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let store = Memory::new();
+    /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(1)));
+    ///
+    /// cache.insert("temp:data", "temporary").await?;
+    /// let expired = cache.has_expired("temp:data").await?;
+    /// assert!(!expired);
+    /// tokio::time::sleep(Duration::from_secs(2)).await;
+    /// let expired = cache.has_expired("temp:data").await?;
+    /// assert!(expired);
+    ///    # Ok(())
+    /// # }
+    /// ```
+    pub async fn has_expired<K: AsRef<str>>(&self, key: K) -> CacheResult<bool> {
+        let k = self.format_key(key.as_ref());
+        let result = self.store.has_expired(&k).await?;
         Ok(result)
     }
 
@@ -562,7 +600,7 @@ impl Cache {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let store = Arc::new(Memory::new());
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
     /// cache
@@ -614,7 +652,7 @@ impl Cache {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let store = Arc::new(Memory::new());
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
     /// let value1: String = cache
@@ -676,7 +714,7 @@ impl Cache {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let store = Arc::new(Memory::new());
+    /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
     /// let value = cache
@@ -760,24 +798,24 @@ impl Cache {
     pub async fn from_config(config: &CacheConfig) -> CacheResult<Self> {
         let store_cfg = &config.store;
 
-        let store = match store_cfg.store_type {
-            CacheStoreTypeConfig::Memory => {
-                let mem_store = Memory::new();
-                Arc::new(mem_store)
-            }
-            _ => {
-                unimplemented!();
+        let this = {
+            match store_cfg.store_type {
+                CacheStoreTypeConfig::Memory => {
+                    let mem_store = Memory::new();
+                    Self::new(mem_store, config.prefix.clone(), config.timeout)
+                }
+                _ => {
+                    unimplemented!();
+                }
             }
         };
 
-        let this = Self::new(store, config.prefix.clone(), config.timeout);
         Ok(this)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use std::time::Duration;
 
     use serde::{Deserialize, Serialize};
@@ -795,7 +833,7 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_basic_operations() {
-        let store = Arc::new(Memory::new());
+        let store = Memory::new();
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
         cache.insert("user:1", "John Doe").await.unwrap();
@@ -809,7 +847,7 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_with_prefix() {
-        let store = Arc::new(Memory::new());
+        let store = Memory::new();
         let cache = Cache::new(
             store,
             Some("myapp".to_string()),
@@ -823,7 +861,7 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_complex_objects() {
-        let store = Arc::new(Memory::new());
+        let store = Memory::new();
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
         let user = User {
@@ -839,7 +877,7 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_insert_expiring() {
-        let store = Arc::new(Memory::new());
+        let store = Memory::new();
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
         cache
@@ -857,7 +895,7 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_get_or_insert_with() {
-        let store = Arc::new(Memory::new());
+        let store = Memory::new();
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
         let mut call_count = 0;
@@ -884,7 +922,7 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_get_or_insert_with_expiring() {
-        let store = Arc::new(Memory::new());
+        let store = Memory::new();
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
         let mut call_count = 0;
@@ -919,7 +957,7 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_statistics() {
-        let store = Arc::new(Memory::new());
+        let store = Memory::new();
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
         assert_eq!(cache.approx_size().await.unwrap(), 0);
@@ -935,12 +973,23 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_contains_key() {
-        let store = Arc::new(Memory::new());
+        let store = Memory::new();
         let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
 
         assert!(!cache.contains_key("nonexistent").await.unwrap());
 
         cache.insert("existing", "value").await.unwrap();
         assert!(cache.contains_key("existing").await.unwrap());
+    }
+
+    #[cot::test]
+    async fn test_cache_has_expired() {
+        let store = Memory::new();
+        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(1)));
+
+        cache.insert("temp:data", "temporary").await.unwrap();
+        assert!(!cache.has_expired("temp:data").await.unwrap());
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        assert!(cache.has_expired("temp:data").await.unwrap());
     }
 }

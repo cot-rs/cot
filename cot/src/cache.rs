@@ -7,7 +7,7 @@
 //!
 //! # Basic Usage
 //!
-//! ```no_run
+//! ```
 //! # use std::sync::Arc;
 //! # use std::time::Duration;
 //!
@@ -33,7 +33,7 @@
 //!
 //! // Retrieve a value
 //! let user: Option<String> = cache.get("user:123").await?;
-//! println!("User: {:?}", user);
+//! assert_eq!(user, Some("John Doe".to_string()));
 //!
 //! // Use lazy loading
 //! let expensive_value: String = cache
@@ -50,7 +50,7 @@
 //!
 //! # Advanced Usage
 //!
-//! ```no_run
+//! ```
 //! # use std::time::Duration;
 //!
 //! # use cot::cache::Cache;
@@ -160,7 +160,7 @@ pub type CacheResult<T> = Result<T, CacheError>;
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
 /// # use std::sync::Arc;
 /// # use std::time::Duration;
 ///
@@ -240,7 +240,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     ///
@@ -256,7 +256,7 @@ impl Cache {
     /// cache.insert("user:123", "John Doe").await?;
     ///
     /// let user: Option<String> = cache.get("user:123").await?;
-    /// assert_eq!(user, Some("user:123".to_string()));
+    /// assert_eq!(user, Some("John Doe".to_string()));
     ///
     /// let missing: Option<String> = cache.get("nonexistent").await?;
     /// assert!(missing.is_none());
@@ -292,7 +292,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     ///
@@ -347,7 +347,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     ///
@@ -396,7 +396,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     ///
@@ -433,7 +433,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use std::sync::Arc;
     /// use std::time::Duration;
     /// # use cot::cache::Cache;
@@ -473,7 +473,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     /// # use cot::cache::Cache;
@@ -511,7 +511,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     /// # use cot::cache::Cache;
@@ -549,7 +549,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     ///
@@ -590,7 +590,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     ///
@@ -642,7 +642,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     ///
@@ -704,7 +704,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     ///
@@ -772,7 +772,7 @@ impl Cache {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// # use std::time::Duration;
     ///
     /// # use cot::cache::Cache;

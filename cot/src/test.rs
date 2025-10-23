@@ -19,7 +19,7 @@ use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 #[cfg(feature = "cache")]
 use crate::cache::Cache;
 #[cfg(feature = "cache")]
-use crate::cache::stores::memory::Memory;
+use crate::cache::store::memory::Memory;
 use crate::config::ProjectConfig;
 #[cfg(feature = "db")]
 use crate::db::Database;

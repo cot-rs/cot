@@ -41,7 +41,7 @@ pub type CacheStoreResult<T> = Result<T, CacheStoreError>;
 /// basic CRUD operations as well as helpers to lazily compute and insert
 /// values, with optional expiration policies.
 pub trait CacheStore: Debug + Send + Sync + 'static {
-    /// Get a value by key. Returns `Ok(None)` if the key does not exist.
+    /// Get a value by a given key.
     ///
     /// # Errors
     ///
@@ -75,7 +75,10 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     /// This method can return error if there is an issue clearing the cache.
     fn clear(&self) -> impl Future<Output = CacheStoreResult<()>> + Send;
 
-    /// Return the number of entries in the cache.
+    /// Get an approximate count of entries in the cache.
+    ///
+    /// This is an approximate count and may or may not be exact depending on
+    /// the backend implementation.
     ///
     /// # Errors
     ///

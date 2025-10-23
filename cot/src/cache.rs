@@ -110,7 +110,7 @@
 //! # }
 //! ```
 
-pub mod stores;
+pub mod store;
 
 use std::future::Future;
 use std::sync::Arc;
@@ -120,8 +120,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 
-use crate::cache::stores::memory::Memory;
-use crate::cache::stores::{BoxCacheStore, CacheStore};
+use crate::cache::store::memory::Memory;
+use crate::cache::store::{BoxCacheStore, CacheStore};
 use crate::config::{CacheConfig, Timeout};
 use crate::error::error_impl::impl_into_cot_error;
 
@@ -134,7 +134,7 @@ pub enum CacheError {
     SerdeJson(#[from] serde_json::Error),
     /// An error occurred in the underlying cache store.
     #[error(transparent)]
-    Store(#[from] stores::CacheStoreError),
+    Store(#[from] store::CacheStoreError),
 }
 
 impl_into_cot_error!(CacheError, INTERNAL_SERVER_ERROR);
@@ -165,7 +165,7 @@ pub type CacheResult<T> = Result<T, CacheError>;
 /// # use std::time::Duration;
 ///
 /// # use cot::cache::Cache;
-/// # use cot::cache::stores::memory::Memory;
+/// # use cot::cache::store::memory::Memory;
 /// # use cot::config::Timeout;
 ///
 /// # #[tokio::main]
@@ -204,7 +204,7 @@ impl Cache {
     /// use std::time::Duration;
     ///
     /// use cot::cache::Cache;
-    /// use cot::cache::stores::memory::Memory;
+    /// use cot::cache::store::memory::Memory;
     /// use cot::config::Timeout;
     ///
     /// let store = Memory::new();
@@ -245,7 +245,7 @@ impl Cache {
     /// # use std::time::Duration;
     ///
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -297,7 +297,7 @@ impl Cache {
     /// # use std::time::Duration;
     ///
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     /// # use serde::{Deserialize, Serialize};
     ///
@@ -353,7 +353,7 @@ impl Cache {
     ///
     /// # use chrono::{DateTime, Utc};
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -401,7 +401,7 @@ impl Cache {
     /// # use std::time::Duration;
     ///
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -437,7 +437,7 @@ impl Cache {
     /// use std::sync::Arc;
     /// use std::time::Duration;
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -477,7 +477,7 @@ impl Cache {
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -515,7 +515,7 @@ impl Cache {
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -554,7 +554,7 @@ impl Cache {
     /// # use std::time::Duration;
     ///
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -595,7 +595,7 @@ impl Cache {
     /// # use std::time::Duration;
     ///
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -647,7 +647,7 @@ impl Cache {
     /// # use std::time::Duration;
     ///
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -709,7 +709,7 @@ impl Cache {
     /// # use std::time::Duration;
     ///
     /// # use cot::cache::Cache;
-    /// # use cot::cache::stores::memory::Memory;
+    /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
     ///
     /// # #[tokio::main]
@@ -821,7 +821,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     use super::*;
-    use crate::cache::stores::memory::Memory;
+    use crate::cache::store::memory::Memory;
     use crate::config::Timeout;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]

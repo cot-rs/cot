@@ -8,8 +8,8 @@
 //! # Examples
 //!
 //! ```no_run
-//! # use cot::cache::stores::memory::Memory;
-//! # use cot::cache::stores::CacheStore;
+//! # use cot::cache::store::memory::Memory;
+//! # use cot::cache::store::CacheStore;
 //! # use serde_json::json;
 //!
 //! # #[tokio::main]
@@ -33,7 +33,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use cot::cache::stores::{CacheStore, CacheStoreError, CacheStoreResult};
+use cot::cache::store::{CacheStore, CacheStoreError, CacheStoreResult};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -63,7 +63,7 @@ type InMemoryMap = HashMap<String, (Value, Option<Timeout>)>;
 ///
 /// # Examples
 /// ```
-/// use cot::cache::stores::memory::Memory;
+/// use cot::cache::store::memory::Memory;
 /// let store = Memory::new();
 /// ```
 
@@ -77,7 +77,7 @@ impl Memory {
     ///
     /// # Examples
     /// ```
-    /// use cot::cache::stores::memory::Memory;
+    /// use cot::cache::store::memory::Memory;
     /// let store = Memory::new();
     /// ```
     #[must_use]

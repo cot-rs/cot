@@ -7,7 +7,7 @@
 //!
 //! # Examples
 //!
-//! ```no_run
+//! ```
 //! # use cot::cache::store::memory::Memory;
 //! # use cot::cache::store::CacheStore;
 //! # use serde_json::json;

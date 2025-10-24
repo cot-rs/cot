@@ -482,8 +482,8 @@ impl Timeout {
     ///
     /// # Panics
     ///
-    /// This function will panic if the timeout variant is `After` and the `insertion_time`
-    /// is `None`.
+    /// This function will panic if the timeout variant is `After` and the
+    /// `insertion_time` is `None`.
     ///
     /// # Examples
     ///

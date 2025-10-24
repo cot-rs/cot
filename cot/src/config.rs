@@ -480,6 +480,11 @@ impl Timeout {
     /// Check if the timeout has expired, given the insertion time (with its
     /// fixed offset).
     ///
+    /// # Panics
+    ///
+    /// This function will panic if the timeout variant is `After` and the `insertion_time`
+    /// is `None`.
+    ///
     /// # Examples
     ///
     /// ```

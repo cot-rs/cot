@@ -11,17 +11,17 @@
 //! # use cot::cache::store::memory::Memory;
 //! # use cot::cache::store::CacheStore;
 //! # use serde_json::json;
-//!
+//! #
 //! # #[tokio::main]
 //! # async fn main() {
-//!     let store = Memory::new();
-//!     let key = "example_key".to_string();
-//!     let value = json!({"data": 42});
+//! let store = Memory::new();
+//! let key = "example_key".to_string();
+//! let value = json!({"data": 42});
 //!
-//!     store.insert(key.clone(), value, Default::default()).await.unwrap();
-//!     let retrieved = store.get(&key).await.unwrap();
+//! store.insert(key.clone(), value, Default::default()).await.unwrap();
+//! let retrieved = store.get(&key).await.unwrap();
 //!
-//!     assert_eq!(retrieved, Some(json!({"data": 42})));
+//! assert_eq!(retrieved, Some(json!({"data": 42})));
 //! # }
 //! ```
 //!

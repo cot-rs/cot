@@ -27,7 +27,7 @@
 //!
 //! # Expiration Policies
 //!
-//! Keys are only removed eagerly when accessed via `get` or `has_expired`.
+//! Keys are only removed eagerly when accessed via `get` or `contains_key`.
 //! There is no background task to clean up expired keys.
 
 use std::collections::HashMap;
@@ -66,7 +66,6 @@ type InMemoryMap = HashMap<String, (Value, Option<Timeout>)>;
 /// use cot::cache::store::memory::Memory;
 /// let store = Memory::new();
 /// ```
-
 #[derive(Debug, Clone, Default)]
 pub struct Memory {
     map: Arc<Mutex<InMemoryMap>>,
@@ -134,17 +133,6 @@ impl CacheStore for Memory {
                 return Ok(false);
             }
             return Ok(true);
-        }
-        Ok(false)
-    }
-
-    async fn has_expired(&self, key: &str) -> CacheStoreResult<bool> {
-        let mut map = self.map.lock().await;
-        if let Some((_, Some(timeout))) = map.get(key) {
-            if timeout.is_expired(None) {
-                map.remove(key);
-                return Ok(true);
-            }
         }
         Ok(false)
     }

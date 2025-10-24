@@ -40,7 +40,7 @@ pub type CacheStoreResult<T> = Result<T, CacheStoreError>;
 /// The `CacheStore` trait abstracts over different cache backends. It supports
 /// basic CRUD operations as well as helpers to lazily compute and insert
 /// values, with optional expiration policies.
-pub trait CacheStore: Debug + Send + Sync + 'static {
+pub trait CacheStore: Send + Sync + 'static {
     /// Get a value by a given key.
     ///
     /// # Errors
@@ -92,17 +92,9 @@ pub trait CacheStore: Debug + Send + Sync + 'static {
     /// This method can return error if there is an issue checking the presence
     /// of the key.
     fn contains_key(&self, key: &str) -> impl Future<Output = CacheStoreResult<bool>> + Send;
-
-    /// Check if the value associated with the key has expired.
-    ///
-    ///  # Errors
-    ///
-    /// This method can return error if there is an issue checking the
-    /// expiration status.
-    fn has_expired(&self, key: &str) -> impl Future<Output = CacheStoreResult<bool>> + Send;
 }
 
-pub(crate) trait BoxCacheStore: Debug + Send + Sync + 'static {
+pub(crate) trait BoxCacheStore: Send + Sync + 'static {
     fn get<'a>(
         &'a self,
         key: &'a str,
@@ -127,11 +119,6 @@ pub(crate) trait BoxCacheStore: Debug + Send + Sync + 'static {
     ) -> Pin<Box<dyn Future<Output = CacheStoreResult<usize>> + Send + 'a>>;
 
     fn contains_key<'a>(
-        &'a self,
-        key: &'a str,
-    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>>;
-
-    fn has_expired<'a>(
         &'a self,
         key: &'a str,
     ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>>;
@@ -176,12 +163,5 @@ impl<T: CacheStore> BoxCacheStore for T {
         key: &'a str,
     ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>> {
         Box::pin(async move { T::contains_key(self, key).await })
-    }
-
-    fn has_expired<'a>(
-        &'a self,
-        key: &'a str,
-    ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>> {
-        Box::pin(async move { T::has_expired(self, key).await })
     }
 }

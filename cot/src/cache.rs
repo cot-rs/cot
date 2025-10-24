@@ -10,10 +10,10 @@
 //! ```
 //! # use std::sync::Arc;
 //! # use std::time::Duration;
-//!
+//! #
 //! # use cot::cache::Cache;
 //! # use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig, Timeout};
-//!
+//! #
 //! # #[tokio::main]
 //! # async fn main() -> cot::Result<()> {
 //! let config = CacheConfig::builder()
@@ -44,7 +44,7 @@
 //!     })
 //!     .await?;
 //!
-//!     # Ok(())
+//! # Ok(())
 //! # }
 //! ```
 //!
@@ -52,11 +52,11 @@
 //!
 //! ```
 //! # use std::time::Duration;
-//!
+//! #
 //! # use cot::cache::Cache;
 //! # use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig, Timeout};
 //! # use serde::{Deserialize, Serialize};
-//!
+//! #
 //! #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 //! struct User {
 //!     id: u32,
@@ -106,12 +106,13 @@
 //! let size = cache.approx_size().await?;
 //! println!("Cache has {size:?} items");
 //!
-//!     # Ok(())
+//! # Ok(())
 //! # }
 //! ```
 
 pub mod store;
 
+use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -163,11 +164,11 @@ pub type CacheResult<T> = Result<T, CacheError>;
 /// ```
 /// # use std::sync::Arc;
 /// # use std::time::Duration;
-///
+/// #
 /// # use cot::cache::Cache;
 /// # use cot::cache::store::memory::Memory;
 /// # use cot::config::Timeout;
-///
+/// #
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
 /// let store = Memory::new();
@@ -183,10 +184,10 @@ pub type CacheResult<T> = Result<T, CacheError>;
 /// let user: Option<String> = cache.get("user:123").await?;
 /// assert_eq!(user, Some("John Doe".to_string()));
 ///
-///     # Ok(())
+/// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Cache {
     store: Arc<dyn BoxCacheStore>,
     prefix: Option<String>,
@@ -203,6 +204,7 @@ impl Cache {
     /// use std::sync::Arc;
     /// use std::time::Duration;
     ///
+    /// #
     /// use cot::cache::Cache;
     /// use cot::cache::store::memory::Memory;
     /// use cot::config::Timeout;
@@ -231,7 +233,8 @@ impl Cache {
         k.to_string()
     }
 
-    /// Retrieves a value from the cache.
+    /// Retrieves a value from the cache. Returns `None` if the key does not
+    /// exist.
     ///
     /// # Errors
     ///
@@ -243,11 +246,11 @@ impl Cache {
     /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
-    ///
+    /// #
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let store = Memory::new();
@@ -261,7 +264,7 @@ impl Cache {
     /// let missing: Option<String> = cache.get("nonexistent").await?;
     /// assert!(missing.is_none());
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn get<K, V>(&self, key: K) -> CacheResult<Option<V>>
@@ -295,7 +298,7 @@ impl Cache {
     /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
-    ///
+    /// #
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
@@ -320,7 +323,7 @@ impl Cache {
     /// };
     /// cache.insert("user:123", &user).await?;
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn insert<K, V>(&self, key: K, value: V) -> CacheResult<()>
@@ -350,12 +353,12 @@ impl Cache {
     /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
-    ///
+    /// #
     /// # use chrono::{DateTime, Utc};
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let store = Memory::new();
@@ -373,7 +376,7 @@ impl Cache {
     ///     .insert_expiring("user:session", "session_data", Timeout::Never)
     ///     .await?;
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn insert_expiring<K, V>(&self, key: K, value: V, expiry: Timeout) -> CacheResult<()>
@@ -399,7 +402,7 @@ impl Cache {
     /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
-    ///
+    /// #
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
@@ -414,7 +417,7 @@ impl Cache {
     /// let user: Option<String> = cache.get("user:123").await?;
     /// assert!(user.is_none());
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn remove<K: AsRef<str>>(&self, key: K) -> CacheResult<()> {
@@ -434,15 +437,14 @@ impl Cache {
     /// # Examples
     ///
     /// ```
-    /// use std::sync::Arc;
-    /// use std::time::Duration;
+    /// # use std::sync::Arc;
+    /// # use std::time::Duration;
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    ///
     /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
@@ -457,7 +459,7 @@ impl Cache {
     /// let size = cache.approx_size().await?;
     /// assert_eq!(size, 0); // 0
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn clear(&self) -> CacheResult<()> {
@@ -466,6 +468,9 @@ impl Cache {
     }
 
     /// Returns the approximate number of entries in the cache.
+    ///
+    /// This is an approximate count and may not be exact depending on the
+    /// backend implementation.
     ///
     /// # Errors
     ///
@@ -479,10 +484,9 @@ impl Cache {
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    ///
     /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
@@ -495,7 +499,7 @@ impl Cache {
     /// let size = cache.approx_size().await?;
     /// assert_eq!(size, 2);
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn approx_size(&self) -> CacheResult<usize> {
@@ -517,10 +521,9 @@ impl Cache {
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    ///
     /// let store = Memory::new();
     /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(300)));
     ///
@@ -532,48 +535,12 @@ impl Cache {
     /// let exists = cache.contains_key("user:123").await?;
     /// assert!(exists);
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn contains_key<K: AsRef<str>>(&self, key: K) -> CacheResult<bool> {
         let k = self.format_key(key.as_ref());
         let result = self.store.contains_key(&k).await?;
-        Ok(result)
-    }
-
-    /// Checks if the value associated with the key has expired.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if there was a problem accessing the cache store.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::sync::Arc;
-    /// # use std::time::Duration;
-    ///
-    /// # use cot::cache::Cache;
-    /// # use cot::cache::store::memory::Memory;
-    /// # use cot::config::Timeout;
-    ///
-    /// # #[tokio::main]
-    /// # async fn main() -> cot::Result<()> {
-    /// let store = Memory::new();
-    /// let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(1)));
-    ///
-    /// cache.insert("temp:data", "temporary").await?;
-    /// let expired = cache.has_expired("temp:data").await?;
-    /// assert!(!expired);
-    /// tokio::time::sleep(Duration::from_secs(2)).await;
-    /// let expired = cache.has_expired("temp:data").await?;
-    /// assert!(expired);
-    ///    # Ok(())
-    /// # }
-    /// ```
-    pub async fn has_expired<K: AsRef<str>>(&self, key: K) -> CacheResult<bool> {
-        let k = self.format_key(key.as_ref());
-        let result = self.store.has_expired(&k).await?;
         Ok(result)
     }
 
@@ -593,11 +560,11 @@ impl Cache {
     /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
-    ///
+    /// #
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let store = Memory::new();
@@ -611,7 +578,7 @@ impl Cache {
     /// let value: Option<String> = cache.get("expensive").await?;
     /// assert_eq!(value, Some("computed result".to_string()));
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn insert_with<F, Fut, K, V>(&self, key: K, f: F) -> CacheResult<()>
@@ -645,11 +612,11 @@ impl Cache {
     /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
-    ///
+    /// #
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let store = Memory::new();
@@ -664,7 +631,7 @@ impl Cache {
     ///     .await?;
     ///
     /// assert_eq!(value1, value2);
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn get_or_insert_with<F, Fut, K, V>(&self, key: K, f: F) -> CacheResult<V>
@@ -707,11 +674,11 @@ impl Cache {
     /// ```
     /// # use std::sync::Arc;
     /// # use std::time::Duration;
-    ///
+    /// #
     /// # use cot::cache::Cache;
     /// # use cot::cache::store::memory::Memory;
     /// # use cot::config::Timeout;
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let store = Memory::new();
@@ -737,7 +704,7 @@ impl Cache {
     ///
     /// assert_eq!(session, "session_data".to_string());
     ///
-    ///     # Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn get_or_insert_expiring_with<F, Fut, K, V>(
@@ -774,10 +741,10 @@ impl Cache {
     ///
     /// ```
     /// # use std::time::Duration;
-    ///
+    /// #
     /// # use cot::cache::Cache;
     /// # use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig, Timeout};
-    ///
+    /// #
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
     /// let config = CacheConfig::builder()
@@ -791,7 +758,7 @@ impl Cache {
     ///     .build();
     ///
     /// let cache = Cache::from_config(&config).await?;
-    /// Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     #[expect(clippy::unused_async)]
@@ -811,6 +778,16 @@ impl Cache {
         };
 
         Ok(this)
+    }
+}
+
+impl Debug for Cache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Cache")
+            .field("prefix", &self.prefix)
+            .field("expiry", &self.expiry)
+            .field("store", &"Arc<dyn CacheStore>")
+            .finish()
     }
 }
 
@@ -980,16 +957,5 @@ mod tests {
 
         cache.insert("existing", "value").await.unwrap();
         assert!(cache.contains_key("existing").await.unwrap());
-    }
-
-    #[cot::test]
-    async fn test_cache_has_expired() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(1)));
-
-        cache.insert("temp:data", "temporary").await.unwrap();
-        assert!(!cache.has_expired("temp:data").await.unwrap());
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        assert!(cache.has_expired("temp:data").await.unwrap());
     }
 }

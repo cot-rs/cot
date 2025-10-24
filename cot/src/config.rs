@@ -503,7 +503,7 @@ impl Timeout {
                     let now_in_offset = Utc::now().with_timezone(time.offset());
                     return now_in_offset >= expiry_time;
                 }
-                false
+                panic!("insertion_time is required for Timeout::After expiry check");
             }
             Timeout::AtDateTime(dt) => {
                 let now_in_offset = Utc::now().with_timezone(dt.offset());
@@ -522,14 +522,13 @@ impl Timeout {
     #[expect(clippy::missing_panics_doc)]
     pub fn canonicalize(self) -> Self {
         match self {
-            Timeout::Never => Timeout::Never,
             Timeout::After(duration) => {
                 let time_now = Utc::now().with_timezone(&FixedOffset::east_opt(0).expect("conversion to FixedOffset(0) should not fail since 0 is a valid timezone offset"));
                 let expiry_time =
                     time_now + chrono::Duration::from_std(duration).unwrap_or_default();
                 Timeout::AtDateTime(expiry_time)
             }
-            Timeout::AtDateTime(dt) => Timeout::AtDateTime(dt),
+            timeout => timeout,
         }
     }
 }
@@ -2607,12 +2606,6 @@ mod tests {
     }
 
     #[test]
-    fn after_with_no_insertion_time_is_not_expired() {
-        let timeout = Timeout::After(Duration::from_secs(60));
-        assert!(!timeout.is_expired(None));
-    }
-
-    #[test]
     fn after_is_expired_based_on_insertion_offset() {
         // insertion_time is 1 hour in the past with +1h offset
         let offset = FixedOffset::east_opt(3600).unwrap();
@@ -2630,6 +2623,13 @@ mod tests {
             (Utc::now() - chrono::Duration::seconds(10)).with_timezone(&offset);
         let timeout = Timeout::After(Duration::from_secs(60));
         assert!(!timeout.is_expired(Some(insertion_time)));
+    }
+
+    #[test]
+    #[should_panic(expected = "insertion_time is required for Timeout::After expiry check")]
+    fn after_is_expired_panics_with_no_insertion_time() {
+        let timeout = Timeout::After(Duration::from_secs(60));
+        let _ = timeout.is_expired(None);
     }
 
     #[test]

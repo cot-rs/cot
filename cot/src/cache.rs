@@ -204,7 +204,6 @@ impl Cache {
     /// use std::sync::Arc;
     /// use std::time::Duration;
     ///
-    /// #
     /// use cot::cache::Cache;
     /// use cot::cache::store::memory::Memory;
     /// use cot::config::Timeout;

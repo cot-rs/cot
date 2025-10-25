@@ -39,7 +39,11 @@ use crate::admin::AdminModelManager;
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{AuthBackend, NoAuthBackend};
+#[cfg(feature = "cache")]
+use crate::cache::Cache;
 use crate::cli::Cli;
+#[cfg(feature = "cache")]
+use crate::config::CacheConfig;
 #[cfg(feature = "db")]
 use crate::config::DatabaseConfig;
 use crate::config::{AuthBackendConfig, ProjectConfig};
@@ -433,11 +437,11 @@ pub type RegisterAppsContext = ProjectContext<WithConfig>;
 
 /// An alias for `ProjectContext` in appropriate phase for use with the
 /// [`Project::auth_backend`] method.
-pub type AuthBackendContext = ProjectContext<WithDatabase>;
+pub type AuthBackendContext = ProjectContext<WithCache>;
 
 /// An alias for `ProjectContext` in appropriate phase for use with the
 /// [`Project::middlewares`] method.
-pub type MiddlewareContext = ProjectContext<WithDatabase>;
+pub type MiddlewareContext = ProjectContext<WithCache>;
 
 /// A helper struct to build the root handler for the project.
 ///
@@ -1268,6 +1272,108 @@ impl Bootstrapper<WithDatabase> {
     /// ```
     // Function marked `async` to be consistent with the other `boot` methods
     // Send not needed; Bootstrapper is run async in a single thread
+    #[expect(clippy::future_not_send)]
+    pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
+        self.with_cache().await?.boot().await
+    }
+
+    /// Moves forward to the next phase of bootstrapping, the with-cache phase.
+    ///
+    /// See the [`BootstrapPhase`] and [`WithCache`] documentation for more
+    /// details.
+    ///
+    /// # Errors
+    ///
+    /// This method may return an error if it cannot initialize the cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use cot::project::{Bootstrapper, WithApps};
+    /// use cot::{AppBuilder, Project};
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {}
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let bootstrapper = Bootstrapper::new(MyProject)
+    ///     .with_config(ProjectConfig::default())
+    ///     .with_apps()
+    ///     .with_database()
+    ///     .await?
+    ///     .with_cache()
+    ///     .await?
+    ///     .boot()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[expect(clippy::future_not_send)]
+    #[allow(
+        clippy::unused_async,
+        clippy::allow_attributes,
+        reason = "see https://github.com/cot-rs/cot/pull/399#discussion_r2430379966"
+    )]
+    pub async fn with_cache(self) -> cot::Result<Bootstrapper<WithCache>> {
+        #[cfg(feature = "cache")]
+        let cache = Self::init_cache(&self.context.config.cache).await?;
+
+        let context = self.context.with_cache(
+            #[cfg(feature = "cache")]
+            cache,
+        );
+
+        Ok(Bootstrapper {
+            project: self.project,
+            context,
+            handler: self.handler,
+            error_handler: self.error_handler,
+        })
+    }
+
+    #[cfg(feature = "cache")]
+    async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
+        let cache = Cache::from_config(config).await.map(Arc::new)?;
+        Ok(cache)
+    }
+}
+
+impl Bootstrapper<WithCache> {
+    /// Builds the Cot project instance.
+    ///
+    /// This is the final step in the bootstrapping process. It initializes the
+    /// project with the given configuration and returns a [`Bootstrapper`]
+    /// instance that contains the project's context and handler.
+    /// /// You shouldn't have to use this method directly most of the time.
+    /// It's mainly useful for controlling the bootstrapping process in
+    /// custom [`CliTask`](cli::CliTask)s.
+    ///
+    /// # Errors
+    ///
+    /// This method may return an error if it cannot initialize any of the
+    /// project's components, such as the database.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use cot::{Bootstrapper, Project};
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {}
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let bootstrapper = Bootstrapper::new(MyProject)
+    ///     .with_config(ProjectConfig::default())
+    ///     .boot()
+    ///     .await?;
+    /// let bootstrapped_project = bootstrapper.finish();
+    /// # Ok(())
+    /// # }
+    /// ```
     #[expect(clippy::unused_async, clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
@@ -1379,7 +1485,8 @@ mod sealed {
 /// 2. [`WithConfig`]
 /// 3. [`WithApps`]
 /// 4. [`WithDatabase`]
-/// 5. [`Initialized`]
+/// 5. [`WithCache`]
+/// 6. [`Initialized`]
 ///
 /// # Sealed
 ///
@@ -1428,6 +1535,9 @@ pub trait BootstrapPhase: sealed::Sealed {
     type Database: Debug;
     /// The type of the auth backend.
     type AuthBackend;
+    /// The type of the cache.
+    #[cfg(feature = "cache")]
+    type Cache: Debug;
 }
 
 /// First phase of bootstrapping a Cot project, the uninitialized phase.
@@ -1449,6 +1559,8 @@ impl BootstrapPhase for Uninitialized {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    #[cfg(feature = "cache")]
+    type Cache = ();
 }
 
 /// Second phase of bootstrapping a Cot project, the with-config phase.
@@ -1470,6 +1582,8 @@ impl BootstrapPhase for WithConfig {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    #[cfg(feature = "cache")]
+    type Cache = ();
 }
 
 /// Third phase of bootstrapping a Cot project, the with-apps phase.
@@ -1491,6 +1605,8 @@ impl BootstrapPhase for WithApps {
     #[cfg(feature = "db")]
     type Database = ();
     type AuthBackend = ();
+    #[cfg(feature = "cache")]
+    type Cache = ();
 }
 
 /// Fourth phase of bootstrapping a Cot project, the with-database phase.
@@ -1512,6 +1628,31 @@ impl BootstrapPhase for WithDatabase {
     #[cfg(feature = "db")]
     type Database = Option<Arc<Database>>;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
+    #[cfg(feature = "cache")]
+    type Cache = ();
+}
+
+/// Fifth phase of bootstrapping a Cot project, the with-cache phase.
+///
+/// # See also
+///
+/// See the details about the different bootstrap phases in the
+/// [`BootstrapPhase`] trait documentation.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum WithCache {}
+
+impl sealed::Sealed for WithCache {}
+impl BootstrapPhase for WithCache {
+    type RequestHandler = ();
+    type ErrorHandler = ();
+    type Config = <WithApps as BootstrapPhase>::Config;
+    type Apps = <WithApps as BootstrapPhase>::Apps;
+    type Router = <WithApps as BootstrapPhase>::Router;
+    #[cfg(feature = "db")]
+    type Database = Option<Arc<Database>>;
+    type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
+    #[cfg(feature = "cache")]
+    type Cache = Arc<Cache>;
 }
 
 /// The final phase of bootstrapping a Cot project, the initialized phase.
@@ -1533,6 +1674,8 @@ impl BootstrapPhase for Initialized {
     #[cfg(feature = "db")]
     type Database = <WithDatabase as BootstrapPhase>::Database;
     type AuthBackend = Arc<dyn AuthBackend>;
+    #[cfg(feature = "cache")]
+    type Cache = <WithCache as BootstrapPhase>::Cache;
 }
 
 /// Shared context and configs for all apps. Used in conjunction with the
@@ -1547,6 +1690,8 @@ pub struct ProjectContext<S: BootstrapPhase = Initialized> {
     database: S::Database,
     #[debug("..")]
     auth_backend: S::AuthBackend,
+    #[cfg(feature = "cache")]
+    cache: S::Cache,
 }
 
 impl ProjectContext<Uninitialized> {
@@ -1559,6 +1704,8 @@ impl ProjectContext<Uninitialized> {
             #[cfg(feature = "db")]
             database: (),
             auth_backend: (),
+            #[cfg(feature = "cache")]
+            cache: (),
         }
     }
 
@@ -1570,6 +1717,8 @@ impl ProjectContext<Uninitialized> {
             #[cfg(feature = "db")]
             database: self.database,
             auth_backend: self.auth_backend,
+            #[cfg(feature = "cache")]
+            cache: self.cache,
         }
     }
 }
@@ -1610,6 +1759,8 @@ impl ProjectContext<WithConfig> {
             #[cfg(feature = "db")]
             database: self.database,
             auth_backend: self.auth_backend,
+            #[cfg(feature = "cache")]
+            cache: self.cache,
         }
     }
 }
@@ -1649,11 +1800,29 @@ impl ProjectContext<WithApps> {
             #[cfg(feature = "db")]
             database,
             auth_backend: self.auth_backend,
+            #[cfg(feature = "cache")]
+            cache: self.cache,
         }
     }
 }
 
 impl ProjectContext<WithDatabase> {
+    #[must_use]
+    fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
+        ProjectContext {
+            config: self.config,
+            apps: self.apps,
+            router: self.router,
+            auth_backend: self.auth_backend,
+            #[cfg(feature = "db")]
+            database: self.database,
+            #[cfg(feature = "cache")]
+            cache,
+        }
+    }
+}
+
+impl ProjectContext<WithCache> {
     #[must_use]
     fn with_auth(self, auth_backend: Arc<dyn AuthBackend>) -> ProjectContext<Initialized> {
         ProjectContext {
@@ -1663,6 +1832,8 @@ impl ProjectContext<WithDatabase> {
             auth_backend,
             #[cfg(feature = "db")]
             database: self.database,
+            #[cfg(feature = "cache")]
+            cache: self.cache,
         }
     }
 }
@@ -1675,6 +1846,7 @@ impl ProjectContext<Initialized> {
         router: <Initialized as BootstrapPhase>::Router,
         auth_backend: <Initialized as BootstrapPhase>::AuthBackend,
         #[cfg(feature = "db")] database: <Initialized as BootstrapPhase>::Database,
+        #[cfg(feature = "cache")] cache: <Initialized as BootstrapPhase>::Cache,
     ) -> Self {
         Self {
             config,
@@ -1683,6 +1855,8 @@ impl ProjectContext<Initialized> {
             #[cfg(feature = "db")]
             database,
             auth_backend,
+            #[cfg(feature = "cache")]
+            cache,
         }
     }
 }
@@ -1730,6 +1904,29 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
     #[must_use]
     pub fn auth_backend(&self) -> &Arc<dyn AuthBackend> {
         &self.auth_backend
+    }
+}
+
+#[cfg(feature = "cache")]
+impl<S: BootstrapPhase<Cache = Arc<Cache>>> ProjectContext<S> {
+    /// Returns the cache for the project.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn index(request: Request) -> cot::Result<Response> {
+    ///     let cache = request.context().cache();
+    ///     // ...
+    /// #    unimplemented!()
+    /// }
+    /// ```
+    #[must_use]
+    #[cfg(feature = "cache")]
+    pub fn cache(&self) -> &Arc<Cache> {
+        &self.cache
     }
 }
 
@@ -2137,13 +2334,14 @@ async fn shutdown_signal() {
 mod tests {
     use std::task::{Context, Poll};
 
+    use cot::cache;
     use tower::util::MapResultLayer;
     use tower::{ServiceExt, service_fn};
 
     use super::*;
     use crate::StatusCode;
     use crate::auth::UserId;
-    use crate::config::SecretKey;
+    use crate::config::{SecretKey, Timeout};
     use crate::error::handler::{RequestError, RequestOuterError};
     use crate::html::Html;
     use crate::request::extractors::FromRequestHead;
@@ -2323,6 +2521,12 @@ mod tests {
 
     #[cot::test]
     async fn default_auth_backend() {
+        let cache_memory = Arc::new(Cache::new(
+            cache::store::memory::Memory::new(),
+            None,
+            Timeout::default(),
+        ));
+
         let context = ProjectContext::new()
             .with_config(
                 ProjectConfig::builder()
@@ -2330,7 +2534,8 @@ mod tests {
                     .build(),
             )
             .with_apps(vec![], Arc::new(Router::empty()))
-            .with_database(None);
+            .with_database(None)
+            .with_cache(cache_memory);
 
         let auth_backend = TestProject.auth_backend(&context);
         assert!(

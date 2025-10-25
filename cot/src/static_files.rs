@@ -571,6 +571,9 @@ mod tests {
             .with_apps()
             .with_database()
             .await
+            .unwrap()
+            .with_cache()
+            .await
             .unwrap();
         let middleware = StaticFilesMiddleware::from_context(bootstrapper.context());
         let static_files = middleware.static_files;

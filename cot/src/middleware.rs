@@ -732,7 +732,7 @@ mod tests {
         SessionStoreConfig, SessionStoreTypeConfig,
     };
     use crate::middleware::SessionMiddleware;
-    use crate::project::{RegisterAppsContext, WithDatabase};
+    use crate::project::{RegisterAppsContext, WithCache};
     use crate::response::Response;
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
@@ -876,7 +876,7 @@ mod tests {
         assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
 
-    async fn create_svc_and_call_with_req(context: &ProjectContext<WithDatabase>) {
+    async fn create_svc_and_call_with_req(context: &ProjectContext<WithCache>) {
         let store = SessionMiddleware::from_context(context);
         let svc = tower::service_fn(|req: Request<Body>| async move {
             assert!(req.extensions().get::<Session>().is_some());
@@ -925,6 +925,9 @@ mod tests {
             .with_apps()
             .with_database()
             .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
             .expect("bootstrap failed");
         let context = bootstrapper.context();
 
@@ -942,6 +945,9 @@ mod tests {
             .with_config(config)
             .with_apps()
             .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
             .await
             .expect("bootstrap failed");
         let context = bootstrapper.context();
@@ -962,6 +968,9 @@ mod tests {
             .with_apps()
             .with_database()
             .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
             .expect("bootstrap failed");
         let context = bootstrapper.context();
 
@@ -980,6 +989,9 @@ mod tests {
             .with_config(config)
             .with_apps()
             .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
             .await
             .expect("bootstrap failed");
         let context = bootstrapper.context();

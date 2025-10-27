@@ -41,10 +41,7 @@
 //! [examples in the repository](https://github.com/cot-rs/cot/tree/master/examples).
 
 #![warn(missing_docs, rustdoc::missing_crate_level_docs)]
-#![cfg_attr(
-    docsrs,
-    feature(doc_cfg, doc_auto_cfg, rustdoc_missing_doc_code_examples)
-)]
+#![cfg_attr(docsrs, feature(doc_cfg, rustdoc_missing_doc_code_examples))]
 #![cfg_attr(docsrs, warn(rustdoc::missing_doc_code_examples))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/cot-rs/media/6585c518/logo/logo.svg",

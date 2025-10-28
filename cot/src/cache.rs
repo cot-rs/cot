@@ -112,11 +112,11 @@
 
 pub mod store;
 
-use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
 
 use cot::config::CacheStoreTypeConfig;
+use derive_more::with_trait::Debug;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
@@ -187,8 +187,9 @@ pub type CacheResult<T> = Result<T, CacheError>;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Cache {
+    #[debug("..")]
     store: Arc<dyn BoxCacheStore>,
     prefix: Option<String>,
     expiry: Timeout,
@@ -780,17 +781,9 @@ impl Cache {
     }
 }
 
-impl Debug for Cache {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Cache")
-            .field("prefix", &self.prefix)
-            .field("expiry", &self.expiry)
-            .finish()
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use std::fmt::Debug;
     use std::time::Duration;
 
     use serde::{Deserialize, Serialize};

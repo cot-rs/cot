@@ -785,7 +785,6 @@ impl Debug for Cache {
         f.debug_struct("Cache")
             .field("prefix", &self.prefix)
             .field("expiry", &self.expiry)
-            .field("store", &"Arc<dyn CacheStore>")
             .finish()
     }
 }

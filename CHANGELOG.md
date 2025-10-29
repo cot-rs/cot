@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/cot-rs/cot/compare/cot-v0.4.0...cot-v0.5.0) - 2025-10-29
+
+[View diff on diff.rs](https://diff.rs/cot/0.4.0/cot/0.5.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Cache support with pluggable backends ([#399](https://github.com/cot-rs/cot/pull/399)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+
+### Fixes
+
+- Clippy errors ([#402](https://github.com/cot-rs/cot/pull/402)) (by [@m4tx](https://github.com/m4tx))
+
+### Other
+
+- [**breaking**] Rename opt to opts ([#398](https://github.com/cot-rs/cot/pull/398)) (by [@seqre](https://github.com/seqre))
+- *(deps)* Bump the dependencies group with 22 updates ([#401](https://github.com/cot-rs/cot/pull/401)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- Remove `#[cfg(doc_auto_cfg)]` ([#406](https://github.com/cot-rs/cot/pull/406)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.4.0](https://github.com/cot-rs/cot/compare/cot-v0.3.1...cot-v0.4.0) - 2025-09-11
 
 [View diff on diff.rs](https://diff.rs/cot/0.3.1/cot/0.4.0/Cargo.toml)

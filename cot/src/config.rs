@@ -819,6 +819,14 @@ impl CacheStoreConfigBuilder {
     }
 }
 
+const fn default_redis_pool_size() -> usize {
+    10
+}
+
+const fn is_default_redis_pool_size(size: &usize) -> bool {
+    *size == default_redis_pool_size()
+}
+
 /// The type of cache store backend to use.
 ///
 /// This specifies which backend is used for caching: `in-memory`, `Redis`,
@@ -871,10 +879,14 @@ pub enum CacheStoreTypeConfig {
         /// The URL of the Redis server.
         url: CacheUrl,
         /// Connection pool size for Redis connections.
-        #[serde(skip_serializing_if = "Option::is_none")]
+
         /// This controls how many connections to maintain in the connection
         /// pool. When not specified, a default pool size is used.
-        pool_size: Option<u32>,
+        #[serde(
+            default = "default_redis_pool_size",
+            skip_serializing_if = "is_default_redis_pool_size"
+        )]
+        pool_size: usize,
     },
     /// File-based cache store.
 
@@ -2044,6 +2056,21 @@ impl CacheUrl {
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+
+    /// Checks if the cache URL is for a Redis cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheUrl;
+    ///
+    /// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
+    /// assert!(url.is_redis());
+    /// ```
+    #[must_use]
+    pub fn is_redis(&self) -> bool {
+        self.0.scheme() == "redis"
     }
 }
 

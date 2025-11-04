@@ -122,6 +122,8 @@ use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 use crate::cache::store::memory::Memory;
+#[cfg(feature = "redis")]
+use crate::cache::store::redis::Redis;
 use crate::cache::store::{BoxCacheStore, CacheStore};
 use crate::config::{CacheConfig, Timeout};
 use crate::error::error_impl::impl_into_cot_error;
@@ -770,6 +772,11 @@ impl Cache {
                 CacheStoreTypeConfig::Memory => {
                     let mem_store = Memory::new();
                     Self::new(mem_store, config.prefix.clone(), config.timeout)
+                }
+                #[cfg(feature = "redis")]
+                CacheStoreTypeConfig::Redis {ref url, pool_size} => {
+                    let redis_store = Redis::new(url.clone(), pool_size).await?;
+                    Self::new(redis_store, config.prefix.clone(), config.timeout)
                 }
                 _ => {
                     unimplemented!();

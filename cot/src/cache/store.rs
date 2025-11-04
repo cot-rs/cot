@@ -6,6 +6,8 @@
 //! cached values, optionally with expiration policies.
 
 pub mod memory;
+#[cfg(feature = "redis")]
+pub mod redis;
 
 use std::fmt::Debug;
 use std::pin::Pin;

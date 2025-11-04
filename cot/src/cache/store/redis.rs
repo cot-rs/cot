@@ -1,11 +1,11 @@
-use deadpool_redis::{Pool, Runtime, Config, Connection};
+use crate::cache::store::{CacheStore, CacheStoreError};
+use crate::config::CacheUrl;
+use cot::cache::store::CacheStoreResult;
+use cot::config::Timeout;
+use deadpool_redis::{Config, Connection, Pool, Runtime};
 use redis::{AsyncCommands, SetExpiry, SetOptions};
 use serde_json::Value;
 use thiserror::Error;
-use cot::cache::store::CacheStoreResult;
-use cot::config::Timeout;
-use crate::config::CacheUrl;
-use crate::cache::store::{CacheStore, CacheStoreError};
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -28,7 +28,6 @@ pub enum RedisCacheStoreError {
     Deserialize(String),
 }
 
-
 impl From<RedisCacheStoreError> for CacheStoreError {
     fn from(err: RedisCacheStoreError) -> Self {
         match err {
@@ -39,44 +38,57 @@ impl From<RedisCacheStoreError> for CacheStoreError {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Redis {
-    pool: Pool
+    pool: Pool,
 }
 
-impl Redis{
+impl Redis {
     pub async fn new(url: CacheUrl, pool_size: usize) -> CacheStoreResult<Self> {
-        if !url.is_redis(){
-            return Err(RedisCacheStoreError::InvalidConnectionString(url.as_str().to_string()).into());
+        if !url.is_redis() {
+            return Err(
+                RedisCacheStoreError::InvalidConnectionString(url.as_str().to_string()).into(),
+            );
         }
-        let cfg = Config::from_url(url.as_str()).builder().unwrap().max_size(pool_size).runtime(Runtime::Tokio1).build().unwrap();
+        let cfg = Config::from_url(url.as_str())
+            .builder()
+            .unwrap()
+            .max_size(pool_size)
+            .runtime(Runtime::Tokio1)
+            .build()
+            .unwrap();
 
         Ok(Self { pool: cfg })
     }
 
     pub async fn get_connection(&self) -> Result<Connection, RedisCacheStoreError> {
-        self.pool.get().await.map_err(|e| RedisCacheStoreError::PoolConnection(Box::new(e)))
+        self.pool
+            .get()
+            .await
+            .map_err(|e| RedisCacheStoreError::PoolConnection(Box::new(e)))
     }
 }
-
-
 
 impl CacheStore for Redis {
     async fn get(&self, key: &str) -> CacheStoreResult<Option<Value>> {
         let mut conn = self.get_connection().await?;
-        let data = conn.get::<_, Option<String>>(key).await.map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
+        let data = conn
+            .get::<_, Option<String>>(key)
+            .await
+            .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
 
         data.map(|d| {
-            let value = serde_json::from_str::<Value>(&d).map_err(|err| RedisCacheStoreError::Deserialize(err.to_string()))?;
+            let value = serde_json::from_str::<Value>(&d)
+                .map_err(|err| RedisCacheStoreError::Deserialize(err.to_string()))?;
             Ok(value)
-        }).transpose()
-
+        })
+        .transpose()
     }
 
     async fn insert(&self, key: String, value: Value, expiry: Timeout) -> CacheStoreResult<()> {
         let mut conn = self.get_connection().await?;
-        let data = serde_json::to_string(&value).map_err(|e| RedisCacheStoreError::Serialize(e.to_string()))?;
+        let data = serde_json::to_string(&value)
+            .map_err(|e| RedisCacheStoreError::Serialize(e.to_string()))?;
         let options = SetOptions::default();
 
         match expiry {
@@ -90,33 +102,44 @@ impl CacheStore for Redis {
             _ => {}
         }
 
-        conn.set_options::<_, _, bool>(key, data, options).await.map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
+        conn.set_options::<_, _, bool>(key, data, options)
+            .await
+            .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
         Ok(())
-
     }
 
     async fn remove(&self, key: &str) -> CacheStoreResult<()> {
         let mut conn = self.get_connection().await?;
-        conn.del::<_, usize>(key).await.map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
+        conn.del::<_, usize>(key)
+            .await
+            .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
         Ok(())
     }
 
-    async fn clear(&self) -> CacheStoreResult<()>{
+    async fn clear(&self) -> CacheStoreResult<()> {
         let mut conn = self.get_connection().await?;
-        conn.flushdb::<bool>().await.map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
+        conn.flushdb::<bool>()
+            .await
+            .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
         Ok(())
     }
 
-    async fn approx_size(&self) -> CacheStoreResult<usize>{
+    async fn approx_size(&self) -> CacheStoreResult<usize> {
         let mut conn = self.get_connection().await?;
         let cmd = redis::cmd("DBSIZE");
-        let val = cmd.query_async::<usize>(&mut conn).await.map_err(|err| RedisCacheStoreError::RedisCommand(Box::new(err)))?;
+        let val = cmd
+            .query_async::<usize>(&mut conn)
+            .await
+            .map_err(|err| RedisCacheStoreError::RedisCommand(Box::new(err)))?;
         Ok(val)
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
-       let mut conn = self.get_connection().await?;
-        let exists = conn.exists(key).await.map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
+        let mut conn = self.get_connection().await?;
+        let exists = conn
+            .exists(key)
+            .await
+            .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
         Ok(exists)
     }
 }

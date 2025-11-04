@@ -774,7 +774,7 @@ impl Cache {
                     Self::new(mem_store, config.prefix.clone(), config.timeout)
                 }
                 #[cfg(feature = "redis")]
-                CacheStoreTypeConfig::Redis {ref url, pool_size} => {
+                CacheStoreTypeConfig::Redis { ref url, pool_size } => {
                     let redis_store = Redis::new(url.clone(), pool_size).await?;
                     Self::new(redis_store, config.prefix.clone(), config.timeout)
                 }

@@ -54,10 +54,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       matrix:
-        # nightly was pinned because of a compiler bug:
-        # https://github.com/rust-lang/rust/issues/145288
-        # TODO: remove the pinning once the bug is fixed
-        rust: [stable, nightly-2025-08-11, "1.85"] # 1.85 is the MSRV
+        rust: [stable, nightly, "1.85"] # 1.85 is the MSRV
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     name: Build & test

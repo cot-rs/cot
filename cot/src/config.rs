@@ -823,6 +823,12 @@ const fn default_redis_pool_size() -> usize {
     10
 }
 
+#[expect(clippy::trivially_copy_pass_by_ref)]
+#[allow(
+    clippy::allow_attributes,
+    dead_code,
+    reason = "used in serde via the Redis pool_size field. Also allow is used here with same reason as cot::project::Bootstrapper<WithDatabase>::with_cache"
+)]
 const fn is_default_redis_pool_size(size: &usize) -> bool {
     *size == default_redis_pool_size()
 }
@@ -873,7 +879,7 @@ pub enum CacheStoreTypeConfig {
         ///
         /// let config = CacheStoreTypeConfig::Redis {
         ///     url: CacheUrl::from("redis://localhost:6379"),
-        ///     pool_size: Some(20),
+        ///     pool_size: 20,
         /// };
         /// ```
         /// The URL of the Redis server.
@@ -881,7 +887,7 @@ pub enum CacheStoreTypeConfig {
         /// Connection pool size for Redis connections.
 
         /// This controls how many connections to maintain in the connection
-        /// pool. When not specified, a default pool size is used.
+        /// pool. When not specified, a default pool size of `10` is used.
         #[serde(
             default = "default_redis_pool_size",
             skip_serializing_if = "is_default_redis_pool_size"
@@ -2072,6 +2078,11 @@ impl CacheUrl {
     pub fn is_redis(&self) -> bool {
         self.0.scheme() == "redis"
     }
+
+    #[allow(clippy::allow_attributes, dead_code, reason = "used in tests")]
+    pub(crate) fn inner_mut(&mut self) -> &mut url::Url {
+        &mut self.0
+    }
 }
 
 #[cfg(feature = "cache")]
@@ -2523,7 +2534,7 @@ mod tests {
         match config.cache.store.store_type {
             CacheStoreTypeConfig::Redis { url, pool_size } => {
                 assert_eq!(url.as_str(), "redis://localhost:6379");
-                assert_eq!(pool_size, Some(20));
+                assert_eq!(pool_size, 20);
             }
             _ => panic!("Expected Redis store type"),
         }
@@ -2610,14 +2621,14 @@ mod tests {
         let config = CacheStoreConfig {
             store_type: CacheStoreTypeConfig::Redis {
                 url: CacheUrl::from("redis://localhost:6379"),
-                pool_size: Some(15),
+                pool_size: 15,
             },
         };
 
         match config.store_type {
             CacheStoreTypeConfig::Redis { url, pool_size } => {
                 assert_eq!(url.as_str(), "redis://localhost:6379");
-                assert_eq!(pool_size, Some(15));
+                assert_eq!(pool_size, 15);
             }
             _ => panic!("Expected Redis store type"),
         }

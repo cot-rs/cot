@@ -97,10 +97,6 @@ impl AdminModelDeriveBuilder {
         quote! {
             #[#crate_ident::__private::async_trait]
             impl #crate_ident::admin::AdminModel for #name {
-                fn as_any(&self) -> &dyn ::core::any::Any {
-                    self
-                }
-
                 async fn get_total_object_counts(
                     request: &#crate_ident::request::Request,
                 ) -> #crate_ident::Result<u64> {

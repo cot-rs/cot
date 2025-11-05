@@ -528,7 +528,7 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
     }
 
     async fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext> {
-        let object_any: &dyn Any = &object;
+        let object_any: &dyn Any = &*object;
         let object_casted = object_any.downcast_ref::<T>().expect("Invalid object type");
 
         T::form_context_from_self(object_casted).await

@@ -60,15 +60,15 @@ assert_cmd = "2"
 async-stream = "0.3"
 async-trait = "0.1"
 axum = { version = "0.8", default-features = false }
-backtrace = "0.3"
+backtrace = "0.3.76"
 bytes = "1.10"
 cargo_toml = "0.22"
 chrono = { version = "0.4.42", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
-clap = { version = "4", features = ["deprecated"] }
+clap = { version = "4.5.51", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
-clap_mangen = "0.2.29"
+clap_mangen = "0.2.31"
 cot = { version = "0.4.0", path = "cot" }
 cot_codegen = { version = "0.4.0", path = "cot-codegen" }
 cot_macros = { version = "0.4.0", path = "cot-macros" }
@@ -129,7 +129,7 @@ sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
 time = { version = "0.3.44", default-features = false }
-tokio = { version = "1.47", default-features = false }
+tokio = { version = "1.48", default-features = false }
 toml = { version = "0.9", default-features = false }
 tower = "0.5.2"
 tower-livereload = "0.9.6"

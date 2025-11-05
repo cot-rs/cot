@@ -2,8 +2,13 @@ error[E0277]: the trait bound `Dummy: ApiOperationResponse` is not satisfied
  --> tests/ui/derive_api_operation_response_missing_trait_impl.rs:5:7
   |
 5 |     A(Dummy),
-  |       ^^^^^ the trait `ApiOperationResponse` is not implemented for `Dummy`
+  |       ^^^^^ unsatisfied trait bound
   |
+help: the trait `ApiOperationResponse` is not implemented for `Dummy`
+ --> tests/ui/derive_api_operation_response_missing_trait_impl.rs:8:1
+  |
+8 | struct Dummy;
+  | ^^^^^^^^^^^^
   = help: the following other types implement trait `ApiOperationResponse`:
             Json<S>
             MyResponse

@@ -141,7 +141,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # cot_macros ui tests require nightly
-          toolchain: nightly-2025-08-11
+          toolchain: nightly
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -187,7 +187,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # branch coverage is currently optional and requires nightly
-          toolchain: nightly-2025-08-11
+          toolchain: nightly
           components: llvm-tools-preview
 
       - name: Reclaim disk space
@@ -240,7 +240,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # nightly-only rustfmt settings
-          toolchain: nightly-2025-08-11
+          toolchain: nightly
           components: rustfmt
 
       - name: Cache Cargo registry
@@ -291,7 +291,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # the `-Z` flag is only accepted on the nightly channel of Cargo
-          toolchain: nightly-2025-08-11
+          toolchain: nightly
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -360,7 +360,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # miri requires nightly
-          toolchain: nightly-2025-08-11
+          toolchain: nightly
           components: miri
 
       - name: Cache Cargo registry

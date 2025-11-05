@@ -321,7 +321,7 @@ mod tests {
     #[ignore = "requires a running redis instance"]
     async fn test_remove() {
         let store = make_store("0").await;
-        let key = "test_key".to_string();
+        let key = "test_key_remove".to_string();
         let value = json!({"data": 123});
         store
             .insert(key.clone(), value, Timeout::default())

@@ -1,6 +1,5 @@
 use std::process::Command;
 
-pub(crate) use assert_cmd::prelude::*;
 pub(crate) use insta_cmd::assert_cmd_snapshot;
 
 pub(crate) use crate::cot_cli;
@@ -63,7 +62,7 @@ pub(crate) fn cot_cli_cmd() -> Command {
     if let Ok(np) = std::env::var("COT_CLI_TEST_CMD") {
         Command::new(np)
     } else {
-        Command::cargo_bin("cot").expect("cot-cli should be executable")
+        Command::new(assert_cmd::cargo::cargo_bin!("cot"))
     }
 }
 

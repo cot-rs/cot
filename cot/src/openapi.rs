@@ -447,11 +447,7 @@ where
     Inner(handler, PhantomData, PhantomData)
 }
 
-pub(crate) trait BoxApiEndpointRequestHandler: BoxRequestHandler + AsApiRoute {
-    // TODO: consider removing this when Rust trait_upcasting is stabilized and we
-    // bump the MSRV (lands in Rust 1.86)
-    fn as_box_request_handler(&self) -> &(dyn BoxRequestHandler + Send + Sync);
-}
+pub(crate) trait BoxApiEndpointRequestHandler: BoxRequestHandler + AsApiRoute {}
 
 pub(crate) fn into_box_api_endpoint_request_handler<HandlerParams, H>(
     handler: H,
@@ -486,13 +482,9 @@ where
         }
     }
 
-    impl<HandlerParams, H> BoxApiEndpointRequestHandler for Inner<HandlerParams, H>
-    where
-        H: RequestHandler<HandlerParams> + AsApiRoute + Send + Sync,
+    impl<HandlerParams, H> BoxApiEndpointRequestHandler for Inner<HandlerParams, H> where
+        H: RequestHandler<HandlerParams> + AsApiRoute + Send + Sync
     {
-        fn as_box_request_handler(&self) -> &(dyn BoxRequestHandler + Send + Sync) {
-            self
-        }
     }
 
     Inner(handler, PhantomData)

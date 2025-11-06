@@ -172,10 +172,9 @@ impl Router {
                     #[cfg(feature = "openapi")]
                     RouteInner::ApiHandler(handler) => {
                         if matches_fully {
+                            let handler: &(dyn BoxRequestHandler + Send + Sync) = &**handler;
                             return Some(HandlerFound {
-                                // TODO: consider removing this when Rust trait_upcasting is
-                                // stabilized and we bump the MSRV (lands in Rust 1.86)
-                                handler: handler.as_box_request_handler(),
+                                handler,
                                 app_name: self.app_name.clone(),
                                 name: route.name.clone(),
                                 params: Self::matches_to_path_params(&matches, Vec::new()),

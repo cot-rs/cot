@@ -254,7 +254,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires a running redis instance"]
     async fn test_insert_and_get() {
-        let store = make_store("0").await;
+        let store = make_store("1").await;
         let key = "test_key".to_string();
         let value = json!({"data": 123});
 
@@ -269,7 +269,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires a running redis instance"]
     async fn test_get_after_expiry() {
-        let store = make_store("0").await;
+        let store = make_store("1").await;
         let key = "temp_key__".to_string();
         let value = json!({"data": "temporary"});
         let short_timeout = Timeout::After(Duration::from_secs(1));
@@ -285,7 +285,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires a running redis instance"]
     async fn test_insert_with_expiry_types() {
-        let store = make_store("0").await;
+        let store = make_store("1").await;
 
         macro_rules! run_expiry {
             ($idx:expr, $timeout:expr) => {
@@ -320,7 +320,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires a running redis instance"]
     async fn test_remove() {
-        let store = make_store("0").await;
+        let store = make_store("1").await;
         let key = "test_key_remove".to_string();
         let value = json!({"data": 123});
         store
@@ -335,7 +335,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires a running redis instance"]
     async fn test_clear() {
-        let store = make_store("1").await;
+        let store = make_store("2").await;
         store
             .insert("key1".to_string(), json!(1), Timeout::default())
             .await
@@ -352,7 +352,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires a running redis instance"]
     async fn test_contains_key() {
-        let store = make_store("0").await;
+        let store = make_store("1").await;
         let key = "test_key".to_string();
         let value = json!({"data": 123});
         store
@@ -367,7 +367,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires a running redis instance"]
     async fn test_approx_size() {
-        let store = make_store("2").await;
+        let store = make_store("3").await;
         store.clear().await.unwrap();
         store
             .insert("key1".to_string(), json!(1), Timeout::default())

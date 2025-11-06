@@ -2511,32 +2511,54 @@ mod tests {
     #[test]
     #[cfg(feature = "cache")]
     fn cache_config_from_toml_redis() {
-        let toml_content = r#"
-            [cache]
-            max_retries = 10
-            timeout = "120s"
+        macro_rules! cache_toml_with_pool {
+            () => {
+                r#"
+                [cache]
+                max_retries = 10
+                timeout = "120s"
 
-            [cache.store]
-            type = "redis"
-            url = "redis://localhost:6379"
-            pool_size = 20
-        "#;
+                [cache.store]
+                type = "redis"
+                url = "redis://localhost:6379"
+                pool_size = 20
+                "#
+            };
+        }
 
-        let config = ProjectConfig::from_toml(toml_content).unwrap();
+        macro_rules! cache_toml_without_pool {
+            () => {
+                r#"
+                [cache]
+                max_retries = 10
+                timeout = "120s"
 
-        assert_eq!(config.cache.max_retries, 10);
-        assert_eq!(
-            config.cache.timeout,
-            Timeout::After(Duration::from_secs(120))
-        );
-        assert_eq!(config.cache.prefix, None);
+                [cache.store]
+                type = "redis"
+                url = "redis://localhost:6379"
+                "#
+            };
+        }
 
-        match config.cache.store.store_type {
-            CacheStoreTypeConfig::Redis { url, pool_size } => {
+        let variants: [(&str, usize); 2] = [
+            (cache_toml_with_pool!(), 20),
+            (cache_toml_without_pool!(), default_redis_pool_size()),
+        ];
+
+        for (toml_content, expected_size) in variants {
+            let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+            assert_eq!(config.cache.max_retries, 10);
+            assert_eq!(
+                config.cache.timeout,
+                Timeout::After(Duration::from_secs(120))
+            );
+            assert_eq!(config.cache.prefix, None);
+
+            if let CacheStoreTypeConfig::Redis { url, pool_size } = config.cache.store.store_type {
                 assert_eq!(url.as_str(), "redis://localhost:6379");
-                assert_eq!(pool_size, 20);
+                assert_eq!(pool_size, expected_size);
             }
-            _ => panic!("Expected Redis store type"),
         }
     }
 
@@ -2563,11 +2585,8 @@ mod tests {
         );
         assert_eq!(config.cache.prefix, Some("dev".to_string()));
 
-        match config.cache.store.store_type {
-            CacheStoreTypeConfig::File { path } => {
-                assert_eq!(path, PathBuf::from("/tmp/cache"));
-            }
-            _ => panic!("Expected File store type"),
+        if let CacheStoreTypeConfig::File { path } = &config.cache.store.store_type {
+            assert_eq!(path, &PathBuf::from("/tmp/cache"));
         }
     }
 
@@ -2579,7 +2598,6 @@ mod tests {
         ";
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
-        println!("project cache {:#?}", config.cache);
         assert_eq!(config.cache.max_retries, 3);
         assert_eq!(config.cache.timeout, Timeout::default());
         assert_eq!(config.cache.prefix, None);

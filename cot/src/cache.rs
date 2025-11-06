@@ -793,11 +793,13 @@ mod tests {
     use std::fmt::Debug;
     use std::time::Duration;
 
+    use sea_query::Iden;
     use serde::{Deserialize, Serialize};
 
     use super::*;
     use crate::cache::store::memory::Memory;
     use crate::config::Timeout;
+    use crate::test::TestCache;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct User {
@@ -806,12 +808,14 @@ mod tests {
         email: String,
     }
 
-    #[cot::test]
-    async fn test_cache_basic_operations() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_basic_operations(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
-        cache.insert("user:1", "John Doe").await.unwrap();
+        cache
+            .insert("user:1", "John Doe".to_string())
+            .await
+            .unwrap();
         let user: Option<String> = cache.get("user:1").await.unwrap();
         assert_eq!(user, Some("John Doe".to_string()));
 
@@ -829,15 +833,14 @@ mod tests {
             Timeout::After(Duration::from_secs(60)),
         );
 
-        cache.insert("user:1", "John Doe").await.unwrap();
-        let user: Option<String> = cache.get("user:1").await.unwrap();
+        cache.insert("user:2", "John Doe").await.unwrap();
+        let user: Option<String> = cache.get("user:2").await.unwrap();
         assert_eq!(user, Some("John Doe".to_string()));
     }
 
-    #[cot::test]
-    async fn test_cache_complex_objects() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_complex_objects(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         let user = User {
             id: 1,
@@ -845,38 +848,35 @@ mod tests {
             email: "john@example.com".to_string(),
         };
 
-        cache.insert("user:1", &user).await.unwrap();
-        let cached_user: Option<User> = cache.get("user:1").await.unwrap();
+        cache.insert("user:3", &user).await.unwrap();
+        let cached_user: Option<User> = cache.get("user:3").await.unwrap();
         assert_eq!(cached_user, Some(user));
     }
 
-    #[cot::test]
-    async fn test_cache_insert_expiring() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_insert_expiring(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         cache
             .insert_expiring(
-                "temp:data",
+                "temp:data_1",
                 "temporary",
                 Timeout::After(Duration::from_secs(300)),
             )
             .await
             .unwrap();
 
-        let value: Option<String> = cache.get("temp:data").await.unwrap();
+        let value: Option<String> = cache.get("temp:data_1").await.unwrap();
         assert_eq!(value, Some("temporary".to_string()));
     }
 
-    #[cot::test]
-    async fn test_cache_get_or_insert_with() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_get_or_insert_with(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         let mut call_count = 0;
-
         let value1: String = cache
-            .get_or_insert_with("expensive", || async {
+            .get_or_insert_with("expensive_1", || async {
                 call_count += 1;
                 Ok("computed".to_string())
             })
@@ -884,7 +884,8 @@ mod tests {
             .unwrap();
 
         let value2: String = cache
-            .get_or_insert_with("expensive", || async {
+            .get_or_insert_with("expensive_1", || async {
+                println!("dong dong");
                 call_count += 1;
                 Ok("different".to_string())
             })
@@ -895,16 +896,15 @@ mod tests {
         assert_eq!(call_count, 1);
     }
 
-    #[cot::test]
-    async fn test_cache_get_or_insert_with_expiring() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_get_or_insert_with_expiring(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         let mut call_count = 0;
 
         let value1: String = cache
             .get_or_insert_expiring_with(
-                "temp:data",
+                "temp:data_2",
                 || async {
                     call_count += 1;
                     Ok("temporary".to_string())
@@ -916,7 +916,7 @@ mod tests {
 
         let value2: String = cache
             .get_or_insert_expiring_with(
-                "temp:data",
+                "temp:data_2",
                 || async {
                     call_count += 1;
                     Ok("different".to_string())
@@ -930,10 +930,9 @@ mod tests {
         assert_eq!(call_count, 1);
     }
 
-    #[cot::test]
-    async fn test_cache_statistics() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest(redis_db = 4)]
+    async fn test_cache_statistics(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         assert_eq!(cache.approx_size().await.unwrap(), 0);
 
@@ -946,10 +945,9 @@ mod tests {
         assert_eq!(cache.approx_size().await.unwrap(), 0);
     }
 
-    #[cot::test]
-    async fn test_cache_contains_key() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_contains_key(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         assert!(!cache.contains_key("nonexistent").await.unwrap());
 

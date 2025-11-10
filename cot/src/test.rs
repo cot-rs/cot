@@ -7,6 +7,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+#[cfg(feature = "cache")]
+use cot::config::CacheUrl;
 use derive_more::Debug;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -17,10 +19,12 @@ use tower_sessions::MemoryStore;
 use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 #[cfg(feature = "cache")]
-use crate::cache::Cache;
+use crate::cache::store::{memory::Memory, redis::Redis};
 #[cfg(feature = "cache")]
-use crate::cache::store::memory::Memory;
+use crate::cache::{Cache, CacheResult};
 use crate::config::ProjectConfig;
+#[cfg(feature = "cache")]
+use crate::config::Timeout;
 #[cfg(feature = "db")]
 use crate::db::Database;
 #[cfg(feature = "db")]
@@ -760,13 +764,9 @@ impl TestRequestBuilder {
             #[cfg(feature = "db")]
             self.database.clone(),
             #[cfg(feature = "cache")]
-            self.cache.clone().unwrap_or_else(|| {
-                Arc::new(Cache::new(
-                    Memory::new(),
-                    None,
-                    crate::config::Timeout::default(),
-                ))
-            }),
+            self.cache
+                .clone()
+                .unwrap_or_else(|| Arc::new(Cache::new(Memory::new(), None, Timeout::default()))),
         );
         prepare_request(&mut request, Arc::new(context));
 
@@ -1576,5 +1576,122 @@ pub fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
             // We can ignore poisoned mutexes because we don't store any data inside
             poison_error.into_inner()
         }
+    }
+}
+
+/// A test cache.
+///
+/// This is used to create a separate cache for testing.
+///
+/// # Examples
+///
+/// ```
+/// use cot::test::TestCache;
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// let test_cache = TestCache::new_memory();
+/// let cache = test_cache.cache();
+///
+/// // do something with the cache
+///
+/// # Ok(())
+#[cfg(feature = "cache")]
+#[derive(Debug, Clone)]
+pub struct TestCache {
+    cache: Arc<Cache>,
+}
+
+#[cfg(feature = "cache")]
+impl TestCache {
+    fn new(cache: Cache) -> Self {
+        Self {
+            cache: Arc::new(cache),
+        }
+    }
+
+    /// Create a new in-memory test cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache could not be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_memory();
+    /// let cache = test_cache.cache();
+    ///
+    /// // do something with the cache
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn new_memory() -> Self {
+        let cache = Cache::new(Memory::new(), None, Timeout::default());
+        Self::new(cache)
+    }
+
+    /// Create a new Redis test cache.
+    ///
+    /// The Redis URL is read from the `REDIS_URL` environment variable. If not
+    /// provided, it defaults to `redis://localhost`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Redis cache could not be created.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_redis().await?;
+    /// let cache = test_cache.cache();
+    ///
+    /// // do something with the cache
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "redis")]
+    pub fn new_redis(db: &str) -> CacheResult<Self> {
+        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost".to_string());
+        let mut url = CacheUrl::from(url);
+        url.inner_mut().set_path(db);
+
+        let cache = Cache::new(
+            Redis::new(&url, 10)?,
+            Some("test_harness".to_string()),
+            Timeout::default(),
+        );
+        Ok(Self::new(cache))
+    }
+
+    /// Get the cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_memory();
+    /// let cache = test_cache.cache();
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn cache(&self) -> Arc<Cache> {
+        self.cache.clone()
     }
 }

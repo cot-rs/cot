@@ -819,6 +819,20 @@ impl CacheStoreConfigBuilder {
     }
 }
 
+const fn default_redis_pool_size() -> usize {
+    10
+}
+
+#[expect(clippy::trivially_copy_pass_by_ref)]
+#[allow(
+    clippy::allow_attributes,
+    dead_code,
+    reason = "used in serde via the Redis pool_size field. Also allow is used here with same reason as cot::project::Bootstrapper<WithDatabase>::with_cache"
+)]
+const fn is_default_redis_pool_size(size: &usize) -> bool {
+    *size == default_redis_pool_size()
+}
+
 /// The type of cache store backend to use.
 ///
 /// This specifies which backend is used for caching: `in-memory`, `Redis`,
@@ -865,16 +879,20 @@ pub enum CacheStoreTypeConfig {
         ///
         /// let config = CacheStoreTypeConfig::Redis {
         ///     url: CacheUrl::from("redis://localhost:6379"),
-        ///     pool_size: Some(20),
+        ///     pool_size: 20,
         /// };
         /// ```
         /// The URL of the Redis server.
         url: CacheUrl,
         /// Connection pool size for Redis connections.
-        #[serde(skip_serializing_if = "Option::is_none")]
+
         /// This controls how many connections to maintain in the connection
-        /// pool. When not specified, a default pool size is used.
-        pool_size: Option<u32>,
+        /// pool. When not specified, a default pool size of `10` is used.
+        #[serde(
+            default = "default_redis_pool_size",
+            skip_serializing_if = "is_default_redis_pool_size"
+        )]
+        pool_size: usize,
     },
     /// File-based cache store.
 
@@ -2045,6 +2063,26 @@ impl CacheUrl {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
+
+    /// Checks if the cache URL is for a Redis cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheUrl;
+    ///
+    /// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
+    /// assert!(url.is_redis());
+    /// ```
+    #[must_use]
+    pub fn is_redis(&self) -> bool {
+        self.0.scheme() == "redis"
+    }
+
+    #[allow(clippy::allow_attributes, dead_code, reason = "used in tests")]
+    pub(crate) fn inner_mut(&mut self) -> &mut url::Url {
+        &mut self.0
+    }
 }
 
 #[cfg(feature = "cache")]
@@ -2473,32 +2511,54 @@ mod tests {
     #[test]
     #[cfg(feature = "cache")]
     fn cache_config_from_toml_redis() {
-        let toml_content = r#"
-            [cache]
-            max_retries = 10
-            timeout = "120s"
+        macro_rules! cache_toml_with_pool {
+            () => {
+                r#"
+                [cache]
+                max_retries = 10
+                timeout = "120s"
 
-            [cache.store]
-            type = "redis"
-            url = "redis://localhost:6379"
-            pool_size = 20
-        "#;
+                [cache.store]
+                type = "redis"
+                url = "redis://localhost:6379"
+                pool_size = 20
+                "#
+            };
+        }
 
-        let config = ProjectConfig::from_toml(toml_content).unwrap();
+        macro_rules! cache_toml_without_pool {
+            () => {
+                r#"
+                [cache]
+                max_retries = 10
+                timeout = "120s"
 
-        assert_eq!(config.cache.max_retries, 10);
-        assert_eq!(
-            config.cache.timeout,
-            Timeout::After(Duration::from_secs(120))
-        );
-        assert_eq!(config.cache.prefix, None);
+                [cache.store]
+                type = "redis"
+                url = "redis://localhost:6379"
+                "#
+            };
+        }
 
-        match config.cache.store.store_type {
-            CacheStoreTypeConfig::Redis { url, pool_size } => {
+        let variants: [(&str, usize); 2] = [
+            (cache_toml_with_pool!(), 20),
+            (cache_toml_without_pool!(), default_redis_pool_size()),
+        ];
+
+        for (toml_content, expected_size) in variants {
+            let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+            assert_eq!(config.cache.max_retries, 10);
+            assert_eq!(
+                config.cache.timeout,
+                Timeout::After(Duration::from_secs(120))
+            );
+            assert_eq!(config.cache.prefix, None);
+
+            if let CacheStoreTypeConfig::Redis { url, pool_size } = config.cache.store.store_type {
                 assert_eq!(url.as_str(), "redis://localhost:6379");
-                assert_eq!(pool_size, Some(20));
+                assert_eq!(pool_size, expected_size);
             }
-            _ => panic!("Expected Redis store type"),
         }
     }
 
@@ -2525,11 +2585,8 @@ mod tests {
         );
         assert_eq!(config.cache.prefix, Some("dev".to_string()));
 
-        match config.cache.store.store_type {
-            CacheStoreTypeConfig::File { path } => {
-                assert_eq!(path, PathBuf::from("/tmp/cache"));
-            }
-            _ => panic!("Expected File store type"),
+        if let CacheStoreTypeConfig::File { path } = &config.cache.store.store_type {
+            assert_eq!(path, &PathBuf::from("/tmp/cache"));
         }
     }
 
@@ -2541,7 +2598,6 @@ mod tests {
         ";
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
-        println!("project cache {:#?}", config.cache);
         assert_eq!(config.cache.max_retries, 3);
         assert_eq!(config.cache.timeout, Timeout::default());
         assert_eq!(config.cache.prefix, None);
@@ -2583,14 +2639,14 @@ mod tests {
         let config = CacheStoreConfig {
             store_type: CacheStoreTypeConfig::Redis {
                 url: CacheUrl::from("redis://localhost:6379"),
-                pool_size: Some(15),
+                pool_size: 15,
             },
         };
 
         match config.store_type {
             CacheStoreTypeConfig::Redis { url, pool_size } => {
                 assert_eq!(url.as_str(), "redis://localhost:6379");
-                assert_eq!(pool_size, Some(15));
+                assert_eq!(pool_size, 15);
             }
             _ => panic!("Expected Redis store type"),
         }

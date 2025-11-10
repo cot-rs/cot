@@ -13,12 +13,12 @@ error[E0277]: `fn(()) -> impl Future<Output = Result<cot::http::Response<Body>, 
   = note: make sure the function takes no more than 10 parameters
   = note: make sure the function returns a type that implements `IntoResponse`
 help: the following other types implement trait `RequestHandler<T>`
-  |
- ::: src/router/method/openapi.rs
+ --> src/router/method/openapi.rs
   |
   |   impl RequestHandler for ApiMethodRouter {
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ApiMethodRouter` implements `RequestHandler`
- --> src/router/method.rs
+  |
+ ::: src/router/method.rs
   |
   |   impl RequestHandler for MethodRouter {
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `MethodRouter` implements `RequestHandler`

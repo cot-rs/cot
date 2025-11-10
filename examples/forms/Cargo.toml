@@ -8,5 +8,5 @@ edition = "2024"
 [dependencies]
 askama = "0.14"
 cot = { path = "../../cot" , features = ["full"]}
-chrono = "0.4.41"
+chrono = "0.4.42"
 chrono-tz = "0.10.4"

@@ -43,7 +43,7 @@ async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Html> {
 
 #[derive(Debug, Form)]
 struct TodoForm {
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     title: String,
 }
 

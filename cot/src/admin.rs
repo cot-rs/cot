@@ -528,10 +528,8 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
     }
 
     async fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext> {
-        let object_casted = object
-            .as_any()
-            .downcast_ref::<T>()
-            .expect("Invalid object type");
+        let object_any: &dyn Any = &*object;
+        let object_casted = object_any.downcast_ref::<T>().expect("Invalid object type");
 
         T::form_context_from_self(object_casted).await
     }
@@ -557,11 +555,6 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
     note = "add #[derive(cot::admin::AdminModel)] to the struct to automatically derive the trait"
 )]
 pub trait AdminModel: Any + Send + 'static {
-    /// Returns the object as an `Any` trait object.
-    // TODO: consider removing this when Rust trait_upcasting is stabilized and we
-    // bump the MSRV (lands in Rust 1.86)
-    fn as_any(&self) -> &dyn Any;
-
     /// Get the objects of this model.
     async fn get_objects(request: &Request, pagination: Pagination) -> cot::Result<Vec<Self>>
     where

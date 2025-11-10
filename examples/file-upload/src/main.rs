@@ -30,9 +30,9 @@ async fn index(urls: Urls) -> cot::Result<Html> {
 
 #[derive(Debug, Form)]
 struct FileForm {
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     title: String,
-    #[form(opt(accept = vec!["image/*".to_string()]))]
+    #[form(opts(accept = vec!["image/*".to_string()]))]
     file: InMemoryUploadedFile,
 }
 

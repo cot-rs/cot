@@ -71,7 +71,7 @@ impl FormOpts {
 struct Field {
     ident: Option<syn::Ident>,
     ty: syn::Type,
-    opt: Option<HashMap<syn::Ident, PreservedStrExpr>>,
+    opts: Option<HashMap<syn::Ident, PreservedStrExpr>>,
 }
 
 #[derive(Debug)]
@@ -117,7 +117,7 @@ impl FormDeriveBuilder {
         let crate_ident = cot_ident();
         let field_ident = field.ident.as_ref().unwrap();
         let ty = &field.ty;
-        let opt = &field.opt;
+        let opts = &field.opts;
 
         let name = field_ident.to_string().to_title_case();
 
@@ -125,8 +125,8 @@ impl FormDeriveBuilder {
             .push(quote!(#field_ident: <#ty as #crate_ident::form::AsFormField>::Type));
 
         self.fields_as_struct_fields_new.push({
-            let custom_options_setters: Vec<_> = if let Some(opt) = opt {
-                opt.iter()
+            let custom_options_setters: Vec<_> = if let Some(opts) = opts {
+                opts.iter()
                     .map(|(key, value)| {
                         quote!(custom_options.#key = ::core::option::Option::Some(#value))
                     })

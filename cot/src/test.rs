@@ -16,6 +16,10 @@ use tower_sessions::MemoryStore;
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
+#[cfg(feature = "cache")]
+use crate::cache::Cache;
+#[cfg(feature = "cache")]
+use crate::cache::store::memory::Memory;
 use crate::config::ProjectConfig;
 #[cfg(feature = "db")]
 use crate::db::Database;
@@ -216,6 +220,8 @@ pub struct TestRequestBuilder {
     #[cfg(feature = "json")]
     json_data: Option<String>,
     static_files: Vec<StaticFile>,
+    #[cfg(feature = "cache")]
+    cache: Option<Arc<Cache>>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -269,6 +275,8 @@ impl Default for TestRequestBuilder {
             #[cfg(feature = "json")]
             json_data: None,
             static_files: Vec::new(),
+            #[cfg(feature = "cache")]
+            cache: None,
         }
     }
 }
@@ -751,6 +759,14 @@ impl TestRequestBuilder {
             auth_backend,
             #[cfg(feature = "db")]
             self.database.clone(),
+            #[cfg(feature = "cache")]
+            self.cache.clone().unwrap_or_else(|| {
+                Arc::new(Cache::new(
+                    Memory::new(),
+                    None,
+                    crate::config::Timeout::default(),
+                ))
+            }),
         );
         prepare_request(&mut request, Arc::new(context));
 

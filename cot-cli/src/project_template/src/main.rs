@@ -1,6 +1,7 @@
 mod migrations;
 
 use askama::Template;
+use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
 use cot::html::Html;
@@ -9,6 +10,7 @@ use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHand
 use cot::request::extractors::StaticFiles;
 use cot::router::{Route, Router};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
+use cot::session::db::SessionApp;
 use cot::{App, AppBuilder, Project, static_files};
 
 #[derive(Debug, Template)]
@@ -53,6 +55,8 @@ impl Project for {{ project_struct_name }} {
 
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views({{ app_name }}, "");
+        apps.register(DatabaseUserApp::new());
+        apps.register(SessionApp::new());
     }
 
     fn middlewares(

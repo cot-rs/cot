@@ -35,7 +35,8 @@ macro_rules! impl_sea_query_db_backend {
 
                 let row = Self::sqlx_query_with(&sql, values)
                     .fetch_optional(&self.db_connection)
-                    .await?;
+                    .await
+                    .map_err(|err| crate::db::sea_query_db::map_sqlx_error(err))?;
                 Ok(row.map($row_name::new))
             }
 
@@ -89,7 +90,10 @@ macro_rules! impl_sea_query_db_backend {
             where
                 A: 'a + sqlx::IntoArguments<'a, $sqlx_db_ty>,
             {
-                let result = sqlx_statement.execute(&self.db_connection).await?;
+                let result = sqlx_statement
+                    .execute(&self.db_connection)
+                    .await
+                    .map_err(|err| crate::db::sea_query_db::map_sqlx_error(err))?;
                 let result = crate::db::StatementResult {
                     rows_affected: crate::db::RowsNum(result.rows_affected()),
                     last_inserted_row_id: Self::last_inserted_row_id_for(&result),
@@ -168,6 +172,17 @@ macro_rules! impl_sea_query_db_backend {
             }
         }
     };
+}
+
+pub(crate) fn map_sqlx_error(err: sqlx::Error) -> crate::db::DatabaseError {
+    if err
+        .as_database_error()
+        .is_some_and(sqlx::error::DatabaseError::is_unique_violation)
+    {
+        return crate::db::DatabaseError::UniqueViolation;
+    }
+
+    crate::db::DatabaseError::from(err)
 }
 
 pub(super) use impl_sea_query_db_backend;

@@ -824,7 +824,7 @@ const fn default_redis_pool_size() -> usize {
 }
 
 #[expect(clippy::trivially_copy_pass_by_ref)]
-#[cfg(feature="cache")]
+#[cfg(feature = "cache")]
 const fn is_default_redis_pool_size(size: &usize) -> bool {
     *size == default_redis_pool_size()
 }

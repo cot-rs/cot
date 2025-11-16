@@ -1662,7 +1662,9 @@ impl RedisDbAllocator {
         const LOCK_FILE_NAME: &str = "cot_redis_init.lock";
         const INIT_KEY: &str = "cot:test:db_pool:initialized";
 
-        let lock_path = std::env::temp_dir().as_path().with_file_name(LOCK_FILE_NAME);
+        let lock_path = std::env::temp_dir()
+            .as_path()
+            .with_file_name(LOCK_FILE_NAME);
 
         let create_result = tokio::task::spawn_blocking({
             let lock_path_clone = lock_path.clone();
@@ -1953,7 +1955,6 @@ impl TestCache {
     /// # }
     /// ```
     pub async fn cleanup(&self) -> Result<()> {
-
         match &self.kind {
             #[cfg(feature = "redis")]
             CacheKind::Redis { allocator: _ } => {

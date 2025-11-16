@@ -9,6 +9,7 @@ pub mod memory;
 #[cfg(feature = "redis")]
 pub mod redis;
 
+use std::any::Any;
 use std::fmt::Debug;
 use std::pin::Pin;
 
@@ -16,6 +17,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::Timeout;
+use crate::error::error_impl::impl_into_cot_error;
 
 const CACHE_STORE_ERROR_PREFIX: &str = "Cache store error: ";
 
@@ -33,6 +35,8 @@ pub enum CacheStoreError {
     #[error("{CACHE_STORE_ERROR_PREFIX} Deserialization error: {0}")]
     Deserialize(String),
 }
+
+impl_into_cot_error!(CacheStoreError);
 
 /// Convenience alias for results returned by cache store operations.
 pub type CacheStoreResult<T> = Result<T, CacheStoreError>;
@@ -96,7 +100,7 @@ pub trait CacheStore: Send + Sync + 'static {
     fn contains_key(&self, key: &str) -> impl Future<Output = CacheStoreResult<bool>> + Send;
 }
 
-pub(crate) trait BoxCacheStore: Send + Sync + 'static {
+pub(crate) trait BoxCacheStore: Any + Send + Sync + 'static {
     fn get<'a>(
         &'a self,
         key: &'a str,
@@ -124,6 +128,9 @@ pub(crate) trait BoxCacheStore: Send + Sync + 'static {
         &'a self,
         key: &'a str,
     ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>>;
+
+    #[expect(unused)]
+    fn as_any(&self) -> &dyn Any;
 }
 
 impl<T: CacheStore> BoxCacheStore for T {
@@ -165,5 +172,9 @@ impl<T: CacheStore> BoxCacheStore for T {
         key: &'a str,
     ) -> Pin<Box<dyn Future<Output = CacheStoreResult<bool>> + Send + 'a>> {
         Box::pin(async move { T::contains_key(self, key).await })
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }

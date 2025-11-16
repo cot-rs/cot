@@ -158,16 +158,9 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn cachetest(args: TokenStream, input: TokenStream) -> TokenStream {
-    let args_input = match NestedMeta::parse_meta_list(args.into()) {
-        Ok(v) => v,
-        Err(e) => {
-            return TokenStream::from(Error::from(e).write_errors());
-        }
-    };
-
+pub fn cachetest(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);
-    cache::fn_to_cache_test(&args_input, &fn_input).into()
+    cache::fn_to_cache_test(&fn_input).into()
 }
 
 /// An attribute macro that defines an `async` test function for a Cot-powered

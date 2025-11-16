@@ -25,6 +25,7 @@ use thiserror::Error;
 
 use crate::cache::store::{CacheStore, CacheStoreError};
 use crate::config::CacheUrl;
+use crate::error::error_impl::impl_into_cot_error;
 
 /// Errors specific to the Redis cache store.
 #[derive(Debug, Error)]
@@ -54,6 +55,8 @@ pub enum RedisCacheStoreError {
     #[error("Deserialization error: {0}")]
     Deserialize(String),
 }
+
+impl_into_cot_error!(RedisCacheStoreError);
 
 impl From<RedisCacheStoreError> for CacheStoreError {
     fn from(err: RedisCacheStoreError) -> Self {

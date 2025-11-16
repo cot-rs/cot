@@ -793,7 +793,6 @@ mod tests {
     use std::fmt::Debug;
     use std::time::Duration;
 
-    use sea_query::Iden;
     use serde::{Deserialize, Serialize};
 
     use super::*;
@@ -891,7 +890,6 @@ mod tests {
             })
             .await
             .unwrap();
-
         assert_eq!(value1, value2);
         assert_eq!(call_count, 1);
     }
@@ -930,7 +928,7 @@ mod tests {
         assert_eq!(call_count, 1);
     }
 
-    #[cot_macros::cachetest(redis_db = 4)]
+    #[cot_macros::cachetest]
     async fn test_cache_statistics(test_cache: &mut TestCache) {
         let cache = test_cache.cache();
 

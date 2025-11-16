@@ -1648,15 +1648,17 @@ impl RedisDbAllocator {
 
     /// Initialize the Redis database allocator.
     ///
-    /// The goal here is to ensure that the initialization script is only run once,
-    /// Since we run tests with `nextest`, tests are run per process. Thus we use the
-    /// creation of a file in the systems's temp directory as a lock to ensure that only
-    /// the first process to create the file runs the initialization script since file creation is atomic.
+    /// The goal here is to ensure that the initialization script is only run
+    /// once, Since we run tests with `nextest`, tests are run per process.
+    /// Thus we use the creation of a file in the systems's temp directory
+    /// as a lock to ensure that only the first process to create the file
+    /// runs the initialization script since file creation is atomic.
     ///
-    /// The initialization script itself checks if the pool has already been initialized
-    /// by checking for the existence of an "init" key in Redis. If the key does not exist,
-    /// or if the length of the pool list does not match the expected count, it initializes
-    /// the pool by populating it with database indices from 1 to `alloc_db - 1`.
+    /// The initialization script itself checks if the pool has already been
+    /// initialized by checking for the existence of an "init" key in Redis.
+    /// If the key does not exist, or if the length of the pool list does
+    /// not match the expected count, it initializes the pool by populating
+    /// it with database indices from 1 to `alloc_db - 1`.
     async fn init(&self) -> RedisAllocatorResult<()> {
         const KEY_TIMEOUT_SECS: u64 = 300;
         const LOCK_FILE_NAME: &str = "cot_redis_init.lock";
@@ -1933,7 +1935,8 @@ impl TestCache {
 
     /// Cleanup the test cache.
     ///
-    /// This will clear the cache and deallocate any resources used by the test cache.
+    /// This will clear the cache and deallocate any resources used by the test
+    /// cache.
     ///
     /// # Errors
     ///

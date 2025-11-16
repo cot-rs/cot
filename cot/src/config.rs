@@ -2068,14 +2068,14 @@ impl CacheUrl {
     /// use cot::config::CacheUrl;
     ///
     /// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
-    /// assert_eq!(url.scheme() , "redis");
+    /// assert_eq!(url.scheme(), "redis");
     /// ```
     #[must_use]
     pub fn scheme(&self) -> &str {
         self.0.scheme()
     }
 
-    #[allow(clippy::allow_attributes, dead_code, reason = "used in tests")]
+    #[allow(clippy::allow_attributes, unused, reason = "used in tests")]
     pub(crate) fn inner_mut(&mut self) -> &mut url::Url {
         &mut self.0
     }

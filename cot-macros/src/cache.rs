@@ -17,7 +17,7 @@ pub(super) fn fn_to_cache_test(test_fn: &ItemFn) -> TokenStream {
         }
 
 
-        #[cfg(feature = "redis")]
+        #[ignore = "Tests that use Redis are ignored by default"]
         #[::cot::test]
         async fn #redis_ident() {
             let mut cache = cot::test::TestCache::new_redis().await.unwrap();

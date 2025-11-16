@@ -824,11 +824,7 @@ const fn default_redis_pool_size() -> usize {
 }
 
 #[expect(clippy::trivially_copy_pass_by_ref)]
-#[allow(
-    clippy::allow_attributes,
-    dead_code,
-    reason = "used in serde via the Redis pool_size field. Also allow is used here with same reason as cot::project::Bootstrapper<WithDatabase>::with_cache"
-)]
+#[cfg(feature="cache")]
 const fn is_default_redis_pool_size(size: &usize) -> bool {
     *size == default_redis_pool_size()
 }
@@ -2064,7 +2060,7 @@ impl CacheUrl {
         self.0.as_str()
     }
 
-    /// Checks if the cache URL is for a Redis cache.
+    /// Returns the scheme of the cache URL.
     ///
     /// # Examples
     ///
@@ -2072,11 +2068,11 @@ impl CacheUrl {
     /// use cot::config::CacheUrl;
     ///
     /// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
-    /// assert!(url.is_redis());
+    /// assert_eq!(url.scheme() , "redis");
     /// ```
     #[must_use]
-    pub fn is_redis(&self) -> bool {
-        self.0.scheme() == "redis"
+    pub fn scheme(&self) -> &str {
+        self.0.scheme()
     }
 
     #[allow(clippy::allow_attributes, dead_code, reason = "used in tests")]

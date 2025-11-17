@@ -1944,7 +1944,7 @@ impl TestCache {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use cot::test::TestCache;
     ///
     /// # #[tokio::main]

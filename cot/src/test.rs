@@ -1741,17 +1741,6 @@ impl RedisDbAllocator {
             .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
         Ok(db_index.and_then(|i| i.parse::<usize>().ok()))
     }
-
-    #[expect(unused)]
-    async fn deallocate(&self, db_index: usize) -> RedisAllocatorResult<()> {
-        let mut connection = self.get_conn().await?;
-
-        let _: () = connection
-            .rpush(POOL_KEY, db_index.to_string())
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-        Ok(())
-    }
 }
 
 #[cfg(feature = "cache")]

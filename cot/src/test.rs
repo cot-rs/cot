@@ -2,7 +2,6 @@
 
 use std::any::Any;
 use std::future::poll_fn;
-use std::io;
 use std::marker::PhantomData;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -15,7 +14,6 @@ use deadpool_redis::Connection;
 use derive_more::Debug;
 #[cfg(feature = "redis")]
 use redis::AsyncCommands;
-use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
@@ -37,6 +35,7 @@ use crate::db::Database;
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
+#[cfg(feature = "redis")]
 use crate::error::error_impl::impl_into_cot_error;
 use crate::handler::BoxedHandler;
 use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
@@ -1611,15 +1610,17 @@ async fn set_current_db(conn: &mut Connection, db_num: usize) {
         .expect("Failed to select Redis database");
 }
 
-#[derive(Debug, Error)]
+#[cfg(feature = "redis")]
+#[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 enum RedisDbAllocatorError {
     #[error(transparent)]
-    Io(#[from] io::Error),
+    Io(#[from] std::io::Error),
     #[error("Redis error: {0}")]
     Redis(String),
 }
 
+#[cfg(feature = "redis")]
 impl_into_cot_error!(RedisDbAllocatorError);
 
 #[cfg(feature = "redis")]
@@ -1648,103 +1649,85 @@ impl RedisDbAllocator {
 
     /// Initialize the Redis database allocator.
     ///
-    /// The goal here is to ensure that the initialization script is only run
-    /// once, Since we run tests with `nextest`, tests are run per process.
-    /// Thus we use the creation of a file in the systems's temp directory
-    /// as a lock to ensure that only the first process to create the file
-    /// runs the initialization script since file creation is atomic.
+    /// The goal here is to ensure that DB IDs are initialized once.
+    /// Since we run tests using `nextest`, the tests are run per process.
+    /// Thus, we run this in a transaction to guarantee a deterministic
+    /// behavior.
     ///
-    /// The initialization script itself checks if the pool has already been
-    /// initialized by checking for the existence of an "init" key in Redis.
-    /// If the key does not exist, or if the length of the pool list does
-    /// not match the expected count, it initializes the pool by populating
-    /// it with database indices from 1 to `alloc_db - 1`.
-    async fn init(&self) -> RedisAllocatorResult<()> {
+    /// On initializing the IDs, we check for the existence of an "init" key in
+    /// the DB. If the key does not exist, or if the length of the pool list
+    /// does not match the expected count, we  reinitialize the pool by
+    /// populating it with database indices from 1 to `alloc_db - 1`.
+    async fn init(&self) -> RedisAllocatorResult<Option<String>> {
         const KEY_TIMEOUT_SECS: u64 = 300;
-        const LOCK_FILE_NAME: &str = "cot_redis_init.lock";
         const INIT_KEY: &str = "cot:test:db_pool:initialized";
 
-        let lock_path = std::env::temp_dir()
-            .as_path()
-            .with_file_name(LOCK_FILE_NAME);
+        let mut con = self.get_conn().await?;
+        let last_eligible_db = self.alloc_db - 1;
 
-        let create_result = tokio::task::spawn_blocking({
-            let lock_path_clone = lock_path.clone();
-            move || {
-                std::fs::OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&lock_path_clone)
-            }
-        })
-        .await
-        .map_err(|err| RedisDbAllocatorError::Io(io::Error::other(err)))?;
+        redis::cmd("WATCH")
+            .arg(INIT_KEY)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
 
-        // we use the file creation as a lock
-        match create_result {
-            Ok(file) => {
-                let mut conn = self.get_conn().await?;
+        let prev = redis::cmd("GET")
+            .arg(INIT_KEY)
+            .query_async::<Option<String>>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
 
-                let init_script = r"
-                -- KEYS[1] = INIT_KEY
-                -- KEYS[2] = POOL_KEY
-                -- ARGV[1] = expected_count
-                -- ARGV[2] = expire_secs
-
-                local init_key = KEYS[1]
-                local pool_key = KEYS[2]
-                local expected = tonumber(ARGV[1])
-                local ex = tonumber(ARGV[2])
-                local llen = redis.call('LLEN', pool_key)
-
-                -- defensive check here to ensure the pool is properly initialized with
-                -- the correct number of IDs
-
-                if redis.call('EXISTS', init_key) == 0 or llen ~= expected then
-                    redis.call('DEL', pool_key)
-                    for i = 1, expected do
-                        redis.call('RPUSH', pool_key, tostring(i))
-                    end
-                    redis.call('SET', init_key, '1')
-                    if ex ~= nil and ex > 0 then
-                        redis.call('EXPIRE', init_key, ex)
-                        redis.call('EXPIRE', pool_key, ex)
-                    end
-                    return 1
-                end
-                return 0
-            ";
-
-                let _ = redis::cmd("EVAL")
-                    .arg(init_script)
-                    .arg(2)
-                    .arg(INIT_KEY)
-                    .arg(POOL_KEY)
-                    .arg(self.alloc_db - 1)
-                    .arg(KEY_TIMEOUT_SECS)
-                    .query_async::<i64>(&mut conn)
-                    .await
-                    .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-
-                drop(file);
-                tokio::task::spawn_blocking(move || {
-                    // sleep for a short time to ensure other processes have time to notice the file
-                    std::thread::sleep(std::time::Duration::from_secs(1));
-                    let _ = std::fs::remove_file(&lock_path);
-                    Ok::<(), io::Error>(())
-                });
-                Ok(())
-            }
-
-            Err(e) => {
-                if e.kind() == io::ErrorKind::AlreadyExists {
-                    // Another process got to it, so we do nothing.
-                    Ok(())
-                } else {
-                    Err(RedisDbAllocatorError::Io(e))
-                }
-            }
+        if prev.is_some() {
+            redis::cmd("UNWATCH")
+                .query_async::<redis::Value>(&mut con)
+                .await
+                .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+            return Ok(prev);
         }
+
+        // start a transaction so this is atomic across processes
+        redis::cmd("MULTI")
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        let mut set_cmd = redis::cmd("SET");
+        set_cmd.arg(INIT_KEY).arg("1");
+        set_cmd.arg("EX").arg(KEY_TIMEOUT_SECS);
+        set_cmd
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        // delete and reinit IDs
+        redis::cmd("DEL")
+            .arg(POOL_KEY)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        let vals: Vec<String> = (1..=last_eligible_db).map(|i| i.to_string()).collect();
+        redis::cmd("RPUSH")
+            .arg(POOL_KEY)
+            .arg(vals)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        // keys should expire after a short while, a double defense against reuse by
+        // subsequent runs
+        redis::cmd("EXPIRE")
+            .arg(POOL_KEY)
+            .arg(KEY_TIMEOUT_SECS)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        redis::cmd("EXEC")
+            .query_async::<Option<Vec<redis::Value>>>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+        Ok(None)
     }
 
     async fn allocate(&self) -> RedisAllocatorResult<Option<usize>> {
@@ -1760,6 +1743,7 @@ impl RedisDbAllocator {
     #[expect(unused)]
     async fn deallocate(&self, db_index: usize) -> RedisAllocatorResult<()> {
         let mut connection = self.get_conn().await?;
+
         let _: () = connection
             .rpush(POOL_KEY, db_index.to_string())
             .await

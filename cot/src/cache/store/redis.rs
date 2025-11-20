@@ -106,7 +106,7 @@ impl Redis {
     /// let store = Redis::new(&CacheUrl::from("redis://127.0.0.1/"), 16).unwrap();
     ///  ```
     pub fn new(url: &CacheUrl, pool_size: usize) -> CacheStoreResult<Self> {
-        if !(url.scheme() == "redis") {
+        if url.scheme() != "redis" {
             return Err(
                 RedisCacheStoreError::InvalidConnectionString(url.as_str().to_string()).into(),
             );

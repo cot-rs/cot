@@ -819,7 +819,7 @@ impl CacheStoreConfigBuilder {
     }
 }
 
-#[cfg(feature = "redis")]
+#[cfg(feature = "cache")]
 const fn default_redis_pool_size() -> usize {
     10
 }

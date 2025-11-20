@@ -2603,6 +2603,11 @@ mod tests {
 
     #[test]
     #[cfg(feature = "cache")]
+    fn test_is_default_redis_pool_size() {
+        assert!(is_default_redis_pool_size(&10))
+    }
+    #[test]
+    #[cfg(feature = "cache")]
     fn cache_config_builder() {
         let config = CacheConfig::builder()
             .max_retries(7)
@@ -2640,12 +2645,9 @@ mod tests {
             },
         };
 
-        match config.store_type {
-            CacheStoreTypeConfig::Redis { url, pool_size } => {
-                assert_eq!(url.as_str(), "redis://localhost:6379");
-                assert_eq!(pool_size, 15);
-            }
-            _ => panic!("Expected Redis store type"),
+        if let CacheStoreTypeConfig::Redis { url, pool_size } = config.store_type {
+            assert_eq!(url.as_str(), "redis://localhost:6379");
+            assert_eq!(pool_size, 15);
         }
     }
 

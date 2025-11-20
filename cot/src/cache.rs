@@ -832,8 +832,8 @@ mod tests {
             Timeout::After(Duration::from_secs(60)),
         );
 
-        cache.insert("user:2", "John Doe").await.unwrap();
-        let user: Option<String> = cache.get("user:2").await.unwrap();
+        cache.insert("user:1", "John Doe").await.unwrap();
+        let user: Option<String> = cache.get("user:1").await.unwrap();
         assert_eq!(user, Some("John Doe".to_string()));
     }
 
@@ -847,8 +847,8 @@ mod tests {
             email: "john@example.com".to_string(),
         };
 
-        cache.insert("user:3", &user).await.unwrap();
-        let cached_user: Option<User> = cache.get("user:3").await.unwrap();
+        cache.insert("user:1", &user).await.unwrap();
+        let cached_user: Option<User> = cache.get("user:1").await.unwrap();
         assert_eq!(cached_user, Some(user));
     }
 
@@ -858,14 +858,14 @@ mod tests {
 
         cache
             .insert_expiring(
-                "temp:data_1",
+                "temp:data",
                 "temporary",
                 Timeout::After(Duration::from_secs(300)),
             )
             .await
             .unwrap();
 
-        let value: Option<String> = cache.get("temp:data_1").await.unwrap();
+        let value: Option<String> = cache.get("temp:data").await.unwrap();
         assert_eq!(value, Some("temporary".to_string()));
     }
 
@@ -875,7 +875,7 @@ mod tests {
 
         let mut call_count = 0;
         let value1: String = cache
-            .get_or_insert_with("expensive_1", || async {
+            .get_or_insert_with("expensive", || async {
                 call_count += 1;
                 Ok("computed".to_string())
             })
@@ -883,8 +883,7 @@ mod tests {
             .unwrap();
 
         let value2: String = cache
-            .get_or_insert_with("expensive_1", || async {
-                println!("dong dong");
+            .get_or_insert_with("expensive", || async {
                 call_count += 1;
                 Ok("different".to_string())
             })
@@ -902,7 +901,7 @@ mod tests {
 
         let value1: String = cache
             .get_or_insert_expiring_with(
-                "temp:data_2",
+                "temp:data",
                 || async {
                     call_count += 1;
                     Ok("temporary".to_string())
@@ -914,7 +913,7 @@ mod tests {
 
         let value2: String = cache
             .get_or_insert_expiring_with(
-                "temp:data_2",
+                "temp:data",
                 || async {
                     call_count += 1;
                     Ok("different".to_string())

@@ -25,7 +25,9 @@ use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 #[cfg(feature = "cache")]
 use crate::cache::Cache;
 #[cfg(feature = "cache")]
-use crate::cache::store::{memory::Memory, redis::Redis};
+use crate::cache::store::memory::Memory;
+#[cfg(feature = "redis")]
+use crate::cache::store::redis::Redis;
 use crate::config::ProjectConfig;
 #[cfg(feature = "cache")]
 use crate::config::Timeout;

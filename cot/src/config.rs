@@ -2604,7 +2604,7 @@ mod tests {
     #[test]
     #[cfg(feature = "cache")]
     fn test_is_default_redis_pool_size() {
-        assert!(is_default_redis_pool_size(&10))
+        assert!(is_default_redis_pool_size(&10));
     }
     #[test]
     #[cfg(feature = "cache")]

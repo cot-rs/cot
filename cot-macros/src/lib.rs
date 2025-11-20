@@ -1,5 +1,6 @@
 mod admin;
 mod api_response_enum;
+mod cache;
 mod dbtest;
 mod form;
 mod from_request;
@@ -156,6 +157,12 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
     fn_to_cot_main(fn_input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
+}
+
+#[proc_macro_attribute]
+pub fn cachetest(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let fn_input = parse_macro_input!(input as ItemFn);
+    cache::fn_to_cache_test(&fn_input).into()
 }
 
 /// An attribute macro that defines an `async` test function for a Cot-powered

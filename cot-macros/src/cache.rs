@@ -17,7 +17,7 @@ pub(super) fn fn_to_cache_test(test_fn: &ItemFn) -> TokenStream {
         }
 
 
-        // #[ignore = "Tests that use Redis are ignored by default"]
+        #[ignore = "Tests that use Redis are ignored by default"]
         #[::cot::test]
         #[cfg(feature="redis")]
         async fn #redis_ident() {

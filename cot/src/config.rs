@@ -820,6 +820,9 @@ impl CacheStoreConfigBuilder {
 }
 
 #[cfg(feature = "cache")]
+pub(crate) const DEFAULT_REDIS_POOL_SIZE: usize = default_redis_pool_size();
+
+#[cfg(feature = "cache")]
 const fn default_redis_pool_size() -> usize {
     10
 }

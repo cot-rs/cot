@@ -1857,9 +1857,9 @@ impl TestCache {
         let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost".to_string());
         let mut url = CacheUrl::from(url);
 
-        let redis = Redis::new(&url, 10)?;
+        let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
         let mut conn = redis.get_connection().await?;
-
+        // get the total number of DBs
         let db_num = get_db_num(&mut conn).await;
         assert!(
             db_num > 1,
@@ -1873,6 +1873,7 @@ impl TestCache {
 
         let allocator = RedisDbAllocator::new(alloc_db, redis);
         allocator.init().await?;
+        // get the db number for the current test
         let current_db = allocator
             .allocate()
             .await?
@@ -1880,7 +1881,7 @@ impl TestCache {
 
         // create a new connection to the correct DB
         url.inner_mut().set_path(current_db.to_string().as_str());
-        let redis = Redis::new(&url, 10)?;
+        let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
         let cache = Cache::new(redis, Some("test_harness".to_string()), Timeout::default());
 
         let this = Self::new(cache, CacheKind::Redis { allocator });

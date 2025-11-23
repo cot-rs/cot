@@ -8,13 +8,13 @@
 //! # use cot::config::CacheUrl;
 //! # #[tokio::main]
 //! # async fn main() {
-//!  let store = Redis::new(&CacheUrl::from("redis://127.0.0.1:6379"), 16).unwrap();
-//!  let key = "example_key".to_string();
-//!  let value = serde_json::json!({"data": "example_value"});
-//!  store.insert(key.clone(), value.clone(), Default::default()).await.unwrap();
-//!  let retrieved  = store.get(&key).await.unwrap();
+//! let store = Redis::new(&CacheUrl::from("redis://127.0.0.1:6379"), 16).unwrap();
+//! let key = "example_key".to_string();
+//! let value = serde_json::json!({"data": "example_value"});
+//! store.insert(key.clone(), value.clone(), Default::default()).await.unwrap();
+//! let retrieved  = store.get(&key).await.unwrap();
 //!
-//!  assert_eq!(retrieved, Some(value));
+//! assert_eq!(retrieved, Some(value));
 //! # }
 use cot::cache::store::CacheStoreResult;
 use cot::config::Timeout;
@@ -27,33 +27,35 @@ use crate::cache::store::{CacheStore, CacheStoreError};
 use crate::config::CacheUrl;
 use crate::error::error_impl::impl_into_cot_error;
 
+const ERROR_PREFIX: &str = "redis cache store error: ";
+
 /// Errors specific to the Redis cache store.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum RedisCacheStoreError {
     /// An error occurred during Redis connection pool creation.
-    #[error("redis pool creation error: {0}")]
+    #[error("{ERROR_PREFIX} redis pool creation error: {0}")]
     PoolCreation(Box<dyn std::error::Error + Send + Sync>),
 
     /// An error occurred during a pool connection or checkout.
-    #[error("redis pool connection error: {0}")]
+    #[error("{ERROR_PREFIX} redis pool connection error: {0}")]
     PoolConnection(Box<dyn std::error::Error + Send + Sync>),
 
     /// An error occurred during a Redis command execution.
-    #[error("redis command error: {0}")]
+    #[error("{ERROR_PREFIX} redis command error: {0}")]
     RedisCommand(Box<dyn std::error::Error + Send + Sync>),
 
     /// The provided Redis connection string is invalid.
-    #[error("invalid redis connection string: {0}")]
+    #[error("{ERROR_PREFIX} invalid redis connection string: {0}")]
     InvalidConnectionString(String),
 
     /// An error occurred during JSON serialization.
-    #[error("Serialization error: {0}")]
-    Serialize(String),
+    #[error("{ERROR_PREFIX} serialization error: {0}")]
+    Serialize(Box<dyn std::error::Error + Send + Sync>),
 
     /// An error occurred during JSON deserialization.
-    #[error("Deserialization error: {0}")]
-    Deserialize(String),
+    #[error("{ERROR_PREFIX} deserialization error: {0}")]
+    Deserialize(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl_into_cot_error!(RedisCacheStoreError);
@@ -61,8 +63,8 @@ impl_into_cot_error!(RedisCacheStoreError);
 impl From<RedisCacheStoreError> for CacheStoreError {
     fn from(err: RedisCacheStoreError) -> Self {
         match err {
-            RedisCacheStoreError::Serialize(e) => CacheStoreError::Serialize(e),
-            RedisCacheStoreError::Deserialize(e) => CacheStoreError::Deserialize(e),
+            RedisCacheStoreError::Serialize(e) => CacheStoreError::Serialize(e.to_string()),
+            RedisCacheStoreError::Deserialize(e) => CacheStoreError::Deserialize(e.to_string()),
             other => CacheStoreError::Backend(other.to_string()),
         }
     }
@@ -92,9 +94,9 @@ impl Redis {
     ///
     /// # Errors
     ///
-    ///  Returns [`RedisCacheStoreError::InvalidConnectionString`] if the
+    /// Returns [`RedisCacheStoreError::InvalidConnectionString`] if the
     /// provided URL is not a valid Redis URL
-    ///  and [`RedisCacheStoreError::PoolCreation`] if the connection pool could
+    /// and [`RedisCacheStoreError::PoolCreation`] if the connection pool could
     /// not be created.
     ///
     /// # Examples
@@ -153,14 +155,14 @@ impl Redis {
 impl CacheStore for Redis {
     async fn get(&self, key: &str) -> CacheStoreResult<Option<Value>> {
         let mut conn = self.get_connection().await?;
-        let data = conn
-            .get::<_, Option<String>>(key)
+        let data: Option<String> = conn
+            .get(key)
             .await
             .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
 
         data.map(|d| {
             let value = serde_json::from_str::<Value>(&d)
-                .map_err(|err| RedisCacheStoreError::Deserialize(err.to_string()))?;
+                .map_err(|err| RedisCacheStoreError::Deserialize(Box::new(err)))?;
             Ok(value)
         })
         .transpose()
@@ -169,7 +171,7 @@ impl CacheStore for Redis {
     async fn insert(&self, key: String, value: Value, expiry: Timeout) -> CacheStoreResult<()> {
         let mut conn = self.get_connection().await?;
         let data = serde_json::to_string(&value)
-            .map_err(|e| RedisCacheStoreError::Serialize(e.to_string()))?;
+            .map_err(|e| RedisCacheStoreError::Serialize(Box::new(e)))?;
         let mut options = SetOptions::default();
 
         match expiry {
@@ -191,7 +193,8 @@ impl CacheStore for Redis {
 
     async fn remove(&self, key: &str) -> CacheStoreResult<()> {
         let mut conn = self.get_connection().await?;
-        conn.del::<_, usize>(key)
+        let _: () = conn
+            .del(key)
             .await
             .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
         Ok(())
@@ -199,7 +202,8 @@ impl CacheStore for Redis {
 
     async fn clear(&self) -> CacheStoreResult<()> {
         let mut conn = self.get_connection().await?;
-        conn.flushdb::<bool>()
+        let _: () = conn
+            .flushdb()
             .await
             .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
         Ok(())
@@ -208,8 +212,8 @@ impl CacheStore for Redis {
     async fn approx_size(&self) -> CacheStoreResult<usize> {
         let mut conn = self.get_connection().await?;
         let cmd = redis::cmd("DBSIZE");
-        let val = cmd
-            .query_async::<usize>(&mut conn)
+        let val: usize = cmd
+            .query_async(&mut conn)
             .await
             .map_err(|err| RedisCacheStoreError::RedisCommand(Box::new(err)))?;
         Ok(val)

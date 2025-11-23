@@ -17,14 +17,15 @@ pub(super) fn fn_to_cache_test(test_fn: &ItemFn) -> TokenStream {
         }
 
 
-        #[ignore = "Tests that use Redis are ignored by default"]
+        // #[ignore = "Tests that use Redis are ignored by default"]
         #[::cot::test]
+        #[cfg(feature="redis")]
         async fn #redis_ident() {
             let mut cache = cot::test::TestCache::new_redis().await.unwrap();
 
             #test_fn_name(&mut cache).await;
 
-            cache.cleanup().await.unwrap();
+            cache.cleanup().await.unwrap_or_else(|err| panic!("Failed to cleanup: {err:?}"));
 
             #test_fn
     }

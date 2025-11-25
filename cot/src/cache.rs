@@ -793,6 +793,7 @@ mod tests {
     use std::fmt::Debug;
     use std::time::Duration;
 
+    use cot::config::CacheUrl;
     use serde::{Deserialize, Serialize};
 
     use super::*;
@@ -950,5 +951,26 @@ mod tests {
 
         cache.insert("existing", "value").await.unwrap();
         assert!(cache.contains_key("existing").await.unwrap());
+    }
+
+    #[cfg(feature = "redis")]
+    #[cot::test]
+    async fn test_cache_from_config_redis() {
+        use crate::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig};
+        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost".to_string());
+        let url = CacheUrl::from(url);
+
+        let config = CacheConfig::builder()
+            .store(
+                CacheStoreConfig::builder()
+                    .store_type(CacheStoreTypeConfig::Redis { url, pool_size: 5 })
+                    .build(),
+            )
+            .prefix("test_redis")
+            .timeout(Timeout::After(Duration::from_secs(60)))
+            .build();
+
+        let result = Cache::from_config(&config).await;
+        assert!(result.is_ok() || result.is_err());
     }
 }

@@ -971,6 +971,6 @@ mod tests {
             .build();
 
         let result = Cache::from_config(&config).await;
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_ok());
     }
 }

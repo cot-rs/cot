@@ -18,7 +18,7 @@ use thiserror::Error;
 use crate::config::Timeout;
 use crate::error::error_impl::impl_into_cot_error;
 
-const CACHE_STORE_ERROR_PREFIX: &str = "Cache store error: ";
+const CACHE_STORE_ERROR_PREFIX: &str = "cache store error:";
 
 /// Errors that can occur when interacting with a cache store.
 #[derive(Debug, Error)]

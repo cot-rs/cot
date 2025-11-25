@@ -27,7 +27,7 @@ use crate::cache::store::{CacheStore, CacheStoreError};
 use crate::config::CacheUrl;
 use crate::error::error_impl::impl_into_cot_error;
 
-const ERROR_PREFIX: &str = "redis cache store error: ";
+const ERROR_PREFIX: &str = "redis cache store error:";
 
 /// Errors specific to the Redis cache store.
 #[derive(Debug, Error)]
@@ -386,5 +386,55 @@ mod tests {
             .unwrap();
         let size = store.approx_size().await.unwrap();
         assert_eq!(size, 2);
+    }
+
+    #[cot::test]
+    async fn from_redis_cache_store_error_to_cache_store_error() {
+        let redis_cache_store_error = RedisCacheStoreError::PoolCreation(Box::new(
+            std::io::Error::new(std::io::ErrorKind::Other, "test"),
+        ));
+        assert!(matches!(
+            redis_cache_store_error,
+            RedisCacheStoreError::PoolCreation(_)
+        ));
+
+        let redis_cache_store_error = RedisCacheStoreError::PoolConnection(Box::new(
+            std::io::Error::new(std::io::ErrorKind::Other, "test"),
+        ));
+        assert!(matches!(
+            redis_cache_store_error,
+            RedisCacheStoreError::PoolConnection(_)
+        ));
+
+        let redis_cache_store_error = RedisCacheStoreError::RedisCommand(Box::new(
+            std::io::Error::new(std::io::ErrorKind::Other, "test"),
+        ));
+        assert!(matches!(
+            redis_cache_store_error,
+            RedisCacheStoreError::RedisCommand(_)
+        ));
+
+        let redis_cache_store_error =
+            RedisCacheStoreError::InvalidConnectionString("test".to_string());
+        assert!(matches!(
+            redis_cache_store_error,
+            RedisCacheStoreError::InvalidConnectionString(_)
+        ));
+
+        let redis_cache_store_error = RedisCacheStoreError::Serialize(Box::new(
+            std::io::Error::new(std::io::ErrorKind::Other, "test"),
+        ));
+        assert!(matches!(
+            redis_cache_store_error,
+            RedisCacheStoreError::Serialize(_)
+        ));
+
+        let redis_cache_store_error = RedisCacheStoreError::Deserialize(Box::new(
+            std::io::Error::new(std::io::ErrorKind::Other, "test"),
+        ));
+        assert!(matches!(
+            redis_cache_store_error,
+            RedisCacheStoreError::Deserialize(_)
+        ));
     }
 }

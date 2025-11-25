@@ -7,7 +7,13 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+#[cfg(feature = "cache")]
+use cot::config::CacheUrl;
+#[cfg(feature = "redis")]
+use deadpool_redis::Connection;
 use derive_more::Debug;
+#[cfg(feature = "redis")]
+use redis::AsyncCommands;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
@@ -20,13 +26,19 @@ use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 use crate::cache::Cache;
 #[cfg(feature = "cache")]
 use crate::cache::store::memory::Memory;
+#[cfg(feature = "redis")]
+use crate::cache::store::redis::Redis;
 use crate::config::ProjectConfig;
+#[cfg(feature = "cache")]
+use crate::config::Timeout;
 #[cfg(feature = "db")]
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
+#[cfg(feature = "redis")]
+use crate::error::error_impl::impl_into_cot_error;
 use crate::handler::BoxedHandler;
 use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
 use crate::request::Request;
@@ -760,13 +772,9 @@ impl TestRequestBuilder {
             #[cfg(feature = "db")]
             self.database.clone(),
             #[cfg(feature = "cache")]
-            self.cache.clone().unwrap_or_else(|| {
-                Arc::new(Cache::new(
-                    Memory::new(),
-                    None,
-                    crate::config::Timeout::default(),
-                ))
-            }),
+            self.cache
+                .clone()
+                .unwrap_or_else(|| Arc::new(Cache::new(Memory::new(), None, Timeout::default()))),
         );
         prepare_request(&mut request, Arc::new(context));
 
@@ -1576,5 +1584,360 @@ pub fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
             // We can ignore poisoned mutexes because we don't store any data inside
             poison_error.into_inner()
         }
+    }
+}
+
+#[cfg(feature = "redis")]
+const POOL_KEY: &str = "cot:test:db_pool";
+
+#[cfg(feature = "redis")]
+async fn get_db_num(conn: &mut Connection) -> usize {
+    let cfg = redis::cmd("CONFIG")
+        .arg("GET")
+        .arg("databases")
+        .query_async::<Vec<String>>(conn)
+        .await
+        .expect("Failed to get Redis config");
+    cfg.get(1)
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(16)
+}
+
+#[cfg(feature = "redis")]
+async fn set_current_db(conn: &mut Connection, db_num: usize) {
+    redis::cmd("SELECT")
+        .arg(db_num)
+        .query_async::<()>(conn)
+        .await
+        .expect("Failed to select Redis database");
+}
+
+#[cfg(feature = "redis")]
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+enum RedisDbAllocatorError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("Redis error: {0}")]
+    Redis(String),
+}
+
+#[cfg(feature = "redis")]
+impl_into_cot_error!(RedisDbAllocatorError);
+
+#[cfg(feature = "redis")]
+#[derive(Debug, Clone)]
+struct RedisDbAllocator {
+    alloc_db: usize,
+    redis: Redis,
+}
+
+#[cfg(feature = "redis")]
+type RedisAllocatorResult<T> = std::result::Result<T, RedisDbAllocatorError>;
+#[cfg(feature = "redis")]
+impl RedisDbAllocator {
+    fn new(alloc_db: usize, redis: Redis) -> Self {
+        Self { alloc_db, redis }
+    }
+
+    async fn get_conn(&self) -> RedisAllocatorResult<Connection> {
+        let conn = self
+            .redis
+            .get_connection()
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+        Ok(conn)
+    }
+
+    /// Initialize the Redis database allocator.
+    ///
+    /// The goal here is to ensure that DB IDs are initialized once.
+    /// Since we run tests using `nextest`, the tests are run per process.
+    /// Thus, we run this in a transaction to guarantee a deterministic
+    /// behavior.
+    ///
+    /// On initializing the IDs, we check for the existence of an "init" key in
+    /// the DB. If the key does not exist, or if the length of the pool list
+    /// does not match the expected count, we  reinitialize the pool by
+    /// populating it with database indices from 1 to `alloc_db - 1`.
+    async fn init(&self) -> RedisAllocatorResult<Option<String>> {
+        const KEY_TIMEOUT_SECS: u64 = 300;
+        const INIT_KEY: &str = "cot:test:db_pool:initialized";
+
+        let mut con = self.get_conn().await?;
+        let last_eligible_db = self.alloc_db - 1;
+
+        redis::cmd("WATCH")
+            .arg(INIT_KEY)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        let prev = redis::cmd("GET")
+            .arg(INIT_KEY)
+            .query_async::<Option<String>>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        if prev.is_some() {
+            redis::cmd("UNWATCH")
+                .query_async::<redis::Value>(&mut con)
+                .await
+                .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+            return Ok(prev);
+        }
+
+        // start a transaction so this is atomic across processes
+        redis::cmd("MULTI")
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        let mut set_cmd = redis::cmd("SET");
+        set_cmd.arg(INIT_KEY).arg("1");
+        set_cmd.arg("EX").arg(KEY_TIMEOUT_SECS);
+        set_cmd
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        // delete and reinit IDs
+        redis::cmd("DEL")
+            .arg(POOL_KEY)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        let vals: Vec<String> = (1..=last_eligible_db).map(|i| i.to_string()).collect();
+        redis::cmd("RPUSH")
+            .arg(POOL_KEY)
+            .arg(vals)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        // keys should expire after a short while, a double defense against reuse by
+        // subsequent runs
+        redis::cmd("EXPIRE")
+            .arg(POOL_KEY)
+            .arg(KEY_TIMEOUT_SECS)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        redis::cmd("EXEC")
+            .query_async::<Option<Vec<redis::Value>>>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+        Ok(None)
+    }
+
+    async fn allocate(&self) -> RedisAllocatorResult<Option<usize>> {
+        let mut connection = self.get_conn().await?;
+
+        let db_index: Option<String> = connection
+            .lpop(POOL_KEY, None)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+        Ok(db_index.and_then(|i| i.parse::<usize>().ok()))
+    }
+}
+
+#[cfg(feature = "cache")]
+#[derive(Debug, Clone)]
+enum CacheKind {
+    Memory,
+    #[cfg(feature = "redis")]
+    Redis {
+        #[expect(unused)]
+        allocator: RedisDbAllocator,
+    },
+}
+
+/// A test cache.
+///
+/// This is used to create a separate cache for testing.
+///
+/// # Examples
+///
+/// ```
+/// use cot::test::TestCache;
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// let test_cache = TestCache::new_memory();
+/// let cache = test_cache.cache();
+///
+/// // do something with the cache
+///
+/// # Ok(())
+/// # }
+/// ```
+#[cfg(feature = "cache")]
+#[derive(Debug, Clone)]
+pub struct TestCache {
+    cache: Arc<Cache>,
+    kind: CacheKind,
+}
+
+#[cfg(feature = "cache")]
+impl TestCache {
+    fn new(cache: Cache, kind: CacheKind) -> Self {
+        Self {
+            cache: Arc::new(cache),
+            kind,
+        }
+    }
+
+    /// Create a new in-memory test cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache could not be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_memory();
+    /// let cache = test_cache.cache();
+    ///
+    /// // do something with the cache
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn new_memory() -> Self {
+        let cache = Cache::new(Memory::new(), None, Timeout::default());
+        Self::new(cache, CacheKind::Memory)
+    }
+
+    /// Create a new Redis test cache.
+    ///
+    /// The Redis URL is read from the `REDIS_URL` environment variable. If not
+    /// provided, it defaults to `redis://localhost`.
+    ///
+    /// Running with redis makes use of an internal allocator that selects what
+    /// DB a test will run. Every test requires its own database to avoid
+    /// conflicts. The allocator, by design, will reserve the last database
+    /// number for allocation purposes, so make sure your Redis instance is
+    /// configured with at least 2 databases. For example if your redis
+    /// instance has 16 logical databases, database 15 will be used for
+    /// allocations, and databases 0-14 will be used for tests.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Redis cache could not be created.
+    ///
+    /// # Panics
+    ///
+    /// Panics if Redis is not configured with at least 2 databases.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_redis().await?;
+    /// let cache = test_cache.cache();
+    ///
+    /// // do something with the cache
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "redis")]
+    pub async fn new_redis() -> Result<Self> {
+        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost".to_string());
+        let mut url = CacheUrl::from(url);
+
+        let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
+        let mut conn = redis.get_connection().await?;
+        // get the total number of DBs
+        let db_num = get_db_num(&mut conn).await;
+        assert!(
+            db_num > 1,
+            "Redis must be configured with at least 2 databases for testing"
+        );
+
+        let alloc_db = db_num - 1;
+
+        // switch to the allocation DB to perform initialization
+        set_current_db(&mut conn, db_num - 1).await;
+
+        let allocator = RedisDbAllocator::new(alloc_db, redis);
+        allocator.init().await?;
+        // get the db number for the current test
+        let current_db = allocator
+            .allocate()
+            .await?
+            .expect("Failed to allocate a Redis database for testing");
+
+        // create a new connection to the correct DB
+        url.inner_mut().set_path(current_db.to_string().as_str());
+        let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
+        let cache = Cache::new(redis, Some("test_harness".to_string()), Timeout::default());
+
+        let this = Self::new(cache, CacheKind::Redis { allocator });
+
+        Ok(this)
+    }
+
+    /// Get the cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_memory();
+    /// let cache = test_cache.cache();
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn cache(&self) -> Arc<Cache> {
+        self.cache.clone()
+    }
+
+    /// Cleanup the test cache.
+    ///
+    /// This will clear the cache and deallocate any resources used by the test
+    /// cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache could not be cleared.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_redis().await?;
+    ///
+    /// // do something with the cache
+    ///
+    /// test_cache.cleanup().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn cleanup(&self) -> Result<()> {
+        #[cfg(feature = "redis")]
+        if let CacheKind::Redis { allocator: _ } = &self.kind {
+            self.cache.clear().await?;
+        }
+        Ok(())
     }
 }

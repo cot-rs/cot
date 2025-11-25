@@ -6,6 +6,8 @@
 //! cached values, optionally with expiration policies.
 
 pub mod memory;
+#[cfg(feature = "redis")]
+pub mod redis;
 
 use std::fmt::Debug;
 use std::pin::Pin;
@@ -14,23 +16,26 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::Timeout;
+use crate::error::error_impl::impl_into_cot_error;
 
-const CACHE_STORE_ERROR_PREFIX: &str = "Cache store error: ";
+const CACHE_STORE_ERROR_PREFIX: &str = "cache store error:";
 
 /// Errors that can occur when interacting with a cache store.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CacheStoreError {
     /// The underlying cache backend returned an error.
-    #[error("{CACHE_STORE_ERROR_PREFIX} Cache store backend error: {0}")]
+    #[error("{CACHE_STORE_ERROR_PREFIX} backend error: {0}")]
     Backend(String),
     /// Failed to serialize a value for storage.
-    #[error("{CACHE_STORE_ERROR_PREFIX} Serialization error: {0}")]
+    #[error("{CACHE_STORE_ERROR_PREFIX} serialization error: {0}")]
     Serialize(String),
     /// Failed to deserialize a stored value.
-    #[error("{CACHE_STORE_ERROR_PREFIX} Deserialization error: {0}")]
+    #[error("{CACHE_STORE_ERROR_PREFIX} deserialization error: {0}")]
     Deserialize(String),
 }
+
+impl_into_cot_error!(CacheStoreError);
 
 /// Convenience alias for results returned by cache store operations.
 pub type CacheStoreResult<T> = Result<T, CacheStoreError>;

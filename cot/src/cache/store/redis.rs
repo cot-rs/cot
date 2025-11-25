@@ -62,10 +62,12 @@ impl_into_cot_error!(RedisCacheStoreError);
 
 impl From<RedisCacheStoreError> for CacheStoreError {
     fn from(err: RedisCacheStoreError) -> Self {
+        let full = err.to_string();
+
         match err {
-            RedisCacheStoreError::Serialize(e) => CacheStoreError::Serialize(e.to_string()),
-            RedisCacheStoreError::Deserialize(e) => CacheStoreError::Deserialize(e.to_string()),
-            other => CacheStoreError::Backend(other.to_string()),
+            RedisCacheStoreError::Serialize(_) => CacheStoreError::Serialize(full),
+            RedisCacheStoreError::Deserialize(_) => CacheStoreError::Deserialize(full),
+            _ => CacheStoreError::Backend(full),
         }
     }
 }
@@ -185,7 +187,8 @@ impl CacheStore for Redis {
             _ => {}
         }
 
-        conn.set_options::<_, _, bool>(key, data, options)
+        let _: () = conn
+            .set_options(key, data, options)
             .await
             .map_err(|e| RedisCacheStoreError::RedisCommand(Box::new(e)))?;
         Ok(())
@@ -299,14 +302,18 @@ mod tests {
                 {
                     let key = format!("temp_key_{}", $idx);
                     let value = json!({"data": "temporary"});
-                    println!("key: {key}, timeout: {:?}", $timeout);
                     store
                         .insert(key.clone(), value.clone(), $timeout)
                         .await
                         .unwrap();
                     tokio::time::sleep(Duration::from_secs(3)).await;
                     let retrieved = store.get(&key).await.unwrap();
-                    assert_eq!(retrieved, None);
+                    if $timeout == Timeout::Never {
+                        assert_eq!(retrieved, Some(value));
+                    }
+                    else {
+                        assert_eq!(retrieved, None);
+                    }
                 }
             };
         }
@@ -317,6 +324,7 @@ mod tests {
                 (chrono::Utc::now() + chrono::Duration::seconds(1))
                     .with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()),
             ),
+            Timeout::Never,
         ];
 
         for (i, t) in timeouts.into_iter().enumerate() {
@@ -393,31 +401,49 @@ mod tests {
         let redis_cache_store_error =
             RedisCacheStoreError::PoolCreation(Box::new(std::io::Error::other("test")));
         let cache_store_error: CacheStoreError = redis_cache_store_error.into();
-        assert!(matches!(cache_store_error, CacheStoreError::Backend(_)));
+        assert_eq!(
+            cache_store_error.to_string(),
+            "cache store error: backend error: redis cache store error: redis pool creation error: test"
+        );
 
         let redis_cache_store_error =
             RedisCacheStoreError::PoolConnection(Box::new(std::io::Error::other("test")));
         let cache_store_error: CacheStoreError = redis_cache_store_error.into();
-        assert!(matches!(cache_store_error, CacheStoreError::Backend(_)));
+        assert_eq!(
+            cache_store_error.to_string(),
+            "cache store error: backend error: redis cache store error: redis pool connection error: test"
+        );
 
         let redis_cache_store_error =
             RedisCacheStoreError::RedisCommand(Box::new(std::io::Error::other("test")));
         let cache_store_error: CacheStoreError = redis_cache_store_error.into();
-        assert!(matches!(cache_store_error, CacheStoreError::Backend(_)));
+        assert_eq!(
+            cache_store_error.to_string(),
+            "cache store error: backend error: redis cache store error: redis command error: test"
+        );
 
         let redis_cache_store_error =
             RedisCacheStoreError::InvalidConnectionString("test".to_string());
         let cache_store_error: CacheStoreError = redis_cache_store_error.into();
-        assert!(matches!(cache_store_error, CacheStoreError::Backend(_)));
+        assert_eq!(
+            cache_store_error.to_string(),
+            "cache store error: backend error: redis cache store error: invalid redis connection string: test"
+        );
 
         let redis_cache_store_error =
             RedisCacheStoreError::Serialize(Box::new(std::io::Error::other("test")));
         let cache_store_error: CacheStoreError = redis_cache_store_error.into();
-        assert!(matches!(cache_store_error, CacheStoreError::Serialize(_)));
+        assert_eq!(
+            cache_store_error.to_string(),
+            "cache store error: serialization error: redis cache store error: serialization error: test"
+        );
 
         let redis_cache_store_error =
             RedisCacheStoreError::Deserialize(Box::new(std::io::Error::other("test")));
         let cache_store_error: CacheStoreError = redis_cache_store_error.into();
-        assert!(matches!(cache_store_error, CacheStoreError::Deserialize(_)));
+        assert_eq!(
+            cache_store_error.to_string(),
+            "cache store error: deserialization error: redis cache store error: deserialization error: test"
+        );
     }
 }

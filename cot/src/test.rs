@@ -1934,12 +1934,9 @@ impl TestCache {
     /// # }
     /// ```
     pub async fn cleanup(&self) -> Result<()> {
-        match &self.kind {
-            #[cfg(feature = "redis")]
-            CacheKind::Redis { allocator: _ } => {
-                self.cache.clear().await?;
-            }
-            _ => {}
+        #[cfg(feature = "redis")]
+        if let CacheKind::Redis { allocator: _ } = &self.kind {
+            self.cache.clear().await?;
         }
         Ok(())
     }

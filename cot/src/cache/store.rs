@@ -25,7 +25,7 @@ const CACHE_STORE_ERROR_PREFIX: &str = "cache store error:";
 #[non_exhaustive]
 pub enum CacheStoreError {
     /// The underlying cache backend returned an error.
-    #[error("{CACHE_STORE_ERROR_PREFIX} cache store backend error: {0}")]
+    #[error("{CACHE_STORE_ERROR_PREFIX} backend error: {0}")]
     Backend(String),
     /// Failed to serialize a value for storage.
     #[error("{CACHE_STORE_ERROR_PREFIX} serialization error: {0}")]

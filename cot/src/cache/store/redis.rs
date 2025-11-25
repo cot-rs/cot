@@ -392,44 +392,32 @@ mod tests {
     async fn from_redis_cache_store_error_to_cache_store_error() {
         let redis_cache_store_error =
             RedisCacheStoreError::PoolCreation(Box::new(std::io::Error::other("test")));
-        assert!(matches!(
-            redis_cache_store_error,
-            RedisCacheStoreError::PoolCreation(_)
-        ));
+        let cache_store_error: CacheStoreError = redis_cache_store_error.into();
+        assert!(matches!(cache_store_error, CacheStoreError::Backend(_)));
 
         let redis_cache_store_error =
             RedisCacheStoreError::PoolConnection(Box::new(std::io::Error::other("test")));
-        assert!(matches!(
-            redis_cache_store_error,
-            RedisCacheStoreError::PoolConnection(_)
-        ));
+        let cache_store_error: CacheStoreError = redis_cache_store_error.into();
+        assert!(matches!(cache_store_error, CacheStoreError::Backend(_)));
 
         let redis_cache_store_error =
             RedisCacheStoreError::RedisCommand(Box::new(std::io::Error::other("test")));
-        assert!(matches!(
-            redis_cache_store_error,
-            RedisCacheStoreError::RedisCommand(_)
-        ));
+        let cache_store_error: CacheStoreError = redis_cache_store_error.into();
+        assert!(matches!(cache_store_error, CacheStoreError::Backend(_)));
 
         let redis_cache_store_error =
             RedisCacheStoreError::InvalidConnectionString("test".to_string());
-        assert!(matches!(
-            redis_cache_store_error,
-            RedisCacheStoreError::InvalidConnectionString(_)
-        ));
+        let cache_store_error: CacheStoreError = redis_cache_store_error.into();
+        assert!(matches!(cache_store_error, CacheStoreError::Backend(_)));
 
         let redis_cache_store_error =
             RedisCacheStoreError::Serialize(Box::new(std::io::Error::other("test")));
-        assert!(matches!(
-            redis_cache_store_error,
-            RedisCacheStoreError::Serialize(_)
-        ));
+        let cache_store_error: CacheStoreError = redis_cache_store_error.into();
+        assert!(matches!(cache_store_error, CacheStoreError::Serialize(_)));
 
         let redis_cache_store_error =
             RedisCacheStoreError::Deserialize(Box::new(std::io::Error::other("test")));
-        assert!(matches!(
-            redis_cache_store_error,
-            RedisCacheStoreError::Deserialize(_)
-        ));
+        let cache_store_error: CacheStoreError = redis_cache_store_error.into();
+        assert!(matches!(cache_store_error, CacheStoreError::Deserialize(_)));
     }
 }

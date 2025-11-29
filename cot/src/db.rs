@@ -27,8 +27,7 @@ use mockall::automock;
 use query::Query;
 pub use relations::{ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use sea_query::{
-    ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder,
-    SimpleExpr, ValueType,
+    ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
 };
 use sea_query_binder::{SqlxBinder, SqlxValues};
 use sqlx::{Type, TypeInfo};
@@ -90,7 +89,7 @@ pub enum DatabaseError {
         "{ERROR_PREFIX} model has {field_count} fields which exceeds the database parameter limit \
         of {limit}"
     )]
-    BulkCreateModelTooLarge {
+    BulkInsertModelTooLarge {
         /// The number of fields in the model.
         field_count: usize,
         /// The database parameter limit.
@@ -98,10 +97,10 @@ pub enum DatabaseError {
     },
     /// Attempted bulk create with a model that only contains Auto fields.
     #[error(
-        "{ERROR_PREFIX} bulk_create requires at least one non-auto field. Models with only \
+        "{ERROR_PREFIX} bulk_insert requires at least one non-auto field. Models with only \
         auto-generated fields should be created individually using insert()"
     )]
-    BulkCreateNoValueColumns,
+    BulkInsertNoValueColumns,
     /// Data returned by the bulk insert does not match the expected number of
     /// rows.
     #[error(
@@ -109,7 +108,7 @@ pub enum DatabaseError {
         due to concurrent inserts or gaps in auto-increment IDs if using MySQL backend, or \
         might be a general database misbehavior otherwise."
     )]
-    BulkCreateReturnDataInvalid {
+    BulkInsertReturnDataInvalid {
         /// The expected number of rows.
         expected: usize,
         /// The actual number of rows returned.
@@ -285,6 +284,24 @@ pub trait Model: Sized + Send + 'static {
     /// multiple times, as it combines all instances into a single SQL
     /// `INSERT` statement with multiple value sets.
     ///
+    /// # Backend-specific behavior
+    ///
+    /// ## MySQL
+    ///
+    /// MySQL does not support returning auto-generated fields in bulk
+    /// insert or update operations. Because of this, any fields marked as
+    /// [`Auto`] will be populated by running a separate `SELECT` query which
+    /// assumes that the auto-generated fields are sequentially assigned.
+    /// This might lead to errors if there are concurrent inserts happening,
+    /// or if the auto-generated fields are not sequential for other reasons.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Database connection fails
+    /// - Unique constraint is violated
+    /// - Single model has more fields than the database parameter limit
+    ///
     /// # Examples
     ///
     /// ```ignore
@@ -294,11 +311,27 @@ pub trait Model: Sized + Send + 'static {
     ///     TodoItem { id: Auto::auto(), title: "Task 3".into() },
     /// ];
     ///
-    /// TodoItem::bulk_create(&db, &mut todos).await?;
+    /// TodoItem::bulk_insert(&db, &mut todos).await?;
     ///
     /// // After insertion, all todos have populated IDs
     /// assert!(todos[0].id.is_fixed());
     /// ```
+    async fn bulk_insert<DB: DatabaseBackend>(db: &DB, instances: &mut [Self]) -> Result<()> {
+        db.bulk_insert(instances).await?;
+        Ok(())
+    }
+
+    /// Bulk insert multiple model instances to the database in a single query,
+    /// or updates existing instances with the same primary keys.
+    ///
+    /// This method is significantly faster than calling
+    /// [`Self::insert`]/[`Self::update`] multiple times, as it combines all
+    /// instances into a single SQL `INSERT` statement with multiple value
+    /// sets.
+    ///
+    /// # Backend-specific behavior
+    ///
+    /// See the docs for [`Self::bulk_insert`] for backend-specific behavior.
     ///
     /// # Errors
     ///
@@ -306,8 +339,26 @@ pub trait Model: Sized + Send + 'static {
     /// - Database connection fails
     /// - Unique constraint is violated
     /// - Single model has more fields than the database parameter limit
-    async fn bulk_create<DB: DatabaseBackend>(db: &DB, instances: &mut [Self]) -> Result<()> {
-        db.bulk_insert(instances).await?;
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let mut todos = vec![
+    ///     TodoItem { id: Auto::auto(), title: "Task 1".into() },
+    ///     TodoItem { id: Auto::auto(), title: "Task 2".into() },
+    ///     TodoItem { id: Auto::auto(), title: "Task 3".into() },
+    /// ];
+    ///
+    /// TodoItem::bulk_insert_or_update(&db, &mut todos).await?;
+    ///
+    /// // After insertion, all todos have populated IDs
+    /// assert!(todos[0].id.is_fixed());
+    /// ```
+    async fn bulk_insert_or_update<DB: DatabaseBackend>(
+        db: &DB,
+        instances: &mut [Self],
+    ) -> Result<()> {
+        db.bulk_insert_or_update(instances).await?;
         Ok(())
     }
 }
@@ -1046,17 +1097,6 @@ impl Database {
     /// Bulk inserts multiple rows into the database, or updates them if they
     /// already exist.
     ///
-    /// # Backend-specific behavior
-    ///
-    /// ## MySQL
-    ///
-    /// MySQL does not support returning auto-generated fields in bulk
-    /// insert or update operations. Because of this, any fields marked as
-    /// [`Auto`] will be populated by running a separate `SELECT` query which
-    /// assumes that the auto-generated fields are sequentially assigned.
-    /// This might lead to errors if there are concurrent inserts happening,
-    /// or if the auto-generated fields are not sequential for other reasons.
-    ///
     /// # Errors
     ///
     /// This method can return an error if the rows could not be inserted into
@@ -1135,7 +1175,7 @@ impl Database {
         let num_value_fields = value_identifiers.len();
 
         if num_value_fields > max_params {
-            return Err(DatabaseError::BulkCreateModelTooLarge {
+            return Err(DatabaseError::BulkInsertModelTooLarge {
                 field_count: num_value_fields,
                 limit: max_params,
             });
@@ -1144,7 +1184,7 @@ impl Database {
         let batch_size = if num_value_fields > 0 {
             max_params / num_value_fields
         } else {
-            return Err(DatabaseError::BulkCreateNoValueColumns);
+            return Err(DatabaseError::BulkInsertNoValueColumns);
         };
 
         for chunk in data.chunks_mut(batch_size) {
@@ -1213,7 +1253,10 @@ impl Database {
 
             let rows = self.fetch_all(&insert_statement).await?;
             if rows.len() != chunk.len() {
-                return Err(DatabaseError::BulkCreateReturnDataInvalid);
+                return Err(DatabaseError::BulkInsertReturnDataInvalid {
+                    expected: chunk.len(),
+                    actual: rows.len(),
+                });
             }
 
             for (instance, row) in chunk.iter_mut().zip(rows) {
@@ -1233,17 +1276,21 @@ impl Database {
                 .from(T::TABLE_NAME)
                 .columns(auto_col_identifiers.iter().cloned())
                 .and_where(
-                    sea_query::Expr::col(T::PRIMARY_KEY_NAME)
-                        .gte(first_id)
-                        .and(sea_query::Expr::col(T::PRIMARY_KEY_NAME).lt(first_id
-                            + u64::try_from(chunk.len()).expect("chunk length fits in u64"))),
+                    sea_query::Expr::col(T::PRIMARY_KEY_NAME).gte(first_id).and(
+                        sea_query::Expr::col(T::PRIMARY_KEY_NAME).lt(first_id
+                            + <u64 as TryFrom<usize>>::try_from(chunk.len())
+                                .expect("chunk length fits in u64")),
+                    ),
                 )
                 .order_by(T::PRIMARY_KEY_NAME, sea_query::Order::Asc)
                 .to_owned();
 
             let rows = self.fetch_all(&query).await?;
             if rows.len() != chunk.len() {
-                return Err(DatabaseError::BulkCreateReturnDataInvalid);
+                return Err(DatabaseError::BulkInsertReturnDataInvalid {
+                    expected: chunk.len(),
+                    actual: rows.len(),
+                });
             }
 
             for (instance, row) in chunk.iter_mut().zip(rows) {

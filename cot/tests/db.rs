@@ -724,7 +724,7 @@ async fn weekday_set_field_functionality(db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn bulk_create_basic(test_db: &mut TestDatabase) {
+async fn bulk_insert_basic(test_db: &mut TestDatabase) {
     migrate_test_model(&*test_db).await;
 
     let mut models = vec![
@@ -742,7 +742,7 @@ async fn bulk_create_basic(test_db: &mut TestDatabase) {
         },
     ];
 
-    TestModel::bulk_create(&**test_db, &mut models)
+    TestModel::bulk_insert(&**test_db, &mut models)
         .await
         .unwrap();
 
@@ -760,7 +760,7 @@ async fn bulk_create_basic(test_db: &mut TestDatabase) {
 
     // Verify IDs match between models and database
     for model in &models {
-        if let Auto::Fixed(id) = model.id {
+        if let Auto::Fixed(_id) = model.id {
             let db_model = TestModel::get_by_primary_key(&**test_db, model.id)
                 .await
                 .unwrap()
@@ -771,11 +771,56 @@ async fn bulk_create_basic(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn bulk_create_empty(test_db: &mut TestDatabase) {
+async fn bulk_insert_or_update(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+
+    let mut models = vec![
+        TestModel {
+            id: Auto::auto(),
+            name: "test1".to_owned(),
+        },
+        TestModel {
+            id: Auto::auto(),
+            name: "test2".to_owned(),
+        },
+        TestModel {
+            id: Auto::auto(),
+            name: "test3".to_owned(),
+        },
+    ];
+    TestModel::bulk_insert(&**test_db, &mut models)
+        .await
+        .unwrap();
+
+    let mut models = vec![
+        TestModel {
+            id: models[0].id,
+            name: "test1_updated".to_owned(),
+        },
+        TestModel {
+            id: models[2].id,
+            name: "test3_updated".to_owned(),
+        },
+    ];
+    TestModel::bulk_insert_or_update(&**test_db, &mut models)
+        .await
+        .unwrap();
+
+    let objects = TestModel::objects().all(&**test_db).await.unwrap();
+    assert_eq!(objects.len(), 3);
+
+    let names: Vec<_> = objects.iter().map(|m| m.name.as_str()).collect();
+    assert!(names.contains(&"test1_updated"));
+    assert!(names.contains(&"test2"));
+    assert!(names.contains(&"test3_updated"));
+}
+
+#[cot_macros::dbtest]
+async fn bulk_insert_empty(test_db: &mut TestDatabase) {
     migrate_test_model(&*test_db).await;
 
     let mut models: Vec<TestModel> = vec![];
-    let result = TestModel::bulk_create(&**test_db, &mut models).await;
+    let result = TestModel::bulk_insert(&**test_db, &mut models).await;
 
     assert!(result.is_ok());
     let objects = TestModel::objects().all(&**test_db).await.unwrap();
@@ -783,7 +828,7 @@ async fn bulk_create_empty(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn bulk_create_large_batch(test_db: &mut TestDatabase) {
+async fn bulk_insert_large_batch(test_db: &mut TestDatabase) {
     const BATCH_SIZE: usize = 100_000;
 
     migrate_test_model(&*test_db).await;
@@ -795,7 +840,7 @@ async fn bulk_create_large_batch(test_db: &mut TestDatabase) {
         })
         .collect();
 
-    TestModel::bulk_create(&**test_db, &mut models)
+    TestModel::bulk_insert(&**test_db, &mut models)
         .await
         .unwrap();
 
@@ -808,7 +853,7 @@ async fn bulk_create_large_batch(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn bulk_create_no_values(test_db: &mut TestDatabase) {
+async fn bulk_insert_no_values(test_db: &mut TestDatabase) {
     #[derive(Debug, PartialEq)]
     #[model]
     struct PkOnlyModel {
@@ -837,17 +882,17 @@ async fn bulk_create_no_values(test_db: &mut TestDatabase) {
         .map(|_| PkOnlyModel { id: Auto::auto() })
         .collect();
 
-    let result = PkOnlyModel::bulk_create(&**test_db, &mut models).await;
+    let result = PkOnlyModel::bulk_insert(&**test_db, &mut models).await;
 
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
-        DatabaseError::BulkCreateNoValueColumns
+        DatabaseError::BulkInsertNoValueColumns
     ));
 }
 
 #[cot_macros::dbtest]
-async fn bulk_create_with_fixed_pk(test_db: &mut TestDatabase) {
+async fn bulk_insert_with_fixed_pk(test_db: &mut TestDatabase) {
     migrate_test_model(&*test_db).await;
 
     let mut models = vec![
@@ -865,7 +910,7 @@ async fn bulk_create_with_fixed_pk(test_db: &mut TestDatabase) {
         },
     ];
 
-    TestModel::bulk_create(&**test_db, &mut models)
+    TestModel::bulk_insert(&**test_db, &mut models)
         .await
         .unwrap();
 

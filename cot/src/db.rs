@@ -27,7 +27,8 @@ use mockall::automock;
 use query::Query;
 pub use relations::{ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use sea_query::{
-    ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
+    ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder,
+    SimpleExpr, ValueType,
 };
 use sea_query_binder::{SqlxBinder, SqlxValues};
 use sqlx::{Type, TypeInfo};
@@ -97,9 +98,23 @@ pub enum DatabaseError {
     },
     /// Attempted bulk create with a model that only contains Auto fields.
     #[error(
-        "{ERROR_PREFIX} calling bulk_create with a model that only contains auto/default fields is unsupported"
+        "{ERROR_PREFIX} bulk_create requires at least one non-auto field. Models with only \
+        auto-generated fields should be created individually using insert()"
     )]
     BulkCreateNoValueColumns,
+    /// Data returned by the bulk insert does not match the expected number of
+    /// rows.
+    #[error(
+        "{ERROR_PREFIX} bulk insert: expected {expected} rows, but got {actual}. This may be \
+        due to concurrent inserts or gaps in auto-increment IDs if using MySQL backend, or \
+        might be a general database misbehavior otherwise."
+    )]
+    BulkCreateReturnDataInvalid {
+        /// The expected number of rows.
+        expected: usize,
+        /// The actual number of rows returned.
+        actual: usize,
+    },
 }
 impl_into_cot_error!(DatabaseError, INTERNAL_SERVER_ERROR);
 
@@ -290,7 +305,6 @@ pub trait Model: Sized + Send + 'static {
     /// Returns error if:
     /// - Database connection fails
     /// - Unique constraint is violated
-    /// - Empty slice is provided
     /// - Single model has more fields than the database parameter limit
     async fn bulk_create<DB: DatabaseBackend>(db: &DB, instances: &mut [Self]) -> Result<()> {
         db.bulk_insert(instances).await?;
@@ -1032,6 +1046,17 @@ impl Database {
     /// Bulk inserts multiple rows into the database, or updates them if they
     /// already exist.
     ///
+    /// # Backend-specific behavior
+    ///
+    /// ## MySQL
+    ///
+    /// MySQL does not support returning auto-generated fields in bulk
+    /// insert or update operations. Because of this, any fields marked as
+    /// [`Auto`] will be populated by running a separate `SELECT` query which
+    /// assumes that the auto-generated fields are sequentially assigned.
+    /// This might lead to errors if there are concurrent inserts happening,
+    /// or if the auto-generated fields are not sequential for other reasons.
+    ///
     /// # Errors
     ///
     /// This method can return an error if the rows could not be inserted into
@@ -1159,13 +1184,16 @@ impl Database {
                 .map(|v| match v.to_db_field_value() {
                     DbFieldValue::Value(val) => val,
                     DbFieldValue::Auto => {
-                        panic!("Expected Value but found Auto in bulk insert")
+                        unreachable!(
+                            "Expected `Value` for a value column, but found `Auto` when running \
+                            a bulk insert"
+                        )
                     }
                 })
                 .map(SimpleExpr::Value)
                 .collect();
 
-            assert!(!db_values.is_empty(), "expected at least 1 value field");
+            debug_assert!(!db_values.is_empty(), "expected at least 1 value field");
             insert_statement.values(db_values)?;
         }
 
@@ -1184,6 +1212,9 @@ impl Database {
             insert_statement.returning(ReturningClause::Columns(auto_col_identifiers.to_vec()));
 
             let rows = self.fetch_all(&insert_statement).await?;
+            if rows.len() != chunk.len() {
+                return Err(DatabaseError::BulkCreateReturnDataInvalid);
+            }
 
             for (instance, row) in chunk.iter_mut().zip(rows) {
                 instance.update_from_db(row, auto_col_ids)?;
@@ -1201,13 +1232,19 @@ impl Database {
             let query = sea_query::Query::select()
                 .from(T::TABLE_NAME)
                 .columns(auto_col_identifiers.iter().cloned())
-                .and_where(sea_query::Expr::col(T::PRIMARY_KEY_NAME).gte(first_id).and(
-                    sea_query::Expr::col(T::PRIMARY_KEY_NAME).lt(first_id + chunk.len() as u64),
-                ))
+                .and_where(
+                    sea_query::Expr::col(T::PRIMARY_KEY_NAME)
+                        .gte(first_id)
+                        .and(sea_query::Expr::col(T::PRIMARY_KEY_NAME).lt(first_id
+                            + u64::try_from(chunk.len()).expect("chunk length fits in u64"))),
+                )
                 .order_by(T::PRIMARY_KEY_NAME, sea_query::Order::Asc)
                 .to_owned();
 
             let rows = self.fetch_all(&query).await?;
+            if rows.len() != chunk.len() {
+                return Err(DatabaseError::BulkCreateReturnDataInvalid);
+            }
 
             for (instance, row) in chunk.iter_mut().zip(rows) {
                 instance.update_from_db(row, auto_col_ids)?;

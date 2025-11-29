@@ -757,6 +757,17 @@ async fn bulk_create_basic(test_db: &mut TestDatabase) {
     assert!(names.contains(&"test1"));
     assert!(names.contains(&"test2"));
     assert!(names.contains(&"test3"));
+
+    // Verify IDs match between models and database
+    for model in &models {
+        if let Auto::Fixed(id) = model.id {
+            let db_model = TestModel::get_by_primary_key(&**test_db, model.id)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(db_model.name, model.name);
+        }
+    }
 }
 
 #[cot_macros::dbtest]

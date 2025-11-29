@@ -122,6 +122,8 @@ use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 use crate::cache::store::memory::Memory;
+#[cfg(feature = "redis")]
+use crate::cache::store::redis::Redis;
 use crate::cache::store::{BoxCacheStore, CacheStore};
 use crate::config::{CacheConfig, Timeout};
 use crate::error::error_impl::impl_into_cot_error;
@@ -771,6 +773,11 @@ impl Cache {
                     let mem_store = Memory::new();
                     Self::new(mem_store, config.prefix.clone(), config.timeout)
                 }
+                #[cfg(feature = "redis")]
+                CacheStoreTypeConfig::Redis { ref url, pool_size } => {
+                    let redis_store = Redis::new(url, pool_size)?;
+                    Self::new(redis_store, config.prefix.clone(), config.timeout)
+                }
                 _ => {
                     unimplemented!();
                 }
@@ -786,11 +793,13 @@ mod tests {
     use std::fmt::Debug;
     use std::time::Duration;
 
+    use cot::config::CacheUrl;
     use serde::{Deserialize, Serialize};
 
     use super::*;
     use crate::cache::store::memory::Memory;
     use crate::config::Timeout;
+    use crate::test::TestCache;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct User {
@@ -799,12 +808,14 @@ mod tests {
         email: String,
     }
 
-    #[cot::test]
-    async fn test_cache_basic_operations() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_basic_operations(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
-        cache.insert("user:1", "John Doe").await.unwrap();
+        cache
+            .insert("user:1", "John Doe".to_string())
+            .await
+            .unwrap();
         let user: Option<String> = cache.get("user:1").await.unwrap();
         assert_eq!(user, Some("John Doe".to_string()));
 
@@ -827,10 +838,9 @@ mod tests {
         assert_eq!(user, Some("John Doe".to_string()));
     }
 
-    #[cot::test]
-    async fn test_cache_complex_objects() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_complex_objects(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         let user = User {
             id: 1,
@@ -843,10 +853,9 @@ mod tests {
         assert_eq!(cached_user, Some(user));
     }
 
-    #[cot::test]
-    async fn test_cache_insert_expiring() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_insert_expiring(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         cache
             .insert_expiring(
@@ -861,13 +870,11 @@ mod tests {
         assert_eq!(value, Some("temporary".to_string()));
     }
 
-    #[cot::test]
-    async fn test_cache_get_or_insert_with() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_get_or_insert_with(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         let mut call_count = 0;
-
         let value1: String = cache
             .get_or_insert_with("expensive", || async {
                 call_count += 1;
@@ -883,15 +890,13 @@ mod tests {
             })
             .await
             .unwrap();
-
         assert_eq!(value1, value2);
         assert_eq!(call_count, 1);
     }
 
-    #[cot::test]
-    async fn test_cache_get_or_insert_with_expiring() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_get_or_insert_with_expiring(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         let mut call_count = 0;
 
@@ -923,10 +928,9 @@ mod tests {
         assert_eq!(call_count, 1);
     }
 
-    #[cot::test]
-    async fn test_cache_statistics() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_statistics(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         assert_eq!(cache.approx_size().await.unwrap(), 0);
 
@@ -939,14 +943,34 @@ mod tests {
         assert_eq!(cache.approx_size().await.unwrap(), 0);
     }
 
-    #[cot::test]
-    async fn test_cache_contains_key() {
-        let store = Memory::new();
-        let cache = Cache::new(store, None, Timeout::After(Duration::from_secs(60)));
+    #[cot_macros::cachetest]
+    async fn test_cache_contains_key(test_cache: &mut TestCache) {
+        let cache = test_cache.cache();
 
         assert!(!cache.contains_key("nonexistent").await.unwrap());
 
         cache.insert("existing", "value").await.unwrap();
         assert!(cache.contains_key("existing").await.unwrap());
+    }
+
+    #[cfg(feature = "redis")]
+    #[cot::test]
+    async fn test_cache_from_config_redis() {
+        use crate::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig};
+        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost".to_string());
+        let url = CacheUrl::from(url);
+
+        let config = CacheConfig::builder()
+            .store(
+                CacheStoreConfig::builder()
+                    .store_type(CacheStoreTypeConfig::Redis { url, pool_size: 5 })
+                    .build(),
+            )
+            .prefix("test_redis")
+            .timeout(Timeout::After(Duration::from_secs(60)))
+            .build();
+
+        let result = Cache::from_config(&config).await;
+        assert!(result.is_ok());
     }
 }

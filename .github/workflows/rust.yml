@@ -54,11 +54,19 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       matrix:
-        rust: [stable, nightly, "1.86"] # 1.85 is the MSRV
+        rust: [stable, nightly, MSRV]
         os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - rust: stable
+            version: stable
+          - rust: nightly
+            version: nightly
+          - rust: MSRV
+            version: "1.86" # MSRV
 
     name: Build & test
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.rust == 'nightly' }}
     needs: ["check"]
     steps:
       - name: Checkout source
@@ -67,7 +75,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: ${{ matrix.version }}
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -84,19 +92,19 @@ jobs:
           tool: nextest
 
       - name: Fetch dependencies
-        run: cargo +${{ matrix.rust }} fetch --locked
+        run: cargo +${{ matrix.version }} fetch --locked
 
       - name: Build
-        run: cargo +${{ matrix.rust }} build --all-features --tests
+        run: cargo +${{ matrix.version }} build --all-features --tests
 
       - name: Test
-        run: cargo +${{ matrix.rust }} nextest run --all-features
+        run: cargo +${{ matrix.version }} nextest run --all-features
 
       # Nextest does not support doc tests as in stable Rust
       # they are not exposed in the same way as normal tests.
       # https://github.com/nextest-rs/nextest/issues/16
       - name: Test docs
-        run: cargo +${{ matrix.rust }} test --all-features --doc
+        run: cargo +${{ matrix.version }} test --all-features --doc
 
   clippy:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository

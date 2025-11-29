@@ -1,11 +1,13 @@
 mod admin;
 mod api_response_enum;
+mod cache;
 mod dbtest;
 mod form;
 mod from_request;
 mod main_fn;
 mod model;
 mod query;
+mod select_as_form_field;
 mod select_choice;
 
 use darling::Error;
@@ -23,6 +25,7 @@ use crate::from_request::impl_from_request_head_for_struct;
 use crate::main_fn::{fn_to_cot_e2e_test, fn_to_cot_main, fn_to_cot_test};
 use crate::model::impl_model_for_struct;
 use crate::query::{Query, query_to_tokens};
+use crate::select_as_form_field::impl_select_as_form_field_for_enum;
 use crate::select_choice::impl_select_choice_for_enum;
 
 #[proc_macro_derive(Form, attributes(form))]
@@ -156,6 +159,12 @@ pub fn main(_args: TokenStream, input: TokenStream) -> TokenStream {
         .into()
 }
 
+#[proc_macro_attribute]
+pub fn cachetest(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let fn_input = parse_macro_input!(input as ItemFn);
+    cache::fn_to_cache_test(&fn_input).into()
+}
+
 /// An attribute macro that defines an `async` test function for a Cot-powered
 /// app.
 ///
@@ -210,6 +219,13 @@ pub fn derive_from_request_head(input: TokenStream) -> TokenStream {
 pub fn derive_select_choice(input: TokenStream) -> TokenStream {
     let ast = syn::parse_macro_input!(input as DeriveInput);
     let token_stream = impl_select_choice_for_enum(&ast);
+    token_stream.into()
+}
+
+#[proc_macro_derive(SelectAsFormField)]
+pub fn derive_select_as_form_field(input: TokenStream) -> TokenStream {
+    let ast = syn::parse_macro_input!(input as DeriveInput);
+    let token_stream = impl_select_as_form_field_for_enum(&ast);
     token_stream.into()
 }
 

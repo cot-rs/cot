@@ -301,6 +301,7 @@ pub trait Model: Sized + Send + 'static {
     /// - Database connection fails
     /// - Unique constraint is violated
     /// - Single model has more fields than the database parameter limit
+    /// - Model only contains auto-generated fields
     ///
     /// # Examples
     ///
@@ -339,6 +340,7 @@ pub trait Model: Sized + Send + 'static {
     /// - Database connection fails
     /// - Unique constraint is violated
     /// - Single model has more fields than the database parameter limit
+    /// - Model only contains auto-generated fields
     ///
     /// # Examples
     ///
@@ -1238,9 +1240,14 @@ impl Database {
         }
 
         if update {
+            let update_cols: Vec<_> = value_identifiers
+                .iter()
+                .filter(|id| **id != T::PRIMARY_KEY_NAME)
+                .copied()
+                .collect();
             insert_statement.on_conflict(
                 OnConflict::column(T::PRIMARY_KEY_NAME)
-                    .update_columns(value_identifiers.iter().copied())
+                    .update_columns(update_cols)
                     .to_owned(),
             );
         }
@@ -1265,9 +1272,12 @@ impl Database {
         } else {
             // MySQL: Use LAST_INSERT_ID() and fetch rows
             let result = self.execute_statement(&insert_statement).await?;
-            let first_id = result
-                .last_inserted_row_id
-                .expect("expected last inserted row ID if RETURNING clause is not supported");
+            let first_id = result.last_inserted_row_id.ok_or_else(|| {
+                DatabaseError::BulkInsertReturnDataInvalid {
+                    expected: chunk.len(),
+                    actual: 0,
+                }
+            })?;
 
             // Fetch the inserted rows using a SELECT query
             // Note: This assumes IDs are consecutive, which is generally safe for

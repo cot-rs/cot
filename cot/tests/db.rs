@@ -760,7 +760,7 @@ async fn bulk_insert_basic(test_db: &mut TestDatabase) {
 
     // Verify IDs match between models and database
     for model in &models {
-        if let Auto::Fixed(_id) = model.id {
+        if let Auto::Fixed(_) = model.id {
             let db_model = TestModel::get_by_primary_key(&**test_db, model.id)
                 .await
                 .unwrap()

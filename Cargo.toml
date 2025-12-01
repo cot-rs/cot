@@ -99,7 +99,7 @@ insta = { version = "1", features = ["filters"] }
 insta-cmd = "0.6"
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
-mockall = "0.13"
+mockall = "0.14"
 multer = "3"
 password-auth = { version = "1", default-features = false }
 petgraph = { version = "0.8", default-features = false }

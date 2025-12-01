@@ -1,28 +1,28 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Send Email</title>
-</head>
-<body>
-    <h1>Send Email</h1>
-    <form action="/send" method="post">
-        <div>
-            <label for="from">From:</label>
-            <input type="email" name="from" required />
-        </div>
-        <div>
-            <label for="to">To:</label>
-            <input type="email" name="to" required />
-        </div>
-        <div>
-            <label for="subject">Subject:</label>
-            <input type="text" name="subject" required />
-        </div>
-        <div>
-            <label for="body">Body:</label>
-            <textarea name="body" required></textarea>
-        </div>
-        <button type="submit">Send</button>
-    </form>
-</body>
+    <head>
+        <title>Send Email</title>
+    </head>
+    <body>
+        <h1>Send Email</h1>
+        <form action="/send" method="post">
+            <div>
+                <label for="from">From:</label>
+                <input type="email" name="from" required />
+            </div>
+            <div>
+                <label for="to">To:</label>
+                <input type="email" name="to" required />
+            </div>
+            <div>
+                <label for="subject">Subject:</label>
+                <input type="text" name="subject" required />
+            </div>
+            <div>
+                <label for="body">Body:</label>
+                <textarea name="body" required></textarea>
+            </div>
+            <button type="submit">Send</button>
+        </form>
+    </body>
 </html>

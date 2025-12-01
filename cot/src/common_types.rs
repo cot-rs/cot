@@ -5,7 +5,7 @@
 //! general-purpose newtype wrappers and associated trait implementations to
 //! ensure consistent and safe processing of form data.
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
 
 #[cfg(feature = "mysql")]
@@ -14,7 +14,9 @@ use cot::db::impl_mysql::MySqlValueRef;
 use cot::db::impl_postgres::PostgresValueRef;
 #[cfg(feature = "sqlite")]
 use cot::db::impl_sqlite::SqliteValueRef;
+use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
+use thiserror::Error;
 
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
@@ -29,7 +31,7 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 /// the password value.
 ///
 /// For persisting passwords in the database, and verifying passwords against
-/// the hash, use [`PasswordHash`].
+/// the hash, use [`PasswordHash`](crate::auth::PasswordHash).
 ///
 /// # Security
 ///
@@ -40,10 +42,12 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///
 /// When comparing passwords, there are two recommended approaches:
 ///
-/// 1. The most secure approach is to use [`PasswordHash::from_password`] to
-///    create a hash from one password, and then use [`PasswordHash::verify`] to
-///    compare it with the other password. This method uses constant-time
-///    equality comparison, which protects against timing attacks.
+/// 1. The most secure approach is to use
+///    [`PasswordHash::from_password`](crate::auth::PasswordHash::from_password)
+///    to create a hash from one password, and then use
+///    [`PasswordHash::verify`](crate::auth::PasswordHash::verify) to compare it
+///    with the other password. This method uses constant-time equality
+///    comparison, which protects against timing attacks.
 ///
 /// 2. An alternative is to use the [`Password::as_str`] method and compare the
 ///    strings directly. This approach uses non-constant-time comparison, which
@@ -55,7 +59,7 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 /// # Examples
 ///
 /// ```
-/// use cot::auth::Password;
+/// use cot::common_types::Password;
 ///
 /// let password = Password::new("pass");
 /// assert_eq!(&format!("{:?}", password), "Password(\"**********\")");
@@ -133,11 +137,268 @@ impl From<String> for Password {
     }
 }
 
+/// A validated URL wrapper.
+///
+/// This structure ensures that the contained URL is correctly formatted and
+/// complies with standard URL syntax rules. It wraps [`url::Url`] to provide
+/// validation upon construction through methods like [`Url::new`] and
+/// [`Url::from_str`], and exposes useful methods for accessing URL components
+/// or converting the URL into different representations.
+///
+/// # Behavior
+///
+/// - **Validation**: Both `new` and `from_str` ensure the input is a
+///   syntactically correct URL as defined by the WHATWG URL specification via
+///   the underlying [`url::Url`] parser.
+/// - **Normalization**: The internal URL is normalized (e.g., trailing slash
+///   added for HTTP URLs) during construction.
+///
+/// # Examples
+///
+/// ## Creating a Validated URL Using `new`
+///
+/// ```
+/// use cot::common_types::Url;
+///
+/// // Successful URL creation
+/// let url = Url::new("https://example.com").unwrap();
+///
+/// // Accessing the normalized URL string
+/// assert_eq!(url.as_str(), "https://example.com/");
+/// ```
+///
+/// ## Parsing a URL from a [`String`] Using `from_str`
+///
+/// ```
+/// use std::str::FromStr;
+///
+/// use cot::common_types::Url;
+///
+/// // Parse a valid URL string
+/// let url = Url::from_str("https://example.com").unwrap();
+///
+/// // Convert into owned string representation
+/// let url_string = url.into_string();
+/// assert_eq!(url_string, "https://example.com/");
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Url(url::Url);
+
+impl Url {
+    /// Creates a new `Url` by parsing the input string.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UrlParseError`] if the input string is not a valid URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let valid_url = Url::new("https://example.com").unwrap();
+    /// ```
+    pub fn new<S: AsRef<str>>(s: S) -> Result<Url, UrlParseError> {
+        url::Url::from_str(s.as_ref())
+            .map(Self)
+            .map_err(UrlParseError)
+    }
+
+    /// Returns a string slice reference to the URL's string representation.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    /// Converts the `Url` into a owned `String` representation.
+    ///
+    /// # Examples
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com").unwrap();
+    /// let url_string = url.into_string();
+    /// assert_eq!(url_string, "https://example.com/");
+    /// ```
+    #[must_use]
+    pub fn into_string(self) -> String {
+        self.0.into()
+    }
+    /// Returns the URL scheme (e.g., "http", "https").
+    ///
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com").unwrap();
+    /// assert_eq!(url.scheme(), "https");
+    /// ```
+    #[must_use]
+    pub fn scheme(&self) -> &str {
+        self.0.scheme()
+    }
+
+    /// Returns the host part of the URL, if present.
+    ///
+    /// This typically includes the domain name or IP address.
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com/path").unwrap();
+    /// assert_eq!(url.host(), Some("example.com"));
+    /// ```
+    #[must_use]
+    pub fn host(&self) -> Option<&str> {
+        self.0.host_str()
+    }
+
+    /// Returns the path component of the URL.
+    ///
+    /// This includes everything after the host and before the query or
+    /// fragment.
+    ///
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com/foo/bar").unwrap();
+    /// assert_eq!(url.path(), "/foo/bar");
+    /// ```
+    #[must_use]
+    pub fn path(&self) -> &str {
+        self.0.path()
+    }
+
+    /// Returns the query string of the URL, if present.
+    ///
+    /// The query is the part that follows the '?' character.
+    ///
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com?query=1").unwrap();
+    /// assert_eq!(url.query(), Some("query=1"));
+    /// ```
+    #[must_use]
+    pub fn query(&self) -> Option<&str> {
+        self.0.query()
+    }
+
+    /// Returns the fragment identifier of the URL, if present.
+    ///
+    /// The fragment is the part that follows the '#' character.
+    ///
+    /// # Example
+    /// ```
+    /// use cot::common_types::Url;
+    ///
+    /// let url = Url::new("https://example.com#section-1").unwrap();
+    /// assert_eq!(url.fragment(), Some("section-1"));
+    /// ```
+    #[must_use]
+    pub fn fragment(&self) -> Option<&str> {
+        self.0.fragment()
+    }
+}
+
+/// Implements string parsing for `Url`.
+///
+/// This allows a string to be parsed directly into a validated [`Url`]
+/// instance. The parsing process ensures that the input string is a
+/// syntactically valid URL.
+///
+/// # Errors
+///
+/// Returns [`UrlParseError`] if the input string is not a valid URL format.
+///
+/// # Examples
+///
+/// ```
+/// use std::str::FromStr;
+///
+/// use cot::common_types::Url;
+///
+/// // Parsing a valid URL string
+/// let url = Url::from_str("https://example.com").unwrap();
+/// assert_eq!(url.as_str(), "https://example.com/");
+///
+/// // Attempting to parse an invalid URL
+/// assert!(Url::from_str("not-a-url").is_err());
+/// ```
+impl FromStr for Url {
+    type Err = UrlParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Url::new(s)
+    }
+}
+
+impl Display for Url {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// A type that represents an error that occurs when parsing a URL.
+///
+/// This is returned by [`Url::new`] and [`Url::from_str`] when the input string
+/// is not a valid URL.
+#[derive(Debug, Error)]
+#[error(transparent)]
+#[expect(missing_copy_implementations)] // implementation detail
+pub struct UrlParseError(url::ParseError);
+
+impl From<UrlParseError> for FormFieldValidationError {
+    fn from(error: UrlParseError) -> Self {
+        FormFieldValidationError::from_string(error.to_string())
+    }
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for Url {
+    fn to_db_value(&self) -> DbValue {
+        self.0.clone().to_string().into()
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for Url {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        Url::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        Url::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        Url::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
+#[cfg(feature = "db")]
+impl DatabaseField for Url {
+    const TYPE: ColumnType = ColumnType::Text;
+}
+
 /// A validated email address.
 ///
-/// This is a newtype wrapper around
-/// [`EmailAddress`](email_address::EmailAddress) that provides validation and
-/// integration with Cot's database system. It ensures email addresses
+/// This is a newtype wrapper around [`EmailAddress`] that provides validation
+/// and integration with Cot's database system. It ensures email addresses
 /// comply with RFC 5321/5322 standards.
 ///
 /// # Examples
@@ -153,7 +414,7 @@ impl From<String> for Password {
 /// // Convert using TryFrom
 /// let email = Email::try_from("user@example.com").unwrap();
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Email(EmailAddress);
 
 impl Email {
@@ -173,8 +434,10 @@ impl Email {
     /// let email = Email::new("user@example.com").unwrap();
     /// assert!(Email::new("invalid").is_err());
     /// ```
-    pub fn new<S: AsRef<str>>(email: S) -> Result<Email, email_address::Error> {
-        EmailAddress::from_str(email.as_ref()).map(Self)
+    pub fn new<S: AsRef<str>>(email: S) -> Result<Email, EmailParseError> {
+        EmailAddress::from_str(email.as_ref())
+            .map(Self)
+            .map_err(EmailParseError)
     }
 
     /// Returns the email address as a string.
@@ -319,7 +582,7 @@ impl Email {
 /// let email = Email::from_str("user@example.com").unwrap();
 /// ```
 impl FromStr for Email {
-    type Err = email_address::Error;
+    type Err = EmailParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Email::new(s)
@@ -336,7 +599,7 @@ impl FromStr for Email {
 /// let email = Email::try_from("user@example.com").unwrap();
 /// ```
 impl TryFrom<&str> for Email {
-    type Error = email_address::Error;
+    type Error = EmailParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Email::new(value)
@@ -352,12 +615,25 @@ impl TryFrom<&str> for Email {
 ///
 /// let email = Email::try_from(String::from("user@example.com")).unwrap();
 /// ```
-#[cfg(feature = "db")]
 impl TryFrom<String> for Email {
-    type Error = email_address::Error;
+    type Error = EmailParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Email::new(value)
+    }
+}
+
+/// A type that represents an error that occurs when parsing an email address.
+///
+/// This is returned by [`Email::new`] and [`Email::from_str`] when the input
+/// string is not a valid email address.
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct EmailParseError(email_address::Error);
+
+impl From<EmailParseError> for FormFieldValidationError {
+    fn from(error: EmailParseError) -> Self {
+        FormFieldValidationError::from_string(error.to_string())
     }
 }
 
@@ -413,11 +689,48 @@ impl DatabaseField for Email {
     const TYPE: ColumnType = ColumnType::String(MAX_EMAIL_LENGTH);
 }
 
+impl Display for Email {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryFrom;
 
+    use askama::Template;
+
     use super::*;
+
+    #[test]
+    fn url_new() {
+        let parse_url = Url::new("https://example.com/").unwrap();
+        assert_eq!(parse_url.as_str(), "https://example.com/");
+        assert_eq!(parse_url.to_string(), "https://example.com/");
+        assert_eq!(parse_url.scheme(), "https");
+        assert_eq!(parse_url.host(), Some("example.com"));
+    }
+
+    #[test]
+    fn url_new_normalize() {
+        let parse_url = Url::new("https://example.com").unwrap();
+        assert_eq!(parse_url.as_str(), "https://example.com/"); // Normalizes to add trailing slash
+    }
+
+    #[test]
+    fn askama_renders_url_field() {
+        #[derive(Template)]
+        #[template(source = "{{ url }}", ext = "html")]
+        struct UrlTestTemplate {
+            url: Url,
+        }
+
+        let url = Url::new("https://example.com").unwrap();
+        let tpl = UrlTestTemplate { url };
+        let rendered = tpl.render().expect("template failed to render");
+        assert_eq!(rendered, "https://example.com/");
+    }
 
     #[test]
     fn password_debug() {
@@ -436,6 +749,7 @@ mod tests {
     fn test_valid_email_creation() {
         let email = Email::new("user@example.com").unwrap();
         assert_eq!(email.as_str(), "user@example.com");
+        assert_eq!(email.to_string(), "user@example.com");
         assert_eq!(email.domain(), "example.com");
     }
 
@@ -457,13 +771,27 @@ mod tests {
         assert_eq!(email.as_str(), "user@example.com");
     }
 
+    #[test]
+    fn askama_renders_email_field() {
+        #[derive(Template)]
+        #[template(source = "{{ email }}", ext = "html")]
+        struct EmailTestTemplate {
+            email: Email,
+        }
+
+        let email = Email::new("foo@example.com").unwrap();
+        let tpl = EmailTestTemplate { email };
+        let rendered = tpl.render().expect("template failed to render");
+        assert_eq!(rendered, "foo@example.com");
+    }
+
     #[cfg(feature = "db")]
     mod db_tests {
         use super::*;
         use crate::db::ToDbValue;
 
         #[test]
-        fn test_to_db_value() {
+        fn test_email_to_db_value() {
             let email = Email::new("user@example.com").unwrap();
             let db_value = email.to_db_value();
 
@@ -473,7 +801,7 @@ mod tests {
         }
 
         #[test]
-        fn test_to_db_value_is_normalized() {
+        fn test_email_to_db_value_is_normalized() {
             let with_display = Email::new("John Doe <user@example.com>").unwrap();
             let bare = Email::new("user@example.com").unwrap();
 
@@ -481,6 +809,16 @@ mod tests {
             let db2 = bare.to_db_value();
 
             assert_eq!(db1, db2);
+        }
+
+        #[test]
+        fn test_url_to_db_value() {
+            let url = Url::new("https://example.com/").unwrap();
+            let db_value = url.to_db_value();
+
+            let url_str = url.as_str();
+            let db_value_str = format!("{db_value:?}");
+            assert!(db_value_str.contains(url_str));
         }
     }
 }

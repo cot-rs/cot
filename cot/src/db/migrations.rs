@@ -18,7 +18,7 @@ use crate::db::{Auto, ColumnType, Database, DatabaseField, Identifier, Result, m
 #[non_exhaustive]
 pub enum MigrationEngineError {
     /// An error occurred while determining the correct order of migrations.
-    #[error("Error while determining the correct order of migrations")]
+    #[error("error while determining the correct order of migrations")]
     MigrationSortError(#[from] MigrationSorterError),
 }
 
@@ -658,6 +658,12 @@ impl Field {
     }
 
     /// Marks the field as a foreign key to the given model and field.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if `on_delete` or `on_update` is set to
+    /// [`SetNone`](ForeignKeyOnDeletePolicy::SetNone) and the field is not
+    /// nullable.
     ///
     /// # Cot CLI Usage
     ///

@@ -1,6 +1,7 @@
 [workspace]
 git_release_enable = false
 changelog_update = false
+git_release_draft = true
 git_release_body = """
 {{ changelog }}
 {% if remote.contributors %}
@@ -12,6 +13,44 @@ git_release_body = """
 """
 
 [changelog]
+header = """# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), \
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+"""
+
+body = """
+
+## [{{ version }}]\
+    {%- if release_link -%}\
+        ({{ release_link }})\
+    {% endif %} \
+    - {{ timestamp | date(format="%Y-%m-%d") }}
+
+    {% if previous.version -%}\
+        [View diff on diff.rs](https://diff.rs/{{ package }}/{{ previous.version }}/{{ package }}/{{ version }}/Cargo.toml)
+    {%- endif %}
+{% for group, commits in commits | sort(attribute="remote.pr_number") | reverse | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+
+    {% for commit in commits | sort(attribute="breaking") | reverse %}
+        {%- if commit.scope -%}
+            - {% if commit.breaking %}[**breaking**] {% endif %}*({{commit.scope}})* \
+                {{ commit.message | upper_first }}{{ self::username(commit=commit) }}
+        {% else -%}
+            - {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}{{ self::username(commit=commit) }}
+        {% endif -%}
+    {% endfor -%}
+{% endfor %}
+{%- macro username(commit) -%}
+    {% if commit.remote.username %} (by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }})){% endif -%}
+{% endmacro -%}
+"""
+
 protect_breaking_commits = true
 commit_parsers = [
     { message = "^.*\\(security\\)", group = "<!-- 0 -->Security", scope = "" },

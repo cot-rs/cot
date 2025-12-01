@@ -1,5 +1,8 @@
 #[test]
-#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
 fn generate_manpages() {
     let tempdir = tempfile::TempDir::new().unwrap();
     let args = cot_cli::args::ManpagesArgs {

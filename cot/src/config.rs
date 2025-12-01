@@ -15,12 +15,18 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
+use std::path::PathBuf;
 use std::time::Duration;
 
+use chrono::{DateTime, FixedOffset, Utc};
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
+use thiserror::Error;
+
+use crate::error::error_impl::impl_into_cot_error;
+use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
 use crate::email;
 
@@ -31,6 +37,7 @@ use crate::email;
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct ProjectConfig {
     /// Debug mode flag.
     ///
@@ -165,6 +172,38 @@ pub struct ProjectConfig {
     /// ```
     #[cfg(feature = "db")]
     pub database: DatabaseConfig,
+    /// Configuration related to the cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::{CacheConfig, CacheStoreTypeConfig, ProjectConfig, Timeout};
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [cache]
+    /// prefix = "myapp"
+    /// max_retries = 3
+    /// timeout = "1h"
+    ///
+    /// [cache.store]
+    /// type = "memory"
+    /// "#,
+    /// )?;
+    ///
+    /// assert_eq!(config.cache.prefix, Some("myapp".to_string()));
+    /// assert_eq!(config.cache.max_retries, 3);
+    /// assert_eq!(
+    ///     config.cache.timeout,
+    ///     Timeout::After(Duration::from_secs(3600))
+    /// );
+    /// assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
+    /// Ok::<(), cot::Error>(())
+    /// ```
+    #[cfg(feature = "cache")]
+    pub cache: CacheConfig,
     /// Configuration related to the static files.
     ///
     /// # Examples
@@ -305,10 +344,15 @@ impl ProjectConfig {
     /// # Ok::<_, cot::Error>(())
     /// ```
     pub fn from_toml(toml_content: &str) -> crate::Result<ProjectConfig> {
-        let config: ProjectConfig = toml::from_str(toml_content)?;
+        let config: ProjectConfig = toml::from_str(toml_content).map_err(ParseConfig)?;
         Ok(config)
     }
 }
+
+#[derive(Debug, Error)]
+#[error("could not parse the config: {0}")]
+struct ParseConfig(#[from] toml::de::Error);
+impl_into_cot_error!(ParseConfig);
 
 impl ProjectConfigBuilder {
     /// Builds the project configuration.
@@ -331,6 +375,8 @@ impl ProjectConfigBuilder {
             auth_backend: self.auth_backend.unwrap_or_default(),
             #[cfg(feature = "db")]
             database: self.database.clone().unwrap_or_default(),
+            #[cfg(feature = "cache")]
+            cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
             email_backend: self.email_backend.clone().unwrap_or_default(),
@@ -348,8 +394,8 @@ impl ProjectConfigBuilder {
 /// let config = AuthBackendConfig::Database;
 /// ```
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[non_exhaustive]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum AuthBackendConfig {
     /// No authentication backend.
     ///
@@ -381,6 +427,7 @@ pub enum AuthBackendConfig {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct DatabaseConfig {
     /// The URL of the database, possibly with username, password, and other
     /// options.
@@ -437,8 +484,460 @@ impl DatabaseConfig {
     }
 }
 
-/// The configuration for serving static files.
+/// Expiration policy for cached values.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Timeout {
+    /// Never expire the value.
+    Never,
+    /// Expire after the specified duration from the insertion time.
+    After(Duration),
+    /// Expire at the specific datetime with a fixed offset.
+    AtDateTime(DateTime<FixedOffset>),
+}
+
+impl Timeout {
+    /// Check if the timeout has expired, given the insertion time (with its
+    /// fixed offset).
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the timeout variant is `After` and the
+    /// `insertion_time` is `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use chrono::{DateTime, FixedOffset, Utc};
+    /// use cot::config::Timeout;
+    ///
+    /// let timeout = Timeout::After(Duration::from_secs(60));
+    /// let insertion_time: DateTime<FixedOffset> =
+    ///     Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
+    /// assert!(!timeout.is_expired(Some(insertion_time)));
+    /// ```
+    #[must_use]
+    pub fn is_expired(&self, insertion_time: Option<DateTime<FixedOffset>>) -> bool {
+        match self {
+            Timeout::Never => false,
+            Timeout::After(dur) => {
+                if let Some(time) = insertion_time {
+                    let expiry_time = time + chrono::Duration::from_std(*dur).unwrap_or_default();
+                    let now_in_offset = Utc::now().with_timezone(time.offset());
+                    return now_in_offset >= expiry_time;
+                }
+                panic!("insertion_time is required for Timeout::After expiry check");
+            }
+            Timeout::AtDateTime(dt) => {
+                let now_in_offset = Utc::now().with_timezone(dt.offset());
+                now_in_offset >= *dt
+            }
+        }
+    }
+
+    /// Convert `After(duration)` into `AtDateTime` anchored at "now" (UTC
+    /// offset 0).
+    ///
+    /// Note: `canonicalize` uses UTC (fixed offset 0) as the produced offset.
+    /// If you want to canonicalize with a particular insertion offset,
+    /// consider providing that insertion time to the API instead.
+    #[must_use]
+    #[expect(clippy::missing_panics_doc)]
+    pub fn canonicalize(self) -> Self {
+        match self {
+            Timeout::After(duration) => {
+                let time_now = Utc::now().with_timezone(&FixedOffset::east_opt(0).expect("conversion to FixedOffset(0) should not fail since 0 is a valid timezone offset"));
+                let expiry_time =
+                    time_now + chrono::Duration::from_std(duration).unwrap_or_default();
+                Timeout::AtDateTime(expiry_time)
+            }
+            timeout => timeout,
+        }
+    }
+}
+
+impl Default for Timeout {
+    fn default() -> Self {
+        // expire after 5 mins.
+        Self::After(Duration::from_secs(300))
+    }
+}
+
+#[cfg(feature = "cache")]
+const MAX_RETRIES_DEFAULT: u32 = 3;
+
+#[cfg(feature = "cache")]
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+#[non_exhaustive]
+/// Configuration for the cache system.
 ///
+/// This struct holds all configuration options related to caching, including
+/// the cache backend type, connection options, and cache key prefixing.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig};
+/// let config = CacheConfig::builder()
+///     .store(
+///         CacheStoreConfig::builder()
+///             .store_type(CacheStoreTypeConfig::Memory)
+///             .build(),
+///     )
+///     .build();
+/// assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
+/// ```
+pub struct CacheConfig {
+    /// Maximum number of retries for cache operations.
+    ///
+    /// This controls how many times the cache will attempt to retry failed
+    /// operations before giving up. The default is `3` retries.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    ///
+    /// let config = CacheConfig::builder().max_retries(5).build();
+    /// assert_eq!(config.max_retries, 5);
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache]
+    /// max_retries = 5
+    /// ```
+    pub max_retries: u32,
+
+    /// Timeout for cache operations.
+    ///
+    /// This controls how long to wait for cache operations to complete before
+    /// timing out. The default is 300 seconds(5 minutes).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::{CacheConfig, Timeout};
+    ///
+    /// let config = CacheConfig::builder()
+    ///     .timeout(Timeout::After(Duration::from_secs(7200)))
+    ///     .build();
+    /// assert_eq!(config.timeout, Timeout::After(Duration::from_secs(7200)));
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache]
+    /// timeout = "2h"
+    /// ```
+    #[serde(with = "crate::serializers::cache_timeout")]
+    pub timeout: Timeout,
+
+    /// Prefix for cache keys.
+    ///
+    /// This prefix is added to all cache keys.
+    /// It's useful for versioning or categorizing cache entries.
+    /// When not specified, no prefix is used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    ///
+    /// let config = CacheConfig::builder().prefix("v1".to_string()).build();
+    /// assert_eq!(config.prefix, Some("v1".to_string()));
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache]
+    /// prefix = "v1"
+    /// ```
+    #[builder(setter(into, strip_option), default)]
+    pub prefix: Option<String>,
+
+    /// The cache store configuration.
+    ///
+    /// This determines which type of cache backend to use (`memory`, `redis`,
+    /// `file`) and its specific configuration options.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheConfig, CacheStoreConfig, CacheStoreTypeConfig};
+    ///
+    /// let config = CacheConfig::builder()
+    ///     .store(
+    ///         CacheStoreConfig::builder()
+    ///             .store_type(CacheStoreTypeConfig::Memory)
+    ///             .build(),
+    ///     )
+    ///     .build();
+    ///
+    /// assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [cache.store]
+    /// type = "memory"
+    ///
+    /// # Or for Redis:
+    /// # [cache.store]
+    /// # type = "redis"
+    /// # url = "redis://localhost:6379"
+    /// # pool_size = 20
+    ///
+    /// # Or for file-based cache:
+    /// # [cache.store]
+    /// # type = "file"
+    /// # path = "/tmp/cache"
+    /// ```
+    #[builder(default)]
+    pub store: CacheStoreConfig,
+}
+
+#[cfg(feature = "cache")]
+impl CacheConfigBuilder {
+    /// Builds the cache configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheConfig, Timeout};
+    ///
+    /// let config = CacheConfig::builder()
+    ///     .max_retries(5)
+    ///     .timeout(Timeout::Never)
+    ///     .prefix("my-app".to_string())
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> CacheConfig {
+        CacheConfig {
+            max_retries: self.max_retries.unwrap_or(MAX_RETRIES_DEFAULT),
+            timeout: self.timeout.unwrap_or_default(),
+            prefix: self.prefix.clone().unwrap_or_default(),
+            store: self.store.clone().unwrap_or_default(),
+        }
+    }
+}
+
+#[cfg(feature = "cache")]
+impl Default for CacheConfig {
+    fn default() -> Self {
+        CacheConfig::builder().build()
+    }
+}
+
+#[cfg(feature = "cache")]
+impl CacheConfig {
+    /// Create a new [`CacheConfigBuilder`] to build a [`CacheConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheConfig;
+    /// ```
+    #[must_use]
+    pub fn builder() -> CacheConfigBuilder {
+        CacheConfigBuilder::default()
+    }
+}
+
+#[cfg(feature = "cache")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+/// Configuration for the cache store backend.
+///
+/// This struct wraps a [`CacheStoreTypeConfig`] which specifies the actual
+/// type of store to use (memory, redis, or file-based).
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::{CacheStoreConfig, CacheStoreTypeConfig};
+/// let config = CacheStoreConfig {
+///     store_type: CacheStoreTypeConfig::Memory,
+/// };
+/// assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+/// ```
+pub struct CacheStoreConfig {
+    /// The type of cache store to use.
+    ///
+    /// This determines how and where cache data is stored. This defaults
+    /// to the in-memory store.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheStoreConfig, CacheStoreTypeConfig};
+    ///
+    /// let config = CacheStoreConfig::builder()
+    ///     .store_type(CacheStoreTypeConfig::Memory)
+    ///     .build();
+    ///
+    /// assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    /// ```
+    #[serde(flatten)]
+    pub store_type: CacheStoreTypeConfig,
+}
+
+#[cfg(feature = "cache")]
+impl CacheStoreConfig {
+    /// Create a new [`CacheStoreConfigBuilder`] to build a
+    /// [`CacheStoreConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheStoreConfig, CacheStoreTypeConfig};
+    ///
+    /// let config = CacheStoreConfig::builder()
+    ///     .store_type(CacheStoreTypeConfig::Memory)
+    ///     .build();
+    ///
+    /// assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    /// ```
+    #[must_use]
+    pub fn builder() -> CacheStoreConfigBuilder {
+        CacheStoreConfigBuilder::default()
+    }
+}
+
+#[cfg(feature = "cache")]
+impl CacheStoreConfigBuilder {
+    /// Builds the cache store configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheStoreConfig, CacheStoreTypeConfig};
+    ///
+    /// let config = CacheStoreConfig::builder()
+    ///     .store_type(CacheStoreTypeConfig::Memory)
+    ///     .build();
+    ///
+    /// assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> CacheStoreConfig {
+        CacheStoreConfig {
+            store_type: self.store_type.clone().unwrap_or_default(),
+        }
+    }
+}
+
+#[cfg(feature = "cache")]
+pub(crate) const DEFAULT_REDIS_POOL_SIZE: usize = default_redis_pool_size();
+
+#[cfg(feature = "cache")]
+const fn default_redis_pool_size() -> usize {
+    10
+}
+
+#[expect(clippy::trivially_copy_pass_by_ref)]
+#[cfg(feature = "cache")]
+const fn is_default_redis_pool_size(size: &usize) -> bool {
+    *size == default_redis_pool_size()
+}
+
+/// The type of cache store backend to use.
+///
+/// This specifies which backend is used for caching: `in-memory`, `Redis`,
+/// or `file-based`.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::CacheStoreTypeConfig;
+///
+/// let mem = CacheStoreTypeConfig::Memory;
+///
+/// assert_eq!(mem, CacheStoreTypeConfig::Memory);
+/// ```
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
+#[cfg(feature = "cache")]
+pub enum CacheStoreTypeConfig {
+    /// In-memory cache store.
+    ///
+    /// This uses a simple in-memory store that does not persist data across
+    /// application restarts. This is suitable for development or testing
+    /// environments where persistence is not required.
+    #[default]
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheStoreTypeConfig;
+    ///
+    /// let config = CacheStoreTypeConfig::Memory;
+    /// ```
+    Memory,
+    /// Redis cache store.
+
+    /// This stores cache data in a Redis instance. The URL to the Redis server
+    /// must be specified, and additional Redis-specific options can be
+    /// configured.
+    Redis {
+        /// # Examples
+        ///
+        /// ```
+        /// use cot::config::{CacheStoreTypeConfig, CacheUrl};
+        ///
+        /// let config = CacheStoreTypeConfig::Redis {
+        ///     url: CacheUrl::from("redis://localhost:6379"),
+        ///     pool_size: 20,
+        /// };
+        /// ```
+        /// The URL of the Redis server.
+        url: CacheUrl,
+        /// Connection pool size for Redis connections.
+
+        /// This controls how many connections to maintain in the connection
+        /// pool. When not specified, a default pool size of `10` is used.
+        #[serde(
+            default = "default_redis_pool_size",
+            skip_serializing_if = "is_default_redis_pool_size"
+        )]
+        pool_size: usize,
+    },
+    /// File-based cache store.
+
+    /// This stores cache data in files on the local filesystem. The path to
+    /// the directory where the cache files will be stored must be specified.
+    File {
+        /// # Examples
+        ///
+        /// ```
+        /// use std::path::PathBuf;
+        ///
+        /// use cot::config::CacheStoreTypeConfig;
+        ///
+        /// let config = CacheStoreTypeConfig::File {
+        ///     path: PathBuf::from("/tmp/cache"),
+        /// };
+        /// ```
+        /// The path to the directory where cache files will be stored.
+        path: PathBuf,
+    },
+}
+
+/// The configuration for the static files.
+/// The configuration for serving static files.
 /// This configuration controls how static files (like CSS, JavaScript, images,
 /// etc.) are served by the application. It allows you to customize the URL
 /// prefix, caching behavior, and URL rewriting strategy for static assets.
@@ -482,6 +981,7 @@ impl DatabaseConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct StaticFilesConfig {
     /// The URL prefix for the static files to be served at (which should
     /// typically end with a slash). The default is `/static/`.
@@ -578,8 +1078,8 @@ pub struct StaticFilesConfig {
 ///
 /// This is used as part of the [`StaticFilesConfig`] struct.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum StaticFilesPathRewriteMode {
     /// No rewriting. The path to the static files is returned as is (with the
     /// URL prefix, if any).
@@ -661,6 +1161,7 @@ impl StaticFilesConfig {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct MiddlewareConfig {
     /// The configuration for the live reload middleware.
     pub live_reload: LiveReloadMiddlewareConfig,
@@ -721,6 +1222,7 @@ impl MiddlewareConfigBuilder {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct LiveReloadMiddlewareConfig {
     /// Whether the live reload middleware is enabled.
     ///
@@ -769,6 +1271,288 @@ impl LiveReloadMiddlewareConfigBuilder {
     }
 }
 
+/// The configuration for the session store type.
+///
+/// This enum represents the different types of stores that can be used to
+/// persist session data. The default is to use an in-memory store, but other
+/// options are available like database storage, file-based storage, or
+/// cache-based storage.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::PathBuf;
+///
+/// use cot::config::{CacheUrl, SessionStoreTypeConfig};
+///
+/// // Using in-memory storage (default)
+/// let memory_config = SessionStoreTypeConfig::Memory;
+///
+/// // Using file-based storage
+/// let file_config = SessionStoreTypeConfig::File {
+///     path: PathBuf::from("/tmp/sessions"),
+/// };
+///
+/// // Using cache-based storage with Redis
+/// let cache_config = SessionStoreTypeConfig::Cache {
+///     uri: CacheUrl::from("redis://localhost:6379"),
+/// };
+/// ```
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum SessionStoreTypeConfig {
+    /// In-memory session storage.
+    ///
+    /// This uses a simple in-memory store that does not persist sessions across
+    /// application restarts. This is the default, and is suitable for
+    /// development or testing environments.
+    #[default]
+    Memory,
+
+    /// Database-backed session storage.
+    ///
+    /// This stores session data in the configured database. This requires the
+    /// "db" and "json" features enabled.
+    #[cfg(all(feature = "db", feature = "json"))]
+    Database,
+
+    /// File-based session storage.
+    ///
+    /// This stores session data in files on the local filesystem. The path to
+    /// the directory where the session files will be stored must be specified.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    ///
+    /// use cot::config::SessionStoreTypeConfig;
+    ///
+    /// let config = SessionStoreTypeConfig::File {
+    ///     path: PathBuf::from("/tmp/sessions"),
+    /// };
+    /// ```
+    #[cfg(feature = "json")]
+    File {
+        /// The path to the directory where session files will be stored.
+        path: PathBuf,
+    },
+
+    /// Cache-based session storage.
+    ///
+    /// This stores session data in a cache service like Redis. The URI to the
+    /// cache service must be specified.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheUrl, SessionStoreTypeConfig};
+    ///
+    /// let config = SessionStoreTypeConfig::Cache {
+    ///     uri: CacheUrl::from("redis://localhost:6379"),
+    /// };
+    /// ```
+    #[cfg(feature = "cache")]
+    Cache {
+        /// The URI to the cache service.
+        uri: CacheUrl,
+    },
+}
+
+/// The configuration for the session store.
+///
+/// This is used as part of the [`SessionMiddlewareConfig`] struct and wraps a
+/// [`SessionStoreTypeConfig`] which specifies the actual type of store to use.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::PathBuf;
+///
+/// use cot::config::{SessionStoreConfig, SessionStoreTypeConfig};
+///
+/// let config = SessionStoreConfig::builder()
+///     .store_type(SessionStoreTypeConfig::File {
+///         path: PathBuf::from("/tmp/sessions"),
+///     })
+///     .build();
+/// ```
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct SessionStoreConfig {
+    /// The type of session store to use.
+    ///
+    /// This determines how and where session data is stored. The default is
+    /// to use an in-memory store.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheUrl, SessionStoreConfig, SessionStoreTypeConfig};
+    ///
+    /// let config = SessionStoreConfig::builder()
+    ///     .store_type(SessionStoreTypeConfig::Cache {
+    ///         uri: CacheUrl::from("redis://localhost:6379"),
+    ///     })
+    ///     .build();
+    /// ```
+    #[serde(flatten)]
+    pub store_type: SessionStoreTypeConfig,
+}
+
+impl SessionStoreConfig {
+    /// Create a new [`SessionStoreConfigBuilder`] to build a
+    /// [`SessionStoreConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{SessionStoreConfig, SessionStoreTypeConfig};
+    ///
+    /// let config = SessionStoreConfig::builder()
+    ///     .store_type(SessionStoreTypeConfig::Memory)
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> SessionStoreConfigBuilder {
+        SessionStoreConfigBuilder::default()
+    }
+}
+
+impl SessionStoreConfigBuilder {
+    /// Builds the session store configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{CacheUrl, SessionStoreConfig, SessionStoreTypeConfig};
+    ///
+    /// let config = SessionStoreConfig::builder()
+    ///     .store_type(SessionStoreTypeConfig::Cache {
+    ///         uri: CacheUrl::from("redis://localhost:6379"),
+    ///     })
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> SessionStoreConfig {
+        SessionStoreConfig {
+            store_type: self.store_type.clone().unwrap_or_default(),
+        }
+    }
+}
+
+/// The [`SameSite`] attribute of a cookie determines how strictly browsers send
+/// cookies on cross-site requests. When not explicitly configured, it defaults
+/// to `Strict`, which provides the most restrictive security posture.
+///
+/// - `Strict`: Cookie is only sent for same-site requests (most restrictive).
+/// - `Lax`: Cookie is sent for same-site requests and top-level navigations (a
+///   reasonable default).
+/// - `None`: Cookie is sent on all requests, including third-party contexts
+///   (least restrictive).
+///
+///  [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum SameSite {
+    /// Only send cookie for same-site requests.
+    #[default]
+    Strict,
+
+    /// Send cookie on same-site requests and top-level cross-site navigations.
+    Lax,
+
+    /// Send cookie on all requests, including third-party.
+    None,
+}
+
+impl From<SameSite> for tower_sessions::cookie::SameSite {
+    fn from(value: SameSite) -> Self {
+        match value {
+            SameSite::Strict => Self::Strict,
+            SameSite::Lax => Self::Lax,
+            SameSite::None => Self::None,
+        }
+    }
+}
+
+/// Session expiry configuration.
+/// The [`Expiry`] attribute of a cookie determines its lifetime. When not
+/// explicitly configured, cookies default to `OnSessionEnd` behavior.
+///
+/// [`Expiry`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use chrono::DateTime;
+/// use cot::config::Expiry;
+///
+/// // Expires when the session ends.
+/// let expiry = Expiry::OnSessionEnd;
+///
+/// // Expires 5 mins after inactivity.
+/// let expiry = Expiry::OnInactivity(Duration::from_secs(5 * 60));
+///
+/// // Expires at the given timestamp.
+/// let expired_at =
+///     DateTime::parse_from_str("2025-05-27 13:03:00 -0200", "%Y-%m-%d %H:%M:%S %z").unwrap();
+/// let expiry = Expiry::AtDateTime(expired_at);
+/// ```
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Expiry {
+    /// The cookie expires when the browser session ends.
+    ///
+    /// This is equivalent to not setting the `max-age` or `expires` attributes
+    /// in the cookie header, making it a session cookie. The cookie will be
+    /// deleted when the user closes their browser or when the browser decides
+    /// to end the session.
+    ///
+    /// This is the most secure option as it ensures sessions don't persist
+    /// beyond the browser session, but it may require users to log in more
+    /// frequently.
+    #[default]
+    OnSessionEnd,
+    /// The cookie expires after the specified duration of inactivity.
+    ///
+    /// The session will remain valid as long as the user continues to make
+    /// requests within the specified time window. Each request resets the
+    /// inactivity timer, extending the session lifetime.
+    ///
+    /// This provides a balance between security and user convenience, as
+    /// active users won't be logged out unexpectedly, but inactive sessions
+    /// will eventually expire.
+    OnInactivity(Duration),
+    /// The cookie expires at the specified date and time.
+    ///
+    /// The session will remain valid until the exact datetime specified,
+    /// regardless of user activity.
+    AtDateTime(DateTime<FixedOffset>),
+}
+
+impl From<Expiry> for tower_sessions::Expiry {
+    fn from(value: Expiry) -> Self {
+        match value {
+            Expiry::OnSessionEnd => Self::OnSessionEnd,
+            Expiry::OnInactivity(duration) => {
+                Self::OnInactivity(time::Duration::try_from(duration).unwrap_or_else(|e| {
+                    panic!("could not convert {duration:?} into a valid time::Duration: {e:?}",)
+                }))
+            }
+            Expiry::AtDateTime(time) => {
+                Self::AtDateTime(DateTimeWithOffsetAdapter::new(time).into_offsetdatetime())
+            }
+        }
+    }
+}
+
 /// The configuration for the session middleware.
 ///
 /// This is used as part of the [`MiddlewareConfig`] struct.
@@ -780,12 +1564,15 @@ impl LiveReloadMiddlewareConfigBuilder {
 ///
 /// let config = SessionMiddlewareConfig::builder().secure(false).build();
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
+#[non_exhaustive]
 pub struct SessionMiddlewareConfig {
-    /// Whether the session middleware is secure.
+    /// The [`Secure`] of the cookie determines whether the session middleware
+    /// is secure.
     ///
+    ///  [`Secure`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies
     /// # Examples
     ///
     /// ```
@@ -794,6 +1581,190 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
+    /// The [`HttpOnly`] of the cookie used for the session. It is set to `true`
+    /// by default.
+    ///
+    /// [`HttpOnly`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies
+    ///
+    ///  # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().http_only(true).build();
+    /// ```
+    pub http_only: bool,
+    /// The [`SameSite`] attribute of the cookie used for the session.
+    /// The default value is [`SameSite::Strict`]
+    ///
+    /// [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{SameSite, SessionMiddlewareConfig};
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .same_site(SameSite::None)
+    ///     .build();
+    /// ```
+    pub same_site: SameSite,
+
+    /// The [`Domain`] attribute of the cookie used for the session. When not
+    /// explicitly configured, it is set to `None` by default.
+    ///
+    /// [`Domain`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .domain("localhost".to_string())
+    ///     .build();
+    /// ```
+    #[builder(setter(strip_option), default)]
+    pub domain: Option<String>,
+    /// The [`Path`] attribute of the cookie used for the session. It is set to
+    /// `/` by default.
+    ///
+    /// [`Path`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    ///
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .path(String::from("/random/path"))
+    ///     .build();
+    /// ```
+    pub path: String,
+    /// The name of the cookie used for the session. It is set to "id" by
+    /// default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .name("some.id".to_string())
+    ///     .build();
+    /// ```
+    pub name: String,
+    /// Whether the unmodified session should be saved on read or not.
+    /// If set to `true`, the session will be saved even if it was not modified.
+    /// It is set to `false` by default.
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SessionMiddlewareConfig;
+    ///
+    /// let config = SessionMiddlewareConfig::builder().always_save(true).build();
+    /// ```
+    pub always_save: bool,
+    /// The [`Expiry`] behavior for session cookies.
+    ///
+    /// This controls when the session cookie expires and how long it remains
+    /// valid. The expiry behavior affects how the cookie's `max-age` and
+    /// `expires` attributes are set in the HTTP response.
+    ///
+    /// The available expiry modes are:
+    /// - `OnSessionEnd`: The cookie expires when the browser session ends. This
+    ///   is equivalent to not adding or removing the `max-age`/`expires` field
+    ///   in the cookie header, making it a session cookie.
+    /// - `OnInactivity`: The cookie expires after the specified duration of
+    ///   inactivity. The cookie will be refreshed on each request.
+    /// - `AtDateTime`: The cookie expires at the given timestamp, regardless of
+    ///   user activity.
+    ///
+    /// The default value is [`Expiry::OnSessionEnd`] when not specified.
+    ///
+    /// # TOML
+    ///
+    /// In TOML configuration, the expiry can be specified in two formats:
+    /// - For `OnInactivity`: Use the "humantime" format (e.g., `"1h"`, `"30m"`,
+    ///   `"7d"`). Please refer to the [`humantime::parse_duration`]
+    ///   documentation for supported formats.
+    /// - For `AtDateTime`: Use a valid RFC 3339/ISO 8601 formatted timestamp
+    ///   (e.g., `"2025-12-31T23:59:59+00:00"`).
+    ///
+    /// [`Expiry`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use chrono::DateTime;
+    /// use cot::config::{Expiry, SessionMiddlewareConfig};
+    ///
+    /// // Session expires when browser session ends (default)
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::OnSessionEnd)
+    ///     .build();
+    ///
+    /// // Session expires after 1 hour of inactivity
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::OnInactivity(Duration::from_secs(3600)))
+    ///     .build();
+    ///
+    /// // Session expires at specific datetime
+    /// let expire_at =
+    ///     DateTime::parse_from_str("2025-12-31 23:59:59 +0000", "%Y-%m-%d %H:%M:%S %z").unwrap();
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .expiry(Expiry::AtDateTime(expire_at))
+    ///     .build();
+    /// ```
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::ProjectConfig;
+    ///
+    /// // TOML configuration for inactivity-based expiry
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [session]
+    /// expiry = "2h"
+    /// "#,
+    /// );
+    ///
+    /// // TOML configuration for datetime-based expiry
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [session]
+    /// expiry = "2025-12-31 23:59:59 +0000"
+    /// "#,
+    /// );
+    /// ```
+    #[serde(with = "crate::serializers::session_expiry_time")]
+    pub expiry: Expiry,
+
+    /// What session store to use.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{
+    ///     CacheUrl, SessionMiddlewareConfig, SessionStoreConfig, SessionStoreTypeConfig,
+    /// };
+    ///
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .store(
+    ///         SessionStoreConfig::builder()
+    ///             .store_type(SessionStoreTypeConfig::Cache {
+    ///                 uri: CacheUrl::from("redis://localhost:6379"),
+    ///             })
+    ///             .build(),
+    ///     )
+    ///     .build();
+    /// ```
+    pub store: SessionStoreConfig,
 }
 
 impl SessionMiddlewareConfig {
@@ -819,15 +1790,36 @@ impl SessionMiddlewareConfigBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::SessionMiddlewareConfig;
+    /// use cot::config::{SessionMiddlewareConfig, SessionStoreConfig, SessionStoreTypeConfig};
     ///
-    /// let config = SessionMiddlewareConfig::builder().secure(false).build();
+    /// let config = SessionMiddlewareConfig::builder()
+    ///     .secure(false)
+    ///     .store(
+    ///         SessionStoreConfig::builder()
+    ///             .store_type(SessionStoreTypeConfig::Memory)
+    ///             .build(),
+    ///     )
+    ///     .build();
     /// ```
     #[must_use]
     pub fn build(&self) -> SessionMiddlewareConfig {
         SessionMiddlewareConfig {
             secure: self.secure.unwrap_or(true),
+            http_only: self.http_only.unwrap_or(true),
+            same_site: self.same_site.unwrap_or_default(),
+            domain: self.domain.clone().unwrap_or_default(),
+            name: self.name.clone().unwrap_or("id".to_string()),
+            path: self.path.clone().unwrap_or(String::from("/")),
+            always_save: self.always_save.unwrap_or(false),
+            expiry: self.expiry.unwrap_or_default(),
+            store: self.store.clone().unwrap_or_default(),
         }
+    }
+}
+
+impl Default for SessionMiddlewareConfig {
+    fn default() -> Self {
+        SessionMiddlewareConfig::builder().build()
     }
 }
 /// The type of email backend to use.
@@ -1102,17 +2094,7 @@ impl From<&str> for DatabaseUrl {
 #[cfg(feature = "db")]
 impl Debug for DatabaseUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut new_url = self.0.clone();
-        if !new_url.username().is_empty() {
-            new_url
-                .set_username("********")
-                .expect("set_username should succeed if username is present");
-        }
-        if new_url.password().is_some() {
-            new_url
-                .set_password(Some("********"))
-                .expect("set_password should succeed if password is present");
-        }
+        let new_url = conceal_url_parts(&self.0);
 
         f.debug_tuple("DatabaseUrl")
             .field(&new_url.as_str())
@@ -1120,8 +2102,166 @@ impl Debug for DatabaseUrl {
     }
 }
 
+/// An error returned when parsing a `CacheType` from a string.
+#[derive(Debug, Error, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ParseCacheTypeError {
+    /// The input did not match any supported cache type.
+    #[error("unsupported cache type: `{0}`")]
+    Unsupported(String),
+}
+
+/// A structure that holds the type of Cache.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg(feature = "cache")]
+#[non_exhaustive]
+pub enum CacheType {
+    /// A redis cache type.
+    #[cfg(feature = "redis")]
+    Redis,
+}
+
+#[cfg(feature = "cache")]
+impl TryFrom<&str> for CacheType {
+    type Error = ParseCacheTypeError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            #[cfg(feature = "redis")]
+            "redis" => Ok(CacheType::Redis),
+            other => Err(ParseCacheTypeError::Unsupported(other.to_owned())),
+        }
+    }
+}
+
+#[cfg(feature = "cache")]
+impl std::str::FromStr for CacheType {
+    type Err = ParseCacheTypeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        CacheType::try_from(s)
+    }
+}
+
+/// A URL for caches.
+///
+/// This is a wrapper over the [`url::Url`] type, which is used to store the
+/// URL of a cache. It parses the URL and ensures that it is valid.
+///
+/// # Security
+///
+/// The implementation of the [`Debug`] trait for this type hides the password
+/// from the debug output.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::CacheUrl;
+///
+/// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
+/// ```
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+#[cfg(feature = "cache")]
+pub struct CacheUrl(url::Url);
+
+#[cfg(feature = "cache")]
+impl CacheUrl {
+    /// Returns the string representation of the cache URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheUrl;
+    ///
+    /// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
+    /// assert_eq!(url.as_str(), "redis://user:password@localhost:6379/0");
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    /// Returns the scheme of the cache URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::CacheUrl;
+    ///
+    /// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
+    /// assert_eq!(url.scheme(), "redis");
+    /// ```
+    #[must_use]
+    pub fn scheme(&self) -> &str {
+        self.0.scheme()
+    }
+
+    #[allow(clippy::allow_attributes, unused, reason = "used in tests")]
+    pub(crate) fn inner_mut(&mut self) -> &mut url::Url {
+        &mut self.0
+    }
+}
+
+#[cfg(feature = "cache")]
+impl From<String> for CacheUrl {
+    fn from(url: String) -> Self {
+        Self(url::Url::parse(&url).expect("invalid  cache URL"))
+    }
+}
+
+#[cfg(feature = "cache")]
+impl From<&str> for CacheUrl {
+    fn from(url: &str) -> Self {
+        Self(url::Url::parse(url).expect("invalid cache URL"))
+    }
+}
+
+#[cfg(feature = "cache")]
+impl TryFrom<CacheUrl> for CacheType {
+    type Error = ParseCacheTypeError;
+
+    fn try_from(value: CacheUrl) -> Result<Self, Self::Error> {
+        CacheType::try_from(value.0.scheme())
+    }
+}
+
+#[cfg(feature = "cache")]
+impl Debug for CacheUrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let new_url = conceal_url_parts(&self.0);
+
+        f.debug_tuple("CacheUrl").field(&new_url.as_str()).finish()
+    }
+}
+
+#[cfg(any(feature = "cache", feature = "db"))]
+fn conceal_url_parts(url: &url::Url) -> url::Url {
+    let mut new_url = url.clone();
+    if !new_url.username().is_empty() {
+        new_url
+            .set_username("********")
+            .expect("set_username should succeed if username is present");
+    }
+    if new_url.password().is_some() {
+        new_url
+            .set_password(Some("********"))
+            .expect("set_password should succeed if password is present");
+    }
+    new_url
+}
+
+#[cfg(feature = "cache")]
+impl std::fmt::Display for CacheUrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use time::OffsetDateTime;
+
     use super::*;
 
     #[test]
@@ -1142,6 +2282,11 @@ mod tests {
             live_reload.enabled = true
             [middlewares.session]
             secure = false
+            http_only = false
+            domain = "localhost"
+            path = "/some/path"
+            always_save = true
+            name = "some.sid"
             [email_backend]
             type = "none"
         "#;
@@ -1167,8 +2312,196 @@ mod tests {
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
         assert_eq!(config.email_backend.backend_type, EmailBackendType::None);
+        assert!(!config.middlewares.session.http_only);
+        assert_eq!(
+            config.middlewares.session.domain,
+            Some(String::from("localhost"))
+        );
+        assert!(config.middlewares.session.always_save);
+        assert_eq!(config.middlewares.session.name, String::from("some.sid"));
+        assert_eq!(config.middlewares.session.path, String::from("/some/path"));
     }
 
+    #[test]
+    fn default_values_from_valid_toml() {
+        let toml_content = "";
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+        assert!(config.debug);
+        assert!(config.register_panic_hook);
+        assert_eq!(config.secret_key.as_bytes(), b"");
+        assert_eq!(config.fallback_secret_keys.len(), 0);
+        assert_eq!(config.auth_backend, AuthBackendConfig::None);
+        assert_eq!(config.static_files.url, "/static/");
+        assert_eq!(
+            config.static_files.rewrite,
+            StaticFilesPathRewriteMode::None
+        );
+        assert_eq!(config.static_files.cache_timeout, None);
+        assert!(!config.middlewares.live_reload.enabled);
+        assert!(config.middlewares.session.secure);
+        assert!(config.middlewares.session.http_only);
+        assert_eq!(config.middlewares.session.domain, None);
+        assert!(!config.middlewares.session.always_save);
+        assert_eq!(config.middlewares.session.name, String::from("id"));
+        assert_eq!(config.middlewares.session.path, String::from("/"));
+        assert_eq!(config.middlewares.session.same_site, SameSite::Strict);
+        assert_eq!(config.middlewares.session.expiry, Expiry::OnSessionEnd);
+        assert_eq!(
+            config.middlewares.session.store.store_type,
+            SessionStoreTypeConfig::Memory
+        );
+        assert_eq!(config.database.url, None);
+    }
+
+    #[test]
+    fn same_site_from_valid_toml() {
+        let same_site_options = [
+            (
+                "none",
+                SameSite::None,
+                tower_sessions::cookie::SameSite::None,
+            ),
+            ("lax", SameSite::Lax, tower_sessions::cookie::SameSite::Lax),
+            (
+                "strict",
+                SameSite::Strict,
+                tower_sessions::cookie::SameSite::Strict,
+            ),
+        ];
+        for (value, expected, tower_sessions_expected) in same_site_options {
+            let toml_content = format!(
+                r#"
+            [middlewares.session]
+            same_site = "{value}"
+        "#
+            );
+            let config = ProjectConfig::from_toml(&toml_content).unwrap();
+            let actual = config.middlewares.session.same_site;
+            assert_eq!(actual, expected);
+            assert_eq!(
+                tower_sessions::cookie::SameSite::from(actual),
+                tower_sessions_expected
+            );
+        }
+    }
+
+    #[test]
+    fn expiry_from_valid_toml() {
+        let expiry_opts = [
+            (
+                "2h",
+                Expiry::OnInactivity(Duration::from_secs(7200)),
+                tower_sessions::Expiry::OnInactivity(time::Duration::seconds(7200)),
+            ),
+            (
+                "2025-12-31T23:59:59+00:00",
+                Expiry::AtDateTime(
+                    DateTime::parse_from_rfc3339("2025-12-31T23:59:59+00:00").unwrap(),
+                ),
+                tower_sessions::Expiry::AtDateTime(OffsetDateTime::new_utc(
+                    time::Date::from_calendar_date(2025, time::Month::December, 31).unwrap(),
+                    time::Time::from_hms(23, 59, 59).unwrap(),
+                )),
+            ),
+        ];
+        for (value, expected, tower_session_expected) in expiry_opts {
+            let toml_content = format!(
+                r#"
+            [middlewares.session]
+            expiry = "{value}"
+        "#
+            );
+            let config = ProjectConfig::from_toml(&toml_content).unwrap();
+            let actual = config.middlewares.session.expiry;
+            assert_eq!(actual, expected);
+            assert_eq!(tower_sessions::Expiry::from(actual), tower_session_expected);
+        }
+    }
+
+    #[test]
+    fn expiry_from_invalid_toml() {
+        let toml_content = r#"
+            [middlewares.session]
+            expiry = "invalid time"
+        "#
+        .to_string();
+
+        let config = ProjectConfig::from_toml(&toml_content);
+        assert!(config.is_err());
+        assert!(
+            config
+                .unwrap_err()
+                .to_string()
+                .contains("could not parse the config")
+        );
+    }
+
+    #[test]
+    fn session_store_valid_toml() {
+        let toml_content = r#"
+            debug = true
+            register_panic_hook = true
+            secret_key = "123abc"
+            fallback_secret_keys = ["456def", "789ghi"]
+            auth_backend = { type = "none" }
+
+            [static_files]
+            url = "/assets/"
+            rewrite = "none"
+            cache_timeout = "1h"
+
+            [middlewares]
+            live_reload.enabled = true
+            [middlewares.session]
+            secure = false
+        "#;
+
+        let store_configs = [
+            (
+                r#"
+            [middlewares.session.store]
+            type = "memory"
+            "#,
+                SessionStoreTypeConfig::Memory,
+            ),
+            #[cfg(feature = "cache")]
+            (
+                r#"
+            [middlewares.session.store]
+            type = "cache"
+            uri = "redis://redis"
+            "#,
+                SessionStoreTypeConfig::Cache {
+                    uri: CacheUrl::from("redis://redis"),
+                },
+            ),
+            (
+                r#"
+            [middlewares.session.store]
+            type = "file"
+            path = "session/path/"
+            "#,
+                SessionStoreTypeConfig::File {
+                    path: PathBuf::from("session/path"),
+                },
+            ),
+            #[cfg(all(feature = "db", feature = "json"))]
+            (
+                r#"
+            [middlewares.session.store]
+            type = "database"
+            "#,
+                SessionStoreTypeConfig::Database,
+            ),
+        ];
+
+        for (cfg_toml, cfg_type) in store_configs {
+            let full_cfg_str = format!("{toml_content}\n{cfg_toml}");
+            let config = ProjectConfig::from_toml(&full_cfg_str).unwrap();
+            assert_eq!(config.middlewares.session.store.store_type, cfg_type);
+        }
+    }
     #[test]
     fn from_toml_invalid() {
         let toml_content = r"
@@ -1198,5 +2531,337 @@ mod tests {
             config.static_files.rewrite,
             StaticFilesPathRewriteMode::QueryParam
         );
+    }
+    #[test]
+    #[cfg(feature = "redis")]
+    fn cache_type_from_str_redis() {
+        assert_eq!(CacheType::try_from("redis").unwrap(), CacheType::Redis);
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_type_from_str_unknown() {
+        for &s in &["", "foo", "redis://foo"] {
+            assert_eq!(
+                CacheType::try_from(s),
+                Err(ParseCacheTypeError::Unsupported(s.to_owned()))
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "redis")]
+    fn cache_type_from_cacheurl() {
+        let url = CacheUrl::from("redis://localhost/");
+        assert_eq!(CacheType::try_from(url.clone()).unwrap(), CacheType::Redis);
+
+        let other = CacheUrl::from("http://example.com/");
+        assert_eq!(
+            CacheType::try_from(other),
+            Err(ParseCacheTypeError::Unsupported("http".to_string()))
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cacheurl_from_str_and_string() {
+        let s = "http://example.com/foo";
+        let u1 = CacheUrl::from(s);
+        let u2 = CacheUrl::from(s.to_string());
+        assert_eq!(u1, u2);
+        assert_eq!(u1.as_str(), s);
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    #[should_panic(expected = "invalid cache URL")]
+    fn cacheurl_from_invalid_str_panics() {
+        let _ = CacheUrl::from("not a url");
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cacheurl_as_str_roundtrip() {
+        let raw = "https://user:pass@host:1234/path?query#frag";
+        let cu = CacheUrl::from(raw);
+        assert_eq!(cu.as_str(), url::Url::parse(raw).unwrap().as_str());
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cacheurl_debug_masks_credentials() {
+        let raw = "https://user:secret@host:1234/path";
+        let cu = CacheUrl::from(raw);
+        let dbg = format!("{cu:?}");
+        assert!(dbg.starts_with("CacheUrl(\"https://********:********@host:1234/path\")"));
+    }
+
+    #[test]
+    fn conceal_url_details_leaves_no_credentials() {
+        let raw = "ftp://alice:alicepwd@server/";
+        let parsed = url::Url::parse(raw).unwrap();
+        let concealed = conceal_url_parts(&parsed);
+        assert_eq!(concealed.username(), "********");
+        assert_eq!(concealed.password(), Some("********"));
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_from_toml_memory() {
+        let toml_content = r#"
+            [cache]
+            max_retries = 5
+            timeout = "60s"
+            prefix = "v1"
+
+            [cache.store]
+            type = "memory"
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(config.cache.max_retries, 5);
+        assert_eq!(
+            config.cache.timeout,
+            Timeout::After(Duration::from_secs(60))
+        );
+        assert_eq!(config.cache.prefix, Some("v1".to_string()));
+        assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_from_toml_redis() {
+        macro_rules! cache_toml_with_pool {
+            () => {
+                r#"
+                [cache]
+                max_retries = 10
+                timeout = "120s"
+
+                [cache.store]
+                type = "redis"
+                url = "redis://localhost:6379"
+                pool_size = 20
+                "#
+            };
+        }
+
+        macro_rules! cache_toml_without_pool {
+            () => {
+                r#"
+                [cache]
+                max_retries = 10
+                timeout = "120s"
+
+                [cache.store]
+                type = "redis"
+                url = "redis://localhost:6379"
+                "#
+            };
+        }
+
+        let variants: [(&str, usize); 2] = [
+            (cache_toml_with_pool!(), 20),
+            (cache_toml_without_pool!(), default_redis_pool_size()),
+        ];
+
+        for (toml_content, expected_size) in variants {
+            let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+            assert_eq!(config.cache.max_retries, 10);
+            assert_eq!(
+                config.cache.timeout,
+                Timeout::After(Duration::from_secs(120))
+            );
+            assert_eq!(config.cache.prefix, None);
+
+            if let CacheStoreTypeConfig::Redis { url, pool_size } = config.cache.store.store_type {
+                assert_eq!(url.as_str(), "redis://localhost:6379");
+                assert_eq!(pool_size, expected_size);
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_from_toml_file() {
+        let toml_content = r#"
+            [cache]
+            max_retries = 3
+            timeout = "30s"
+            prefix = "dev"
+
+            [cache.store]
+            type = "file"
+            path = "/tmp/cache"
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(config.cache.max_retries, 3);
+        assert_eq!(
+            config.cache.timeout,
+            Timeout::After(Duration::from_secs(30))
+        );
+        assert_eq!(config.cache.prefix, Some("dev".to_string()));
+
+        if let CacheStoreTypeConfig::File { path } = &config.cache.store.store_type {
+            assert_eq!(path, &PathBuf::from("/tmp/cache"));
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_defaults() {
+        let toml_content = r"
+            [cache]
+        ";
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+        assert_eq!(config.cache.max_retries, 3);
+        assert_eq!(config.cache.timeout, Timeout::default());
+        assert_eq!(config.cache.prefix, None);
+        assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn test_is_default_redis_pool_size() {
+        assert!(is_default_redis_pool_size(&10));
+    }
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_builder() {
+        let config = CacheConfig::builder()
+            .max_retries(7)
+            .timeout(Timeout::After(Duration::from_secs(90)))
+            .prefix("v2".to_string())
+            .store(CacheStoreConfig {
+                store_type: CacheStoreTypeConfig::Memory,
+            })
+            .build();
+
+        assert_eq!(config.max_retries, 7);
+        assert_eq!(config.timeout, Timeout::After(Duration::from_secs(90)));
+        assert_eq!(config.prefix, Some("v2".to_string()));
+        assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_builder_defaults() {
+        let config = CacheConfig::builder().build();
+
+        assert_eq!(config.max_retries, 3);
+        assert_eq!(config.timeout, Timeout::default());
+        assert_eq!(config.prefix, None);
+        assert_eq!(config.store.store_type, CacheStoreTypeConfig::Memory);
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_store_config_builder() {
+        let config = CacheStoreConfig {
+            store_type: CacheStoreTypeConfig::Redis {
+                url: CacheUrl::from("redis://localhost:6379"),
+                pool_size: 15,
+            },
+        };
+
+        if let CacheStoreTypeConfig::Redis { url, pool_size } = config.store_type {
+            assert_eq!(url.as_str(), "redis://localhost:6379");
+            assert_eq!(pool_size, 15);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_store_config_default() {
+        let config = CacheStoreConfig::default();
+        assert_eq!(config.store_type, CacheStoreTypeConfig::Memory);
+    }
+    #[test]
+    fn never_is_never_expired() {
+        let now_fixed: DateTime<FixedOffset> =
+            Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
+        assert!(!Timeout::Never.is_expired(Some(now_fixed)));
+        assert!(!Timeout::Never.is_expired(None));
+    }
+
+    #[test]
+    fn after_is_expired_based_on_insertion_offset() {
+        // insertion_time is 1 hour in the past with +1h offset
+        let offset = FixedOffset::east_opt(3600).unwrap();
+        let insertion_time: DateTime<FixedOffset> =
+            (Utc::now() - chrono::Duration::hours(1)).with_timezone(&offset);
+        let timeout = Timeout::After(Duration::from_secs(60)); // 1 minute
+        assert!(timeout.is_expired(Some(insertion_time)));
+    }
+
+    #[test]
+    fn after_is_not_expired_when_not_yet_passed_with_offset() {
+        // insertion_time 10s ago with -2h offset
+        let offset = FixedOffset::east_opt(-2 * 3600).unwrap();
+        let insertion_time: DateTime<FixedOffset> =
+            (Utc::now() - chrono::Duration::seconds(10)).with_timezone(&offset);
+        let timeout = Timeout::After(Duration::from_secs(60));
+        assert!(!timeout.is_expired(Some(insertion_time)));
+    }
+
+    #[test]
+    #[should_panic(expected = "insertion_time is required for Timeout::After expiry check")]
+    fn after_is_expired_panics_with_no_insertion_time() {
+        let timeout = Timeout::After(Duration::from_secs(60));
+        let _ = timeout.is_expired(None);
+    }
+
+    #[test]
+    fn atdatetime_respects_stored_offset_when_comparing() {
+        // Build a past and future instant and attach +1h offset
+        let offset = FixedOffset::east_opt(3600).unwrap();
+        let past: DateTime<FixedOffset> =
+            (Utc::now() - chrono::Duration::seconds(60)).with_timezone(&offset);
+        let future: DateTime<FixedOffset> =
+            (Utc::now() + chrono::Duration::seconds(60)).with_timezone(&offset);
+
+        assert!(Timeout::AtDateTime(past).is_expired(None));
+        assert!(!Timeout::AtDateTime(future).is_expired(None));
+    }
+
+    #[test]
+    fn canonicalize_after_produces_atdatetime_in_utc_offset_zero() {
+        let before = Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap());
+        let duration = Duration::from_secs(2);
+        let canon = Timeout::After(duration).canonicalize();
+
+        match canon {
+            Timeout::AtDateTime(dt) => {
+                // dt offset should be UTC (0)
+                assert_eq!(dt.offset().local_minus_utc(), 0);
+                // dt should be >= before
+                assert!(dt >= before);
+                // dt should be reasonably close to before + duration (allow 1s slack)
+                let max_allowed = before
+                    + chrono::Duration::from_std(duration).unwrap()
+                    + chrono::Duration::seconds(1);
+                assert!(
+                    dt <= max_allowed,
+                    "canonicalized datetime is unexpectedly far ahead"
+                );
+            }
+            other => panic!("expected AtDateTime, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn canonicalize_preserves_atdatetime_and_never() {
+        let dt: DateTime<FixedOffset> = (Utc::now() + chrono::Duration::seconds(10))
+            .with_timezone(&FixedOffset::east_opt(0).unwrap());
+        let t = Timeout::AtDateTime(dt);
+        assert_eq!(t.canonicalize(), t);
+
+        let never = Timeout::Never;
+        assert_eq!(never.canonicalize(), Timeout::Never);
     }
 }

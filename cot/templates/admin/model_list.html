@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-
-{% block title %}Home{% endblock %}
-
+{% block title %}
+    Home
+{% endblock title %}
 {% block content -%}
-{%- let urls = urls -%}
-
-<h2>Choose a model to manage</h2>
-
-<ul class="model-list">
-{%- for model in model_managers -%}
-    {%- let model_link = cot::reverse!(urls, "view_model", model_name = model.url_name())? -%}
-    <li><a href="{{ model_link }}?page=1&page_size=10">{{ model.name() }}</a></li>
-{%- endfor -%}
-</ul>
-{%- endblock -%}
+    {%- let urls = urls -%}
+    <h2>Choose a model to manage</h2>
+    <ul class="model-list">
+        {%- for model in model_managers -%}
+            {%- let model_link = cot::reverse!(urls, "view_model", model_name = model.url_name())? -%}
+            <li>
+                <a href="{{ model_link }}?page=1&page_size=10">{{ model.name() }}</a>
+            </li>
+        {%- endfor -%}
+    </ul>
+{%- endblock content -%}

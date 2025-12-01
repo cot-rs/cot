@@ -4,7 +4,7 @@
 //! benefit of using an extractor is that it can be used directly as a parameter
 //! in a route handler.
 //!
-//! An extractor implements either [`FromRequest`] or [`FromRequestParts`].
+//! An extractor implements either [`FromRequest`] or [`FromRequestHead`].
 //! There are two variants because the request body can only be read once, so it
 //! needs to be read in the [`FromRequest`] implementation. Therefore, there can
 //! only be one extractor that implements [`FromRequest`] per route handler.
@@ -14,18 +14,14 @@
 //! For example, the [`Path`] extractor is used to extract path parameters:
 //!
 //! ```
+//! use cot::html::Html;
 //! use cot::request::extractors::{FromRequest, Path};
 //! use cot::request::{Request, RequestExt};
-//! use cot::response::{Response, ResponseExt};
 //! use cot::router::{Route, Router};
 //! use cot::test::TestRequestBuilder;
-//! use cot::{Body, RequestHandler};
 //!
-//! async fn my_handler(Path(my_param): Path<String>) -> cot::Result<Response> {
-//!     Ok(Response::new_html(
-//!         cot::StatusCode::OK,
-//!         Body::fixed(format!("Hello {my_param}!")),
-//!     ))
+//! async fn my_handler(Path(my_param): Path<String>) -> Html {
+//!     Html::new(format!("Hello {my_param}!"))
 //! }
 //!
 //! # #[tokio::main]
@@ -55,20 +51,16 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use cot::Error;
-use cot::error::ErrorRepr;
-use cot::request::{PathParams, Request};
-use http::request::Parts;
 use serde::de::DeserializeOwned;
 
-use crate::Method;
 use crate::auth::Auth;
 use crate::form::{Form, FormResult};
 #[cfg(feature = "json")]
 use crate::json::Json;
-use crate::request::RequestExt;
+use crate::request::{InvalidContentType, PathParams, Request, RequestExt, RequestHead};
 use crate::router::Urls;
 use crate::session::Session;
+use crate::{Body, Method};
 
 /// Trait for extractors that consume the request body.
 ///
@@ -84,12 +76,15 @@ pub trait FromRequest: Sized {
     ///
     /// Throws an error if the extractor fails to extract the data from the
     /// request.
-    fn from_request(request: Request) -> impl Future<Output = cot::Result<Self>> + Send;
+    fn from_request(
+        head: &RequestHead,
+        body: Body,
+    ) -> impl Future<Output = cot::Result<Self>> + Send;
 }
 
 impl FromRequest for Request {
-    async fn from_request(request: Request) -> cot::Result<Self> {
-        Ok(request)
+    async fn from_request(head: &RequestHead, body: Body) -> cot::Result<Self> {
+        Ok(Request::from_parts(head.clone(), body))
     }
 }
 
@@ -102,23 +97,23 @@ impl FromRequest for Request {
 ///
 /// See [`crate::request::extractors`] documentation for more information about
 /// extractors.
-pub trait FromRequestParts: Sized {
-    /// Extracts data from the request parts.
+pub trait FromRequestHead: Sized {
+    /// Extracts data from the request head.
     ///
     /// # Errors
     ///
     /// Throws an error if the extractor fails to extract the data from the
-    /// request parts.
-    fn from_request_parts(parts: &mut Parts) -> impl Future<Output = cot::Result<Self>> + Send;
+    /// request head.
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = cot::Result<Self>> + Send;
 }
 
-impl FromRequestParts for Urls {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        Ok(Self::from_parts(parts))
+impl FromRequestHead for Urls {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        Ok(Self::from_parts(head))
     }
 }
 
-/// An extractor that extract data from the URL params.
+/// An extractor that extracts data from the URL params.
 ///
 /// The extractor is generic over a type that implements
 /// `serde::de::DeserializeOwned`.
@@ -126,18 +121,14 @@ impl FromRequestParts for Urls {
 /// # Examples
 ///
 /// ```
+/// use cot::html::Html;
 /// use cot::request::extractors::{FromRequest, Path};
 /// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
 ///
-/// async fn my_handler(Path(my_param): Path<String>) -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {my_param}!")),
-///     ))
+/// async fn my_handler(Path(my_param): Path<String>) -> Html {
+///     Html::new(format!("Hello {my_param}!"))
 /// }
 ///
 /// # #[tokio::main]
@@ -166,14 +157,13 @@ impl FromRequestParts for Urls {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Path<D>(pub D);
 
-impl<D: DeserializeOwned> FromRequestParts for Path<D> {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        let params = parts
+impl<D: DeserializeOwned> FromRequestHead for Path<D> {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        let params = head
             .extensions
             .get::<PathParams>()
             .expect("PathParams extension missing")
-            .parse()
-            .map_err(|error| Error::new(ErrorRepr::PathParametersParse(error)))?;
+            .parse()?;
         Ok(Self(params))
     }
 }
@@ -186,12 +176,11 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
 /// # Example
 ///
 /// ```
+/// use cot::RequestHandler;
+/// use cot::html::Html;
 /// use cot::request::extractors::{FromRequest, UrlQuery};
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
 /// use serde::Deserialize;
 ///
 /// #[derive(Deserialize)]
@@ -199,11 +188,8 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(UrlQuery(query): UrlQuery<MyQuery>) -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {}!", query.hello)),
-///     ))
+/// async fn my_handler(UrlQuery(query): UrlQuery<MyQuery>) -> Html {
+///     Html::new(format!("Hello {}!", query.hello))
 /// }
 ///
 /// # #[tokio::main]
@@ -225,22 +211,27 @@ impl<D: DeserializeOwned> FromRequestParts for Path<D> {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct UrlQuery<T>(pub T);
 
-impl<D: DeserializeOwned> FromRequestParts for UrlQuery<D>
+impl<D: DeserializeOwned> FromRequestHead for UrlQuery<D>
 where
     D: DeserializeOwned,
 {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        let query = parts.uri.query().unwrap_or_default();
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        let query = head.uri.query().unwrap_or_default();
 
         let deserializer =
             serde_html_form::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
 
-        let value = serde_path_to_error::deserialize(deserializer)
-            .map_err(|error| Error::new(ErrorRepr::QueryParametersParse(error)))?;
+        let value =
+            serde_path_to_error::deserialize(deserializer).map_err(QueryParametersParseError)?;
 
         Ok(UrlQuery(value))
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("could not parse query parameters: {0}")]
+struct QueryParametersParseError(serde_path_to_error::Error<serde::de::value::Error>);
+impl_into_cot_error!(QueryParametersParseError, BAD_REQUEST);
 
 /// Extractor that gets the request body as JSON and deserializes it into a type
 /// `T` implementing `serde::de::DeserializeOwned`.
@@ -260,8 +251,6 @@ where
 /// ```
 /// use cot::RequestHandler;
 /// use cot::json::Json;
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::test::TestRequestBuilder;
 /// use serde::{Deserialize, Serialize};
 ///
@@ -270,8 +259,8 @@ where
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(Json(data): Json<MyData>) -> cot::Result<Response> {
-///     Ok(Response::new_json(cot::StatusCode::OK, &data)?)
+/// async fn my_handler(Json(data): Json<MyData>) -> Json<MyData> {
+///     Json(data)
 /// }
 ///
 /// # #[tokio::main]
@@ -296,19 +285,35 @@ where
 /// ```
 #[cfg(feature = "json")]
 impl<D: DeserializeOwned> FromRequest for Json<D> {
-    async fn from_request(mut request: Request) -> cot::Result<Self> {
-        request.expect_content_type(cot::headers::JSON_CONTENT_TYPE)?;
+    async fn from_request(head: &RequestHead, body: Body) -> cot::Result<Self> {
+        let content_type = head
+            .headers
+            .get(http::header::CONTENT_TYPE)
+            .map_or("".into(), |value| String::from_utf8_lossy(value.as_bytes()));
+        if content_type != cot::headers::JSON_CONTENT_TYPE {
+            return Err(InvalidContentType {
+                expected: cot::headers::JSON_CONTENT_TYPE,
+                actual: content_type.into_owned(),
+            }
+            .into());
+        }
 
-        let body = std::mem::take(request.body_mut());
         let bytes = body.into_bytes().await?;
 
         let deserializer = &mut serde_json::Deserializer::from_slice(&bytes);
-        let result = serde_path_to_error::deserialize(deserializer)
-            .map_err(|error| Error::new(ErrorRepr::Json(error)))?;
+        let result =
+            serde_path_to_error::deserialize(deserializer).map_err(JsonDeserializeError)?;
 
         Ok(Self(result))
     }
 }
+
+#[cfg(feature = "json")]
+#[derive(Debug, thiserror::Error)]
+#[error("JSON deserialization error: {0}")]
+struct JsonDeserializeError(serde_path_to_error::Error<serde_json::Error>);
+#[cfg(feature = "json")]
+impl_into_cot_error!(JsonDeserializeError, BAD_REQUEST);
 
 /// An extractor that gets the request body as form data and deserializes it
 /// into a type `F` implementing `cot::form::Form`.
@@ -327,19 +332,16 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 ///
 /// ```
 /// use cot::form::{Form, FormResult};
+/// use cot::html::Html;
 /// use cot::request::extractors::RequestForm;
-/// use cot::request::{Request, RequestExt};
-/// use cot::response::{Response, ResponseExt};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler};
-/// use serde::Deserialize;
 ///
 /// #[derive(Form)]
 /// struct MyForm {
 ///     hello: String,
 /// }
 ///
-/// async fn my_handler(RequestForm(form): RequestForm<MyForm>) -> cot::Result<Response> {
+/// async fn my_handler(RequestForm(form): RequestForm<MyForm>) -> Html {
 ///     let form = match form {
 ///         FormResult::Ok(form) => form,
 ///         FormResult::ValidationError(error) => {
@@ -347,14 +349,12 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 ///         }
 ///     };
 ///
-///     Ok(Response::new_html(
-///         cot::StatusCode::OK,
-///         Body::fixed(format!("Hello {}!", form.hello)),
-///     ))
+///     Html::new(format!("Hello {}!", form.hello))
 /// }
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
+/// # use cot::RequestHandler;
 /// # let request = TestRequestBuilder::post("/").form_data(&[("hello", "world")]).build();
 /// # my_handler.handle(request).await?;
 /// # Ok(())
@@ -364,7 +364,8 @@ impl<D: DeserializeOwned> FromRequest for Json<D> {
 pub struct RequestForm<F: Form>(pub FormResult<F>);
 
 impl<F: Form> FromRequest for RequestForm<F> {
-    async fn from_request(mut request: Request) -> cot::Result<Self> {
+    async fn from_request(head: &RequestHead, body: Body) -> cot::Result<Self> {
+        let mut request = Request::from_parts(head.clone(), body);
         Ok(Self(F::from_request(&mut request).await?))
     }
 }
@@ -375,7 +376,6 @@ impl<F: Form> FromRequest for RequestForm<F> {
 ///
 /// ```
 /// use cot::html::Html;
-/// use cot::request::Request;
 /// use cot::request::extractors::RequestDb;
 ///
 /// async fn my_handler(RequestDb(db): RequestDb) -> Html {
@@ -399,9 +399,9 @@ impl<F: Form> FromRequest for RequestForm<F> {
 pub struct RequestDb(pub Arc<crate::db::Database>);
 
 #[cfg(feature = "db")]
-impl FromRequestParts for RequestDb {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        Ok(Self(parts.db().clone()))
+impl FromRequestHead for RequestDb {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        Ok(Self(head.db().clone()))
     }
 }
 
@@ -485,6 +485,7 @@ impl StaticFiles {
     }
 }
 
+const ERROR_PREFIX: &str = "could not get URL for a static file:";
 /// Errors that can occur when trying to get a static file.
 ///
 /// This enum represents errors that can occur when attempting to
@@ -493,17 +494,19 @@ impl StaticFiles {
 #[non_exhaustive]
 pub enum StaticFilesGetError {
     /// The requested static file was not found.
-    #[error("static file `{path}` not found")]
+    #[error("{ERROR_PREFIX} static file `{path}` not found")]
+    #[non_exhaustive]
     NotFound {
         /// The path of the static file that was not found.
         path: String,
     },
 }
+impl_into_cot_error!(StaticFilesGetError);
 
-impl FromRequestParts for StaticFiles {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
+impl FromRequestHead for StaticFiles {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         Ok(StaticFiles {
-            inner: parts
+            inner: head
                 .extensions
                 .get::<Arc<crate::static_files::StaticFiles>>()
                 .cloned()
@@ -513,21 +516,27 @@ impl FromRequestParts for StaticFiles {
 }
 
 // extractor impls for existing types
-impl FromRequestParts for Method {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        Ok(parts.method.clone())
+impl FromRequestHead for RequestHead {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        Ok(head.clone())
     }
 }
 
-impl FromRequestParts for Session {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        Ok(Session::from_extensions(&parts.extensions).clone())
+impl FromRequestHead for Method {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        Ok(head.method.clone())
     }
 }
 
-impl FromRequestParts for Auth {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        let auth = parts
+impl FromRequestHead for Session {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        Ok(Session::from_extensions(&head.extensions).clone())
+    }
+}
+
+impl FromRequestHead for Auth {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        let auth = head
             .extensions
             .get::<Auth>()
             .expect("AuthMiddleware not enabled for the route/project")
@@ -536,6 +545,43 @@ impl FromRequestParts for Auth {
         Ok(auth)
     }
 }
+
+/// A derive macro that automatically implements the [`FromRequestHead`] trait
+/// for structs.
+///
+/// This macro generates code to extract each field of the struct from HTTP
+/// request head, making it easy to create composite extractors that combine
+/// multiple data sources from an incoming request.
+///
+/// The macro works by calling [`FromRequestHead::from_request_head`] on each
+/// field's type, allowing you to compose extractors seamlessly. All fields must
+/// implement the [`FromRequestHead`] trait for the derivation to work.
+///
+/// # Requirements
+///
+/// - The target struct must have all fields implement [`FromRequestHead`]
+/// - Works with named fields, unnamed fields (tuple structs), and unit structs
+/// - The struct must be accessible where the macro is used
+///
+/// # Examples
+///
+/// ## Named Fields
+///
+/// ```no_run
+/// use cot::request::extractors::{Path, StaticFiles, UrlQuery};
+/// use cot::router::Urls;
+/// use cot_macros::FromRequestHead;
+/// use serde::Deserialize;
+///
+/// #[derive(Debug, FromRequestHead)]
+/// pub struct BaseContext {
+///     urls: Urls,
+///     static_files: StaticFiles,
+/// }
+/// ```
+pub use cot_macros::FromRequestHead;
+
+use crate::error::error_impl::impl_into_cot_error;
 
 #[cfg(test)]
 mod tests {
@@ -557,7 +603,8 @@ mod tests {
             .body(Body::fixed(r#"{"hello":"world"}"#))
             .unwrap();
 
-        let Json(data): Json<serde_json::Value> = Json::from_request(request).await.unwrap();
+        let (head, body) = request.into_parts();
+        let Json(data): Json<serde_json::Value> = Json::from_request(&head, body).await.unwrap();
         assert_eq!(data, serde_json::json!({"hello": "world"}));
     }
 
@@ -573,7 +620,8 @@ mod tests {
             .body(Body::fixed("{}"))
             .unwrap();
 
-        let Json(data): Json<TestData> = Json::from_request(request).await.unwrap();
+        let (head, body) = request.into_parts();
+        let Json(data): Json<TestData> = Json::from_request(&head, body).await.unwrap();
         assert_eq!(data, TestData {});
     }
 
@@ -596,7 +644,8 @@ mod tests {
             .body(Body::fixed(r#"{"inner":{"hello":"world"}}"#))
             .unwrap();
 
-        let Json(data): Json<TestData> = Json::from_request(request).await.unwrap();
+        let (head, body) = request.into_parts();
+        let Json(data): Json<TestData> = Json::from_request(&head, body).await.unwrap();
         assert_eq!(
             data,
             TestData {
@@ -615,14 +664,14 @@ mod tests {
             name: String,
         }
 
-        let (mut parts, _body) = Request::new(Body::empty()).into_parts();
+        let (mut head, _body) = Request::new(Body::empty()).into_parts();
 
         let mut params = PathParams::new();
         params.insert("id".to_string(), "42".to_string());
         params.insert("name".to_string(), "test".to_string());
-        parts.extensions.insert(params);
+        head.extensions.insert(params);
 
-        let Path(extracted): Path<TestParams> = Path::from_request_parts(&mut parts).await.unwrap();
+        let Path(extracted): Path<TestParams> = Path::from_request_head(&head).await.unwrap();
         let expected = TestParams {
             id: 42,
             name: "test".to_string(),
@@ -639,11 +688,11 @@ mod tests {
             filter: String,
         }
 
-        let (mut parts, _body) = Request::new(Body::empty()).into_parts();
-        parts.uri = "https://example.com/?page=2&filter=active".parse().unwrap();
+        let (mut head, _body) = Request::new(Body::empty()).into_parts();
+        head.uri = "https://example.com/?page=2&filter=active".parse().unwrap();
 
         let UrlQuery(query): UrlQuery<QueryParams> =
-            UrlQuery::from_request_parts(&mut parts).await.unwrap();
+            UrlQuery::from_request_head(&head).await.unwrap();
 
         assert_eq!(query.page, 2);
         assert_eq!(query.filter, "active");
@@ -654,10 +703,10 @@ mod tests {
         #[derive(Deserialize, Debug, PartialEq)]
         struct EmptyParams {}
 
-        let (mut parts, _body) = Request::new(Body::empty()).into_parts();
-        parts.uri = "https://example.com/".parse().unwrap();
+        let (mut head, _body) = Request::new(Body::empty()).into_parts();
+        head.uri = "https://example.com/".parse().unwrap();
 
-        let result: UrlQuery<EmptyParams> = UrlQuery::from_request_parts(&mut parts).await.unwrap();
+        let result: UrlQuery<EmptyParams> = UrlQuery::from_request_head(&head).await.unwrap();
         assert!(matches!(result, UrlQuery(_)));
     }
 
@@ -670,7 +719,8 @@ mod tests {
             .body(Body::fixed(r#"{"hello":"world"}"#))
             .unwrap();
 
-        let result = Json::<serde_json::Value>::from_request(request).await;
+        let (head, body) = request.into_parts();
+        let result = Json::<serde_json::Value>::from_request(&head, body).await;
         assert!(result.is_err());
     }
 
@@ -686,8 +736,9 @@ mod tests {
             .form_data(&[("hello", "world"), ("foo", "bar")])
             .build();
 
+        let (head, body) = request.into_parts();
         let RequestForm(form_result): RequestForm<MyForm> =
-            RequestForm::from_request(request).await.unwrap();
+            RequestForm::from_request(&head, body).await.unwrap();
 
         assert_eq!(
             form_result.unwrap(),
@@ -712,7 +763,7 @@ mod tests {
 
         let mut request = TestRequestBuilder::get("/test/").router(router).build();
 
-        let urls: Urls = request.extract_parts().await.unwrap();
+        let urls: Urls = request.extract_from_head().await.unwrap();
 
         assert!(reverse!(urls, "test_route").is_ok());
     }
@@ -721,20 +772,22 @@ mod tests {
     async fn method_extraction() {
         let mut request = TestRequestBuilder::get("/test/").build();
 
-        let method: Method = request.extract_parts().await.unwrap();
+        let method: Method = request.extract_from_head().await.unwrap();
 
         assert_eq!(method, Method::GET);
     }
 
     #[cfg(feature = "db")]
     #[cot::test]
-    // unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`
-    #[cfg_attr(miri, ignore)]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`"
+    )]
     async fn request_db() {
         let db = crate::test::TestDatabase::new_sqlite().await.unwrap();
         let mut test_request = TestRequestBuilder::get("/").database(db.database()).build();
 
-        let RequestDb(extracted_db) = test_request.extract_parts().await.unwrap();
+        let RequestDb(extracted_db) = test_request.extract_from_head().await.unwrap();
 
         // check that we have a connection to the database
         extracted_db.close().await.unwrap();

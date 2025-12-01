@@ -12,7 +12,7 @@
 //! }
 //!
 //! async fn get_page(request: Request) -> cot::Result<Response> {
-//!     todo!()
+//!     unimplemented!()
 //! }
 //!
 //! let router = Router::with_urls([Route::with_handler_and_name(
@@ -28,13 +28,13 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use derive_more::with_trait::Debug;
-use http::request::Parts;
 use tracing::debug;
 
-use crate::error::ErrorRepr;
+use crate::error::NotFound;
+use crate::error::error_impl::impl_into_cot_error;
 use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
-use crate::request::{AppName, PathParams, Request, RequestExt, RouteName};
-use crate::response::{Response, not_found_response};
+use crate::request::{AppName, PathParams, Request, RequestExt, RequestHead, RouteName};
+use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};
 
@@ -55,7 +55,7 @@ pub mod path;
 /// use cot::router::{Route, Router};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
-///     todo!()
+///     unimplemented!()
 /// }
 ///
 /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -94,7 +94,7 @@ impl Router {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -139,7 +139,7 @@ impl Router {
             result.handler.handle(request).await
         } else {
             debug!("Not found: {}", request_path);
-            not_found_response(None)
+            Err(Error::from(NotFound::router()))
         }
     }
 
@@ -172,10 +172,9 @@ impl Router {
                     #[cfg(feature = "openapi")]
                     RouteInner::ApiHandler(handler) => {
                         if matches_fully {
+                            let handler: &(dyn BoxRequestHandler + Send + Sync) = &**handler;
                             return Some(HandlerFound {
-                                // TODO: consider removing this when Rust trait_upcasting is
-                                // stabilized and we bump the MSRV (lands in Rust 1.86)
-                                handler: handler.as_box_request_handler(),
+                                handler,
                                 app_name: self.app_name.clone(),
                                 name: route.name.clone(),
                                 params: Self::matches_to_path_params(&matches, Vec::new()),
@@ -237,7 +236,7 @@ impl Router {
     ) -> Result<String> {
         Ok(self
             .reverse_option(app_name, name, params)?
-            .ok_or_else(|| ErrorRepr::NoViewToReverse {
+            .ok_or_else(|| NoViewToReverse {
                 app_name: app_name.map(ToOwned::to_owned),
                 view_name: name.to_owned(),
             })?)
@@ -281,15 +280,13 @@ impl Router {
             .get(&RouteName(String::from(name)))
             .map(|matcher| matcher.reverse(params));
         if let Some(url) = url {
-            return Ok(Some(url.map_err(ErrorRepr::from)?));
+            return Ok(Some(url?));
         }
 
         for route in &self.urls {
             if let RouteInner::Router(router) = &route.view {
                 if let Some(url) = router.reverse_option(app_name, name, params)? {
-                    return Ok(Some(
-                        route.url.reverse(params).map_err(ErrorRepr::from)? + &url,
-                    ));
+                    return Ok(Some(route.url.reverse(params)? + &url));
                 }
             }
         }
@@ -306,7 +303,7 @@ impl Router {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -327,7 +324,7 @@ impl Router {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::empty();
@@ -345,23 +342,32 @@ impl Router {
     ///
     /// This might be useful if you want to manually serve the generated OpenAPI
     /// specs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if invalid schemas are generated. This should not happen in
+    /// normal operation, but if it does, it indicates a bug in the
+    /// [`schemars`](https://docs.rs/schemars/latest/schemars/) library
+    /// or in the way the OpenAPI specs are generated.
     #[cfg(feature = "openapi")]
     #[must_use]
     pub fn as_api(&self) -> aide::openapi::OpenApi {
         let mut paths = aide::openapi::Paths::default();
         let mut schema_generator =
-            schemars::SchemaGenerator::new(schemars::r#gen::SchemaSettings::openapi3());
+            schemars::SchemaGenerator::new(schemars::generate::SchemaSettings::openapi3());
 
         self.as_openapi_impl("", &[], &mut paths, &mut schema_generator);
 
         let component_schemas = schema_generator
-            .take_definitions()
+            .take_definitions(true)
             .into_iter()
             .map(|(name, json_schema)| {
                 (
                     name,
                     aide::openapi::SchemaObject {
-                        json_schema,
+                        json_schema: schemars::Schema::try_from(json_schema).expect(
+                            "SchemaGenerator::take_definitions should return valid schemas",
+                        ),
                         example: None,
                         external_docs: None,
                     },
@@ -435,6 +441,14 @@ impl Default for Router {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("failed to reverse route `{view_name}` due to view not existing")]
+struct NoViewToReverse {
+    app_name: Option<String>,
+    view_name: String,
+}
+impl_into_cot_error!(NoViewToReverse);
+
 #[derive(Debug)]
 struct HandlerFound<'a> {
     #[debug("handler(...)")]
@@ -467,7 +481,7 @@ impl RouterService {
     /// use cot::router::{Route, Router, RouterService};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -518,7 +532,7 @@ pub fn split_view_name(view_name: &str) -> (Option<&str>, &str) {
 /// use cot::router::{Route, Router};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
-///     todo!()
+///     unimplemented!()
 /// }
 ///
 /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -555,9 +569,7 @@ impl Route {
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(into_box_request_handler(ErrorHandlerWrapper(
-                handler,
-            )))),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: None,
         }
     }
@@ -593,7 +605,7 @@ impl Route {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+                crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: None,
         }
@@ -662,7 +674,7 @@ impl Route {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+                crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: Some(RouteName(name.into())),
         }
@@ -678,7 +690,7 @@ impl Route {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -703,7 +715,7 @@ impl Route {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let route = Route::with_handler("/test", home);
@@ -725,7 +737,7 @@ impl Route {
     /// use cot::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
-    ///     todo!()
+    ///     unimplemented!()
     /// }
     ///
     /// let route = Route::with_handler_and_name("/", home, "home");
@@ -771,39 +783,6 @@ enum RouteInner {
     ApiHandler(Arc<dyn crate::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
 }
 
-struct ErrorHandlerWrapper<H>(H);
-
-impl<HandlerParams, H> RequestHandler<HandlerParams> for ErrorHandlerWrapper<H>
-where
-    H: RequestHandler<HandlerParams> + Send + Sync,
-{
-    async fn handle(&self, request: Request) -> Result<Response> {
-        let response = self.0.handle(request).await;
-
-        match response {
-            Ok(response) => Ok(response),
-            Err(error) => match error.inner {
-                ErrorRepr::NotFound { message } => not_found_response(message),
-                _ => Err(error),
-            },
-        }
-    }
-}
-
-#[cfg(feature = "openapi")]
-impl<H> crate::openapi::AsApiRoute for ErrorHandlerWrapper<H>
-where
-    H: crate::openapi::AsApiRoute,
-{
-    fn as_api_route(
-        &self,
-        route_context: &crate::openapi::RouteContext<'_>,
-        schema_generator: &mut schemars::SchemaGenerator,
-    ) -> aide::openapi::PathItem {
-        self.0.as_api_route(route_context, schema_generator)
-    }
-}
-
 /// Get a URL for a view by its registered name and given params.
 ///
 /// If the view name has two parts separated by a colon, the first part is
@@ -820,21 +799,21 @@ where
 /// # Examples
 ///
 /// ```
+/// use cot::html::Html;
 /// use cot::project::RegisterAppsContext;
 /// use cot::request::Request;
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
-/// use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
+/// use cot::{App, AppBuilder, Project, StatusCode, reverse};
 ///
-/// async fn home(request: Request) -> cot::Result<Response> {
+/// async fn home(request: Request) -> cot::Result<Html> {
 ///     // any of below two lines returns the same:
 ///     let url = reverse!(request, "home")?;
 ///     let url = reverse!(request, "my_custom_app:home")?;
 ///
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed(format!("Hello! The URL for this view is: {}", url)),
-///     ))
+///     Ok(Html::new(format!(
+///         "Hello! The URL for this view is: {}",
+///         url
+///     )))
 /// }
 ///
 /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
@@ -862,7 +841,11 @@ where
 #[macro_export]
 macro_rules! reverse {
     ($request:expr, $view_name:literal $(, $($key:ident = $value:expr),*)?) => {{
-        #[allow(unused_imports)] // allow using either `Request` or `Urls` objects
+        #[allow(
+            clippy::allow_attributes,
+            unused_imports,
+            reason = "allow using either `Request` or `Urls` objects"
+        )]
         use $crate::request::RequestExt;
         let (app_name, view_name) = $crate::router::split_view_name($view_name);
         let app_name = app_name.or_else(|| $request.app_name());
@@ -880,18 +863,14 @@ macro_rules! reverse {
 /// # Examples
 ///
 /// ```
-/// use cot::request::Request;
-/// use cot::response::{Response, ResponseExt};
+/// use cot::html::Html;
 /// use cot::router::{Route, Router, Urls};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler, StatusCode, reverse};
+/// use cot::{RequestHandler, reverse};
 ///
-/// async fn my_handler(urls: Urls) -> cot::Result<Response> {
+/// async fn my_handler(urls: Urls) -> cot::Result<Html> {
 ///     let url = reverse!(urls, "home")?;
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed(format!("{url}")),
-///     ))
+///     Ok(Html::new(format!("{url}")))
 /// }
 ///
 /// # #[tokio::main]
@@ -923,18 +902,19 @@ impl Urls {
     /// # Examples
     ///
     /// ```
+    /// use cot::html::Html;
     /// use cot::request::Request;
     /// use cot::response::{Response, ResponseExt};
     /// use cot::router::Urls;
     /// use cot::{Body, StatusCode, reverse};
     ///
-    /// async fn my_handler(request: Request) -> cot::Result<Response> {
+    /// async fn my_handler(request: Request) -> cot::Result<Html> {
     ///     let urls = Urls::from_request(&request);
     ///     let url = reverse!(urls, "home")?;
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed(format!("Hello! The URL for this view is: {}", url)),
-    ///     ))
+    ///     Ok(Html::new(format!(
+    ///         "Hello! The URL for this view is: {}",
+    ///         url
+    ///     )))
     /// }
     /// ```
     pub fn from_request(request: &Request) -> Self {
@@ -944,10 +924,10 @@ impl Urls {
         }
     }
 
-    pub(crate) fn from_parts(request_parts: &Parts) -> Self {
+    pub(crate) fn from_parts(request_head: &RequestHead) -> Self {
         Self {
-            app_name: request_parts.app_name().map(ToOwned::to_owned),
-            router: Arc::clone(request_parts.router()),
+            app_name: request_head.app_name().map(ToOwned::to_owned),
+            router: Arc::clone(request_head.router()),
         }
     }
 

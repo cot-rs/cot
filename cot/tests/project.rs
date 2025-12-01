@@ -8,7 +8,10 @@ use cot::test::Client;
 use cot::{App, AppBuilder, Project, StatusCode, reverse};
 
 #[cot::test]
-#[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+)]
 async fn cot_project_router_sub_path() {
     async fn hello(_request: Request) -> Html {
         Html::new("OK")
@@ -59,7 +62,10 @@ async fn cot_project_router_sub_path() {
 }
 
 #[cot::test]
-#[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+)]
 async fn cot_router_reverse_local() {
     async fn get_index(request: Request) -> cot::Result<Html> {
         let reversed = reverse!(request, "index")?;

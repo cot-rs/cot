@@ -1,10 +1,10 @@
 use bytes::{Bytes, BytesMut};
+use cot::error::error_impl::impl_into_cot_error;
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use cot::response::Response;
 use cot::{Body, Error, StatusCode};
 use http;
 
-use crate::error::ErrorRepr;
 #[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
@@ -226,6 +226,12 @@ where
     }
 }
 
+impl IntoResponse for Error {
+    fn into_response(self) -> cot::Result<Response> {
+        Err(self)
+    }
+}
+
 impl IntoResponse for Response {
     fn into_response(self) -> cot::Result<Response> {
         Ok(self)
@@ -299,7 +305,7 @@ impl IntoResponse for http::Extensions {
     }
 }
 
-impl IntoResponse for http::response::Parts {
+impl IntoResponse for crate::response::ResponseHead {
     fn into_response(self) -> cot::Result<Response> {
         Ok(Response::from_parts(self, Body::empty()))
     }
@@ -357,13 +363,19 @@ impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {
 
         let mut buf = Vec::with_capacity(DEFAULT_JSON_SIZE);
         let mut serializer = serde_json::Serializer::new(&mut buf);
-        serde_path_to_error::serialize(&self.0, &mut serializer)
-            .map_err(|error| Error::new(ErrorRepr::Json(error)))?;
+        serde_path_to_error::serialize(&self.0, &mut serializer).map_err(JsonSerializeError)?;
         let data = String::from_utf8(buf).expect("JSON serialization always returns valid UTF-8");
 
         data.with_content_type(JSON_CONTENT_TYPE).into_response()
     }
 }
+
+#[cfg(feature = "json")]
+#[derive(Debug, thiserror::Error)]
+#[error("JSON serialization error: {0}")]
+struct JsonSerializeError(serde_path_to_error::Error<serde_json::Error>);
+#[cfg(feature = "json")]
+impl_into_cot_error!(JsonSerializeError, INTERNAL_SERVER_ERROR);
 
 // Shortcuts for common uses
 
@@ -381,10 +393,10 @@ mod tests {
     use http::{self, HeaderMap, HeaderValue};
 
     use super::*;
-    use crate::error::ErrorRepr;
+    use crate::error::NotFound;
     use crate::html::Html;
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_unit_into_response() {
         let response = ().into_response().unwrap();
 
@@ -393,7 +405,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap().len(), 0);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_result_ok_into_response() {
         let res: Result<&'static str, Error> = Ok("hello");
 
@@ -407,11 +419,9 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "hello");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_result_err_into_response() {
-        let err = Error::new(ErrorRepr::NotFound {
-            message: Some("test".to_string()),
-        });
+        let err = Error::from(NotFound::with_message("test"));
         let res: Result<&'static str, Error> = Err(err);
 
         let error_result = res.into_response();
@@ -420,7 +430,7 @@ mod tests {
         assert!(error_result.err().unwrap().to_string().contains("test"));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_response_into_response() {
         let original_response = Response::new(Body::from("test"));
 
@@ -430,7 +440,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "test");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_static_str_into_response() {
         let response = "hello world".into_response().unwrap();
 
@@ -445,7 +455,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_string_into_response() {
         let s = String::from("hello string");
 
@@ -462,7 +472,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_box_str_into_response() {
         let b: Box<str> = "hello box".into();
 
@@ -479,7 +489,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_static_u8_slice_into_response() {
         let data: &'static [u8] = b"hello bytes";
 
@@ -496,7 +506,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_vec_u8_into_response() {
         let data: Vec<u8> = vec![1, 2, 3];
 
@@ -513,7 +523,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_bytes_into_response() {
         let data = Bytes::from_static(b"hello bytes obj");
 
@@ -530,7 +540,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_static_u8_array_into_response() {
         let data: &'static [u8; 5] = b"array";
 
@@ -544,7 +554,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "array");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_u8_array_into_response() {
         let data: [u8; 3] = [4, 5, 6];
 
@@ -561,7 +571,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_box_u8_slice_into_response() {
         let data: Box<[u8]> = Box::new([7, 8, 9]);
 
@@ -578,7 +588,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_bytes_mut_into_response() {
         let mut data = BytesMut::with_capacity(10);
         data.extend_from_slice(b"mutable");
@@ -593,7 +603,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "mutable");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_status_code_into_response() {
         let response = StatusCode::NOT_FOUND.into_response().unwrap();
 
@@ -602,7 +612,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap().len(), 0);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_header_map_into_response() {
         let mut headers = HeaderMap::new();
         headers.insert("X-Test", HeaderValue::from_static("value"));
@@ -614,7 +624,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap().len(), 0);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_extensions_into_response() {
         let mut extensions = http::Extensions::new();
         extensions.insert("My Extension Data");
@@ -630,7 +640,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap().len(), 0);
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_parts_into_response() {
         let mut response = Response::new(Body::empty());
         *response.status_mut() = StatusCode::ACCEPTED;
@@ -638,9 +648,9 @@ mod tests {
             .headers_mut()
             .insert("X-From-Parts", HeaderValue::from_static("yes"));
         response.extensions_mut().insert(123usize);
-        let (parts, _) = response.into_parts();
+        let (head, _) = response.into_parts();
 
-        let new_response = parts.into_response().unwrap();
+        let new_response = head.into_response().unwrap();
 
         assert_eq!(new_response.status(), StatusCode::ACCEPTED);
         assert_eq!(new_response.headers().get("X-From-Parts").unwrap(), "yes");
@@ -651,7 +661,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_html_into_response() {
         let html = Html::new("<h1>Test</h1>");
 
@@ -668,7 +678,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_body_into_response() {
         let body = Body::from("body test");
 
@@ -685,7 +695,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_with_header() {
         let response = "test"
             .with_header("X-Custom", "HeaderValue")
@@ -696,7 +706,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "test");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_with_content_type() {
         let response = "test"
             .with_content_type("application/json")
@@ -711,7 +721,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "test");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_with_status() {
         let response = "test"
             .with_status(StatusCode::CREATED)
@@ -726,7 +736,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "test");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_with_body() {
         let response = StatusCode::ACCEPTED
             .with_body("new body")
@@ -737,7 +747,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "new body");
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn test_with_extension() {
         #[derive(Clone, Debug, PartialEq)]
         struct MyExt(String);
@@ -756,7 +766,7 @@ mod tests {
     }
 
     #[cfg(feature = "json")]
-    #[tokio::test]
+    #[cot::test]
     async fn test_json_struct_into_response() {
         use serde::Serialize;
 
@@ -786,7 +796,7 @@ mod tests {
     }
 
     #[cfg(feature = "json")]
-    #[tokio::test]
+    #[cot::test]
     async fn test_json_hashmap_into_response() {
         use std::collections::HashMap;
 

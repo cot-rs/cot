@@ -1,19 +1,16 @@
 {% let urls = urls %}
-
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File upload</title>
-</head>
-<body>
-<h1>Uploaded file</h1>
-
-<img src="data:{{ content_type }};base64,{{ file_as_b64 }}" alt="Uploaded file" />
-
-<hr/>
-
-<a href="{{ cot::reverse!(urls, "index")? }}">Back to upload</a>
-</body>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>File upload</title>
+    </head>
+    <body>
+        <h1>Uploaded file</h1>
+        <img src="data:{{ content_type }};base64,{{ file_as_b64 }}"
+             alt="Uploaded file" />
+        <hr />
+        <a href="{{ cot::reverse!(urls, "index")? }}">Back to upload</a>
+    </body>
 </html>

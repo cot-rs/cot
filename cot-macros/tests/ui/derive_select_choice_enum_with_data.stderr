@@ -1,0 +1,5 @@
+error: `SelectChoice` can only be derived for enums with unit variants
+ --> tests/ui/derive_select_choice_enum_with_data.rs:5:5
+  |
+5 |     Foo(u32),
+  |     ^^^^^^^^

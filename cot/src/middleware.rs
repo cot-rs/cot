@@ -4,6 +4,9 @@
 //! are used to add functionality to the request/response cycle, such as
 //! session management, adding security headers, and more.
 
+use std::borrow::Cow;
+use std::fmt::Debug;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
@@ -12,13 +15,30 @@ use futures_util::TryFutureExt;
 use http_body_util::BodyExt;
 use http_body_util::combinators::BoxBody;
 use tower::Service;
-use tower_sessions::{MemoryStore, SessionManagerLayer};
+use tower_sessions::service::PlaintextCookie;
+use tower_sessions::{SessionManagerLayer, SessionStore};
 
-use crate::error::ErrorRepr;
+#[cfg(feature = "cache")]
+use crate::config::CacheType;
+use crate::config::{Expiry, SameSite, SessionStoreTypeConfig};
 use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
+use crate::session::store::SessionStoreWrapper;
+#[cfg(all(feature = "db", feature = "json"))]
+use crate::session::store::db::DbStore;
+#[cfg(feature = "json")]
+use crate::session::store::file::FileStore;
+use crate::session::store::memory::MemoryStore;
+#[cfg(feature = "redis")]
+use crate::session::store::redis::RedisStore;
 use crate::{Body, Error};
+
+#[cfg(feature = "live-reload")]
+mod live_reload;
+
+#[cfg(feature = "live-reload")]
+pub use live_reload::LiveReloadMiddleware;
 
 /// Middleware that converts a any [`http::Response`] generic type to a
 /// [`cot::response::Response`].
@@ -32,9 +52,9 @@ use crate::{Body, Error};
 /// # Examples
 ///
 /// ```
+/// use cot::Project;
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -42,7 +62,7 @@ use crate::{Body, Error};
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler
 ///             // IntoCotResponseLayer used internally in middleware()
 ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -83,7 +103,7 @@ impl<S> tower::Layer<S> for IntoCotResponseLayer {
     }
 }
 
-/// Service struct that converts a any [`http::Response`] generic type to a
+/// Service struct that converts any [`http::Response`] generic type to
 /// [`cot::response::Response`].
 ///
 /// Used by [`IntoCotResponseLayer`].
@@ -134,8 +154,7 @@ where
     response.map(|body| Body::wrapper(BoxBody::new(body.map_err(map_err))))
 }
 
-/// Middleware that converts a any error type to a
-/// [`cot::Error`].
+/// Middleware that converts any error type to [`cot::Error`].
 ///
 /// This is useful for converting a response from a middleware that is
 /// compatible with the `tower` crate to a response that is compatible with
@@ -146,9 +165,9 @@ where
 /// # Examples
 ///
 /// ```
+/// use cot::Project;
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -156,7 +175,7 @@ where
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler
 ///             // IntoCotErrorLayer used internally in middleware()
 ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -242,26 +261,27 @@ fn map_err<E>(error: E) -> Error
 where
     E: std::error::Error + Send + Sync + 'static,
 {
-    Error::new(ErrorRepr::MiddlewareWrapped {
-        source: Box::new(error),
-    })
+    #[expect(trivial_casts)]
+    let boxed = Box::new(error) as Box<dyn std::error::Error + Send + Sync>;
+    boxed.downcast::<Error>().map_or_else(Error::wrap, |e| *e)
 }
+
+type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;
 
 /// A middleware that provides session management.
 ///
 /// By default, it uses an in-memory store for session data.
 #[derive(Debug, Clone)]
 pub struct SessionMiddleware {
-    inner: SessionManagerLayer<MemoryStore>,
+    inner: DynamicSessionStore,
 }
 
 impl SessionMiddleware {
     /// Crates a new instance of [`SessionMiddleware`].
     #[must_use]
-    pub fn new() -> Self {
-        let store = MemoryStore::default();
-        let layer = SessionManagerLayer::new(store);
-        Self { inner: layer }
+    pub fn new<S: SessionStore + Send + Sync + 'static>(store: S) -> Self {
+        let layer = SessionManagerLayer::new(SessionStoreWrapper::new(Arc::new(store)));
+        SessionMiddleware { inner: layer }
     }
 
     /// Creates a new instance of [`SessionMiddleware`] from the application
@@ -270,9 +290,9 @@ impl SessionMiddleware {
     /// # Examples
     ///
     /// ```
+    /// use cot::Project;
     /// use cot::middleware::SessionMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -280,16 +300,37 @@ impl SessionMiddleware {
     ///         &self,
     ///         handler: RootHandlerBuilder,
     ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
+    ///     ) -> RootHandler {
     ///         handler
     ///             .middleware(SessionMiddleware::from_context(context))
     ///             .build()
     ///     }
     /// }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the session store type is not supported.
     #[must_use]
     pub fn from_context(context: &MiddlewareContext) -> Self {
-        Self::new().secure(context.config().middlewares.session.secure)
+        let session_cfg = &context.config().middlewares.session;
+        let store_type = session_cfg.store.store_type.clone();
+        let boxed_store = Self::config_to_session_store(store_type, context);
+        let arc_store = Arc::from(boxed_store);
+        let layer = SessionManagerLayer::new(SessionStoreWrapper::new(arc_store));
+        let mut middleware = SessionMiddleware { inner: layer }
+            .secure(session_cfg.secure)
+            .path(session_cfg.path.clone())
+            .name(session_cfg.name.clone())
+            .http_only(session_cfg.http_only)
+            .always_save(session_cfg.always_save)
+            .same_site(session_cfg.same_site)
+            .expiry(session_cfg.expiry);
+
+        if let Some(domain) = session_cfg.domain.as_ref() {
+            middleware = middleware.domain(domain.clone());
+        }
+        middleware
     }
 
     /// Sets the secure flag for the session middleware.
@@ -298,25 +339,193 @@ impl SessionMiddleware {
     ///
     /// ```
     /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
     ///
-    /// let middleware = SessionMiddleware::new().secure(false);
+    /// let store = MemoryStore::new();
+    /// let middleware = SessionMiddleware::new(store).secure(false);
     /// ```
     #[must_use]
     pub fn secure(self, secure: bool) -> Self {
+        let layer = self.inner.with_secure(secure);
+        SessionMiddleware { inner: layer }
+    }
+
+    /// Enables or disables the `HttpOnly` flag on the session cookie.
+    ///
+    /// When `true`, the cookie is inaccessible to JavaScript.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = MemoryStore::new();
+    /// let middleware = SessionMiddleware::new(store).http_only(false);
+    /// ```
+    #[must_use]
+    pub fn http_only(self, http_only: bool) -> Self {
         Self {
-            inner: self.inner.with_secure(secure),
+            inner: self.inner.with_http_only(http_only),
+        }
+    }
+
+    /// Sets the `Domain` attribute for the session cookie.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = MemoryStore::new();
+    /// let middleware = SessionMiddleware::new(store).domain("example.com");
+    /// ```
+    #[must_use]
+    pub fn domain<D: Into<Cow<'static, str>>>(self, domain: D) -> Self {
+        Self {
+            inner: self.inner.with_domain(domain),
+        }
+    }
+
+    /// Sets the `SameSite` attribute for the session cookie.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::SameSite;
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = MemoryStore::new();
+    /// let middleware = SessionMiddleware::new(store).same_site(SameSite::Lax);
+    /// ```
+    #[must_use]
+    pub fn same_site(self, same_site: SameSite) -> Self {
+        Self {
+            inner: self.inner.with_same_site(same_site.into()),
+        }
+    }
+
+    /// Sets the cookie **name** (default `"id"`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = MemoryStore::new();
+    /// let middleware = SessionMiddleware::new(store).name("session_id");
+    /// ```
+    #[must_use]
+    pub fn name<N: Into<Cow<'static, str>>>(self, name: N) -> Self {
+        Self {
+            inner: self.inner.with_name(name.into()),
+        }
+    }
+
+    /// Sets the cookie **path** (default `"/"`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = MemoryStore::new();
+    /// let middleware = SessionMiddleware::new(store).path("/api");
+    /// ```
+    #[must_use]
+    pub fn path<P: Into<Cow<'static, str>>>(self, path: P) -> Self {
+        Self {
+            inner: self.inner.with_path(path.into()),
+        }
+    }
+
+    /// When `true`, always writes back the session even if unmodified.
+    ///
+    /// Useful for resetting expiry on every request.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = MemoryStore::new();
+    /// let middleware = SessionMiddleware::new(store).always_save(true);
+    /// ```
+    #[must_use]
+    pub fn always_save(self, always_save: bool) -> Self {
+        Self {
+            inner: self.inner.with_always_save(always_save),
+        }
+    }
+
+    /// Sets the expiry behavior for the session cookie.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use cot::config::Expiry;
+    /// use cot::middleware::SessionMiddleware;
+    /// use cot::session::store::memory::MemoryStore;
+    ///
+    /// let store = MemoryStore::new();
+    /// let middleware =
+    ///     SessionMiddleware::new(store).expiry(Expiry::OnInactivity(Duration::from_secs(3600)));
+    /// ```
+    #[must_use]
+    pub fn expiry(self, expiry: Expiry) -> Self {
+        Self {
+            inner: self.inner.with_expiry(expiry.into()),
+        }
+    }
+
+    /// Convert a [`SessionStoreTypeConfig`] variant into a valid
+    /// [`SessionStore`]
+    fn config_to_session_store(
+        config: SessionStoreTypeConfig,
+        context: &MiddlewareContext,
+    ) -> Box<dyn SessionStore + Send + Sync> {
+        match config {
+            SessionStoreTypeConfig::Memory => Box::new(MemoryStore::new()),
+            #[cfg(feature = "json")]
+            SessionStoreTypeConfig::File { path } => Box::new(
+                FileStore::new(path)
+                    .unwrap_or_else(|err| panic!("could not create File store: {err}")),
+            ),
+            #[cfg(feature = "cache")]
+            SessionStoreTypeConfig::Cache { ref uri } => {
+                let cache_type = CacheType::try_from(uri.clone())
+                    .unwrap_or_else(|e| panic!("could not convert cache URI `{uri}`: {e}"));
+                match cache_type {
+                    #[cfg(feature = "redis")]
+                    CacheType::Redis => {
+                        Box::new(RedisStore::new(uri).unwrap_or_else(|e| {
+                            panic!("could not connect to Redis at `{uri}`: {e}")
+                        }))
+                    }
+                }
+            }
+            #[cfg(all(feature = "db", feature = "json"))]
+            SessionStoreTypeConfig::Database => Box::new(DbStore::new(context.database().clone())),
         }
     }
 }
 
 impl Default for SessionMiddleware {
     fn default() -> Self {
-        Self::new()
+        let memory_store = MemoryStore::default();
+        Self::new(memory_store)
     }
 }
 
 impl<S> tower::Layer<S> for SessionMiddleware {
-    type Service = <SessionManagerLayer<MemoryStore> as tower::Layer<
+    type Service = <DynamicSessionStore as tower::Layer<
         <SessionWrapperLayer as tower::Layer<S>>::Service,
     >>::Service;
 
@@ -413,8 +622,8 @@ where
 ///
 /// ```
 /// use cot::middleware::AuthMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+/// use cot::{Project, ProjectContext};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -422,7 +631,7 @@ where
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler.middleware(AuthMiddleware::new()).build()
 ///     }
 /// }
@@ -504,188 +713,44 @@ where
         })
     }
 }
-#[cfg(feature = "live-reload")]
-type LiveReloadLayerType = tower::util::Either<
-    (
-        IntoCotErrorLayer,
-        IntoCotResponseLayer,
-        tower_livereload::LiveReloadLayer,
-    ),
-    tower::layer::util::Identity,
->;
-
-/// A middleware providing live reloading functionality.
-///
-/// This is useful for development, where you want to see the effects of
-/// changing your code as quickly as possible. Note that you still need to
-/// compile and rerun your project, so it is recommended to combine this
-/// middleware with something like [bacon](https://dystroy.org/bacon/).
-///
-/// This works by serving an additional endpoint that is long-polled in a
-/// JavaScript snippet that it injected into the usual response from your
-/// service. When the endpoint responds (which happens when the server is
-/// started), the website is reloaded. You can see the [`tower_livereload`]
-/// crate for more details on the implementation.
-///
-/// Note that you probably want to have this disabled in the production. You
-/// can achieve that by using the [`from_context()`](Self::from_context) method
-/// which will read your config to know whether to enable live reloading (by
-/// default it will be disabled). Then, you can include the following in your
-/// development config to enable it:
-///
-/// ```toml
-/// [middlewares]
-/// live_reload.enabled = true
-/// ```
-///
-/// # Examples
-///
-/// ```
-/// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
-///
-/// struct MyProject;
-/// impl Project for MyProject {
-///     fn middlewares(
-///         &self,
-///         handler: RootHandlerBuilder,
-///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
-///         handler
-///             .middleware(LiveReloadMiddleware::from_context(context))
-///             .build()
-///     }
-/// }
-/// ```
-#[cfg(feature = "live-reload")]
-#[derive(Debug, Clone)]
-pub struct LiveReloadMiddleware(LiveReloadLayerType);
-
-#[cfg(feature = "live-reload")]
-impl LiveReloadMiddleware {
-    /// Creates a new instance of [`LiveReloadMiddleware`] that is always
-    /// enabled.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
-    ///
-    /// struct MyProject;
-    /// impl Project for MyProject {
-    ///     fn middlewares(
-    ///         &self,
-    ///         handler: RootHandlerBuilder,
-    ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
-    ///         // only enable live reloading when compiled in debug mode
-    ///         #[cfg(debug_assertions)]
-    ///         let handler = handler.middleware(cot::middleware::LiveReloadMiddleware::new());
-    ///         handler.build()
-    ///     }
-    /// }
-    /// ```
-    #[must_use]
-    pub fn new() -> Self {
-        Self::with_enabled(true)
-    }
-
-    /// Creates a new instance of [`LiveReloadMiddleware`] that is enabled if
-    /// the corresponding config value is set to `true`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::middleware::LiveReloadMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
-    ///
-    /// struct MyProject;
-    /// impl Project for MyProject {
-    ///     fn middlewares(
-    ///         &self,
-    ///         handler: RootHandlerBuilder,
-    ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
-    ///         handler
-    ///             .middleware(LiveReloadMiddleware::from_context(context))
-    ///             .build()
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// This will enable live reloading only if the service has the following in
-    /// the config file:
-    ///
-    /// ```toml
-    /// [middlewares]
-    /// live_reload.enabled = true
-    /// ```
-    #[must_use]
-    pub fn from_context(context: &MiddlewareContext) -> Self {
-        Self::with_enabled(context.config().middlewares.live_reload.enabled)
-    }
-
-    fn with_enabled(enabled: bool) -> Self {
-        let option_layer = enabled.then(|| {
-            (
-                IntoCotErrorLayer::new(),
-                IntoCotResponseLayer::new(),
-                tower_livereload::LiveReloadLayer::new(),
-            )
-        });
-        Self(tower::util::option_layer(option_layer))
-    }
-}
-
-#[cfg(feature = "live-reload")]
-impl Default for LiveReloadMiddleware {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[cfg(feature = "live-reload")]
-impl<S> tower::Layer<S> for LiveReloadMiddleware {
-    type Service = <LiveReloadLayerType as tower::Layer<S>>::Service;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        self.0.layer(inner)
-    }
-}
 
 // TODO: add Cot ORM-based session store
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use http::Request;
-    use tower::{Layer, ServiceExt};
+    use tower::{Layer, Service, ServiceExt};
 
     use super::*;
     use crate::auth::Auth;
+    use crate::config::{
+        CacheUrl, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
+        SessionStoreConfig, SessionStoreTypeConfig,
+    };
+    use crate::middleware::SessionMiddleware;
+    use crate::project::{RegisterAppsContext, WithCache};
+    use crate::response::Response;
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
+    use crate::{AppBuilder, Body, Bootstrapper, Error, Project, ProjectContext};
 
-    #[tokio::test]
+    #[cot::test]
     async fn session_middleware_adds_session() {
         let svc = tower::service_fn(|req: Request<Body>| async move {
             assert!(req.extensions().get::<Session>().is_some());
             Ok::<_, Error>(Response::new(Body::empty()))
         });
-
-        let mut svc = SessionMiddleware::new().layer(svc);
-
+        let store = MemoryStore::default();
+        let mut svc = SessionMiddleware::new(store).layer(svc);
         let request = TestRequestBuilder::get("/").build();
-
         svc.ready().await.unwrap().call(request).await.unwrap();
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn session_middleware_adds_cookie() {
         let svc = tower::service_fn(|req: Request<Body>| async move {
             let session = req.extensions().get::<Session>().unwrap();
@@ -693,8 +758,10 @@ mod tests {
 
             Ok::<_, Error>(Response::new(Body::empty()))
         });
-
-        let mut svc = SessionMiddleware::new().layer(svc);
+        let store = MemoryStore::default();
+        let mut svc = SessionMiddleware::new(store)
+            .domain("example.com")
+            .layer(svc);
 
         let request = TestRequestBuilder::get("/").build();
 
@@ -706,14 +773,16 @@ mod tests {
             .unwrap()
             .to_str()
             .unwrap();
+
         assert!(cookie_value.contains("id="));
         assert!(cookie_value.contains("HttpOnly;"));
         assert!(cookie_value.contains("SameSite=Strict;"));
         assert!(cookie_value.contains("Secure;"));
         assert!(cookie_value.contains("Path=/"));
+        assert!(cookie_value.contains("Domain=example.com"));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn session_middleware_adds_cookie_not_secure() {
         let svc = tower::service_fn(|req: Request<Body>| async move {
             let session = req.extensions().get::<Session>().unwrap();
@@ -722,7 +791,8 @@ mod tests {
             Ok::<_, Error>(Response::new(Body::empty()))
         });
 
-        let mut svc = SessionMiddleware::new().secure(false).layer(svc);
+        let store = MemoryStore::default();
+        let mut svc = SessionMiddleware::new(store).secure(false).layer(svc);
 
         let request = TestRequestBuilder::get("/").build();
 
@@ -736,7 +806,7 @@ mod tests {
         assert!(!cookie_value.contains("Secure;"));
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn auth_middleware_adds_auth() {
         let svc = tower::service_fn(|req: Request<Body>| async move {
             let auth = req
@@ -756,7 +826,7 @@ mod tests {
         svc.ready().await.unwrap().call(request).await.unwrap();
     }
 
-    #[tokio::test]
+    #[cot::test]
     #[should_panic(
         expected = "Session extension missing. Did you forget to add the SessionMiddleware?"
     )]
@@ -773,7 +843,7 @@ mod tests {
         let _result = svc.ready().await.unwrap().call(request).await;
     }
 
-    #[tokio::test]
+    #[cot::test]
     async fn auth_service_cloning() {
         let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter_clone = counter.clone();
@@ -804,5 +874,128 @@ mod tests {
 
         // Counter should have been incremented twice
         assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    async fn create_svc_and_call_with_req(context: &ProjectContext<WithCache>) {
+        let store = SessionMiddleware::from_context(context);
+        let svc = tower::service_fn(|req: Request<Body>| async move {
+            assert!(req.extensions().get::<Session>().is_some());
+            Ok::<_, Error>(Response::new(Body::empty()))
+        });
+        let mut svc = store.layer(svc);
+        let request = TestRequestBuilder::get("/").build();
+        svc.ready().await.unwrap().call(request).await.unwrap();
+    }
+
+    fn create_project_config(store: SessionStoreTypeConfig) -> ProjectConfig {
+        let mut project = ProjectConfig::builder();
+        let project = match store {
+            SessionStoreTypeConfig::Database => project.database(
+                DatabaseConfig::builder()
+                    .url("sqlite::memory:".to_string())
+                    .build(),
+            ),
+            _ => &mut project,
+        };
+
+        project
+            .middlewares(
+                MiddlewareConfig::builder()
+                    .session(
+                        SessionMiddlewareConfig::builder()
+                            .store(SessionStoreConfig::builder().store_type(store).build())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build()
+    }
+
+    struct TestProject;
+
+    impl Project for TestProject {
+        fn register_apps(&self, _apps: &mut AppBuilder, _context: &RegisterAppsContext) {}
+    }
+
+    #[cot::test]
+    async fn memory_store_factory_produces_working_store() {
+        let config = create_project_config(SessionStoreTypeConfig::Memory);
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(feature = "json")]
+    #[cot::test]
+    async fn session_middleware_file_config_to_session_store() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path: PathBuf = dir.path().to_path_buf();
+        let config = create_project_config(SessionStoreTypeConfig::File { path });
+
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(all(feature = "cache", feature = "redis"))]
+    #[cot::test]
+    #[ignore = "requires external Redis service"]
+    async fn session_middleware_redis_config_to_session_store() {
+        let redis_url =
+            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let uri = CacheUrl::from(redis_url);
+        let config = create_project_config(SessionStoreTypeConfig::Cache { uri });
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(all(feature = "db", feature = "json"))]
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    async fn session_middleware_database_config_to_session_store() {
+        let config = create_project_config(SessionStoreTypeConfig::Database);
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
     }
 }

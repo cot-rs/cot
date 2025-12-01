@@ -9,7 +9,6 @@ pub use clap;
 use clap::{Arg, ArgMatches, Command, value_parser};
 use derive_more::Debug;
 
-use crate::error::ErrorRepr;
 use crate::{Bootstrapper, Error, Result};
 
 const CONFIG_PARAM: &str = "config";
@@ -306,8 +305,8 @@ impl CliTask for RunServer {
 
 impl RunServer {
     fn get_user_friendly_error(error: &Error, addr_port: &str) -> Option<String> {
-        match &error.inner {
-            ErrorRepr::StartServer { source } => match source.kind() {
+        if let Some(start_server_error) = error.downcast_ref::<StartServerError>() {
+            match start_server_error.0.kind() {
                 std::io::ErrorKind::AddrInUse => {
                     let exec = std::env::args()
                         .next()
@@ -325,8 +324,9 @@ impl RunServer {
                     ))
                 }
                 _ => None,
-            },
-            _ => None,
+            }
+        } else {
+            None
         }
     }
 }
@@ -355,12 +355,15 @@ impl CliTask for CollectStatic {
         let dir = matches
             .get_one::<PathBuf>(COLLECT_STATIC_DIR_PARAM)
             .expect("required argument");
-        println!("Collecting static files into {:?}", dir);
+        println!("Collecting static files into {}", dir.display());
 
-        let bootstrapper = bootstrapper.with_apps().with_database().await?;
-        StaticFiles::from(bootstrapper.context())
-            .collect_into(dir)
-            .map_err(|e| Error::new(ErrorRepr::CollectStatic { source: e }))?;
+        let bootstrapper = bootstrapper
+            .with_apps()
+            .with_database()
+            .await?
+            .with_cache()
+            .await?;
+        StaticFiles::from(bootstrapper.context()).collect_into(dir)?;
 
         Ok(())
     }
@@ -401,7 +404,7 @@ macro_rules! metadata {
 
 pub use metadata;
 
-use crate::project::WithConfig;
+use crate::project::{StartServerError, WithConfig};
 use crate::static_files::StaticFiles;
 
 #[cfg(test)]
@@ -409,7 +412,6 @@ mod tests {
     use clap::Command;
     use cot::test::serial_guard;
     use tempfile::tempdir;
-    use thiserror::__private::AsDisplay;
 
     use super::*;
     use crate::config::ProjectConfig;
@@ -439,7 +441,7 @@ mod tests {
         assert_eq!(cli.command.get_version().unwrap(), "1.0");
         assert_eq!(cli.command.get_author().unwrap(), "Author");
         assert_eq!(
-            cli.command.get_about().unwrap().as_display().to_string(),
+            cli.command.get_about().unwrap().to_string(),
             "Test application"
         );
     }
@@ -484,7 +486,10 @@ mod tests {
     }
 
     #[cot::test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     async fn collect_static_execute() {
         struct TestApp;
         impl App for TestApp {
@@ -528,7 +533,10 @@ mod tests {
     }
 
     #[cot::test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `geteuid` on OS `linux`
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `geteuid` on OS `linux`"
+    )]
     #[cfg(feature = "db")]
     async fn check_execute_db_fail() {
         let config = r#"
@@ -564,7 +572,7 @@ mod tests {
     #[test]
     fn get_user_friendly_error_addr_in_use() {
         let source = std::io::Error::new(std::io::ErrorKind::AddrInUse, "error");
-        let error = Error::new(ErrorRepr::StartServer { source });
+        let error = Error::from(StartServerError(source));
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
 
@@ -577,7 +585,7 @@ mod tests {
     #[test]
     fn get_user_friendly_error_io_error_other() {
         let source = std::io::Error::other("error");
-        let error = Error::new(ErrorRepr::StartServer { source });
+        let error = Error::from(StartServerError(source));
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
 
@@ -586,10 +594,7 @@ mod tests {
 
     #[test]
     fn get_user_friendly_error_unsupported_error() {
-        let error = Error::new(ErrorRepr::NoViewToReverse {
-            app_name: None,
-            view_name: "test".to_string(),
-        });
+        let error = Error::internal("test");
 
         let message = RunServer::get_user_friendly_error(&error, "1.2.3.4:8123");
 

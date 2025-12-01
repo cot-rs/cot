@@ -1,19 +1,29 @@
 {%- let urls = ctx.urls -%}
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="robots" content="NONE,NOARCHIVE">
-    <title>{% block title %}{% endblock %} | Cot Admin</title>
-    <link rel="stylesheet" href="{{ ctx.static_files.url_for("admin/admin.css")? }}">
-</head>
-<body class="{% block body_class %}{% endblock %}">
-<header id="header">
-    <div id="branding"><a href="{{ cot::reverse!(urls, "index")? }}"><h1>Cot Administration</h1></a></div>
-</header>
-<main>
-    {% block content %}{% endblock %}
-</main>
-</body>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="robots" content="NONE,NOARCHIVE">
+        <title>
+            {%- block title -%}
+            {%- endblock title %}
+            | Cot Admin
+        </title>
+        <link rel="stylesheet"
+              href="{{ ctx.static_files.url_for("admin/admin.css")? }}">
+    </head>
+    <body class="{% block body_class %}{% endblock body_class %}">
+        <header id="header">
+            <div id="branding">
+                <a href="{{ cot::reverse!(urls, "index")? }}">
+                    <h1>Cot Administration</h1>
+                </a>
+            </div>
+        </header>
+        <main>
+            {%- block content -%}
+            {%- endblock content -%}
+        </main>
+    </body>
 </html>

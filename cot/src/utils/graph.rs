@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Error)]
-#[error("Cycle detected in the graph")]
+#[error("cycle detected in the graph")]
 pub struct CycleDetected;
 
 #[doc(hidden)] // not part of public API, used in the Cot CLI
@@ -59,7 +59,7 @@ impl Graph {
         Ok(sorted_indices_stack)
     }
 
-    #[expect(clippy::match_on_vec_items)]
+    #[expect(clippy::indexing_slicing)]
     fn toposort_visit(
         &self,
         index: usize,

@@ -9,7 +9,6 @@ use std::marker::PhantomData;
 use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
-use cot::request::extractors::StaticFiles;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.
@@ -19,17 +18,17 @@ use cot::request::extractors::StaticFiles;
 /// `#[derive(Form)]` attributes.
 pub use cot_macros::AdminModel;
 use derive_more::Debug;
-use http::request::Parts;
 use serde::Deserialize;
 
 use crate::auth::Auth;
 use crate::common_types::Password;
+use crate::error::NotFound;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
 use crate::html::Html;
-use crate::request::extractors::{FromRequestParts, Path, UrlQuery};
-use crate::request::{Request, RequestExt};
+use crate::request::extractors::{FromRequestHead, Path, StaticFiles, UrlQuery};
+use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
 use crate::static_files::StaticFile;
@@ -46,7 +45,7 @@ impl<T, H: RequestHandler<T> + Send + Sync> AdminAuthenticated<T, H> {
 
 impl<T, H: RequestHandler<T> + Send + Sync> RequestHandler<T> for AdminAuthenticated<T, H> {
     async fn handle(&self, mut request: Request) -> crate::Result<Response> {
-        let auth: Auth = request.extract_parts().await?;
+        let auth: Auth = request.extract_from_head().await?;
         if !auth.user().is_authenticated() {
             return Ok(reverse_redirect!(request, "login")?);
         }
@@ -55,19 +54,10 @@ impl<T, H: RequestHandler<T> + Send + Sync> RequestHandler<T> for AdminAuthentic
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, FromRequestHead)]
 struct BaseContext {
     urls: Urls,
     static_files: StaticFiles,
-}
-
-impl FromRequestParts for BaseContext {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        let urls = Urls::from_request_parts(parts).await?;
-        let static_files = StaticFiles::from_request_parts(parts).await?;
-
-        Ok(Self { urls, static_files })
-    }
 }
 
 async fn index(
@@ -137,7 +127,7 @@ async fn login(
     Html::new(template.render()?).into_response()
 }
 
-async fn authenticate(auth: &Auth, login_form: LoginForm) -> cot::Result<bool> {
+async fn authenticate(auth: &Auth, login_form: LoginForm) -> crate::Result<bool> {
     #[cfg(feature = "db")]
     let user = auth
         .authenticate(&crate::auth::db::DatabaseUserCredentials::new(
@@ -199,7 +189,7 @@ async fn view_model(
     Path(model_name): Path<String>,
     UrlQuery(pagination_params): UrlQuery<PaginationParams>,
     request: Request,
-) -> cot::Result<Response> {
+) -> crate::Result<Response> {
     #[derive(Debug, Template)]
     #[template(path = "admin/model.html")]
     struct ModelTemplate<'a> {
@@ -225,7 +215,9 @@ async fn view_model(
     let total_pages = total_object_counts.div_ceil(page_size);
 
     if (page == 0 || page > total_pages) && total_pages > 0 {
-        return Err(Error::not_found_message(format!("page {page} not found")));
+        return Err(Error::from(NotFound::with_message(format!(
+            "page {page} not found"
+        ))));
     }
 
     let pagination = Pagination::new(page_size, page);
@@ -366,11 +358,11 @@ async fn get_object(
         .get_object_by_id(request, object_id)
         .await?
         .ok_or_else(|| {
-            Error::not_found_message(format!(
+            Error::from(NotFound::with_message(format!(
                 "Object with ID `{}` not found in model `{}`",
                 object_id,
                 manager.name()
-            ))
+            )))
         })
 }
 
@@ -381,15 +373,19 @@ fn get_manager(
     model_managers
         .into_iter()
         .find(|manager| manager.url_name() == model_name)
-        .ok_or_else(|| Error::not_found_message(format!("Model `{model_name}` not found")))
+        .ok_or_else(|| {
+            Error::from(NotFound::with_message(format!(
+                "Model `{model_name}` not found"
+            )))
+        })
 }
 
 #[repr(transparent)]
 struct AdminModelManagers(Vec<Box<dyn AdminModelManager>>);
 
-impl FromRequestParts for AdminModelManagers {
-    async fn from_request_parts(parts: &mut Parts) -> cot::Result<Self> {
-        let managers = parts
+impl FromRequestHead for AdminModelManagers {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        let managers = head
             .context()
             .apps()
             .iter()
@@ -532,10 +528,8 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
     }
 
     async fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext> {
-        let object_casted = object
-            .as_any()
-            .downcast_ref::<T>()
-            .expect("Invalid object type");
+        let object_any: &dyn Any = &*object;
+        let object_casted = object_any.downcast_ref::<T>().expect("Invalid object type");
 
         T::form_context_from_self(object_casted).await
     }
@@ -561,11 +555,6 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
     note = "add #[derive(cot::admin::AdminModel)] to the struct to automatically derive the trait"
 )]
 pub trait AdminModel: Any + Send + 'static {
-    /// Returns the object as an `Any` trait object.
-    // TODO: consider removing this when Rust trait_upcasting is stabilized and we
-    // bump the MSRV (lands in Rust 1.86)
-    fn as_any(&self) -> &dyn Any;
-
     /// Get the objects of this model.
     async fn get_objects(request: &Request, pagination: Pagination) -> cot::Result<Vec<Self>>
     where

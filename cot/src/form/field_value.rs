@@ -1,5 +1,10 @@
+use std::error::Error as StdError;
+use std::fmt::Display;
+
 use bytes::Bytes;
 use thiserror::Error;
+
+use crate::error::error_impl::impl_into_cot_error;
 
 /// A value from a form field.
 ///
@@ -169,19 +174,35 @@ struct MultipartField<'a> {
 ///
 /// This type represents errors that can occur when processing form field
 /// values, such as errors from the multipart parser or validation errors.
-#[derive(Debug, PartialEq, Eq, Error)]
-#[error(transparent)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct FormFieldValueError {
     inner: FormFieldValueErrorImpl,
+}
+impl_into_cot_error!(FormFieldValueError, BAD_REQUEST);
+
+impl Display for FormFieldValueError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "failed to retrieve the value of a form field: {}",
+            self.inner
+        )
+    }
+}
+
+impl StdError for FormFieldValueError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.inner.source()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Error)]
 enum FormFieldValueErrorImpl {
     #[error(transparent)]
     Multer(multer::Error),
-    #[error("Multipart field does not have a name")]
+    #[error("multipart field does not have a name")]
     NoName,
-    #[error("File field requires the form to be sent as multipart/form-data")]
+    #[error("file field requires the form to be sent as `multipart/form-data`")]
     MultipartRequired,
 }
 
@@ -212,6 +233,34 @@ mod tests {
     use multer::Multipart;
 
     use super::*;
+
+    #[test]
+    fn form_field_value_error_display() {
+        let error = FormFieldValueError::no_name();
+        assert_eq!(
+            error.to_string(),
+            "failed to retrieve the value of a form field: multipart field does not have a name"
+        );
+
+        let error = FormFieldValueError::from_multer(multer::Error::IncompleteStream);
+        assert_eq!(
+            error.to_string(),
+            "failed to retrieve the value of a form field: incomplete multipart stream"
+        );
+    }
+
+    #[test]
+    fn form_field_value_error_source() {
+        let error = FormFieldValueError::no_name();
+        assert!(error.source().is_none());
+
+        let error = FormFieldValueError::from_multer(multer::Error::DecodeHeaderName {
+            name: "test".to_string(),
+            cause: Box::new(std::io::Error::other("oh no!")),
+        });
+        assert!(error.source().is_some());
+        assert_eq!(error.source().unwrap().to_string(), "oh no!");
+    }
 
     #[cot::test]
     async fn text_field_value() {

@@ -16,13 +16,12 @@ use std::future::Future;
 use std::sync::Arc;
 
 use http::Extensions;
-use http::request::Parts;
 use indexmap::IndexMap;
 
 #[cfg(feature = "db")]
 use crate::db::Database;
-use crate::error::ErrorRepr;
-use crate::request::extractors::FromRequestParts;
+use crate::error::error_impl::impl_into_cot_error;
+use crate::request::extractors::FromRequestHead;
 use crate::router::Router;
 use crate::{Body, Result};
 
@@ -31,6 +30,9 @@ mod path_params_deserializer;
 
 /// HTTP request type.
 pub type Request = http::Request<Body>;
+
+/// HTTP request head type.
+pub type RequestHead = http::request::Parts;
 
 mod private {
     pub trait Sealed {}
@@ -44,7 +46,7 @@ mod private {
 /// This trait is sealed since it doesn't make sense to be implemented for types
 /// outside the context of Cot.
 pub trait RequestExt: private::Sealed {
-    /// Runs an extractor implementing [`FromRequestParts`] on the request.
+    /// Runs an extractor implementing [`FromRequestHead`] on the request.
     ///
     /// # Examples
     ///
@@ -54,14 +56,14 @@ pub trait RequestExt: private::Sealed {
     /// use cot::response::Response;
     ///
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
-    ///     let path_params = request.extract_parts::<Path<String>>().await?;
+    ///     let path_params = request.extract_from_head::<Path<String>>().await?;
     ///     // ...
     ///     # unimplemented!()
     /// }
     /// ```
-    fn extract_parts<E>(&mut self) -> impl Future<Output = Result<E>> + Send
+    fn extract_from_head<E>(&mut self) -> impl Future<Output = Result<E>> + Send
     where
-        E: FromRequestParts + 'static;
+        E: FromRequestHead + 'static;
 
     /// Get the application context.
     ///
@@ -249,7 +251,7 @@ pub trait RequestExt: private::Sealed {
         if content_type == expected {
             Ok(())
         } else {
-            Err(ErrorRepr::InvalidContentType {
+            Err(InvalidContentType {
                 expected,
                 actual: content_type.into_owned(),
             }
@@ -264,16 +266,16 @@ pub trait RequestExt: private::Sealed {
 impl private::Sealed for Request {}
 
 impl RequestExt for Request {
-    async fn extract_parts<E>(&mut self) -> Result<E>
+    async fn extract_from_head<E>(&mut self) -> Result<E>
     where
-        E: FromRequestParts + 'static,
+        E: FromRequestHead + 'static,
     {
         let request = std::mem::take(self);
 
-        let (mut parts, body) = request.into_parts();
-        let result = E::from_request_parts(&mut parts).await;
+        let (head, body) = request.into_parts();
+        let result = E::from_request_head(&head).await;
 
-        *self = Request::from_parts(parts, body);
+        *self = Request::from_parts(head, body);
         result
     }
 
@@ -329,14 +331,14 @@ impl RequestExt for Request {
     }
 }
 
-impl private::Sealed for Parts {}
+impl private::Sealed for RequestHead {}
 
-impl RequestExt for Parts {
-    async fn extract_parts<E>(&mut self) -> Result<E>
+impl RequestExt for RequestHead {
+    async fn extract_from_head<E>(&mut self) -> Result<E>
     where
-        E: FromRequestParts + 'static,
+        E: FromRequestHead + 'static,
     {
-        E::from_request_parts(self).await
+        E::from_request_head(self).await
     }
 
     fn context(&self) -> &crate::ProjectContext {
@@ -389,6 +391,14 @@ impl RequestExt for Parts {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("invalid content type; expected `{expected}`, found `{actual}`")]
+pub(crate) struct InvalidContentType {
+    expected: &'static str,
+    actual: String,
+}
+impl_into_cot_error!(InvalidContentType, BAD_REQUEST);
+
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct AppName(pub(crate) String);
@@ -421,7 +431,7 @@ pub(crate) struct RouteName(pub(crate) String);
 ///
 ///     let name = println!("Hello, {}!", name);
 ///     // ...
-///     # todo!()
+///     # unimplemented!()
 /// }
 /// ```
 #[derive(Debug, Clone)]
@@ -636,12 +646,13 @@ impl PathParams {
 
 /// An error that occurs when deserializing path parameters.
 #[derive(Debug, Clone, thiserror::Error)]
-#[error("{0}")]
+#[error("could not parse path parameters: {0}")]
 pub struct PathParamsDeserializerError(
     // A wrapper over the original deserializer error. The exact error reason
     // shouldn't be useful to the user, hence we're not exposing it.
     #[source] serde_path_to_error::Error<path_params_deserializer::PathParamsDeserializerError>,
 );
+impl_into_cot_error!(PathParamsDeserializerError, BAD_REQUEST);
 
 #[cfg(test)]
 mod tests {
@@ -707,11 +718,11 @@ mod tests {
     #[test]
     fn request_ext_parts_route_name() {
         let request = TestRequestBuilder::get("/").build();
-        let (mut parts, _body) = request.into_parts();
-        assert_eq!(parts.route_name(), None);
+        let (mut head, _body) = request.into_parts();
+        assert_eq!(head.route_name(), None);
 
-        parts.extensions.insert(RouteName("test_route".to_string()));
-        assert_eq!(parts.route_name(), Some("test_route"));
+        head.extensions.insert(RouteName("test_route".to_string()));
+        assert_eq!(head.route_name(), Some("test_route"));
     }
 
     #[test]
@@ -771,10 +782,10 @@ mod tests {
         assert!(request.expect_content_type("application/json").is_err());
     }
 
-    #[tokio::test]
-    async fn request_ext_extract_parts() {
+    #[cot::test]
+    async fn request_ext_extract_from_head() {
         async fn handler(mut request: Request) -> Result<Response> {
-            let Path(id): Path<String> = request.extract_parts().await?;
+            let Path(id): Path<String> = request.extract_from_head().await?;
             assert_eq!(id, "42");
 
             Ok(Response::new(Body::empty()))
@@ -791,63 +802,62 @@ mod tests {
 
     #[test]
     fn parts_ext_path_params() {
-        let (mut parts, _) = Request::new(Body::empty()).into_parts();
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
         let mut params = PathParams::new();
         params.insert("id".to_string(), "42".to_string());
-        parts.extensions.insert(params);
+        head.extensions.insert(params);
 
-        assert_eq!(parts.path_params().get("id"), Some("42"));
+        assert_eq!(head.path_params().get("id"), Some("42"));
     }
 
     #[test]
     fn parts_ext_mutating_path_params() {
-        let (mut parts, _) = Request::new(Body::empty()).into_parts();
-        parts
-            .path_params_mut()
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
+        head.path_params_mut()
             .insert("page".to_string(), "1".to_string());
 
-        assert_eq!(parts.path_params().get("page"), Some("1"));
+        assert_eq!(head.path_params().get("page"), Some("1"));
     }
 
     #[test]
     fn parts_ext_app_name() {
-        let (mut parts, _) = Request::new(Body::empty()).into_parts();
-        parts.extensions.insert(AppName("test_app".to_string()));
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
+        head.extensions.insert(AppName("test_app".to_string()));
 
-        assert_eq!(parts.app_name(), Some("test_app"));
+        assert_eq!(head.app_name(), Some("test_app"));
     }
 
     #[test]
     fn parts_ext_route_name() {
-        let (mut parts, _) = Request::new(Body::empty()).into_parts();
-        parts.extensions.insert(RouteName("test_route".to_string()));
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
+        head.extensions.insert(RouteName("test_route".to_string()));
 
-        assert_eq!(parts.route_name(), Some("test_route"));
+        assert_eq!(head.route_name(), Some("test_route"));
     }
 
     #[test]
     fn parts_ext_content_type() {
-        let (mut parts, _) = Request::new(Body::empty()).into_parts();
-        parts.headers.insert(
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
+        head.headers.insert(
             http::header::CONTENT_TYPE,
             http::HeaderValue::from_static("text/plain"),
         );
 
         assert_eq!(
-            parts.content_type(),
+            head.content_type(),
             Some(&http::HeaderValue::from_static("text/plain"))
         );
     }
 
-    #[tokio::test]
-    async fn parts_extract_parts() {
-        let (mut parts, _) = Request::new(Body::empty()).into_parts();
+    #[cot::test]
+    async fn path_extract_from_head() {
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
 
         let mut params = PathParams::new();
         params.insert("id".to_string(), "42".to_string());
-        parts.extensions.insert(params);
+        head.extensions.insert(params);
 
-        let Path(id): Path<String> = parts.extract_parts().await.unwrap();
+        let Path(id): Path<String> = head.extract_from_head().await.unwrap();
         assert_eq!(id, "42");
     }
 }

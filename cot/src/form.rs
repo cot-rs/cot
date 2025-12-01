@@ -15,7 +15,7 @@
 //!
 //! #[derive(Form)]
 //! struct MyForm {
-//!     #[form(opt(max_length = 100))]
+//!     #[form(opts(max_length = 100))]
 //!     name: String,
 //! }
 //! ```
@@ -29,7 +29,8 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use cot::error::ErrorRepr;
+use chrono::NaiveDateTime;
+use chrono_tz::Tz;
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
 /// This macro will generate an implementation of the [`Form`] trait for the
@@ -60,29 +61,34 @@ pub use field_value::{FormFieldValue, FormFieldValueError};
 use http_body_util::BodyExt;
 use thiserror::Error;
 
+use crate::error::error_impl::impl_into_cot_error;
 use crate::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
 use crate::request::{Request, RequestExt};
 
+const ERROR_PREFIX: &str = "failed to process a form:";
 /// Error occurred while processing a form.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum FormError {
     /// An error occurred while processing the request, before validating the
     /// form data.
-    #[error("Request error: {error}")]
+    #[error("{ERROR_PREFIX} request error: {error}")]
+    #[non_exhaustive]
     RequestError {
         /// The error that occurred while processing the request.
         #[from]
         error: Box<crate::Error>,
     },
     /// An error occurred while processing a multipart form.
-    #[error("Multipart error: {error}")]
+    #[error("{ERROR_PREFIX} multipart error: {error}")]
+    #[non_exhaustive]
     MultipartError {
         /// The error that occurred while processing the multipart form.
         #[from]
         error: FormFieldValueError,
     },
 }
+impl_into_cot_error!(FormError, BAD_REQUEST);
 
 /// The result of validating a form.
 ///
@@ -152,7 +158,20 @@ pub enum FormFieldValidationError {
         /// The maximum permitted value.
         max_value: String,
     },
-
+    /// The field value is an ambiguous datetime.
+    #[error("This is an ambiguous datetime: {datetime}.")]
+    AmbiguousDateTime {
+        /// The ambiguous datetime value.
+        datetime: NaiveDateTime,
+    },
+    /// The field value is a non-existent local datetime.
+    #[error("Local datetime {datetime} does not exist for the given timezone {timezone}.")]
+    NonExistentLocalDateTime {
+        /// The non-existent local datetime value.
+        datetime: NaiveDateTime,
+        /// The timezone in which the datetime was specified.
+        timezone: Tz,
+    },
     /// The field value is required to be true.
     #[error("This field must be checked.")]
     BooleanRequiredToBeTrue,
@@ -207,6 +226,19 @@ impl FormFieldValidationError {
         }
     }
 
+    /// Creates a new `FormFieldValidationError` for an ambiguous datetime.
+    #[must_use]
+    pub fn ambiguous_datetime(datetime: NaiveDateTime) -> Self {
+        FormFieldValidationError::AmbiguousDateTime { datetime }
+    }
+
+    /// Creates a new `FormFieldValidationError` for a non-existent local
+    /// datetime.
+    #[must_use]
+    pub fn non_existent_local_datetime(datetime: NaiveDateTime, timezone: Tz) -> Self {
+        FormFieldValidationError::NonExistentLocalDateTime { datetime, timezone }
+    }
+
     /// Creates a new `FormFieldValidationError` from a `String`.
     #[must_use]
     pub const fn from_string(message: String) -> Self {
@@ -217,12 +249,6 @@ impl FormFieldValidationError {
     #[must_use]
     pub const fn from_static(message: &'static str) -> Self {
         Self::Custom(Cow::Borrowed(message))
-    }
-}
-
-impl From<email_address::Error> for FormFieldValidationError {
-    fn from(error: email_address::Error) -> Self {
-        FormFieldValidationError::from_string(error.to_string())
     }
 }
 
@@ -253,7 +279,7 @@ pub enum FormErrorTarget<'a> {
 ///
 /// #[derive(Form)]
 /// struct MyForm {
-///     #[form(opt(max_length = 100))]
+///     #[form(opts(max_length = 100))]
 ///     name: String,
 /// }
 /// ```
@@ -346,12 +372,21 @@ async fn urlencoded_form_data(request: &mut Request) -> Result<Bytes, FormError>
             .map_err(|e| FormError::RequestError { error: Box::new(e) })?
     } else {
         return Err(FormError::RequestError {
-            error: Box::new(crate::Error::new(ErrorRepr::ExpectedForm)),
+            error: Box::new(crate::Error::from(ExpectedForm)),
         });
     };
 
     Ok(result)
 }
+
+#[derive(Debug, Error)]
+#[error(
+    "request does not contain a form (expected a POST request with \
+    the `application/x-www-form-urlencoded` or `multipart/form-data` content type, \
+    or a GET or HEAD request)"
+)]
+struct ExpectedForm;
+impl_into_cot_error!(ExpectedForm, BAD_REQUEST);
 
 fn content_type_str(request: &mut Request) -> String {
     request
@@ -521,6 +556,12 @@ pub trait FormField: Display {
     ///
     /// This method should convert the value to the appropriate type for the
     /// field, such as a number for a number field.
+    ///
+    /// Note that this method might be called multiple times. This will happen
+    /// when the field has appeared in the form data multiple times, such as
+    /// in the case of a `<select multiple>` HTML element. If the field
+    /// does not support storing multiple values, it should overwrite the
+    /// previous value.
     fn set_value(
         &mut self,
         field: FormFieldValue<'_>,
@@ -770,7 +811,7 @@ mod tests {
             assert!(
                 error
                     .to_string()
-                    .contains("Request does not contain a form"),
+                    .contains("request does not contain a form"),
                 "{}",
                 error
             );

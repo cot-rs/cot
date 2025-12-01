@@ -12,15 +12,16 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use bytes::Bytes;
-use cot::config::StaticFilesPathRewriteMode;
 use digest::Digest;
 use futures_core::ready;
 use http::{Request, header};
 use pin_project_lite::pin_project;
+use thiserror::Error;
 use tower::Service;
 
 use crate::Body;
-use crate::config::StaticFilesConfig;
+use crate::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
+use crate::error::error_impl::impl_into_cot_error;
 use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
 
@@ -144,7 +145,7 @@ impl StaticFiles {
             .map(|file_with_meta| file_with_meta.url.as_str())
     }
 
-    pub(crate) fn collect_into(&self, path: &Path) -> Result<(), std::io::Error> {
+    pub(crate) fn collect_into(&self, path: &Path) -> Result<(), CollectStaticError> {
         for (file_path, file_with_meta) in &self.files {
             let file_path = path.join(file_path);
             std::fs::create_dir_all(
@@ -157,6 +158,11 @@ impl StaticFiles {
         Ok(())
     }
 }
+
+#[derive(Debug, Error)]
+#[error("could not collect static files: {0}")]
+pub(crate) struct CollectStaticError(#[from] std::io::Error);
+impl_into_cot_error!(CollectStaticError);
 
 impl From<&MiddlewareContext> for StaticFiles {
     fn from(context: &MiddlewareContext) -> Self {
@@ -402,7 +408,10 @@ mod tests {
     use crate::{App, AppBuilder, Bootstrapper, Project};
 
     #[test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     fn static_files_add_and_get_file() {
         let mut static_files = StaticFiles::new(&StaticFilesConfig::default());
         static_files.add_file(StaticFile::new("test.txt", "This is a test file"));
@@ -418,7 +427,7 @@ mod tests {
         let file = StaticFile {
             path: "test.txt".to_owned(),
             content: Bytes::from("This is a test file"),
-            mime_type: mime_guess::mime::TEXT_PLAIN,
+            mime_type: mime::TEXT_PLAIN,
         };
 
         let response = file.as_response();
@@ -522,7 +531,10 @@ mod tests {
     }
 
     #[cot::test]
-    #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `sqlite3_open_v2`
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
     async fn static_files_middleware_from_context() {
         struct App1;
         impl App for App1 {
@@ -559,12 +571,15 @@ mod tests {
             .with_apps()
             .with_database()
             .await
+            .unwrap()
+            .with_cache()
+            .await
             .unwrap();
         let middleware = StaticFilesMiddleware::from_context(bootstrapper.context());
         let static_files = middleware.static_files;
 
         let file = static_files.get_file("test/test.txt").unwrap();
-        assert_eq!(file.mime_type, mime_guess::mime::TEXT_PLAIN);
+        assert_eq!(file.mime_type, mime::TEXT_PLAIN);
         assert_eq!(
             file.content,
             Bytes::from_static(include_bytes!("../static/test/test.txt"))
@@ -637,16 +652,16 @@ mod tests {
     #[test]
     fn static_file_mime_type_detection() {
         let file = StaticFile::new("style.css", "body { color: red; }");
-        assert_eq!(file.mime_type, mime_guess::mime::TEXT_CSS);
+        assert_eq!(file.mime_type, mime::TEXT_CSS);
 
         let file = StaticFile::new("script.js", "console.log('test');");
-        assert_eq!(file.mime_type, mime_guess::mime::TEXT_JAVASCRIPT);
+        assert_eq!(file.mime_type, mime::TEXT_JAVASCRIPT);
 
         let file = StaticFile::new("image.png", "fake image data");
-        assert_eq!(file.mime_type, mime_guess::mime::IMAGE_PNG);
+        assert_eq!(file.mime_type, mime::IMAGE_PNG);
 
         let file = StaticFile::new("unknown", "some content");
-        assert_eq!(file.mime_type, mime_guess::mime::APPLICATION_OCTET_STREAM);
+        assert_eq!(file.mime_type, mime::APPLICATION_OCTET_STREAM);
     }
 
     #[test]

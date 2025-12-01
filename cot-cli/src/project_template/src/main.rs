@@ -1,21 +1,26 @@
 mod migrations;
 
 use askama::Template;
+use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
 use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
-use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
+use cot::request::extractors::StaticFiles;
 use cot::router::{Route, Router};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
-use cot::{App, AppBuilder, BoxedHandler, Project, static_files};
+use cot::session::db::SessionApp;
+use cot::{App, AppBuilder, Project, static_files};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
-struct IndexTemplate {}
+struct IndexTemplate {
+    static_files: StaticFiles,
+}
 
-async fn index() -> cot::Result<Html> {
-    let index_template = IndexTemplate {};
+async fn index(static_files: StaticFiles) -> cot::Result<Html> {
+    let index_template = IndexTemplate { static_files };
     let rendered = index_template.render()?;
 
     Ok(Html::new(rendered))
@@ -50,17 +55,19 @@ impl Project for {{ project_struct_name }} {
 
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views({{ app_name }}, "");
+        apps.register(DatabaseUserApp::new());
+        apps.register(SessionApp::new());
     }
 
     fn middlewares(
         &self,
         handler: RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .middleware(AuthMiddleware::new())
-            .middleware(SessionMiddleware::new())
+            .middleware(SessionMiddleware::from_context(context))
             .middleware(LiveReloadMiddleware::from_context(context))
             .build()
     }

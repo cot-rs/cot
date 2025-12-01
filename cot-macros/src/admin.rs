@@ -97,10 +97,6 @@ impl AdminModelDeriveBuilder {
         quote! {
             #[#crate_ident::__private::async_trait]
             impl #crate_ident::admin::AdminModel for #name {
-                fn as_any(&self) -> &dyn ::core::any::Any {
-                    self
-                }
-
                 async fn get_total_object_counts(
                     request: &#crate_ident::request::Request,
                 ) -> #crate_ident::Result<u64> {
@@ -218,10 +214,11 @@ impl AdminModelDeriveBuilder {
                 use ::std::str::FromStr;
 
                 <T as #crate_ident::db::Model>::PrimaryKey::from_str(id).map_err(|_| {
-                    #crate_ident::Error::admin(::std::format!(
-                        "Invalid ID for {model_name}: `{id}`",
+                    #crate_ident::error::NotFound::with_message(::std::format!(
+                        "invalid ID for admin model `{model_name}`: `{id}`",
                         model_name = stringify!(#name)
                     ))
+                    .into()
                 })
             }
         }

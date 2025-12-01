@@ -5,13 +5,11 @@ pub mod openapi;
 
 use std::fmt::{Debug, Formatter};
 
-use cot::StatusCode;
-use cot::handler::BoxRequestHandler;
-use cot::request::Request;
-
-use crate::handler::into_box_request_handler;
+use crate::error::MethodNotAllowed;
+use crate::handler::{BoxRequestHandler, into_box_request_handler};
+use crate::request::Request;
 use crate::response::Response;
-use crate::{Body, Method, RequestHandler};
+use crate::{Method, RequestHandler};
 
 /// A router that routes requests based on the HTTP method.
 ///
@@ -31,24 +29,17 @@ use crate::{Body, Method, RequestHandler};
 /// # Examples
 ///
 /// ```
-/// use cot::response::{Response, ResponseExt};
+/// use cot::html::Html;
 /// use cot::router::method::{MethodRouter, get};
 /// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, Method, StatusCode};
 ///
-/// async fn get_handler() -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed("GET response"),
-///     ))
+/// async fn get_handler() -> Html {
+///     Html::new("GET response")
 /// }
 ///
-/// async fn post_handler() -> cot::Result<Response> {
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed("POST response"),
-///     ))
+/// async fn post_handler() -> Html {
+///     Html::new("POST response")
 /// }
 ///
 /// # #[tokio::main]
@@ -98,12 +89,11 @@ macro_rules! define_method {
         /// # Examples
         ///
         /// ```
-        /// use cot::response::{Response, ResponseExt};
+        /// use cot::html::Html;
         /// use cot::router::method::MethodRouter;
-        /// use cot::{Body, StatusCode};
         ///
-        /// async fn test_handler() -> cot::Result<Response> {
-        ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+        /// async fn test_handler() -> Html {
+        ///     Html::new("test")
         /// }
         ///
         /// # #[tokio::main]
@@ -164,17 +154,13 @@ impl MethodRouter {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::html::Html;
     /// use cot::router::method::MethodRouter;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn test_handler() -> cot::Result<Response> {
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed("GET response"),
-    ///     ))
+    /// async fn test_handler() -> Html {
+    ///     Html::new("GET response")
     /// }
     ///
     /// # #[tokio::main]
@@ -217,14 +203,15 @@ impl MethodRouter {
     /// # Examples
     ///
     /// ```
-    /// use cot::response::{Response, ResponseExt};
+    /// use cot::StatusCode;
+    /// use cot::html::Html;
+    /// use cot::response::IntoResponse;
     /// use cot::router::method::MethodRouter;
     /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
-    /// use cot::{Body, StatusCode};
     ///
-    /// async fn fallback_handler() -> cot::Result<Response> {
-    ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("fallback")))
+    /// async fn fallback_handler() -> impl IntoResponse {
+    ///     Html::new("Method Not Allowed").with_status(StatusCode::METHOD_NOT_ALLOWED)
     /// }
     ///
     /// # #[tokio::main]
@@ -241,7 +228,7 @@ impl MethodRouter {
     ///         .into_body()
     ///         .into_bytes()
     ///         .await?,
-    ///     "fallback"
+    ///     "Method Not Allowed"
     /// );
     /// # Ok(())
     /// # }
@@ -372,12 +359,11 @@ macro_rules! define_method_router {
         /// # Examples
         ///
         /// ```
-        /// use cot::response::{Response, ResponseExt};
+        /// use cot::html::Html;
         #[doc = concat!("use cot::router::method::", stringify!($name), ";")]
-        /// use cot::{Body, StatusCode};
         ///
-        /// async fn test_handler() -> cot::Result<Response> {
-        ///     Ok(Response::new_html(StatusCode::OK, Body::fixed("test")))
+        /// async fn test_handler() -> cot::Result<Html> {
+        ///     Ok(Html::new("test"))
         /// }
         ///
         /// # #[tokio::main]
@@ -427,13 +413,8 @@ define_method_router!(put => PUT);
 define_method_router!(trace => TRACE);
 define_method_router!(connect => CONNECT);
 
-const DEFAULT_METHOD_NOT_ALLOWED_PAGE: &[u8] = include_bytes!("../../templates/405.html");
-
-async fn default_fallback() -> cot::Result<Response> {
-    Ok(http::Response::builder()
-        .status(StatusCode::METHOD_NOT_ALLOWED)
-        .body(Body::fixed(DEFAULT_METHOD_NOT_ALLOWED_PAGE))
-        .expect("Building the Cot method not allowed page should never fail"))
+async fn default_fallback(method: Method) -> crate::Error {
+    MethodNotAllowed::new(method).into()
 }
 
 #[cfg(test)]
@@ -461,9 +442,11 @@ mod tests {
         let router = MethodRouter::new();
 
         let request = TestRequestBuilder::get("/").build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
+        let inner = response.inner();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(inner.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(inner.is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -471,9 +454,11 @@ mod tests {
         let router = MethodRouter::default();
 
         let request = TestRequestBuilder::get("/").build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
+        let inner = response.inner();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(inner.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(inner.is::<MethodNotAllowed>());
     }
 
     #[cot::test]
@@ -508,9 +493,11 @@ mod tests {
         ];
         for method in methods {
             let request = TestRequestBuilder::with_method("/", method).build();
-            let response = router.handle(request).await.unwrap();
+            let response = router.handle(request).await.unwrap_err();
+            let inner = response.inner();
 
-            assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+            assert_eq!(inner.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+            assert!(inner.is::<MethodNotAllowed>());
         }
     }
 
@@ -543,9 +530,11 @@ mod tests {
         let router = MethodRouter::new();
 
         let request = TestRequestBuilder::with_method("/", Method::HEAD).build();
-        let response = router.handle(request).await.unwrap();
+        let response = router.handle(request).await.unwrap_err();
+        let inner = response.inner();
 
-        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(inner.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(inner.is::<MethodNotAllowed>());
 
         // check that if GET handler is defined, HEAD is routed to it
         let router = get(test_handler);

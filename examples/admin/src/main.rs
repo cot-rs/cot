@@ -17,11 +17,11 @@ use cot::db::{Auto, Model, model};
 use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
-use cot::project::{MiddlewareContext, RegisterAppsContext};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::extractors::RequestDb;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project, ProjectContext};
+use cot::{App, AppBuilder, Project, ProjectContext};
 
 #[derive(Debug, Clone, Form, AdminModel)]
 #[model]
@@ -126,7 +126,7 @@ impl Project for AdminProject {
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .middleware(AuthMiddleware::new())

@@ -904,7 +904,7 @@ impl ModelInSource {
     ) -> anyhow::Result<Self> {
         let input: syn::DeriveInput = item.clone().into();
         let opts = ModelOpts::new_from_derive_input(&input)
-            .map_err(|e| anyhow::anyhow!("cannot parse model: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("cannot parse model: {e}"))?;
         let mut model = opts.as_model(args, symbol_resolver)?;
         model.table_name = format!("{}__{}", app_name.to_snake_case(), model.table_name);
 
@@ -1263,7 +1263,7 @@ impl DynMigration for Migration {
 /// This is used to generate migration files.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 // this is not frequently used, so we don't mind extra memory usage
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 pub enum DynDependency {
     Migration { app: String, migration: String },
     Model { model_type: syn::Type },

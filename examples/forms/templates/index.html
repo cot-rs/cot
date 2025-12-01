@@ -1,0 +1,46 @@
+{% let urls = urls %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Form Examples</title>
+        <link rel="stylesheet" href="{{ static_files.url_for("css/main.css")? }}">
+    </head>
+    <body>
+        <div class="root-container">
+            <h1>Form Examples</h1>
+            <div class="form-container">
+                <form id="example-form"
+                      action="{{ cot::reverse!(urls, "add")? }}"
+                      method="post">
+                    {{ form }}
+                    <button type="submit">Add form</button>
+                </form>
+            </div>
+            <div class="results-container">
+                <ul>
+                    {% for item in example_form_items %}
+                        <li>
+                            <p>
+                                title: <span>{{ item.title }}</span>
+                            </p>
+                            <p>
+                                date: <span>{{ item.date }}</span>
+                            </p>
+                            <p>
+                                time: <span>{{ item.time }}</span>
+                            </p>
+                            <p>
+                                datetime: <span>{{ item.datetime }}</span>
+                            </p>
+                            <p>
+                                datetime_tz: <span>{{ item.datetime_tz }}</span>
+                            </p>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </body>
+</html>

@@ -7,7 +7,7 @@ ci:
 fail_fast: false
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -20,7 +20,7 @@ repos:
         args: ["--fix=lf"]
       - id: trailing-whitespace
   - repo: https://github.com/google/yamlfmt
-    rev: v0.16.0
+    rev: v0.20.0
     hooks:
       - id: yamlfmt
         types_or: [json, yaml]
@@ -38,3 +38,10 @@ repos:
     hooks:
       - id: format-justfile
         name: "format justfiles"
+  - repo: https://github.com/djlint/djLint
+    rev: v1.36.4
+    hooks:
+      - id: djlint
+        name: djLint
+        files: \.(html|jinja|j2)$
+        args: ["--reformat", "--lint"]

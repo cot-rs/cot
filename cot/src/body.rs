@@ -1,3 +1,4 @@
+use std::error::Error as StdError;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -8,7 +9,7 @@ use http_body::{Frame, SizeHint};
 use http_body_util::combinators::BoxBody;
 use sync_wrapper::SyncWrapper;
 
-use crate::error::ErrorRepr;
+use crate::error::error_impl::impl_into_cot_error;
 use crate::{Error, Result};
 
 /// A type that represents an HTTP request or response body.
@@ -161,7 +162,7 @@ impl Body {
             .collect()
             .await
             .map(http_body_util::Collected::to_bytes)
-            .map_err(|source| ErrorRepr::ReadRequestBody { source })?)
+            .map_err(ReadRequestBody)?)
     }
 
     #[must_use]
@@ -208,21 +209,13 @@ impl http_body::Body for Body {
             }
             BodyInner::Axum(ref mut axum_body) => {
                 let axum_body = axum_body.get_mut();
-                Pin::new(axum_body).poll_frame(cx).map_err(|error| {
-                    ErrorRepr::ReadRequestBody {
-                        source: Box::new(error),
-                    }
-                    .into()
-                })
+                Pin::new(axum_body)
+                    .poll_frame(cx)
+                    .map_err(|error| ReadRequestBody(Box::new(error)).into())
             }
-            BodyInner::Wrapper(ref mut http_body) => {
-                Pin::new(http_body).poll_frame(cx).map_err(|error| {
-                    ErrorRepr::ReadRequestBody {
-                        source: Box::new(error),
-                    }
-                    .into()
-                })
-            }
+            BodyInner::Wrapper(ref mut http_body) => Pin::new(http_body)
+                .poll_frame(cx)
+                .map_err(|error| ReadRequestBody(Box::new(error)).into()),
         }
     }
 
@@ -260,6 +253,11 @@ body_from_impl!(&'static str);
 body_from_impl!(String);
 
 body_from_impl!(Bytes);
+
+#[derive(Debug, thiserror::Error)]
+#[error("could not retrieve request body: {0}")]
+struct ReadRequestBody(#[source] Box<dyn StdError + Send + Sync>);
+impl_into_cot_error!(ReadRequestBody, BAD_REQUEST);
 
 #[cfg(test)]
 mod tests {

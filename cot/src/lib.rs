@@ -41,10 +41,7 @@
 //! [examples in the repository](https://github.com/cot-rs/cot/tree/master/examples).
 
 #![warn(missing_docs, rustdoc::missing_crate_level_docs)]
-#![cfg_attr(
-    docsrs,
-    feature(doc_cfg, doc_auto_cfg, rustdoc_missing_doc_code_examples)
-)]
+#![cfg_attr(docsrs, feature(doc_cfg, rustdoc_missing_doc_code_examples))]
 #![cfg_attr(docsrs, warn(rustdoc::missing_doc_code_examples))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/cot-rs/media/6585c518/logo/logo.svg",
@@ -53,9 +50,17 @@
 
 extern crate self as cot;
 
+#[cfg(feature = "cache")]
+pub mod cache;
+
 #[cfg(feature = "db")]
 pub mod db;
-mod error;
+/// Error handling types and utilities for Cot applications.
+///
+/// This module provides error types, error handlers, and utilities for
+/// handling various types of errors that can occur in Cot applications,
+/// including 404 Not Found errors, uncaught panics, and custom error pages.
+pub mod error;
 pub mod form;
 mod headers;
 // Not public API. Referenced by macro-generated code.
@@ -155,7 +160,7 @@ pub use cot_macros::e2e_test;
 /// ```
 pub use cot_macros::main;
 pub use cot_macros::test;
-pub use error::Error;
+pub use error::error_impl::Error;
 #[cfg(feature = "openapi")]
 pub use schemars;
 pub use {bytes, http};

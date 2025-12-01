@@ -6,23 +6,19 @@
 //! # Examples
 //!
 //! ```
-//! use cot::request::Request;
-//! use cot::response::{Response, ResponseExt};
+//! use cot::RequestHandler;
+//! use cot::html::Html;
 //! use cot::router::{Route, Router};
 //! use cot::session::Session;
 //! use cot::test::TestRequestBuilder;
-//! use cot::{Body, RequestHandler, StatusCode};
 //!
-//! async fn my_handler(session: Session) -> cot::Result<Response> {
+//! async fn my_handler(session: Session) -> cot::Result<Html> {
 //!     session.insert("user_name", "world".to_string()).await?;
 //!     let name: String = session
 //!         .get("user_name")
 //!         .await?
 //!         .expect("name was just added");
-//!     Ok(Response::new_html(
-//!         StatusCode::OK,
-//!         Body::fixed(format!("Hello, {}!", name)),
-//!     ))
+//!     Ok(Html::new(format!("Hello, {}!", name)))
 //! }
 //!
 //! # #[tokio::main]
@@ -41,6 +37,9 @@
 //! # Ok(())
 //! # }
 //! ```
+#[cfg(feature = "db")]
+pub mod db;
+pub mod store;
 
 use std::ops::{Deref, DerefMut};
 
@@ -51,23 +50,20 @@ use std::ops::{Deref, DerefMut};
 /// # Examples
 ///
 /// ```
+/// use cot::RequestHandler;
+/// use cot::html::Html;
 /// use cot::request::Request;
-/// use cot::response::{Response, ResponseExt};
 /// use cot::router::{Route, Router};
 /// use cot::session::Session;
 /// use cot::test::TestRequestBuilder;
-/// use cot::{Body, RequestHandler, StatusCode};
 ///
-/// async fn my_handler(session: Session) -> cot::Result<Response> {
+/// async fn my_handler(session: Session) -> cot::Result<Html> {
 ///     session.insert("user_name", "world".to_string()).await?;
 ///     let name: String = session
 ///         .get("user_name")
 ///         .await?
 ///         .expect("name was just added");
-///     Ok(Response::new_html(
-///         StatusCode::OK,
-///         Body::fixed(format!("Hello, {}!", name)),
-///     ))
+///     Ok(Html::new(format!("Hello, {}!", name)))
 /// }
 ///
 /// # #[tokio::main]
@@ -102,14 +98,14 @@ impl Session {
     /// # Examples
     ///
     /// ```
+    /// use cot::RequestHandler;
+    /// use cot::html::Html;
     /// use cot::request::Request;
-    /// use cot::response::{Response, ResponseExt};
     /// use cot::router::{Route, Router};
     /// use cot::session::Session;
     /// use cot::test::TestRequestBuilder;
-    /// use cot::{Body, RequestHandler, StatusCode};
     ///
-    /// async fn my_handler(request: Request) -> cot::Result<Response> {
+    /// async fn my_handler(request: Request) -> cot::Result<Html> {
     ///     let session = Session::from_request(&request);
     ///
     ///     session.insert("user_name", "world".to_string()).await?;
@@ -117,10 +113,7 @@ impl Session {
     ///         .get("user_name")
     ///         .await?
     ///         .expect("name was just added");
-    ///     Ok(Response::new_html(
-    ///         StatusCode::OK,
-    ///         Body::fixed(format!("Hello, {}!", name)),
-    ///     ))
+    ///     Ok(Html::new(format!("Hello, {}!", name)))
     /// }
     ///
     /// # #[tokio::main]

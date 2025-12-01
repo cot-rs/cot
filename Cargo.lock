@@ -46,7 +46,7 @@ checksum = "6966317188cdfe54c58c0900a195d021294afb3ece9b7073d09e4018dbb1e3a2"
 dependencies = [
  "cfg-if",
  "indexmap",
- "schemars",
+ "schemars 0.9.0",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
@@ -688,7 +688,7 @@ dependencies = [
  "redis",
  "reqwest",
  "rustversion",
- "schemars",
+ "schemars 1.1.0",
  "sea-query",
  "sea-query-binder",
  "serde",
@@ -1248,7 +1248,7 @@ name = "example-json"
 version = "0.1.0"
 dependencies = [
  "cot",
- "schemars",
+ "schemars 1.1.0",
  "serde",
 ]
 
@@ -3014,7 +3014,20 @@ dependencies = [
  "dyn-clone",
  "indexmap",
  "ref-cast",
- "schemars_derive",
+ "schemars_derive 0.9.0",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9558e172d4e8533736ba97870c4b2cd63f84b382a3d6eb063da41b91cce17289"
+dependencies = [
+ "dyn-clone",
+ "ref-cast",
+ "schemars_derive 1.1.0",
  "serde",
  "serde_json",
 ]
@@ -3024,6 +3037,18 @@ name = "schemars_derive"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5016d94c77c6d32f0b8e08b781f7dc8a90c2007d4e77472cc2807bc10a8438fe"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "301858a4023d78debd2353c7426dc486001bddc91ae31a76fb1f55132f7e2633"
 dependencies = [
  "proc-macro2",
  "quote",

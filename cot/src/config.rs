@@ -27,6 +27,7 @@ use thiserror::Error;
 
 #[cfg(feature = "email")]
 use crate::email;
+use crate::email::transport::smtp::Mechanism;
 #[cfg(feature = "email")]
 use crate::email::transport::smtp::{SMTPCredentials, SMTPHost};
 use crate::error::error_impl::impl_into_cot_error;
@@ -381,7 +382,8 @@ impl ProjectConfigBuilder {
             cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
-            email: self.email_backend.clone().unwrap_or_default(),
+            #[cfg(feature = "email")]
+            email: self.email.clone().unwrap_or_default(),
         }
     }
 }
@@ -1824,6 +1826,7 @@ impl Default for SessionMiddlewareConfig {
         SessionMiddlewareConfig::builder().build()
     }
 }
+
 /// The type of email backend to use.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1834,7 +1837,9 @@ pub enum EmailTransportTypeConfig {
     Console,
     /// SMTP email backend.
     Smtp {
-        credentials: SMTPCredentials,
+        auth_id: String,
+        secret: String,
+        mechanism: Mechanism,
         host: SMTPHost,
     },
 }
@@ -1866,15 +1871,8 @@ pub struct EmailTransportConfig {
 pub struct EmailConfig {
     /// The type of email backend to use.
     /// Defaults to `None`.
-    #[builder(setter(into, strip_option), default)]
+    #[builder(default)]
     pub transport: EmailTransportConfig,
-    /// The SMTP server port.
-    /// Overwrites the default standard port when specified.
-    #[builder(setter(into, strip_option), default)]
-    pub port: Option<u16>,
-    /// The timeout duration for the SMTP connection.
-    #[builder(setter(into, strip_option), default)]
-    pub timeout: Option<Duration>,
 }
 
 #[cfg(feature = "email")]
@@ -1890,13 +1888,13 @@ impl EmailConfig {
     /// let config = EmailConfig::builder().build();
     /// ```
     #[must_use]
-    pub fn builder() -> EmailTransportConfigBuilder {
-        EmailTransportConfigBuilder::default()
+    pub fn builder() -> EmailConfigBuilder {
+        EmailConfigBuilder::default()
     }
 }
 
 #[cfg(feature = "email")]
-impl EmailTransportConfigBuilder {
+impl EmailConfigBuilder {
     /// Builds the email configuration.
     ///
     /// # Examples
@@ -1908,33 +1906,19 @@ impl EmailTransportConfigBuilder {
     /// ```
     #[must_use]
     pub fn build(&self) -> EmailConfig {
-        match self
-            .backend_type
-            .clone()
-            .unwrap_or(EmailTransportTypeConfig::None)
-        {
-            EmailTransportTypeConfig::Smtp => EmailConfig {
-                transport: EmailTransportTypeConfig::Smtp,
-                smtp_mode: self
-                    .smtp_mode
-                    .clone()
-                    .unwrap_or(email::SmtpTransportMode::Localhost),
-                port: self.port.unwrap_or_default(),
-                username: self.username.clone().unwrap_or_default(),
-                password: self.password.clone().unwrap_or_default(),
-                timeout: self.timeout.unwrap_or_default(),
-            },
-            EmailTransportTypeConfig::None => EmailConfig {
-                transport: EmailTransportTypeConfig::None,
-                smtp_mode: email::SmtpTransportMode::Localhost,
-                port: None,
-                username: None,
-                password: None,
-                timeout: None,
-            },
+        EmailConfig {
+            transport: self.transport.clone().unwrap_or_default(),
         }
     }
 }
+
+#[cfg(feature = "email")]
+impl Default for EmailConfig {
+    fn default() -> Self {
+        EmailConfig::builder().build()
+    }
+}
+
 /// A secret key.
 ///
 /// This is a wrapper over a byte array, which is used to store a cryptographic

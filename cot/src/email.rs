@@ -36,8 +36,10 @@ use lettre::message::{Attachment, Body, Mailbox, Message, MultiPart, SinglePart}
 use serde::{Deserialize, Serialize};
 use transport::{BoxedTransport, Transport};
 
+use crate::common_types::Password;
 use crate::config::EmailTransportTypeConfig::Smtp;
 use crate::email::transport::console::Console;
+use crate::email::transport::smtp::SMTPCredentials;
 
 /// Represents errors that can occur when sending an email.
 #[derive(Debug, thiserror::Error)]
@@ -153,10 +155,13 @@ impl Email {
                 }
 
                 EmailTransportTypeConfig::Smtp {
-                    ref credentials,
+                    ref auth_id,
+                    ref secret,
+                    ref mechanism,
                     host,
                 } => {
-                    let smtp = SMTP::new(credentials.clone(), host.clone());
+                    let credentials = SMTPCredentials::new(auth_id.clone(), Password::from(secret));
+                    let smtp = SMTP::new(credentials, host.clone(), mechanism.clone());
                     Self::new(smtp)
                 }
             }

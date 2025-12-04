@@ -1,5 +1,5 @@
 use cot::cli::CliMetadata;
-use cot::config::{DatabaseConfig, EmailBackendConfig, EmailBackendType, ProjectConfig};
+use cot::config::{DatabaseConfig, EmailConfig, EmailTransportTypeConfig, ProjectConfig};
 use cot::email::{EmailBackend, EmailMessage, SmtpTransportMode};
 use cot::form::Form;
 use cot::html::Html;
@@ -66,8 +66,8 @@ impl Project for MyProject {
     }
 
     fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
-        let mut email_config = EmailBackendConfig::builder();
-        email_config.backend_type(EmailBackendType::Smtp);
+        let mut email_config = EmailConfig::builder();
+        email_config.backend_type(EmailTransportTypeConfig::Smtp);
         email_config.smtp_mode(SmtpTransportMode::Localhost);
         email_config.port(1025_u16);
         let config = ProjectConfig::builder()

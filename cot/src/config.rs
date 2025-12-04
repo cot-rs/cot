@@ -25,10 +25,12 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
+#[cfg(feature = "email")]
+use crate::email;
+#[cfg(feature = "email")]
+use crate::email::transport::smtp::{SMTPCredentials, SMTPHost};
 use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
-
-use crate::email;
 
 /// The configuration for a project.
 ///
@@ -257,7 +259,7 @@ pub struct ProjectConfig {
     /// # Examples
     ///
     /// ```
-    /// use cot::config::{EmailBackendConfig, ProjectConfig};
+    /// use cot::config::{EmailConfig, ProjectConfig};
     ///
     /// let config = ProjectConfig::from_toml(
     ///     r#"
@@ -266,10 +268,10 @@ pub struct ProjectConfig {
     /// "#,
     /// )?;
     ///
-    /// assert_eq!(config.email_backend, EmailBackendConfig::default());
+    /// assert_eq!(config.email, EmailConfig::default());
     /// # Ok::<(), cot::Error>(())
     /// ```
-    pub email_backend: EmailBackendConfig,
+    pub email: EmailConfig,
 }
 
 const fn default_debug() -> bool {
@@ -379,7 +381,7 @@ impl ProjectConfigBuilder {
             cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
-            email_backend: self.email_backend.clone().unwrap_or_default(),
+            email: self.email_backend.clone().unwrap_or_default(),
         }
     }
 }
@@ -1823,83 +1825,96 @@ impl Default for SessionMiddlewareConfig {
     }
 }
 /// The type of email backend to use.
+#[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EmailBackendType {
-    /// No email backend.
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EmailTransportTypeConfig {
+    /// Console email transport.
     #[default]
-    None,
+    Console,
     /// SMTP email backend.
-    Smtp,
+    Smtp {
+        credentials: SMTPCredentials,
+        host: SMTPHost,
+    },
 }
+
+#[cfg(feature = "email")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct EmailTransportConfig {
+    #[serde(flatten)]
+    pub transport_type: EmailTransportTypeConfig,
+}
+
 /// The configuration for the SMTP backend.
 ///
-/// This is used as part of the [`EmailBackendConfig`] enum.
+/// This is used as part of the [`EmailConfig`] enum.
 ///
 /// # Examples
 ///
 /// ```
-/// use cot::config::EmailBackendConfig;
+/// use cot::config::EmailConfig;
 ///
-/// let config = EmailBackendConfig::builder().build();
+/// let config = EmailConfig::builder().build();
 /// ```
+#[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
-pub struct EmailBackendConfig {
+pub struct EmailConfig {
     /// The type of email backend to use.
     /// Defaults to `None`.
     #[builder(setter(into, strip_option), default)]
-    pub backend_type: EmailBackendType,
-    /// The SMTP server host address.
-    /// Defaults to "localhost".
-    #[builder(setter(into, strip_option), default)]
-    pub smtp_mode: email::SmtpTransportMode,
+    pub transport: EmailTransportConfig,
     /// The SMTP server port.
     /// Overwrites the default standard port when specified.
     #[builder(setter(into, strip_option), default)]
     pub port: Option<u16>,
-    /// The username for SMTP authentication.
-    #[builder(setter(into, strip_option), default)]
-    pub username: Option<String>,
-    /// The password for SMTP authentication.
-    #[builder(setter(into, strip_option), default)]
-    pub password: Option<String>,
     /// The timeout duration for the SMTP connection.
     #[builder(setter(into, strip_option), default)]
     pub timeout: Option<Duration>,
 }
 
-impl EmailBackendConfig {
+#[cfg(feature = "email")]
+impl EmailConfig {
     /// Create a new [`EmailBackendConfigBuilder`] to build a
-    /// [`EmailBackendConfig`].
+    /// [`EmailConfig`].
     ///
     /// # Examples
     ///
     /// ```
-    /// use cot::config::EmailBackendConfig;
+    /// use cot::config::EmailConfig;
     ///
-    /// let config = EmailBackendConfig::builder().build();
+    /// let config = EmailConfig::builder().build();
     /// ```
     #[must_use]
-    pub fn builder() -> EmailBackendConfigBuilder {
-        EmailBackendConfigBuilder::default()
+    pub fn builder() -> EmailTransportConfigBuilder {
+        EmailTransportConfigBuilder::default()
     }
 }
-impl EmailBackendConfigBuilder {
+
+#[cfg(feature = "email")]
+impl EmailTransportConfigBuilder {
     /// Builds the email configuration.
     ///
     /// # Examples
     ///
     /// ```
-    /// use cot::config::EmailBackendConfig;
+    /// use cot::config::EmailConfig;
     ///
-    /// let config = EmailBackendConfig::builder().build();
+    /// let config = EmailConfig::builder().build();
     /// ```
     #[must_use]
-    pub fn build(&self) -> EmailBackendConfig {
-        match self.backend_type.clone().unwrap_or(EmailBackendType::None) {
-            EmailBackendType::Smtp => EmailBackendConfig {
-                backend_type: EmailBackendType::Smtp,
+    pub fn build(&self) -> EmailConfig {
+        match self
+            .backend_type
+            .clone()
+            .unwrap_or(EmailTransportTypeConfig::None)
+        {
+            EmailTransportTypeConfig::Smtp => EmailConfig {
+                transport: EmailTransportTypeConfig::Smtp,
                 smtp_mode: self
                     .smtp_mode
                     .clone()
@@ -1909,8 +1924,8 @@ impl EmailBackendConfigBuilder {
                 password: self.password.clone().unwrap_or_default(),
                 timeout: self.timeout.unwrap_or_default(),
             },
-            EmailBackendType::None => EmailBackendConfig {
-                backend_type: EmailBackendType::None,
+            EmailTransportTypeConfig::None => EmailConfig {
+                transport: EmailTransportTypeConfig::None,
                 smtp_mode: email::SmtpTransportMode::Localhost,
                 port: None,
                 username: None,
@@ -2311,7 +2326,7 @@ mod tests {
         );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
-        assert_eq!(config.email_backend.backend_type, EmailBackendType::None);
+        assert_eq!(config.email.transport, EmailTransportTypeConfig::None);
         assert!(!config.middlewares.session.http_only);
         assert_eq!(
             config.middlewares.session.domain,

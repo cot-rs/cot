@@ -42,7 +42,7 @@ http-body.workspace = true
 http.workspace = true
 humantime.workspace = true
 indexmap.workspace = true
-lettre.workspace = true
+lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-native-tls"], optional = true }
 mime.workspace = true
 mime_guess.workspace = true
 multer.workspace = true
@@ -104,9 +104,10 @@ ignored = [
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
-full = ["default", "fake", "live-reload", "test", "cache", "redis"]
+full = ["default", "fake", "live-reload", "test", "cache", "redis", "email"]
 fake = ["dep:fake"]
 db = ["dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
+email = ["dep:lettre"]
 sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
 postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres", "sqlx/postgres"]
 mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]

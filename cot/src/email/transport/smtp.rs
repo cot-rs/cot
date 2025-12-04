@@ -77,7 +77,7 @@ impl SMTP {
 impl Transport for SMTP {
     async fn send(&self, messages: &[EmailMessage]) -> Result<(), String> {
         let mechanisms: Vec<lettre::transport::smtp::authentication::Mechanism> =
-            vec!(self.mechanism.clone().into());
+            vec![self.mechanism.clone().into()];
         for message in messages {
             let mailer = AsyncSmtpTransport::relay(self.host.as_str())
                 .unwrap()

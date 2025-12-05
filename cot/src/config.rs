@@ -25,6 +25,11 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
+#[cfg(feature = "email")]
+use crate::email;
+use crate::email::transport::smtp::Mechanism;
+#[cfg(feature = "email")]
+use crate::email::transport::smtp::{SMTPCredentials, SMTPHost};
 use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
@@ -250,6 +255,24 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub middlewares: MiddlewareConfig,
+    /// Configuration related to the email backend.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{EmailConfig, ProjectConfig};
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [email_backend]
+    /// type = "none"
+    /// "#,
+    /// )?;
+    ///
+    /// assert_eq!(config.email, EmailConfig::default());
+    /// # Ok::<(), cot::Error>(())
+    /// ```
+    pub email: EmailConfig,
 }
 
 const fn default_debug() -> bool {
@@ -359,6 +382,8 @@ impl ProjectConfigBuilder {
             cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
+            #[cfg(feature = "email")]
+            email: self.email.clone().unwrap_or_default(),
         }
     }
 }
@@ -1802,6 +1827,98 @@ impl Default for SessionMiddlewareConfig {
     }
 }
 
+/// The type of email backend to use.
+#[cfg(feature = "email")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EmailTransportTypeConfig {
+    /// Console email transport.
+    #[default]
+    Console,
+    /// SMTP email backend.
+    Smtp {
+        auth_id: String,
+        secret: String,
+        mechanism: Mechanism,
+        host: SMTPHost,
+    },
+}
+
+#[cfg(feature = "email")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct EmailTransportConfig {
+    #[serde(flatten)]
+    pub transport_type: EmailTransportTypeConfig,
+}
+
+/// The configuration for the SMTP backend.
+///
+/// This is used as part of the [`EmailConfig`] enum.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::EmailConfig;
+///
+/// let config = EmailConfig::builder().build();
+/// ```
+#[cfg(feature = "email")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct EmailConfig {
+    /// The type of email backend to use.
+    /// Defaults to `None`.
+    #[builder(default)]
+    pub transport: EmailTransportConfig,
+}
+
+#[cfg(feature = "email")]
+impl EmailConfig {
+    /// Create a new [`EmailBackendConfigBuilder`] to build a
+    /// [`EmailConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailConfig;
+    ///
+    /// let config = EmailConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> EmailConfigBuilder {
+        EmailConfigBuilder::default()
+    }
+}
+
+#[cfg(feature = "email")]
+impl EmailConfigBuilder {
+    /// Builds the email configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailConfig;
+    ///
+    /// let config = EmailConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> EmailConfig {
+        EmailConfig {
+            transport: self.transport.clone().unwrap_or_default(),
+        }
+    }
+}
+
+#[cfg(feature = "email")]
+impl Default for EmailConfig {
+    fn default() -> Self {
+        EmailConfig::builder().build()
+    }
+}
+
 /// A secret key.
 ///
 /// This is a wrapper over a byte array, which is used to store a cryptographic
@@ -2169,6 +2286,8 @@ mod tests {
             path = "/some/path"
             always_save = true
             name = "some.sid"
+            [email_backend]
+            type = "none"
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
@@ -2191,6 +2310,7 @@ mod tests {
         );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
+        assert_eq!(config.email.transport, EmailTransportTypeConfig::None);
         assert!(!config.middlewares.session.http_only);
         assert_eq!(
             config.middlewares.session.domain,

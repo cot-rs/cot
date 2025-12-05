@@ -775,6 +775,7 @@ impl TestRequestBuilder {
             self.cache
                 .clone()
                 .unwrap_or_else(|| Arc::new(Cache::new(Memory::new(), None, Timeout::default()))),
+            None,
         );
         prepare_request(&mut request, Arc::new(context));
 

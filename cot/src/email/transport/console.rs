@@ -34,7 +34,7 @@ impl Console {
 impl Transport for Console {
     async fn send(&self, messages: &[EmailMessage]) -> TransportResult<()> {
         let mut out = io::stdout().lock();
-        for (i, msg) in messages.iter().enumerate() {
+        for msg in messages {
             writeln!(out, "{}", msg).map_err(|err| ConsoleError::Io(err))?;
             writeln!(out, "{}", "─".repeat(60)).map_err(|err| ConsoleError::Io(err))?;
         }

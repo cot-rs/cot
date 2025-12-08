@@ -24,7 +24,7 @@ impl From<SMTPError> for TransportError {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Mechanism {
     #[default]
@@ -61,7 +61,7 @@ impl From<SMTPCredentials> for Credentials {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SMTPServer {
     Gmail,

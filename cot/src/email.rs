@@ -48,6 +48,7 @@ const ERROR_PREFIX: &str = "email error:";
 
 /// Represents errors that can occur when sending an email.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum EmailError {
     #[error("transport error: {0}")]
     TransportError(String),
@@ -209,7 +210,14 @@ impl Email {
         let transport: Arc<dyn BoxedTransport> = Arc::new(transport);
         Self { transport }
     }
-    pub async fn send(&self, messages: &[EmailMessage]) -> EmailResult<()> {
+    pub async fn send(&self, message: EmailMessage) -> EmailResult<()> {
+        self.transport
+            .send(&[message])
+            .await
+            .map_err(|err| EmailError::TransportError(err.to_string()))
+    }
+
+    pub async fn send_multiple(&self, messages: &[EmailMessage]) -> EmailResult<()> {
         self.transport
             .send(messages)
             .await

@@ -1851,6 +1851,43 @@ pub struct EmailTransportConfig {
     pub transport_type: EmailTransportTypeConfig,
 }
 
+#[cfg(feature = "email")]
+impl EmailTransportConfig {
+    /// Create a new [`EmailTransportConfigBuilder`] to build a
+    /// [`EmailTransportConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailTransportConfig;
+    ///
+    /// let config = EmailTransportConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> EmailTransportConfigBuilder {
+        EmailTransportConfigBuilder::default()
+    }
+}
+
+#[cfg(feature = "email")]
+impl EmailTransportConfigBuilder {
+    /// Builds the email transport configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailTransportConfig;
+    ///
+    /// let config = EmailTransportConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> EmailTransportConfig {
+        EmailTransportConfig {
+            transport_type: self.transport_type.clone().unwrap_or_default(),
+        }
+    }
+}
+
 /// The configuration for the SMTP backend.
 ///
 /// This is used as part of the [`EmailConfig`] enum.

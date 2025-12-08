@@ -140,7 +140,8 @@ time = { version = "0.3.44", default-features = false }
 tokio = { version = "1.48", default-features = false }
 toml = { version = "0.9", default-features = false }
 tower = "0.5.2"
-tower-livereload = "0.9.6"
+#tower-livereload = { git = "https://github.com/leotaku/tower-livereload.git", rev = "05d1d9acf7a265b91e800a6dd3599dd6f0359c8e" }
+tower-livereload = "0.9"
 tower-sessions = { version = "0.14", default-features = false }
 tracing = { version = "0.1", default-features = false }
 tracing-subscriber = "0.3"

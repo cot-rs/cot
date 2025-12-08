@@ -26,3 +26,7 @@ pub use crate::utils::graph::apply_permutation;
 /// This is used in the CLI to specify the version of the crate to use in the
 /// `Cargo.toml` file when creating a new Cot project.
 pub const COT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub mod hot_patching {
+    pub use crate::hot_patching::{call_hot, serve};
+}

@@ -18,21 +18,21 @@ pub(super) fn fn_to_cot_main(main_function_decl: ItemFn) -> syn::Result<TokenStr
     let crate_name = cot_ident();
     let result = quote! {
         fn main() {
-            let body = async {
+            async fn body() {
                 let project = __cot_main();
                 #crate_name::run_cli(project).await.expect(
                     "failed to run the Cot project"
                 );
 
                 #new_main_decl
-            };
+            }
             #[expect(clippy::expect_used)]
             {
                 return #crate_name::__private::tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed building the Runtime")
-                    .block_on(body);
+                    .block_on(::cot::__private::hot_patching::serve(body));
             }
         }
     };

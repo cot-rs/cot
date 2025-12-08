@@ -30,6 +30,7 @@ deadpool-redis = { workspace = true, features = ["tokio-comp", "rt_tokio_1"], op
 derive_builder.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
 digest.workspace = true
+dioxus-devtools = { version = "0.7.2", features = ["serve"], optional = true }
 email_address.workspace = true
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 form_urlencoded.workspace = true
@@ -57,6 +58,7 @@ serde_json = { workspace = true, optional = true }
 serde_path_to_error = { workspace = true }
 sha2.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
+subsecond = { version = "0.7.2", optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
 sync_wrapper.workspace = true
@@ -103,7 +105,7 @@ ignored = [
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
-full = ["default", "fake", "live-reload", "test", "cache", "redis"]
+full = ["default", "fake", "live-reload", "hot-patching", "test", "cache", "redis"]
 fake = ["dep:fake"]
 db = ["dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
 sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
@@ -114,6 +116,7 @@ json = ["dep:serde_json"]
 openapi = ["json", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
+hot-patching = ["dep:dioxus-devtools", "dep:subsecond"]
 cache = ["json"]
 test = []
 

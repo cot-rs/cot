@@ -35,7 +35,7 @@ use crate::session::store::redis::RedisStore;
 use crate::{Body, Error};
 
 #[cfg(feature = "live-reload")]
-mod live_reload;
+pub(crate) mod live_reload;
 
 #[cfg(feature = "live-reload")]
 pub use live_reload::LiveReloadMiddleware;

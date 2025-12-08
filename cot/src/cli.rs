@@ -347,7 +347,7 @@ impl RunServer {
                         \n\
                         {exec} -l 8888\n\
                         cargo run -- -l 8888\n\
-                        bacon serve -- -- -l 8888"
+                        dx serve --hot-patch --args=\"-l 8888\""
                     ))
                 }
                 _ => None,

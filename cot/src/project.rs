@@ -2208,24 +2208,43 @@ pub async fn run_at_with_shutdown(
         listener.local_addr().map_err(StartServerError)?
     );
 
-    if register_panic_hook {
-        let current_hook = std::panic::take_hook();
-        let new_hook = move |hook_info: &std::panic::PanicHookInfo<'_>| {
-            current_hook(hook_info);
-            error_page::error_page_panic_hook(hook_info);
-        };
-        std::panic::set_hook(Box::new(new_hook));
-    }
+    let panic_hook_guard = register_panic_hook.then(PanicHookGuard::register);
     serve(listener, handler, shutdown_signal).await;
-    if register_panic_hook {
-        let _ = std::panic::take_hook();
-    }
+    drop(panic_hook_guard);
     #[cfg(feature = "db")]
     if let Some(database) = &context_cleanup.database {
         database.close().await?;
     }
 
     Ok(())
+}
+
+/// Registers the Cot error page panic hook and unregisters it when dropped.
+///
+/// Using a guard ensures the hook is removed even if the server future is
+/// dropped before it completes (e.g. when restarting after a hot-patch), so
+/// that hooks don't pile up.
+struct PanicHookGuard;
+
+impl PanicHookGuard {
+    fn register() -> Self {
+        let current_hook = std::panic::take_hook();
+        let new_hook = move |hook_info: &std::panic::PanicHookInfo<'_>| {
+            current_hook(hook_info);
+            error_page::error_page_panic_hook(hook_info);
+        };
+        std::panic::set_hook(Box::new(new_hook));
+        Self
+    }
+}
+
+impl Drop for PanicHookGuard {
+    fn drop(&mut self) {
+        // modifying the hook while panicking is not allowed
+        if !std::thread::panicking() {
+            let _ = std::panic::take_hook();
+        }
+    }
 }
 
 /// Serves HTTP/1.1 connections accepted from the given listener until the

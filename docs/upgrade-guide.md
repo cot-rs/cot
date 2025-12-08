@@ -8,6 +8,17 @@ As a general rule, try to upgrade one minor version at a time. Many breaking cha
 
 Sometimes, though, the changes need to be made in a backwards-incompatible manner. This page will help you understand those changes and how to adapt your code.
 
+## From 0.8 to 0.9
+
+### General
+
+* **Hot-patching with `dx`**: Cot now integrates with the hot-patching of [`dx`](https://crates.io/crates/dioxus-cli) (the Dioxus CLI), which replaces [bacon](https://dystroy.org/bacon/) as the recommended development server. New projects no longer contain a `bacon.toml` file, and you can remove it from existing projects. To use `dx`, make sure the `live-reload` feature of `cot` is enabled (it's included in the `full` feature), then install `dx` and run your project with it:
+    ```bash
+    cargo install --locked dioxus-cli@0.7
+    dx serve --hot-patch
+    ```
+    On every change, the project is restarted inside the running process, so anything that is only stored in memory (such as sessions in the in-memory session store) is lost.
+
 ## From 0.7 to 0.8
 
 ### Routing

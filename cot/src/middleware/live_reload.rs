@@ -14,9 +14,12 @@ type LiveReloadLayerType = tower::util::Either<
 /// A middleware providing live reloading functionality.
 ///
 /// This is useful for development, where you want to see the effects of
-/// changing your code as quickly as possible. Note that you still need to
-/// compile and rerun your project, so it is recommended to combine this
-/// middleware with something like [bacon](https://dystroy.org/bacon/).
+/// changing your code as quickly as possible. It is recommended to run your
+/// project with `dx serve --hot-patch` (see the
+/// [Dioxus CLI](https://crates.io/crates/dioxus-cli)): the `live-reload`
+/// feature also enables hot-patching, so your changes are applied to the
+/// running server automatically, and this middleware then reloads the page in
+/// the browser.
 ///
 /// This works by serving an additional endpoint that is long-polled in a
 /// JavaScript snippet that it injected into the usual response from your

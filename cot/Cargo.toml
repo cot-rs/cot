@@ -30,6 +30,7 @@ cot_macros.workspace = true
 deadpool-redis = { workspace = true, features = ["tokio-comp", "rt_tokio_1"], optional = true }
 derive_builder.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
+dioxus-devtools = { workspace = true, optional = true }
 email_address.workspace = true
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 form_urlencoded.workspace = true
@@ -60,6 +61,7 @@ sea-query-sqlx = { workspace = true, features = ["with-chrono"], optional = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
+subsecond = { workspace = true, optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
 thiserror.workspace = true
@@ -120,7 +122,8 @@ redis = ["cache", "dep:deadpool-redis", "dep:redis", "json"]
 json = ["cot_core/json"]
 openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
-live-reload = ["dep:tower-livereload"]
+# Also enables hot-patching with `dx serve --hot-patch`
+live-reload = ["dep:tower-livereload", "dep:dioxus-devtools", "dep:subsecond"]
 cache = ["json"]
 test = []
 # Internal feature used to generate the configuration file reference (docs/configuration.md).

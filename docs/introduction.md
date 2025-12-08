@@ -2,7 +2,7 @@
 title: Introduction
 ---
 
-[bacon]: https://dystroy.org/bacon/
+[dx]: https://crates.io/crates/dioxus-cli
 
 Cot is a free and open-source web framework for Rust that makes building web applications both fun and reliable. Taking inspiration from [Django](https://www.djangoproject.com/)'s developer-friendly approach, Cot combines Rust's safety guarantees with rapid development features that help you build secure web applications quickly. Whether you're coming from Django or are new to web development entirely, you'll find Cot's intuitive design helps you be productive from day one.
 
@@ -44,23 +44,22 @@ cot_tutorial
 ├── templates   # HTML templates for your pages
 │   └── index.html
 ├── .gitignore
-├── bacon.toml  # Configuration for live-reloading during development
 └── Cargo.toml
 ```
 
-If you don't have [bacon] installed already, we strongly recommend you to do so. It will make your development process much more pleasant by providing you with the live-reloading functionality. You can install it by running:
+We strongly recommend installing [dx], the Dioxus CLI. Cot integrates with its hot-patching, so the changes you make to your Rust code and templates are applied to the running server within about a second, without restarting it from scratch, and the page in your browser is refreshed automatically. Cot is compatible with `dx` version 0.7, which you can install by running:
 
 ```bash
-cargo install --locked bacon
+cargo install --locked dioxus-cli@0.7
 ```
 
 After you do that, you can run your Cot application by running:
 
 ```bash
-bacon serve
+dx serve --hot-patch
 ```
 
-Or, if you don't have [bacon] installed, you can run your application with the typical:
+Or, if you don't have [dx] installed, you can run your application with the typical:
 
 ```bash
 cargo run

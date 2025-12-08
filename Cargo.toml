@@ -73,7 +73,7 @@ clap_mangen = "0.2.31"
 cot = { version = "0.4.0", path = "cot" }
 cot_codegen = { version = "0.4.0", path = "cot-codegen" }
 cot_macros = { version = "0.4.0", path = "cot-macros" }
-criterion = "0.7"
+criterion = "0.8"
 darling = "0.21"
 deadpool-redis = { version = "0.22", default-features = false }
 derive_builder = "0.20"
@@ -101,7 +101,7 @@ insta-cmd = "0.6"
 lettre = { version = "0.11", default-features = false }
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
-mockall = "0.13"
+mockall = "0.14"
 multer = "3"
 password-auth = { version = "1", default-features = false }
 petgraph = { version = "0.8", default-features = false }

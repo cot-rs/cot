@@ -25,11 +25,9 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
-#[cfg(feature = "email")]
-use crate::email;
 use crate::email::transport::smtp::Mechanism;
 #[cfg(feature = "email")]
-use crate::email::transport::smtp::{SMTPCredentials, SMTPHost};
+use crate::email::transport::smtp::SMTPServer;
 use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
@@ -1840,7 +1838,7 @@ pub enum EmailTransportTypeConfig {
         auth_id: String,
         secret: String,
         mechanism: Mechanism,
-        host: SMTPHost,
+        server: SMTPServer,
     },
 }
 
@@ -1865,7 +1863,7 @@ pub struct EmailTransportConfig {
 /// let config = EmailConfig::builder().build();
 /// ```
 #[cfg(feature = "email")]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct EmailConfig {
@@ -2310,7 +2308,6 @@ mod tests {
         );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
-        assert_eq!(config.email.transport, EmailTransportTypeConfig::None);
         assert!(!config.middlewares.session.http_only);
         assert_eq!(
             config.middlewares.session.domain,

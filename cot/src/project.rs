@@ -1609,7 +1609,7 @@ impl BootstrapPhase for WithApps {
     type ErrorHandler = ();
     type Config = <WithConfig as BootstrapPhase>::Config;
     #[cfg(feature = "email")]
-    type Email = Arc<Email>;
+    type Email = <WithConfig as BootstrapPhase>::Email;
     type Apps = Vec<Box<dyn App>>;
     type Router = Arc<Router>;
     #[cfg(feature = "db")]
@@ -1634,7 +1634,7 @@ impl BootstrapPhase for WithDatabase {
     type ErrorHandler = ();
     type Config = <WithApps as BootstrapPhase>::Config;
     #[cfg(feature = "email")]
-    type Email = Arc<Email>;
+    type Email = <WithApps as BootstrapPhase>::Email;
     type Apps = <WithApps as BootstrapPhase>::Apps;
     type Router = <WithApps as BootstrapPhase>::Router;
     #[cfg(feature = "db")]
@@ -1659,7 +1659,7 @@ impl BootstrapPhase for WithCache {
     type ErrorHandler = ();
     type Config = <WithApps as BootstrapPhase>::Config;
     #[cfg(feature = "email")]
-    type Email = Arc<Email>;
+    type Email = <WithApps as BootstrapPhase>::Email;
     type Apps = <WithApps as BootstrapPhase>::Apps;
     type Router = <WithApps as BootstrapPhase>::Router;
     #[cfg(feature = "db")]
@@ -1684,7 +1684,7 @@ impl BootstrapPhase for Initialized {
     type ErrorHandler = BoxedHandler;
     type Config = <WithDatabase as BootstrapPhase>::Config;
     #[cfg(feature = "email")]
-    type Email = Arc<Email>;
+    type Email = <WithDatabase as BootstrapPhase>::Email;
     type Apps = <WithDatabase as BootstrapPhase>::Apps;
     type Router = <WithDatabase as BootstrapPhase>::Router;
     #[cfg(feature = "db")]
@@ -1730,7 +1730,7 @@ impl ProjectContext<Uninitialized> {
     }
 
     fn with_config(self, config: ProjectConfig) -> ProjectContext<WithConfig> {
-        let email = Email::from_config(&config.email);
+        let email = Arc::new(Email::from_config(&config.email));
 
         ProjectContext {
             config: Arc::new(config),
@@ -1938,6 +1938,14 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
     #[must_use]
     pub fn auth_backend(&self) -> &Arc<dyn AuthBackend> {
         &self.auth_backend
+    }
+}
+
+#[cfg(feature = "email")]
+impl<S: BootstrapPhase<Email = Arc<Email>>> ProjectContext<S> {
+    #[must_use]
+    pub fn email(&self) -> &Arc<Email> {
+        &self.email
     }
 }
 

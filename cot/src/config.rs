@@ -1826,27 +1826,64 @@ impl Default for SessionMiddlewareConfig {
 }
 
 /// The type of email backend to use.
+///
+/// This specifies what email backend is used for sending emails: `console` or
+/// `smtp`. The default backend if not specified is `console`.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EmailTransportTypeConfig {
     /// Console email transport.
+    ///
+    /// This is a convenient backend for development and testing that simply
+    /// prints the email contents to the console instead of actually sending
+    /// them.
     #[default]
     Console,
     /// SMTP email backend.
+    ///
+    /// This backend sends emails using the Simple Mail Transfer Protocol
+    /// (SMTP). It requires authentication details and server configuration.
     Smtp {
+        /// The authentication ID (username) for the SMTP server.
+        /// For `plain` and `xoauth2` mechanisms, this is typically the email
+        /// address. For `login` mechanism, this is the login username.
         auth_id: String,
+        /// The secret (password or token) for the SMTP server.
+        /// For `plain` and `login` mechanisms, this is typically the password.
+        /// For `xoauth2` this is the OAuth2 token.
         secret: String,
+        /// The authentication mechanism to use.
+        /// Supported mechanisms are `plain`, `login`, and `xoauth2`.
         mechanism: Mechanism,
+        /// The SMTP server configuration.
+        ///
+        /// This configures what SMTP server to connect to. The supported
+        /// servers are `gmail` and `localhost`
         server: SMTPServer,
     },
 }
 
+/// Configuration structure for email transport settings.
+///
+/// This specifies the email transport backend to use and its associated
+/// configuration.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct EmailTransportConfig {
+    /// The type of email transport backend to use.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{EmailTransportConfig, EmailTransportTypeConfig};
+    ///
+    /// let config = EmailTransportConfig::builder()
+    ///     .transport_type(EmailTransportTypeConfig::Console)
+    ///     .build();
+    /// ```
     #[serde(flatten)]
     pub transport_type: EmailTransportTypeConfig,
 }
@@ -1888,24 +1925,69 @@ impl EmailTransportConfigBuilder {
     }
 }
 
-/// The configuration for the SMTP backend.
+/// Configuration for the email system.
 ///
-/// This is used as part of the [`EmailConfig`] enum.
+/// This specifies all the configuration options for sending emails.
 ///
 /// # Examples
 ///
 /// ```
-/// use cot::config::EmailConfig;
+/// use cot::config::{EmailConfig, EmailTransportConfig, EmailTransportTypeConfig};
 ///
-/// let config = EmailConfig::builder().build();
+/// let config = EmailConfig::builder()
+///     .transport(
+///         EmailTransportConfig::builder()
+///             .transport_type(EmailTransportTypeConfig::Console)
+///             .build(),
+///     )
+///     .build();
+/// assert_eq!(
+///     config.transport.transport_type,
+///     EmailTransportTypeConfig::Console
+/// );
 /// ```
 #[cfg(feature = "email")]
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct EmailConfig {
-    /// The type of email backend to use.
-    /// Defaults to `None`.
+    /// The type of email transport backend to use.
+    ///
+    /// This determines which type of email transport backend to use (`console`
+    /// or `smtp`) along with its configuration options.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{EmailConfig, EmailTransportConfig, EmailTransportTypeConfig};
+    ///
+    /// let config = EmailConfig::builder()
+    ///     .transport(
+    ///         EmailTransportConfig::builder()
+    ///             .transport_type(EmailTransportTypeConfig::Console)
+    ///             .build(),
+    ///     )
+    ///     .build();
+    /// assert_eq!(
+    ///     config.transport.transport_type,
+    ///     EmailTransportTypeConfig::Console
+    /// );
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [email]
+    /// type = "console"
+    ///
+    /// # Or for SMTP:
+    /// # [email]
+    /// # type = "smtp"
+    /// # auth_id = "your_auth_id"
+    /// # secret = "your_secret"
+    /// # mechanism = "plain" # or "login", "xoauth2"
+    /// # server = "gmail" # or "localhost"
+    /// ```
     #[builder(default)]
     pub transport: EmailTransportConfig,
 }

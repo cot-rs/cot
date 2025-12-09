@@ -1,3 +1,25 @@
+//! Console transport implementation.
+//!
+//! This backend writes a human-friendly representation of emails to stdout.
+//! It is intended primarily for development and testing environments where
+//! actually sending email is not required.
+//!
+//! Typical usage is through the high-level [`crate::email::Email`] API:
+//!
+//! ```no_run
+//! use cot::email::transport::console::Console;
+//! use cot::email::{Email, EmailMessage};
+//!
+//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! let email = Email::new(Console::new());
+//! let recipients = vec!["testreceipient@example.com".into()];
+//! let msg = EmailMessage::builder()
+//!     .from("no-reply@example.com".into())
+//!     .to()
+//!     .build()?;
+//! email.send(msg).await?;
+//! # Ok(()) }
+//! ```
 use std::io::Write;
 use std::{fmt, io};
 
@@ -9,23 +31,43 @@ use crate::email::transport::{Transport, TransportResult};
 
 const ERROR_PREFIX: &str = "console transport error:";
 
+/// Errors that can occur while using the console transport.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ConsoleError {
-    #[error("IO error: {0}")]
+    /// An IO error occurred while writing to stdout.
+    #[error("{ERROR_PREFIX} IO error: {0}")]
     Io(#[from] io::Error),
 }
 
 impl From<ConsoleError> for TransportError {
     fn from(err: ConsoleError) -> Self {
-        TransportError::Transport(err.to_string())
+        TransportError::Backend(err.to_string())
     }
 }
 
-#[derive(Debug, Clone)]
+/// A transport backend that prints emails to stdout.
+///
+/// # Examples
+///
+/// ```
+/// use cot::email::transport::console::Console;
+///
+/// let console_transport = Console::new();
+/// ```
+#[derive(Debug, Clone, Copy)]
 pub struct Console;
 
 impl Console {
+    /// Create a new console transport backend.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::email::transport::console::Console;
+    ///
+    /// let console_transport = Console::new();
+    /// ```
     pub fn new() -> Self {
         Self {}
     }

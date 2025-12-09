@@ -1,32 +1,31 @@
-//! Email sending functionality using SMTP and other backends
+//! Email sending functionality for Cot.
 //!
-//! #Examples
-//! To send an email using the `EmailBackend`, you need to create an instance of
-//! `SmtpConfig`
-//! ```
-//! use cot::email::{EmailBackend, EmailMessage, SmtpConfig, SmtpEmailBackend};
-//! fn test_send_email_localhsot() {
-//!     // Create a test email
-//!     let email = EmailMessage {
-//!         subject: "Test Email".to_string(),
-//!         from: String::from("<from@cotexample.com>").into(),
-//!         to: vec!["<to@cotexample.com>".to_string()],
-//!         body: "This is a test email sent from Rust.".to_string(),
-//!         alternative_html: Some(
-//!             "<p>This is a test email sent from Rust as HTML.</p>".to_string(),
-//!         ),
-//!         ..Default::default()
-//!     };
-//!     let config = SmtpConfig::default();
-//!     // Create a new email backend
-//!     let mut backend = SmtpEmailBackend::new(config);
-//!     let _ = backend.send_message(&email);
-//! }
+//! This module exposes a high-level `Email` API that can send
+//! [`EmailMessage`] values through a chosen transport backend
+//! (see `transport` submodule for available backends).
+//!
+//! # Examples
+//!
+//! Send using the console transport backend (prints nicely formatted messages):
+//!
+//! ```no_run
+//! use cot::email::transport::console::Console;
+//! use cot::email::{Email, EmailMessage};
+//!
+//! # async fn run() -> cot::Result<()> {
+//! let email = Email::new(Console::new());
+//! let message = EmailMessage::builder()
+//!     .from("no-reply@example.com".into())
+//!     .to(vec!["user@example.com".into()])
+//!     .subject("Greetings")
+//!     .body("Hello from cot!")
+//!     .build()?;
+//! email.send(message).await?;
+//! # Ok(()) }
 //! ```
 
 pub mod transport;
 
-use std::error::Error;
 use std::sync::Arc;
 
 use cot::config::{EmailConfig, EmailTransportTypeConfig};
@@ -35,7 +34,6 @@ use derive_builder::Builder;
 use derive_more::with_trait::Debug;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Body, Mailbox, Message, MultiPart, SinglePart};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use transport::{BoxedTransport, Transport};
 
@@ -47,29 +45,40 @@ use crate::error::error_impl::impl_into_cot_error;
 const ERROR_PREFIX: &str = "email error:";
 
 /// Represents errors that can occur when sending an email.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum EmailError {
-    #[error("transport error: {0}")]
+    /// An error occurred in the transport layer while sending the email.
+    #[error("{ERROR_PREFIX} transport error: {0}")]
     TransportError(String),
     /// An error occurred while building the email message.
-    #[error("message error: {0}")]
+    #[error("{ERROR_PREFIX} message error: {0}")]
     MessageError(String),
     /// A required field is missing in the email message.
-    #[error("missing required field: {0}")]
+    #[error("{ERROR_PREFIX} missing required field: {0}")]
     MissingField(String),
 }
 
 impl_into_cot_error!(EmailError);
+
+/// A convenience alias for results returned by email operations.
 pub type EmailResult<T> = Result<T, EmailError>;
 
+/// Raw attachment data to be embedded into an email.
 #[derive(Debug, Clone)]
 pub struct AttachmentData {
+    /// The filename to display for the attachment.
     filename: String,
+    /// The MIME content type of the attachment (e.g., `image/png`).
     content_type: String,
+    /// The raw bytes of the attachment.
     data: Vec<u8>,
 }
 
+/// A high-level email message representation.
+///
+/// This struct encapsulates the components of an email, including
+/// subject, body, sender, recipients, and attachments.
 #[derive(Debug, Clone, Builder)]
 #[builder(build_fn(skip))]
 pub struct EmailMessage {
@@ -84,6 +93,21 @@ pub struct EmailMessage {
 }
 
 impl EmailMessage {
+    /// Create a new builder for constructing an `EmailMessage`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::email::EmailMessage;
+    ///
+    /// let message = EmailMessage::builder()
+    ///     .from("no-reply@example.com".into())
+    ///     .to(vec!["user@example.com".into()])
+    ///     .subject("Greetings")
+    ///     .body("Hello from cot!")
+    ///     .build()
+    ///     .unwrap();
+    /// ```
     #[must_use]
     pub fn builder() -> EmailMessageBuilder {
         EmailMessageBuilder::default()
@@ -91,6 +115,25 @@ impl EmailMessage {
 }
 
 impl EmailMessageBuilder {
+    /// Build the `EmailMessage`, ensuring required fields are set.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an `EmailError` if required fields are missing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::email::EmailMessage;
+    ///
+    /// let message = EmailMessage::builder()
+    ///     .from("no-reply@example.com".into())
+    ///     .to(vec!["user@example.com".into()])
+    ///     .subject("Greetings")
+    ///     .body("Hello from cot!")
+    ///     .build()
+    ///     .unwrap();
+    /// ```
     pub fn build(&self) -> Result<EmailMessage, EmailError> {
         let from = self
             .from
@@ -119,11 +162,14 @@ impl EmailMessageBuilder {
     }
 }
 
+/// Errors that can occur while building an email message.
 #[derive(Debug, Clone, Error)]
 #[non_exhaustive]
 pub enum MessageBuildError {
+    /// An invalid email address was provided.
     #[error("invalid email address: {0}")]
     InvalidEmailAddress(String),
+    /// Failed to build the email message.
     #[error("failed to build email message: {0}")]
     BuildError(String),
 }
@@ -199,6 +245,30 @@ impl TryFrom<EmailMessage> for Message {
     }
 }
 
+/// A high level email interface for sending emails.
+///
+/// This struct wraps a [`Transport`] implementation to provide
+/// methods for sending single or multiple email messages.
+///
+/// # Examples
+///
+/// ```no_run
+/// use cot::email::{Email, EmailMessage};
+/// use cot::email::transport::console::Console;
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+///     let email = Email::new(Console::new());
+///     let message = EmailMessage::builder()
+///         .from("no-reply@example.com".into())
+///         .to(vec!["user@example.com".into()])
+///         .subject("Greetings")
+///         .body("Hello from cot!")
+///         .build()?;
+///     email.send(message).await?;
+/// # Ok(())
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Email {
     #[debug("..")]
@@ -206,10 +276,41 @@ pub struct Email {
 }
 
 impl Email {
+    /// Create a new email sender using the given transport implementation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::email::transport::console::Console;
+    /// use cot::email::{Email, EmailMessage};
+    ///
+    /// let email = Email::new(Console::new());
+    /// ```
     pub fn new(transport: impl Transport) -> Self {
         let transport: Arc<dyn BoxedTransport> = Arc::new(transport);
         Self { transport }
     }
+    /// Send a single [`EmailMessage`]
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::email::{Email, EmailMessage};
+    /// use cot::email::transport::console::Console;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    ///     let email = Email::new(Console::new());
+    ///     let message = EmailMessage::builder()
+    ///         .from("no-reply@example.com".into())
+    ///         .to(vec!["user@example.com".into()])
+    ///         .subject("Greetings")
+    ///         .body("Hello from cot!")
+    ///         .build()?
+    ///    email.send(message).await?;
+    /// # Ok(())
+    /// }
+    /// ```
     pub async fn send(&self, message: EmailMessage) -> EmailResult<()> {
         self.transport
             .send(&[message])
@@ -217,6 +318,34 @@ impl Email {
             .map_err(|err| EmailError::TransportError(err.to_string()))
     }
 
+    /// Send multiple emails in sequence.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::email::{Email, EmailMessage};
+    /// use cot::email::transport::console::Console;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    ///     let email = Email::new(Console::new());
+    ///     let message1 = EmailMessage::builder()
+    ///         .from("no-reply@email.com".into())
+    ///         .to(vec!["user1@example.com".into()])
+    ///         .subject("Hello User 1")
+    ///         .body("This is the first email.")
+    ///         .build()?;
+    ///
+    ///     let message2 = EmailMessage::builder()
+    ///         .from("no-reply@email.com".into())
+    ///         .to(vec!["user2@example.com".into()])
+    ///         .subject("Hello User 2")
+    ///         .body("This is the second email.")
+    ///         .build()?;
+    ///     email.send_multiple(&[message1, message2]).await?;
+    /// # Ok(())
+    /// }
+    /// ```
     pub async fn send_multiple(&self, messages: &[EmailMessage]) -> EmailResult<()> {
         self.transport
             .send(messages)
@@ -224,6 +353,21 @@ impl Email {
             .map_err(|err| EmailError::TransportError(err.to_string()))
     }
 
+    /// Construct an [`Email`] from the provided [`EmailConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{EmailConfig, EmailTransportTypeConfig};
+    /// use cot::email::Email;
+    /// use cot::email::transport::console::Console;
+    ///
+    /// let config = EmailConfig {
+    ///     transport: EmailTransportTypeConfig::Console,
+    ///     ..Default::default()
+    /// };
+    /// let email = Email::from_config(&config);
+    /// ```
     pub fn from_config(config: &EmailConfig) -> Self {
         let transport = &config.transport;
 
@@ -240,8 +384,7 @@ impl Email {
                     mechanism,
                     server: host,
                 } => {
-                    let credentials =
-                        SMTPCredentials::new(auth_id.clone(), Password::from(secret.clone()));
+                    let credentials = SMTPCredentials::new(auth_id, Password::from(secret.clone()));
                     let smtp = SMTP::new(credentials, host.clone(), mechanism.clone());
                     Self::new(smtp)
                 }

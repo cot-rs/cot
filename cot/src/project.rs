@@ -23,7 +23,7 @@
 use std::future::poll_fn;
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use askama::Template;
 use async_trait::async_trait;
@@ -46,7 +46,7 @@ use crate::cli::Cli;
 use crate::config::CacheConfig;
 #[cfg(feature = "db")]
 use crate::config::DatabaseConfig;
-use crate::config::{AuthBackendConfig, EmailConfig, EmailTransportTypeConfig, ProjectConfig};
+use crate::config::{AuthBackendConfig, ProjectConfig};
 #[cfg(feature = "db")]
 use crate::db::Database;
 #[cfg(feature = "db")]
@@ -1944,6 +1944,20 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
 #[cfg(feature = "email")]
 impl<S: BootstrapPhase<Email = Arc<Email>>> ProjectContext<S> {
     #[must_use]
+    /// Returns the email service for the project.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn index(request: Request) -> cot::Result<Response> {
+    ///     let email = request.context().email();
+    ///     // ...
+    /// #    unimplemented!()
+    /// }
+    /// ```
     pub fn email(&self) -> &Arc<Email> {
         &self.email
     }

@@ -159,3 +159,33 @@ impl fmt::Display for EmailMessage {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_formats_minimal_message() {
+        let msg = EmailMessage::builder()
+            .from(crate::common_types::Email::new("sender@example.com").unwrap())
+            .build()
+            .unwrap();
+        let s = format!("{}", msg);
+        assert!(s.contains("From    : sender@example.com"));
+        assert!(s.contains("To      : -"));
+        assert!(s.contains("Subject : -"));
+        assert!(s.contains("<empty>"));
+        assert!(s.contains("Attachments: -"));
+    }
+
+    #[cot::test]
+    async fn console_error_to_transport_error() {
+        let console_error = ConsoleError::Io(io::Error::new(io::ErrorKind::Other, "test error"));
+        let transport_error: TransportError = console_error.into();
+
+        assert_eq!(
+            transport_error.to_string(),
+            "email transport error: transport error: console transport error: IO error: test error"
+        )
+    }
+}

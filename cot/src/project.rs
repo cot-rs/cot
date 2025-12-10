@@ -51,6 +51,7 @@ use crate::config::{AuthBackendConfig, ProjectConfig};
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
+#[cfg(feature = "email")]
 use crate::email::Email;
 use crate::error::UncaughtPanic;
 use crate::error::error_impl::impl_into_cot_error;
@@ -1730,7 +1731,13 @@ impl ProjectContext<Uninitialized> {
     }
 
     fn with_config(self, config: ProjectConfig) -> ProjectContext<WithConfig> {
-        let email = Arc::new(Email::from_config(&config.email));
+        #[cfg(feature = "email")]
+        let email = {
+            let e = Email::from_config(&config.email).unwrap_or_else(|err| {
+                panic!("failed to initialize email service: {}", err);
+            });
+            Arc::new(e)
+        };
 
         ProjectContext {
             config: Arc::new(config),

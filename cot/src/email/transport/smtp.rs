@@ -23,13 +23,13 @@
 //! email.send(msg).await?;
 //! # Ok(()) }
 //! ```
+use cot::config::EmailUrl;
 use cot::email::EmailMessage;
-use lettre::transport::smtp::authentication::Credentials;
+use lettre::transport::smtp;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::common_types::Password;
 use crate::email::transport::{Transport, TransportError, TransportResult};
 
 const ERROR_PREFIX: &str = "smtp transport error:";
@@ -44,6 +44,9 @@ pub enum SMTPError {
     /// An error occurred while sending the email via SMTP.
     #[error("{ERROR_PREFIX} send error: {0}")]
     SmtpSend(Box<dyn std::error::Error + Send + Sync>),
+    /// An error occured while creating the transport.
+    #[error("{ERROR_PREFIX} transport creation error: {0}")]
+    TransportCreation(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<SMTPError> for TransportError {
@@ -70,64 +73,12 @@ pub enum Mechanism {
     Xoauth2,
 }
 
-impl From<Mechanism> for lettre::transport::smtp::authentication::Mechanism {
+impl From<Mechanism> for smtp::authentication::Mechanism {
     fn from(mechanism: Mechanism) -> Self {
         match mechanism {
-            Mechanism::Plain => lettre::transport::smtp::authentication::Mechanism::Plain,
-            Mechanism::Login => lettre::transport::smtp::authentication::Mechanism::Login,
-            Mechanism::Xoauth2 => lettre::transport::smtp::authentication::Mechanism::Xoauth2,
-        }
-    }
-}
-
-/// Credentials used to authenticate to an SMTP server.
-#[derive(Debug, Clone)]
-pub struct SMTPCredentials {
-    auth_id: String,
-    secret: Password,
-}
-
-impl SMTPCredentials {
-    /// Create a new set of credentials.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::common_types::Password;
-    /// use cot::email::transport::smtp::SMTPCredentials;
-    ///
-    /// let creds = SMTPCredentials::new("testuser", Password::from("secret"));
-    /// ```
-    pub fn new<S: Into<String>>(username: S, password: Password) -> Self {
-        Self {
-            auth_id: username.into(),
-            secret: password,
-        }
-    }
-}
-
-impl From<SMTPCredentials> for Credentials {
-    fn from(credentials: SMTPCredentials) -> Self {
-        Credentials::new(credentials.auth_id, credentials.secret.into_string())
-    }
-}
-
-/// The SMTP host/server to connect to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SMTPServer {
-    /// Google's SMTP server.
-    Gmail,
-    /// Localhost SMTP server.
-    Localhost,
-}
-
-impl SMTPServer {
-    /// Returns the hostname for the server.
-    pub fn as_str(&self) -> &str {
-        match self {
-            SMTPServer::Gmail => "smtp.gmail.com",
-            SMTPServer::Localhost => "localhost",
+            Mechanism::Plain => smtp::authentication::Mechanism::Plain,
+            Mechanism::Login => smtp::authentication::Mechanism::Login,
+            Mechanism::Xoauth2 => smtp::authentication::Mechanism::Xoauth2,
         }
     }
 }
@@ -155,9 +106,7 @@ impl SMTPServer {
 /// # Ok(()) }
 #[derive(Debug, Clone)]
 pub struct SMTP {
-    credentials: SMTPCredentials,
-    host: SMTPServer,
-    mechanism: Mechanism,
+    transport: AsyncSmtpTransport<Tokio1Executor>,
 }
 
 impl SMTP {
@@ -172,31 +121,67 @@ impl SMTP {
     /// let creds = SMTPCredentials::new("username", Password::from("password"));
     /// let smtp = SMTP::new(creds, SMTPServer::Gmail, Mechanism::Plain);
     /// ```
-    pub fn new(credentials: SMTPCredentials, host: SMTPServer, mechanism: Mechanism) -> Self {
-        Self {
-            credentials,
-            host,
-            mechanism,
-        }
+    pub fn new(url: &EmailUrl, mechanism: Mechanism) -> TransportResult<Self> {
+        let transport = AsyncSmtpTransport::<Tokio1Executor>::from_url(url.as_str())
+            .map_err(|err| SMTPError::TransportCreation(Box::new(err)))?
+            .authentication(vec![mechanism.into()])
+            .build();
+
+        Ok(SMTP { transport })
     }
 }
 
 impl Transport for SMTP {
     async fn send(&self, messages: &[EmailMessage]) -> TransportResult<()> {
-        let mechanisms: Vec<lettre::transport::smtp::authentication::Mechanism> =
-            vec![self.mechanism.clone().into()];
         for message in messages {
             let m = Message::try_from(message.clone())?;
-            let mailer = AsyncSmtpTransport::<Tokio1Executor>::relay(self.host.as_str())
-                .map_err(|err| SMTPError::SmtpSend(Box::new(err)))?
-                .credentials(self.credentials.clone().into())
-                .authentication(mechanisms.clone())
-                .build();
-            mailer
+            self.transport
                 .send(m)
                 .await
                 .map_err(|err| SMTPError::SmtpSend(Box::new(err)))?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cot::test]
+    async fn test_smtp_creation() {
+        let url = EmailUrl::from("smtp://user:pass@smtp.gmail.com:587");
+        let smtp = SMTP::new(&url, Mechanism::Plain);
+        assert!(smtp.is_ok());
+    }
+
+    #[cot::test]
+    async fn test_smtp_error_to_transport_error() {
+        let smtp_error = SMTPError::SmtpSend(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "test",
+        )));
+        let transport_error: TransportError = smtp_error.into();
+        assert_eq!(
+            transport_error.to_string(),
+            "email transport error: transport error: smtp transport error: send error: test"
+        );
+
+        let smtp_error = SMTPError::TransportCreation(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "test",
+        )));
+        let transport_error: TransportError = smtp_error.into();
+        assert_eq!(
+            transport_error.to_string(),
+            "email transport error: transport error: smtp transport error: transport creation error: test"
+        );
+
+        let smtp_error = SMTPError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test"));
+        let transport_error: TransportError = smtp_error.into();
+        assert_eq!(
+            transport_error.to_string(),
+            "email transport error: transport error: smtp transport error: IO error: test"
+        )
     }
 }

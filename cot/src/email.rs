@@ -37,9 +37,8 @@ use lettre::message::{Attachment, Body, Mailbox, Message, MultiPart, SinglePart}
 use thiserror::Error;
 use transport::{BoxedTransport, Transport};
 
-use crate::common_types::Password;
+use crate::email::transport::TransportError;
 use crate::email::transport::console::Console;
-use crate::email::transport::smtp::SMTPCredentials;
 use crate::error::error_impl::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "email error:";
@@ -49,11 +48,11 @@ const ERROR_PREFIX: &str = "email error:";
 #[non_exhaustive]
 pub enum EmailError {
     /// An error occurred in the transport layer while sending the email.
-    #[error("{ERROR_PREFIX} transport error: {0}")]
-    TransportError(String),
+    #[error(transparent)]
+    Transport(TransportError),
     /// An error occurred while building the email message.
     #[error("{ERROR_PREFIX} message error: {0}")]
-    MessageError(String),
+    Message(String),
     /// A required field is missing in the email message.
     #[error("{ERROR_PREFIX} missing required field: {0}")]
     MissingField(String),
@@ -82,13 +81,23 @@ pub struct AttachmentData {
 #[derive(Debug, Clone, Builder)]
 #[builder(build_fn(skip))]
 pub struct EmailMessage {
+    /// The subject of the email.
+    #[builder(setter(into))]
     subject: String,
+    /// The body content of the email.
+    #[builder(setter(into))]
     body: String,
+    /// The sender's email address.
     from: crate::common_types::Email,
+    /// The primary recipients of the email.
     to: Vec<crate::common_types::Email>,
+    /// The carbon copy (CC) recipients of the email.
     cc: Vec<crate::common_types::Email>,
+    /// The blind carbon copy (BCC) recipients of the email.
     bcc: Vec<crate::common_types::Email>,
+    /// The reply-to addresses for the email.
     reply_to: Vec<crate::common_types::Email>,
+    /// Attachments to include with the email.
     attachments: Vec<AttachmentData>,
 }
 
@@ -315,7 +324,7 @@ impl Email {
         self.transport
             .send(&[message])
             .await
-            .map_err(|err| EmailError::TransportError(err.to_string()))
+            .map_err(EmailError::Transport)
     }
 
     /// Send multiple emails in sequence.
@@ -350,7 +359,7 @@ impl Email {
         self.transport
             .send(messages)
             .await
-            .map_err(|err| EmailError::TransportError(err.to_string()))
+            .map_err(EmailError::Transport)
     }
 
     /// Construct an [`Email`] from the provided [`EmailConfig`].
@@ -368,7 +377,7 @@ impl Email {
     /// };
     /// let email = Email::from_config(&config);
     /// ```
-    pub fn from_config(config: &EmailConfig) -> Self {
+    pub fn from_config(config: &EmailConfig) -> EmailResult<Self> {
         let transport = &config.transport;
 
         let this = {
@@ -378,29 +387,118 @@ impl Email {
                     Self::new(console)
                 }
 
-                EmailTransportTypeConfig::Smtp {
-                    auth_id,
-                    secret,
-                    mechanism,
-                    server: host,
-                } => {
-                    let credentials = SMTPCredentials::new(auth_id, Password::from(secret.clone()));
-                    let smtp = SMTP::new(credentials, host.clone(), mechanism.clone());
+                EmailTransportTypeConfig::Smtp { url, mechanism } => {
+                    let smtp = SMTP::new(url, mechanism.clone()).map_err(EmailError::Transport)?;
                     Self::new(smtp)
                 }
             }
         };
-        this
+        Ok(this)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::EmailUrl;
 
-    #[test]
-    fn test_email_error_variants() {
-        let message_error = EmailError::MessageError("Invalid message".to_string());
-        assert_eq!(format!("{message_error}"), "Message error: Invalid message");
+    #[cot::test]
+    async fn builder_errors_when_from_missing() {
+        let res = EmailMessage::builder()
+            .subject("Hello".to_string())
+            .body("World".to_string())
+            .build();
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.to_string(), "email error: missing required field: from");
+    }
+
+    #[cot::test]
+    async fn builder_defaults_when_only_from_set() {
+        let msg = EmailMessage::builder()
+            .from(crate::common_types::Email::new("sender@example.com").unwrap())
+            .build()
+            .expect("should build with defaults");
+        assert_eq!(msg.subject, "");
+        assert_eq!(msg.body, "");
+        assert!(msg.to.is_empty());
+        assert!(msg.cc.is_empty());
+        assert!(msg.bcc.is_empty());
+        assert!(msg.reply_to.is_empty());
+        assert!(msg.attachments.is_empty());
+    }
+
+    #[cot::test]
+    async fn from_config_console_builds() {
+        use crate::config::{EmailConfig, EmailTransportTypeConfig};
+        let cfg = EmailConfig {
+            transport: crate::config::EmailTransportConfig {
+                transport_type: EmailTransportTypeConfig::Console,
+            },
+            ..Default::default()
+        };
+        let _email = Email::from_config(&cfg);
+        // We can't introspect the inner transport, but construction should not
+        // panic.
+    }
+
+    #[cot::test]
+    async fn from_config_smtp_builds() {
+        use crate::config::{EmailConfig, EmailTransportTypeConfig};
+        use crate::email::transport::smtp::Mechanism;
+
+        let cfg = EmailConfig {
+            transport: crate::config::EmailTransportConfig {
+                transport_type: EmailTransportTypeConfig::Smtp {
+                    url: EmailUrl::from("smtp://localhost:1025"),
+                    mechanism: Mechanism::Plain,
+                },
+            },
+            ..Default::default()
+        };
+        let _email = Email::from_config(&cfg);
+    }
+
+    #[cot::test]
+    async fn email_send_console() {
+        let console = Console::new();
+        let email = Email::new(console);
+        let msg = EmailMessage::builder()
+            .from(crate::common_types::Email::new("user@example.com").unwrap())
+            .to(vec![
+                crate::common_types::Email::new("recipient@example.com").unwrap(),
+            ])
+            .subject("Test Email".to_string())
+            .body("This is a test email body.".to_string())
+            .build()
+            .unwrap();
+
+        assert!(email.send(msg).await.is_ok())
+    }
+
+    #[cot::test]
+    async fn email_send_multiple_console() {
+        let console = Console::new();
+        let email = Email::new(console);
+        let msg1 = EmailMessage::builder()
+            .from(crate::common_types::Email::new("user1@example.com").unwrap())
+            .to(vec![
+                crate::common_types::Email::new("recipient@example.com").unwrap(),
+            ])
+            .subject("Test Email")
+            .body("This is a test email body.")
+            .build()
+            .unwrap();
+
+        let msg2 = EmailMessage::builder()
+            .from(crate::common_types::Email::new("user2@example.com").unwrap())
+            .to(vec![
+                crate::common_types::Email::new("user2@example.com").unwrap(),
+            ])
+            .subject("Another Test Email")
+            .body("This is another test email body.")
+            .build()
+            .unwrap();
+        assert!(email.send_multiple(&[msg1, msg2]).await.is_ok());
     }
 }

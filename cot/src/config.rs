@@ -25,9 +25,8 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
-use crate::email::transport::smtp::Mechanism;
 #[cfg(feature = "email")]
-use crate::email::transport::smtp::SMTPServer;
+use crate::email::transport::smtp::Mechanism;
 use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
@@ -270,6 +269,7 @@ pub struct ProjectConfig {
     /// assert_eq!(config.email, EmailConfig::default());
     /// # Ok::<(), cot::Error>(())
     /// ```
+    #[cfg(feature = "email")]
     pub email: EmailConfig,
 }
 
@@ -1845,22 +1845,56 @@ pub enum EmailTransportTypeConfig {
     /// This backend sends emails using the Simple Mail Transfer Protocol
     /// (SMTP). It requires authentication details and server configuration.
     Smtp {
-        /// The authentication ID (username) for the SMTP server.
-        /// For `plain` and `xoauth2` mechanisms, this is typically the email
-        /// address. For `login` mechanism, this is the login username.
-        auth_id: String,
-        /// The secret (password or token) for the SMTP server.
-        /// For `plain` and `login` mechanisms, this is typically the password.
-        /// For `xoauth2` this is the OAuth2 token.
-        secret: String,
+        /// The SMTP connection URL.
+        ///
+        /// This specifies the protocol, credentials, host, port, and EHLO
+        /// domain for connecting to the SMTP server.
+        ///
+        /// The URL format is:
+        /// `scheme://user:password@host:port/?ehlo_domain=domain?tls=TLS`.
+        ///
+        /// `user`(username) and `password` are optional in the case the
+        /// server does not require authentication.
+        /// When `port` is not specified, it is automatically determined based
+        /// on the `scheme` used.
+        /// `tls` is used to specify whether STARTTLS should be used for the
+        /// connection. Supported values for `tls` are:
+        /// - `required`: Always use STARTTLS. The connection will fail if the
+        ///   server does not support it.
+        /// - `opportunistic`: Use STARTTLS if the server supports it, otherwise
+        ///   fall back to plain connection.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use cot::config::EmailTransportTypeConfig;
+        ///
+        /// let smtp_config = EmailTransportTypeConfig::Smtp {
+        ///     url: Email::from("smtps://username:password@smtp.gmail.com?tls=required"),
+        ///     mechanism: Mechanism::Plain,
+        /// };
+        /// ```
+        ///
+        /// # TOML Configuration
+        ///
+        /// ```toml
+        /// [email]
+        /// type = "smtp"
+        /// url = "smtps://username:password@smtp.gmail.com?tls=required"
+        /// ```
+        url: EmailUrl,
         /// The authentication mechanism to use.
         /// Supported mechanisms are `plain`, `login`, and `xoauth2`.
-        mechanism: Mechanism,
-        /// The SMTP server configuration.
         ///
-        /// This configures what SMTP server to connect to. The supported
-        /// servers are `gmail` and `localhost`
-        server: SMTPServer,
+        /// # TOML Configuration
+        ///
+        /// ```toml
+        /// [email]
+        /// type = "smtp"
+        /// url = "smtps://username:password@smtp.gmail.com?tls=required"
+        /// mechanism = "plain" # or "login", "xoauth2"
+        /// ```
+        mechanism: Mechanism,
     },
 }
 
@@ -2371,6 +2405,54 @@ fn conceal_url_parts(url: &url::Url) -> url::Url {
 impl std::fmt::Display for CacheUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.0.as_str())
+    }
+}
+
+/// A URL for email services.
+///
+/// This is a wrapper over the [`url::Url`] type, which is used to store the
+/// URL of an email service. It parses the URL and ensures that it is valid.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::EmailUrl;
+/// let url = EmailUrl::from("smtp://user:pass@hostname:587");
+/// ```
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+#[cfg(feature = "email")]
+pub struct EmailUrl(url::Url);
+
+#[cfg(feature = "email")]
+impl EmailUrl {
+    /// Returns the string representation of the email URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailUrl;
+    ///
+    /// let url = EmailUrl::from("smtp://user:pass@hostname:587");
+    /// assert_eq!(url.as_str(), "smtp://user:pass@hostname:587");
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+#[cfg(feature = "email")]
+impl From<String> for EmailUrl {
+    fn from(url: String) -> Self {
+        Self(url::Url::parse(&url).expect("valid URL"))
+    }
+}
+
+#[cfg(feature = "email")]
+impl From<&str> for EmailUrl {
+    fn from(url: &str) -> Self {
+        Self(url::Url::parse(url).expect("valid URL"))
     }
 }
 
@@ -2978,5 +3060,50 @@ mod tests {
 
         let never = Timeout::Never;
         assert_eq!(never.canonicalize(), Timeout::Never);
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn email_config_from_toml_console() {
+        let toml_content = r#"
+            [email]
+            type = "console"
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(
+            config.email.transport.transport_type,
+            EmailTransportTypeConfig::Console
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn email_config_from_toml_smtp() {
+        let toml_content = r#"
+            [email]
+            type = "smtp"
+            url = "smtp://user:pass@hostname:587"
+            mechanism = "plain"
+        "#;
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        if let EmailTransportTypeConfig::Smtp { url, mechanism } =
+            &config.email.transport.transport_type
+        {
+            assert_eq!(url.as_str(), "smtp://user:pass@hostname:587");
+            assert_eq!(*mechanism, Mechanism::Plain);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn email_config_builder_defaults() {
+        let config = EmailConfig::builder().build();
+        assert_eq!(
+            config.transport.transport_type,
+            EmailTransportTypeConfig::Console
+        );
     }
 }

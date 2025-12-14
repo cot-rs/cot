@@ -46,9 +46,12 @@ rust_2018_idioms = { level = "warn", priority = -1 }
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
-pedantic = "warn"
+pedantic = { level = "warn", priority = -1 }
 future_not_send = "warn"
 allow_attributes = "warn"
+# TODO: consider removing this if/when this is fixed:
+# https://github.com/rust-lang/rust-clippy/issues/16175
+needless_continue = "allow"
 
 [workspace.dependencies]
 ahash = { version = "0.8.12", default-features = false }

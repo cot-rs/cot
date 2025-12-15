@@ -131,10 +131,23 @@ impl LiveReloadMiddleware {
             (
                 IntoCotErrorLayer::new(),
                 IntoCotResponseLayer::new(),
-                tower_livereload::LiveReloadLayer::new(),
+                Self::create_live_reload_layer(),
             )
         });
         Self(tower::util::option_layer(option_layer))
+    }
+
+    fn create_live_reload_layer() -> tower_livereload::LiveReloadLayer {
+        let layer = tower_livereload::LiveReloadLayer::new();
+        let reloader = layer.reloader();
+        subsecond::register_handler(std::sync::Arc::new(move || {
+            reloader.reload();
+            if let Some(notify) = crate::project::RELOAD_NOTIFY.get() {
+                println!("reloading connected clients");
+                notify.notify_waiters();
+            }
+        }));
+        layer
     }
 }
 

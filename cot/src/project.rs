@@ -1386,6 +1386,7 @@ impl Bootstrapper<WithCache> {
         let auth_backend = self.project.auth_backend(&self.context);
         let context = self.context.with_auth(auth_backend);
 
+        // dioxus_devtools::
         Ok(Bootstrapper {
             project: self.project,
             context,
@@ -2140,7 +2141,7 @@ pub async fn run_at_with_shutdown(
         };
         std::panic::set_hook(Box::new(new_hook));
     }
-    axum::serve(listener, handler.into_make_service())
+    axum::serve(ResetListener::new(listener), handler.into_make_service())
         .with_graceful_shutdown(shutdown_signal)
         .await
         .map_err(StartServerError)?;
@@ -2153,6 +2154,121 @@ pub async fn run_at_with_shutdown(
     }
 
     Ok(())
+}
+
+pub(crate) static RELOAD_NOTIFY: std::sync::OnceLock<Arc<tokio::sync::Notify>> =
+    std::sync::OnceLock::new();
+
+#[derive(Debug)]
+struct ResetListener {
+    inner: tokio::net::TcpListener,
+}
+
+impl ResetListener {
+    fn new(inner: tokio::net::TcpListener) -> Self {
+        Self { inner }
+    }
+}
+
+impl axum::serve::Listener for ResetListener {
+    type Io = ResetStream;
+    type Addr = std::net::SocketAddr;
+
+    async fn accept(&mut self) -> (Self::Io, Self::Addr) {
+        loop {
+            match self.inner.accept().await {
+                Ok((stream, addr)) => {
+                    let notify = RELOAD_NOTIFY.get_or_init(|| Arc::new(tokio::sync::Notify::new()));
+                    let notify = notify.clone();
+                    return (
+                        ResetStream {
+                            inner: stream,
+                            reset_fut: Box::pin(async move { notify.notified().await }),
+                        },
+                        addr,
+                    );
+                }
+                Err(_err) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                }
+            }
+        }
+    }
+
+    fn local_addr(&self) -> std::io::Result<Self::Addr> {
+        self.inner.local_addr()
+    }
+}
+
+struct ResetStream {
+    inner: tokio::net::TcpStream,
+    reset_fut: std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
+}
+
+impl Debug for ResetStream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResetStream")
+            .field("inner", &self.inner)
+            .finish()
+    }
+}
+
+impl tokio::io::AsyncRead for ResetStream {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        if self.reset_fut.as_mut().poll(cx).is_ready() {
+            return std::task::Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionReset,
+                "connection reset by live reload",
+            )));
+        }
+        std::pin::Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
+}
+
+impl tokio::io::AsyncWrite for ResetStream {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        if self.reset_fut.as_mut().poll(cx).is_ready() {
+            return std::task::Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionReset,
+                "connection reset by live reload",
+            )));
+        }
+        std::pin::Pin::new(&mut self.inner).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        if self.reset_fut.as_mut().poll(cx).is_ready() {
+            return std::task::Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionReset,
+                "connection reset by live reload",
+            )));
+        }
+        std::pin::Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        if self.reset_fut.as_mut().poll(cx).is_ready() {
+            return std::task::Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionReset,
+                "connection reset by live reload",
+            )));
+        }
+        std::pin::Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
 }
 
 #[derive(Debug, Error)]

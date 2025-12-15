@@ -65,7 +65,8 @@ pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
             &self,
             request: Request,
         ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + '_>> {
-            Box::pin(self.0.handle(request))
+            let mut hot_fn = subsecond::HotFn::current(|req| self.0.handle(req));
+            Box::pin(hot_fn.call((request,)))
         }
     }
 
@@ -98,7 +99,8 @@ macro_rules! impl_request_handler {
                     let $ty = <$ty as FromRequestHead>::from_request_head(&head).await?;
                 )*
 
-                self.clone()($($ty,)*).await.into_response()
+                let mut hot_fn = subsecond::HotFn::current(move |$($ty,)*| self.clone()($($ty,)*));
+                hot_fn.call(($($ty,)*)).await.into_response()
             }
         }
     };
@@ -136,7 +138,12 @@ macro_rules! impl_request_handler_from_request {
 
                 let $ty_from_request = $ty_from_request::from_request(&head, body).await?;
 
-                self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*).await.into_response()
+                let mut hot_fn = subsecond::HotFn::current(
+                    move |($($ty_lhs,)* $ty_from_request, $($ty_rhs),*)| {
+                        self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*)
+                    }
+                );
+                hot_fn.call((($($ty_lhs,)* $ty_from_request, $($ty_rhs),*),)).await.into_response()
             }
         }
     };
@@ -154,7 +161,7 @@ macro_rules! handle_all_parameters {
         $name!(P1, P2, P3, P4, P5, P6, P7);
         $name!(P1, P2, P3, P4, P5, P6, P7, P8);
         $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9);
-        $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
+        // $name!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
     };
 }
 

@@ -7,7 +7,7 @@ members = [
     # Examples
     "examples/admin",
     "examples/custom-error-pages",
-#    "examples/send-email",
+    "examples/send-email",
     "examples/custom-task",
     "examples/file-upload",
     "examples/hello-world",

@@ -1734,7 +1734,7 @@ impl ProjectContext<Uninitialized> {
         #[cfg(feature = "email")]
         let email = {
             let e = Email::from_config(&config.email).unwrap_or_else(|err| {
-                panic!("failed to initialize email service: {}", err);
+                panic!("failed to initialize email service: {err:?}");
             });
             Arc::new(e)
         };

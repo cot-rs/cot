@@ -8,12 +8,12 @@
 //!
 //! ```no_run
 //! use cot::common_types::Password;
-//! use cot::email::transport::smtp::{Mechanism, SMTP, SMTPCredentials, SMTPServer};
+//! use cot::email::transport::smtp::{Mechanism, Smtp, SMTPCredentials, SMTPServer};
 //! use cot::email::{Email, EmailMessage};
 //!
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
 //! let creds = SMTPCredentials::new("user@example.com", Password::from("secret"));
-//! let smtp = SMTP::new(creds, SMTPServer::Gmail, Mechanism::Plain);
+//! let smtp = Smtp::new(creds, SMTPServer::Gmail, Mechanism::Plain);
 //! let email = Email::new(smtp);
 //! let msg = EmailMessage::builder()
 //!     .from("user@example.com".into())
@@ -89,12 +89,12 @@ impl From<Mechanism> for smtp::authentication::Mechanism {
 ///
 /// ```no_run
 /// use cot::email::{Email, EmailMessage};
-/// use cot::email::transport::smtp::{SMTP, SMTPCredentials, SMTPServer, Mechanism};
+/// use cot::email::transport::smtp::{Smtp, SMTPCredentials, SMTPServer, Mechanism};
 /// use cot::common_types::Password;
 ///
 /// # async fn run() -> cot::Result<()> {
 /// let creds = SMTPCredentials::new("username", Password::from("password"));
-/// let smtp = SMTP::new(creds, SMTPServer::Gmail, Mechanism::Plain);
+/// let smtp = Smtp::new(creds, SMTPServer::Gmail, Mechanism::Plain);
 /// let email = Email::new(smtp);
 /// let recipients = vec!["testreceipient@example.com".into()];
 /// let msg = EmailMessage::builder()
@@ -105,21 +105,25 @@ impl From<Mechanism> for smtp::authentication::Mechanism {
 /// email.send(msg).await?;
 /// # Ok(()) }
 #[derive(Debug, Clone)]
-pub struct SMTP {
+pub struct Smtp {
     transport: AsyncSmtpTransport<Tokio1Executor>,
 }
 
-impl SMTP {
+impl Smtp {
     /// Create a new SMTP transport backend.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `TransportError` if the Smtp backend creation failed.
     ///
     /// # Examples
     ///
     /// ```
     /// use cot::common_types::Password;
-    /// use cot::email::transport::smtp::{Mechanism, SMTP, SMTPCredentials, SMTPServer};
+    /// use cot::email::transport::smtp::{Mechanism, Smtp, SMTPCredentials, SMTPServer};
     ///
     /// let creds = SMTPCredentials::new("username", Password::from("password"));
-    /// let smtp = SMTP::new(creds, SMTPServer::Gmail, Mechanism::Plain);
+    /// let smtp = Smtp::new(creds, SMTPServer::Gmail, Mechanism::Plain);
     /// ```
     pub fn new(url: &EmailUrl, mechanism: Mechanism) -> TransportResult<Self> {
         let transport = AsyncSmtpTransport::<Tokio1Executor>::from_url(url.as_str())
@@ -127,11 +131,11 @@ impl SMTP {
             .authentication(vec![mechanism.into()])
             .build();
 
-        Ok(SMTP { transport })
+        Ok(Smtp { transport })
     }
 }
 
-impl Transport for SMTP {
+impl Transport for Smtp {
     async fn send(&self, messages: &[EmailMessage]) -> TransportResult<()> {
         for message in messages {
             let m = Message::try_from(message.clone())?;
@@ -151,37 +155,31 @@ mod tests {
     #[cot::test]
     async fn test_smtp_creation() {
         let url = EmailUrl::from("smtp://user:pass@smtp.gmail.com:587");
-        let smtp = SMTP::new(&url, Mechanism::Plain);
+        let smtp = Smtp::new(&url, Mechanism::Plain);
         assert!(smtp.is_ok());
     }
 
     #[cot::test]
     async fn test_smtp_error_to_transport_error() {
-        let smtp_error = SMTPError::SmtpSend(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "test",
-        )));
+        let smtp_error = SMTPError::SmtpSend(Box::new(std::io::Error::other("test")));
         let transport_error: TransportError = smtp_error.into();
         assert_eq!(
             transport_error.to_string(),
             "email transport error: transport error: smtp transport error: send error: test"
         );
 
-        let smtp_error = SMTPError::TransportCreation(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "test",
-        )));
+        let smtp_error = SMTPError::TransportCreation(Box::new(std::io::Error::other("test")));
         let transport_error: TransportError = smtp_error.into();
         assert_eq!(
             transport_error.to_string(),
             "email transport error: transport error: smtp transport error: transport creation error: test"
         );
 
-        let smtp_error = SMTPError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test"));
+        let smtp_error = SMTPError::Io(std::io::Error::other("test"));
         let transport_error: TransportError = smtp_error.into();
         assert_eq!(
             transport_error.to_string(),
             "email transport error: transport error: smtp transport error: IO error: test"
-        )
+        );
     }
 }

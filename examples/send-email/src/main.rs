@@ -1,64 +1,118 @@
+use askama::Template;
 use cot::cli::CliMetadata;
-use cot::config::{DatabaseConfig, EmailConfig, EmailTransportTypeConfig, ProjectConfig};
-use cot::email::{EmailBackend, EmailMessage, SmtpTransportMode};
+use cot::common_types::Email;
+use cot::config::{EmailConfig, EmailTransportConfig, EmailTransportTypeConfig, ProjectConfig};
+use cot::email::EmailMessage;
 use cot::form::Form;
 use cot::html::Html;
-use cot::project::RegisterAppsContext;
+use cot::middleware::LiveReloadMiddleware;
+use cot::project::{RegisterAppsContext, RootHandler};
+use cot::request::extractors::{StaticFiles, UrlQuery};
 use cot::request::{Request, RequestExt};
-use cot::router::{Route, Router};
-use cot::{App, AppBuilder, Project};
+use cot::response::Response;
+use cot::router::{Route, Router, Urls};
+use cot::static_files::{StaticFile, StaticFilesMiddleware};
+use cot::{reverse_redirect, static_files, App, AppBuilder, Project};
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 struct EmailApp;
 
 impl App for EmailApp {
-    fn name(&self) -> &str {
-        "email"
+    fn name(&self) -> &'static str {
+        env!("CARGO_CRATE_NAME")
     }
 
     fn router(&self) -> Router {
         Router::with_urls([
-            Route::with_handler_and_name("/", email_form, "email_form"),
+            Route::with_handler_and_name("/", index, "index/"),
             Route::with_handler_and_name("/send", send_email, "send_email"),
         ])
     }
+
+    fn static_files(&self) -> Vec<StaticFile> {
+        static_files!("css/main.css")
+    }
 }
 
-async fn email_form(_request: Request) -> cot::Result<Html> {
-    let template = String::from(include_str!("../templates/index.html"));
-    Ok(Html::new(template))
-}
 #[derive(Debug, Form)]
 struct EmailForm {
-    from: String,
-    to: String,
+    from: Email,
+    to: Email,
     subject: String,
-    body: String,
+    message: String,
 }
-async fn send_email(mut request: Request) -> cot::Result<Html> {
-    let form = EmailForm::from_request(&mut request).await?.unwrap();
 
-    let from = form.from;
-    let to = form.to;
-    let subject = form.subject;
-    let body = form.body;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum Status {
+    Success,
+    Failure,
+}
 
-    // Create the email
-    let email = EmailMessage {
-        subject,
-        from: from.into(),
-        to: vec![to],
-        body,
-        alternative_html: None,
-        ..Default::default()
-    };
-    let _database = request.context().database();
-    let email_backend = request.context().email_backend();
-    {
-        let _x = email_backend.lock().unwrap().send_message(&email);
+impl Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Status::Success => write!(f, "Success"),
+            Status::Failure => write!(f, "Failure"),
+        }
     }
-    let template = String::from(include_str!("../templates/sent.html"));
-    Ok(Html::new(template))
 }
+
+#[derive(Debug, Template)]
+#[allow(unused)]
+#[template(path = "index.html")]
+struct IndexTemplate<'a> {
+    static_files: StaticFiles,
+    urls: &'a Urls,
+    form: <EmailForm as Form>::Context,
+    status: &'a str,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct IndexQuery {
+    status: Option<Status>,
+}
+
+async fn index(
+    urls: Urls,
+    mut request: Request,
+    static_files: StaticFiles,
+    UrlQuery(query): UrlQuery<IndexQuery>,
+) -> cot::Result<Html> {
+    let status = match query.status {
+        Some(s) => s.to_string(),
+        None => "".to_string(),
+    };
+    let index_template = IndexTemplate {
+        urls: &urls,
+        form: EmailForm::build_context(&mut request).await?,
+        status: &status,
+        static_files,
+    };
+    let rendered = index_template.render()?;
+
+    Ok(Html::new(rendered))
+}
+
+async fn send_email(urls: Urls, mut request: Request) -> cot::Result<Response> {
+    let form = EmailForm::from_request(&mut request).await?;
+
+    let form = form.unwrap();
+
+    let message = EmailMessage::builder()
+        .from(form.from)
+        .to(vec![form.to])
+        .subject(form.subject)
+        .body(form.message)
+        .build()?;
+
+    request.email().send(message).await?;
+
+    // Fixme We should redirect with the status when reverse_redirect! supports query parameters
+    Ok(reverse_redirect!(&urls, "index/",)?)
+}
+
 struct MyProject;
 impl Project for MyProject {
     fn cli_metadata(&self) -> CliMetadata {
@@ -66,16 +120,17 @@ impl Project for MyProject {
     }
 
     fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
-        let mut email_config = EmailConfig::builder();
-        email_config.backend_type(EmailTransportTypeConfig::Smtp);
-        email_config.smtp_mode(SmtpTransportMode::Localhost);
-        email_config.port(1025_u16);
-        let config = ProjectConfig::builder()
-            .debug(true)
-            .database(DatabaseConfig::builder().url("sqlite::memory:").build())
-            .email_backend(email_config.build())
-            .build();
-        Ok(config)
+        Ok(ProjectConfig::builder()
+            .email(
+                EmailConfig::builder()
+                    .transport(
+                        EmailTransportConfig::builder()
+                            .transport_type(EmailTransportTypeConfig::Console)
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build())
     }
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views(EmailApp, "");
@@ -84,10 +139,12 @@ impl Project for MyProject {
     fn middlewares(
         &self,
         handler: cot::project::RootHandlerBuilder,
-        _context: &cot::project::MiddlewareContext,
-    ) -> cot::BoxedHandler {
-        // context.config().email_backend().unwrap();
-        handler.build()
+        context: &cot::project::MiddlewareContext,
+    ) -> RootHandler {
+        handler
+            .middleware(StaticFilesMiddleware::from_context(context))
+            .middleware(LiveReloadMiddleware::from_context(context))
+            .build()
     }
 }
 

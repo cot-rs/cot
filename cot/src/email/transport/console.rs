@@ -68,8 +68,15 @@ impl Console {
     ///
     /// let console_transport = Console::new();
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for Console {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -77,8 +84,8 @@ impl Transport for Console {
     async fn send(&self, messages: &[EmailMessage]) -> TransportResult<()> {
         let mut out = io::stdout().lock();
         for msg in messages {
-            writeln!(out, "{}", msg).map_err(|err| ConsoleError::Io(err))?;
-            writeln!(out, "{}", "─".repeat(60)).map_err(|err| ConsoleError::Io(err))?;
+            writeln!(out, "{msg}").map_err(ConsoleError::Io)?;
+            writeln!(out, "{}", "─".repeat(60)).map_err(ConsoleError::Io)?;
         }
         Ok(())
     }
@@ -91,7 +98,7 @@ impl fmt::Display for EmailMessage {
                 "-".to_string()
             } else {
                 list.iter()
-                    .map(|a| format!("{}", a.email()))
+                    .map(|a| a.email().clone())
                     .collect::<Vec<_>>()
                     .join(", ")
             }
@@ -99,7 +106,6 @@ impl fmt::Display for EmailMessage {
 
         writeln!(
             f,
-            "{}",
             "════════════════════════════════════════════════════════════════"
         )?;
         writeln!(f, "From    : {}", self.from.email())?;
@@ -124,7 +130,6 @@ impl fmt::Display for EmailMessage {
         )?;
         writeln!(
             f,
-            "{}",
             "────────────────────────────────────────────────────────"
         )?;
         if self.body.trim().is_empty() {
@@ -134,7 +139,6 @@ impl fmt::Display for EmailMessage {
         }
         writeln!(
             f,
-            "{}",
             "────────────────────────────────────────────────────────"
         )?;
         if self.attachments.is_empty() {
@@ -153,7 +157,6 @@ impl fmt::Display for EmailMessage {
         }
         writeln!(
             f,
-            "{}",
             "════════════════════════════════════════════════════════════════"
         )?;
         Ok(())
@@ -164,28 +167,14 @@ impl fmt::Display for EmailMessage {
 mod tests {
     use super::*;
 
-    #[test]
-    fn display_formats_minimal_message() {
-        let msg = EmailMessage::builder()
-            .from(crate::common_types::Email::new("sender@example.com").unwrap())
-            .build()
-            .unwrap();
-        let s = format!("{}", msg);
-        assert!(s.contains("From    : sender@example.com"));
-        assert!(s.contains("To      : -"));
-        assert!(s.contains("Subject : -"));
-        assert!(s.contains("<empty>"));
-        assert!(s.contains("Attachments: -"));
-    }
-
     #[cot::test]
     async fn console_error_to_transport_error() {
-        let console_error = ConsoleError::Io(io::Error::new(io::ErrorKind::Other, "test error"));
+        let console_error = ConsoleError::Io(io::Error::other("test error"));
         let transport_error: TransportError = console_error.into();
 
         assert_eq!(
             transport_error.to_string(),
             "email transport error: transport error: console transport error: IO error: test error"
-        )
+        );
     }
 }

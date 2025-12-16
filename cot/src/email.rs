@@ -29,7 +29,7 @@ pub mod transport;
 use std::sync::Arc;
 
 use cot::config::{EmailConfig, EmailTransportTypeConfig};
-use cot::email::transport::smtp::SMTP;
+use cot::email::transport::smtp::Smtp;
 use derive_builder::Builder;
 use derive_more::with_trait::Debug;
 use lettre::message::header::ContentType;
@@ -301,6 +301,10 @@ impl Email {
     }
     /// Send a single [`EmailMessage`]
     ///
+    /// # Errors
+    ///
+    /// Returns an `EmailError` if sending the email fails.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -328,6 +332,10 @@ impl Email {
     }
 
     /// Send multiple emails in sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `EmailError` if sending any of the emails fails.
     ///
     /// # Examples
     ///
@@ -364,6 +372,10 @@ impl Email {
 
     /// Construct an [`Email`] from the provided [`EmailConfig`].
     ///
+    /// # Errors
+    ///
+    /// Returns an `EmailError` if creating the transport backend fails from the config.
+    ///
     /// # Examples
     ///
     /// ```
@@ -388,7 +400,7 @@ impl Email {
                 }
 
                 EmailTransportTypeConfig::Smtp { url, mechanism } => {
-                    let smtp = SMTP::new(url, mechanism.clone()).map_err(EmailError::Transport)?;
+                    let smtp = Smtp::new(url, *mechanism).map_err(EmailError::Transport)?;
                     Self::new(smtp)
                 }
             }
@@ -435,7 +447,6 @@ mod tests {
             transport: crate::config::EmailTransportConfig {
                 transport_type: EmailTransportTypeConfig::Console,
             },
-            ..Default::default()
         };
         let _email = Email::from_config(&cfg);
         // We can't introspect the inner transport, but construction should not
@@ -454,7 +465,6 @@ mod tests {
                     mechanism: Mechanism::Plain,
                 },
             },
-            ..Default::default()
         };
         let _email = Email::from_config(&cfg);
     }
@@ -473,7 +483,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert!(email.send(msg).await.is_ok())
+        assert!(email.send(msg).await.is_ok());
     }
 
     #[cot::test]

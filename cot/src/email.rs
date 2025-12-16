@@ -374,7 +374,8 @@ impl Email {
     ///
     /// # Errors
     ///
-    /// Returns an `EmailError` if creating the transport backend fails from the config.
+    /// Returns an `EmailError` if creating the transport backend fails from the
+    /// config.
     ///
     /// # Examples
     ///

@@ -14,7 +14,6 @@ use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
 use cot::{reverse_redirect, static_files, App, AppBuilder, Project};
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
 
 struct EmailApp;
 
@@ -50,7 +49,7 @@ enum Status {
     Failure,
 }
 
-impl Display for Status {
+impl std::fmt::Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Status::Success => write!(f, "Success"),
@@ -109,7 +108,8 @@ async fn send_email(urls: Urls, mut request: Request) -> cot::Result<Response> {
 
     request.email().send(message).await?;
 
-    // Fixme We should redirect with the status when reverse_redirect! supports query parameters
+    // Fixme: We should redirect with the status when reverse_redirect! supports
+    // query parameters
     Ok(reverse_redirect!(&urls, "index/",)?)
 }
 

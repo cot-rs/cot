@@ -220,8 +220,8 @@ pub trait RequestExt: private::Sealed {
     /// use cot::response::Response;
     ///
     /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
-    ///    let email_service = request.email();
-    ///   // ... do something with the email service
+    ///     let email_service = request.email();
+    ///     // ... do something with the email service
     ///  # unimplemented!()
     /// }
     /// ```

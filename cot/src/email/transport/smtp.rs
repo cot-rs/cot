@@ -8,7 +8,7 @@
 //!
 //! ```no_run
 //! use cot::common_types::Password;
-//! use cot::email::transport::smtp::{Mechanism, Smtp, SMTPCredentials, SMTPServer};
+//! use cot::email::transport::smtp::{Mechanism, SMTPCredentials, SMTPServer, Smtp};
 //! use cot::email::{Email, EmailMessage};
 //!
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -120,7 +120,7 @@ impl Smtp {
     ///
     /// ```
     /// use cot::common_types::Password;
-    /// use cot::email::transport::smtp::{Mechanism, Smtp, SMTPCredentials, SMTPServer};
+    /// use cot::email::transport::smtp::{Mechanism, SMTPCredentials, SMTPServer, Smtp};
     ///
     /// let creds = SMTPCredentials::new("username", Password::from("password"));
     /// let smtp = Smtp::new(creds, SMTPServer::Gmail, Mechanism::Plain);

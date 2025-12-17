@@ -1,2 +1,5 @@
 [resolver]
 incompatible-rust-versions = "fallback"
+
+[target.'cfg(target_os = "windows")']
+linker = "rust-lld"

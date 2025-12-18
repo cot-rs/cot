@@ -1867,10 +1867,11 @@ pub enum EmailTransportTypeConfig {
         /// # Examples
         ///
         /// ```
-        /// use cot::config::EmailTransportTypeConfig;
+        /// use cot::config::{EmailTransportTypeConfig, EmailUrl};
+        /// use cot::email::transport::smtp::Mechanism;
         ///
         /// let smtp_config = EmailTransportTypeConfig::Smtp {
-        ///     url: Email::from("smtps://username:password@smtp.gmail.com?tls=required"),
+        ///     url: EmailUrl::from("smtps://username:password@smtp.gmail.com?tls=required"),
         ///     mechanism: Mechanism::Plain,
         /// };
         /// ```

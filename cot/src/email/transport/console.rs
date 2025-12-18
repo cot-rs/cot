@@ -7,15 +7,16 @@
 //! Typical usage is through the high-level [`crate::email::Email`] API:
 //!
 //! ```no_run
+//! use cot::common_types::Email;
+//! use cot::email::EmailMessage;
 //! use cot::email::transport::console::Console;
-//! use cot::email::{Email, EmailMessage};
 //!
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! let email = Email::new(Console::new());
-//! let recipients = vec!["testreceipient@example.com".into()];
+//! let email = cot::email::Email::new(Console::new());
+//! let recipients = vec![Email::try_from("testreceipient@example.com").unwrap()];
 //! let msg = EmailMessage::builder()
-//!     .from("no-reply@example.com".into())
-//!     .to()
+//!     .from(Email::try_from("no-reply@example.com").unwrap())
+//!     .to(vec![Email::try_from("user@example.com").unwrap()])
 //!     .build()?;
 //! email.send(msg).await?;
 //! # Ok(()) }

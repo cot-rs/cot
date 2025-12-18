@@ -7,18 +7,20 @@
 //! Typical usage is through the high-level [`crate::email::Email`] API:
 //!
 //! ```no_run
-//! use cot::common_types::Password;
-//! use cot::email::transport::smtp::{Mechanism, SMTPCredentials, SMTPServer, Smtp};
-//! use cot::email::{Email, EmailMessage};
+//! use cot::common_types::Email;
+//! use cot::config::EmailUrl;
+//! use cot::email::EmailMessage;
+//! use cot::email::transport::Transport;
+//! use cot::email::transport::smtp::{Mechanism, Smtp};
 //!
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! let creds = SMTPCredentials::new("user@example.com", Password::from("secret"));
-//! let smtp = Smtp::new(creds, SMTPServer::Gmail, Mechanism::Plain);
-//! let email = Email::new(smtp);
+//! let url = EmailUrl::from("smtps://username:password@smtp.gmail.com?tls=required");
+//! let smtp = Smtp::new(&url, Mechanism::Plain)?;
+//! let email = cot::email::Email::new(smtp);
 //! let msg = EmailMessage::builder()
-//!     .from("user@example.com".into())
-//!     .to(vec!["user2@example.com".into()])
-//!     .body("This is a test email.".into())
+//!     .from(Email::try_from("user@example.com").unwrap())
+//!     .to(vec![Email::try_from("user2@example.com").unwrap()])
+//!     .body("This is a test email.")
 //!     .build()?;
 //! email.send(msg).await?;
 //! # Ok(()) }
@@ -88,19 +90,21 @@ impl From<Mechanism> for smtp::authentication::Mechanism {
 /// # Examples
 ///
 /// ```no_run
-/// use cot::email::{Email, EmailMessage};
-/// use cot::email::transport::smtp::{Smtp, SMTPCredentials, SMTPServer, Mechanism};
-/// use cot::common_types::Password;
+/// use cot::email::EmailMessage;
+/// use cot::email::transport::Transport;
+/// use cot::email::transport::smtp::{Smtp, Mechanism};
+/// use cot::common_types::Email;
+/// use cot::config::EmailUrl;
 ///
 /// # async fn run() -> cot::Result<()> {
-/// let creds = SMTPCredentials::new("username", Password::from("password"));
-/// let smtp = Smtp::new(creds, SMTPServer::Gmail, Mechanism::Plain);
-/// let email = Email::new(smtp);
-/// let recipients = vec!["testreceipient@example.com".into()];
+/// let url = EmailUrl::from("smtps://username:password@smtp.gmail.com?tls=required");
+/// let smtp = Smtp::new(&url, Mechanism::Plain)?;
+/// let email = cot::email::Email::new(smtp);
+///
 /// let msg = EmailMessage::builder()
-///  .from("testfrom@example.com".into())
-/// .to(recipients)
-/// .body("This is a test email.".into())
+///  .from(Email::try_from("testfrom@example.com").unwrap())
+/// .to(vec![Email::try_from("testreceipient@example.com").unwrap()])
+/// .body("This is a test email.")
 /// .build()?;
 /// email.send(msg).await?;
 /// # Ok(()) }
@@ -119,11 +123,11 @@ impl Smtp {
     /// # Examples
     ///
     /// ```
-    /// use cot::common_types::Password;
-    /// use cot::email::transport::smtp::{Mechanism, SMTPCredentials, SMTPServer, Smtp};
+    /// use cot::config::EmailUrl;
+    /// use cot::email::transport::smtp::{Mechanism, Smtp};
     ///
-    /// let creds = SMTPCredentials::new("username", Password::from("password"));
-    /// let smtp = Smtp::new(creds, SMTPServer::Gmail, Mechanism::Plain);
+    /// let url = EmailUrl::from("smtps://username:password@smtp.gmail.com?tls=required");
+    /// let smtp = Smtp::new(&url, Mechanism::Plain);
     /// ```
     pub fn new(url: &EmailUrl, mechanism: Mechanism) -> TransportResult<Self> {
         let transport = AsyncSmtpTransport::<Tokio1Executor>::from_url(url.as_str())

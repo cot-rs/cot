@@ -9,6 +9,7 @@ use cot::email::MessageBuildError;
 use thiserror::Error;
 
 use crate::email::EmailMessage;
+use crate::error::error_impl::impl_into_cot_error;
 
 pub mod console;
 pub mod smtp;
@@ -26,6 +27,8 @@ pub enum TransportError {
     #[error("{ERROR_PREFIX} message build error: {0}")]
     MessageBuildError(#[from] MessageBuildError),
 }
+
+impl_into_cot_error!(TransportError);
 
 /// A Convenience alias for results returned by transport operations.
 pub type TransportResult<T> = Result<T, TransportError>;

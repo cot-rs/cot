@@ -154,7 +154,9 @@ impl Transport for Smtp {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use lettre::transport::smtp;
+
+    use super::*; // ensure access to lettre's Mechanism in this scope
 
     #[cot::test]
     async fn test_smtp_creation() {
@@ -185,5 +187,17 @@ mod tests {
             transport_error.to_string(),
             "email transport error: transport error: smtp transport error: IO error: test"
         );
+    }
+
+    #[cot::test]
+    async fn mechanism_from_maps_all_cases() {
+        let m_plain: smtp::authentication::Mechanism = Mechanism::Plain.into();
+        assert_eq!(m_plain, smtp::authentication::Mechanism::Plain);
+
+        let m_login: smtp::authentication::Mechanism = Mechanism::Login.into();
+        assert_eq!(m_login, smtp::authentication::Mechanism::Login);
+
+        let m_xoauth2: smtp::authentication::Mechanism = Mechanism::Xoauth2.into();
+        assert_eq!(m_xoauth2, smtp::authentication::Mechanism::Xoauth2);
     }
 }

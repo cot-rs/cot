@@ -167,6 +167,8 @@ impl fmt::Display for EmailMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common_types::Email as Addr;
+    use crate::email::{AttachmentData, Email};
 
     #[cot::test]
     async fn console_error_to_transport_error() {
@@ -177,5 +179,95 @@ mod tests {
             transport_error.to_string(),
             "email transport error: transport error: console transport error: IO error: test error"
         );
+    }
+
+    #[cot::test]
+    async fn display_full_message_renders_all_sections() {
+        let msg = EmailMessage::builder()
+            .from(Addr::new("from@example.com").unwrap())
+            .to(vec![
+                Addr::new("to1@example.com").unwrap(),
+                Addr::new("to2@example.com").unwrap(),
+            ])
+            .cc(vec![
+                Addr::new("cc1@example.com").unwrap(),
+                Addr::new("cc2@example.com").unwrap(),
+            ])
+            .bcc(vec![Addr::new("bcc@example.com").unwrap()])
+            .reply_to(vec![Addr::new("reply@example.com").unwrap()])
+            .subject("Subject Line")
+            .body("Hello body\n")
+            .attachments(vec![
+                AttachmentData {
+                    filename: "a.txt".into(),
+                    content_type: "text/plain".into(),
+                    data: b"abc".to_vec(),
+                },
+                AttachmentData {
+                    filename: "b.pdf".into(),
+                    content_type: "application/pdf".into(),
+                    data: vec![0u8; 10],
+                },
+            ])
+            .build()
+            .unwrap();
+
+        let console = Console::default();
+        let email = Email::new(console);
+        email
+            .send(msg.clone())
+            .await
+            .expect("console send should succeed");
+
+        let rendered = format!("{msg}");
+
+        assert!(rendered.contains("From    : from@example.com"));
+        assert!(rendered.contains("To      : to1@example.com, to2@example.com"));
+        assert!(rendered.contains("Subject : Subject Line"));
+        assert!(rendered.contains("────────────────────────────────────────────────────────"));
+
+        assert!(rendered.contains("Cc      : cc1@example.com, cc2@example.com"));
+        assert!(rendered.contains("Bcc     : bcc@example.com"));
+        assert!(rendered.contains("Reply-To: reply@example.com"));
+
+        assert!(rendered.contains("Hello body"));
+
+        assert!(rendered.contains("Attachments (2):"));
+        assert!(rendered.contains("  - a.txt (3 bytes, text/plain)"));
+        assert!(rendered.contains("  - b.pdf (10 bytes, application/pdf)"));
+
+        assert!(
+            rendered.contains("════════════════════════════════════════════════════════════════")
+        );
+    }
+
+    #[cot::test]
+    async fn display_minimal_message_renders_placeholders_and_omits_optional_headers() {
+        let msg = EmailMessage::builder()
+            .from(Addr::new("sender@example.com").unwrap())
+            // whitespace-only body should render as <empty>
+            .body(" \t\n ")
+            .build()
+            .unwrap();
+
+        let console = Console::default();
+        let email = Email::new(console);
+        email
+            .send(msg.clone())
+            .await
+            .expect("console send should succeed");
+
+        let rendered = format!("{msg}");
+
+        assert!(rendered.contains("From    : sender@example.com"));
+        assert!(rendered.contains("To      : -"));
+        assert!(rendered.contains("Subject : -"));
+
+        assert!(!rendered.contains("Cc      :"));
+        assert!(!rendered.contains("Bcc     :"));
+        assert!(!rendered.contains("Reply-To:"));
+
+        assert!(rendered.contains("<empty>"));
+        assert!(rendered.contains("Attachments: -"));
     }
 }

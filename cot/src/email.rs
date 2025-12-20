@@ -520,4 +520,116 @@ mod tests {
             .unwrap();
         assert!(email.send_multiple(&[msg1, msg2]).await.is_ok());
     }
+
+    #[cot::test]
+    async fn try_from_basic_converts_and_contains_headers() {
+        let msg = EmailMessage::builder()
+            .from(crate::common_types::Email::new("from@example.com").unwrap())
+            .to(vec![
+                crate::common_types::Email::new("to@example.com").unwrap(),
+            ])
+            .subject("Hello World")
+            .body("This is the body.")
+            .build()
+            .unwrap();
+
+        let built: Message = Message::try_from(msg).expect("conversion to lettre::Message");
+
+        let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
+
+        assert!(
+            formatted.contains("From: from@example.com"),
+            "missing From header: {formatted}"
+        );
+        assert!(
+            formatted.contains("To: to@example.com"),
+            "missing To header: {formatted}"
+        );
+        assert!(
+            formatted.contains("Subject: Hello World"),
+            "missing Subject header: {formatted}"
+        );
+        assert!(
+            formatted.contains("Content-Type: multipart/mixed"),
+            "message is not multipart/mixed: {formatted}"
+        );
+        assert!(
+            formatted.contains("This is the body."),
+            "body missing from formatted message: {formatted}"
+        );
+    }
+
+    #[cot::test]
+    async fn try_from_includes_cc_and_reply_to_headers() {
+        let msg = EmailMessage::builder()
+            .from(crate::common_types::Email::new("sender@example.com").unwrap())
+            .to(vec![
+                crate::common_types::Email::new("primary@example.com").unwrap(),
+            ])
+            .cc(vec![
+                crate::common_types::Email::new("cc1@example.com").unwrap(),
+                crate::common_types::Email::new("cc2@example.com").unwrap(),
+            ])
+            .bcc(vec![
+                crate::common_types::Email::new("hidden@example.com").unwrap(),
+            ])
+            .reply_to(vec![
+                crate::common_types::Email::new("replyto@example.com").unwrap(),
+            ])
+            .subject("Headers Test")
+            .body("Body")
+            .build()
+            .unwrap();
+
+        let built: Message = Message::try_from(msg).expect("conversion to lettre::Message");
+        let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
+
+        assert!(
+            formatted.contains("Cc: cc1@example.com, cc2@example.com")
+                || (formatted.contains("Cc: cc1@example.com")
+                    && formatted.contains("cc2@example.com")),
+            "Cc header not found or incomplete: {formatted}"
+        );
+        assert!(
+            formatted.contains("Reply-To: replyto@example.com"),
+            "Reply-To header missing: {formatted}"
+        );
+    }
+
+    #[cot::test]
+    async fn try_from_with_attachment_uses_default_mime_on_parse_failure() {
+        let attachment = AttachmentData {
+            filename: "report.bin".to_string(),
+            content_type: "this/is not a valid mime".to_string(),
+            data: vec![0xDE, 0xAD, 0xBE, 0xEF],
+        };
+
+        let msg = EmailMessage::builder()
+            .from(crate::common_types::Email::new("sender@example.com").unwrap())
+            .to(vec![
+                crate::common_types::Email::new("to@example.com").unwrap(),
+            ])
+            .subject("Attachment Test")
+            .body("Please see attachment")
+            .attachments(vec![attachment])
+            .build()
+            .unwrap();
+
+        let built: Message = Message::try_from(msg).expect("conversion to lettre::Message");
+        let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
+
+        assert!(
+            formatted.contains("Content-Disposition: attachment"),
+            "Attachment disposition missing: {formatted}"
+        );
+        assert!(
+            formatted.contains("report.bin"),
+            "Attachment filename missing: {formatted}"
+        );
+        assert!(
+            formatted.contains("Content-Type: application/octet-stream"),
+            "Default content type not used for invalid mime: {formatted}"
+        );
+        assert!(formatted.contains("Please see attachment"));
+    }
 }

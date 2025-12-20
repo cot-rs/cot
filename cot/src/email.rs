@@ -458,8 +458,6 @@ mod tests {
             },
         };
         let _email = Email::from_config(&cfg);
-        // We can't introspect the inner transport, but construction should not
-        // panic.
     }
 
     #[cot::test]
@@ -588,12 +586,8 @@ mod tests {
             formatted.contains("Cc: cc1@example.com, cc2@example.com")
                 || (formatted.contains("Cc: cc1@example.com")
                     && formatted.contains("cc2@example.com")),
-            "Cc header not found or incomplete: {formatted}"
         );
-        assert!(
-            formatted.contains("Reply-To: replyto@example.com"),
-            "Reply-To header missing: {formatted}"
-        );
+        assert!(formatted.contains("Reply-To: replyto@example.com"),);
     }
 
     #[cot::test]
@@ -618,18 +612,9 @@ mod tests {
         let built: Message = Message::try_from(msg).expect("conversion to lettre::Message");
         let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
 
-        assert!(
-            formatted.contains("Content-Disposition: attachment"),
-            "Attachment disposition missing: {formatted}"
-        );
-        assert!(
-            formatted.contains("report.bin"),
-            "Attachment filename missing: {formatted}"
-        );
-        assert!(
-            formatted.contains("Content-Type: application/octet-stream"),
-            "Default content type not used for invalid mime: {formatted}"
-        );
+        assert!(formatted.contains("Content-Disposition: attachment"),);
+        assert!(formatted.contains("report.bin"),);
+        assert!(formatted.contains("Content-Type: application/octet-stream"),);
         assert!(formatted.contains("Please see attachment"));
     }
 }

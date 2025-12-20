@@ -3083,7 +3083,7 @@ mod tests {
     #[cfg(feature = "email")]
     fn email_config_from_toml_smtp() {
         let toml_content = r#"
-            [email]
+            [email.transport]
             type = "smtp"
             url = "smtp://user:pass@hostname:587"
             mechanism = "plain"
@@ -3106,5 +3106,15 @@ mod tests {
             config.transport.transport_type,
             EmailTransportTypeConfig::Console
         );
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn email_url_from_str_and_string() {
+        let s = "smtp://user:pass@hostname:587";
+        let u1 = EmailUrl::from(s);
+        let u2 = EmailUrl::from(s.to_string());
+        assert_eq!(u1, u2);
+        assert_eq!(u1.as_str(), s);
     }
 }

@@ -2488,8 +2488,6 @@ mod tests {
             path = "/some/path"
             always_save = true
             name = "some.sid"
-            [email_backend]
-            type = "none"
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();

@@ -5,7 +5,7 @@
 //! transport operations.
 use std::pin::Pin;
 
-use cot::email::MessageBuildError;
+use cot::email::EmailMessageError;
 use thiserror::Error;
 
 use crate::email::EmailMessage;
@@ -25,7 +25,7 @@ pub enum TransportError {
     Backend(String),
     /// Failed to build the email message.
     #[error("{ERROR_PREFIX} message build error: {0}")]
-    MessageBuildError(#[from] MessageBuildError),
+    MessageBuildError(#[from] EmailMessageError),
 }
 
 impl_into_cot_error!(TransportError);

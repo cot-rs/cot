@@ -1,8 +1,7 @@
 //! SMTP transport implementation.
 //!
-//! This backend uses the `lettre` crate to send messages to a remote SMTP
-//! server. Credentials, server host and authentication mechanism are
-//! configurable.
+//! This backend sends email messages to a configured remote SMTP
+//! server.
 //!
 //! Typical usage is through the high-level [`crate::email::Email`] API:
 //!
@@ -69,6 +68,8 @@ pub enum Mechanism {
     Plain,
     /// LOGIN authentication mechanism defined in
     /// [draft-murchison-sasl-login-00](https://www.ietf.org/archive/id/draft-murchison-sasl-login-00.txt).
+    /// This mechanism is obsolete but needed for some providers (like Office
+    /// 365).
     Login,
     /// Non-standard XOAUTH2 mechanism defined in
     /// [xoauth2-protocol](https://developers.google.com/gmail/imap/xoauth2-protocol)
@@ -96,16 +97,17 @@ impl From<Mechanism> for smtp::authentication::Mechanism {
 /// use cot::common_types::Email;
 /// use cot::config::EmailUrl;
 ///
+/// # [tokio::main]
 /// # async fn run() -> cot::Result<()> {
-/// let url = EmailUrl::from("smtps://username:password@smtp.gmail.com?tls=required");
+/// let url = EmailUrl::from("smtps://johndoe:xxxx xxxxx xxxx xxxxx@smtp.gmail.com");
 /// let smtp = Smtp::new(&url, Mechanism::Plain)?;
 /// let email = cot::email::Email::new(smtp);
 ///
 /// let msg = EmailMessage::builder()
 ///  .from(Email::try_from("testfrom@example.com").unwrap())
-/// .to(vec![Email::try_from("testreceipient@example.com").unwrap()])
-/// .body("This is a test email.")
-/// .build()?;
+///  .to(vec![Email::try_from("testreceipient@example.com").unwrap()])
+///  .body("This is a test email.")
+///  .build()?;
 /// email.send(msg).await?;
 /// # Ok(()) }
 #[derive(Debug, Clone)]
@@ -118,7 +120,8 @@ impl Smtp {
     ///
     /// # Errors
     ///
-    /// Returns a `TransportError` if the Smtp backend creation failed.
+    /// Returns an `SMTP::TransportCreationError` if the Smtp backend creation
+    /// failed.
     ///
     /// # Examples
     ///
@@ -156,7 +159,7 @@ impl Transport for Smtp {
 mod tests {
     use lettre::transport::smtp;
 
-    use super::*; // ensure access to lettre's Mechanism in this scope
+    use super::*;
 
     #[cot::test]
     async fn test_smtp_creation() {

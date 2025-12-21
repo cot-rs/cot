@@ -261,8 +261,8 @@ pub struct ProjectConfig {
     ///
     /// let config = ProjectConfig::from_toml(
     ///     r#"
-    /// [email_backend]
-    /// type = "none"
+    /// [email.backend]
+    /// type = "console"
     /// "#,
     /// )?;
     ///
@@ -1827,23 +1827,24 @@ impl Default for SessionMiddlewareConfig {
 
 /// The type of email backend to use.
 ///
-/// This specifies what email backend is used for sending emails: `console` or
-/// `smtp`. The default backend if not specified is `console`.
+/// This specifies what email backend is used for sending emails.
+/// The default backend if not specified is `console`.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EmailTransportTypeConfig {
     /// Console email transport.
     ///
-    /// This is a convenient backend for development and testing that simply
-    /// prints the email contents to the console instead of actually sending
-    /// them.
+    /// This is a convenient transport backend for development and testing that
+    /// simply prints the email contents to the console instead of actually
+    /// sending them.
     #[default]
     Console,
     /// SMTP email backend.
     ///
-    /// This backend sends emails using the Simple Mail Transfer Protocol
-    /// (SMTP). It requires authentication details and server configuration.
+    /// This transport backend sends emails using the Simple Mail Transfer
+    /// Protocol (SMTP). It requires authentication details and server
+    /// configuration.
     Smtp {
         /// The SMTP connection URL.
         ///
@@ -1871,7 +1872,7 @@ pub enum EmailTransportTypeConfig {
         /// use cot::email::transport::smtp::Mechanism;
         ///
         /// let smtp_config = EmailTransportTypeConfig::Smtp {
-        ///     url: EmailUrl::from("smtps://username:password@smtp.gmail.com?tls=required"),
+        ///     url: EmailUrl::from("smtps://johndoe:xxxx xxxxx xxxx xxxxx@smtp.gmail.com"),
         ///     mechanism: Mechanism::Plain,
         /// };
         /// ```
@@ -1881,7 +1882,8 @@ pub enum EmailTransportTypeConfig {
         /// ```toml
         /// [email]
         /// type = "smtp"
-        /// url = "smtps://username:password@smtp.gmail.com?tls=required"
+        /// // If email is "johndoe@gmail.com", then the user is "johndoe"
+        /// url = "smtp://johndoe:xxxx xxxx xxxx xxxx@smtp.gmail.com:587?tls=required"
         /// ```
         url: EmailUrl,
         /// The authentication mechanism to use.
@@ -1892,7 +1894,7 @@ pub enum EmailTransportTypeConfig {
         /// ```toml
         /// [email]
         /// type = "smtp"
-        /// url = "smtps://username:password@smtp.gmail.com?tls=required"
+        /// url = "smtp://johndoe:xxxx xxxx xxxx xxxx@smtp.gmail.com:587?tls=required"
         /// mechanism = "plain" # or "login", "xoauth2"
         /// ```
         mechanism: Mechanism,

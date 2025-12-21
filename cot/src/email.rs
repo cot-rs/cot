@@ -43,6 +43,7 @@ use crate::email::transport::console::Console;
 use crate::error::error_impl::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "email error:";
+const EMAIL_MESSAGE_BUILD_ERROR_PREFIX: &str = "email message build error:";
 
 /// Represents errors that can occur when sending an email.
 #[derive(Debug, Error)]
@@ -54,9 +55,6 @@ pub enum EmailError {
     /// An error occurred while building the email message.
     #[error("{ERROR_PREFIX} message error: {0}")]
     Message(String),
-    /// A required field is missing in the email message.
-    #[error("{ERROR_PREFIX} missing required field: {0}")]
-    MissingField(String),
 }
 
 impl_into_cot_error!(EmailError);
@@ -146,11 +144,11 @@ impl EmailMessageBuilder {
     ///     .build()
     ///     .unwrap();
     /// ```
-    pub fn build(&self) -> Result<EmailMessage, EmailError> {
+    pub fn build(&self) -> Result<EmailMessage, EmailMessageError> {
         let from = self
             .from
             .clone()
-            .ok_or_else(|| EmailError::MissingField("from".to_string()))?;
+            .ok_or_else(|| EmailMessageError::MissingField("from".to_string()))?;
 
         let subject = self.subject.clone().unwrap_or_default();
         let body = self.body.clone().unwrap_or_default();
@@ -177,17 +175,22 @@ impl EmailMessageBuilder {
 /// Errors that can occur while building an email message.
 #[derive(Debug, Clone, Error)]
 #[non_exhaustive]
-pub enum MessageBuildError {
+pub enum EmailMessageError {
     /// An invalid email address was provided.
-    #[error("invalid email address: {0}")]
+    #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} invalid email address: {0}")]
     InvalidEmailAddress(String),
     /// Failed to build the email message.
-    #[error("failed to build email message: {0}")]
+    #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} failed to build email message: {0}")]
     BuildError(String),
+    /// A required field is missing in the email message.
+    #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} The `{0}` field is required but was not set")]
+    MissingField(String),
 }
 
+impl_into_cot_error!(EmailMessageError);
+
 impl TryFrom<EmailMessage> for Message {
-    type Error = MessageBuildError;
+    type Error = EmailMessageError;
 
     fn try_from(message: EmailMessage) -> Result<Self, Self::Error> {
         let from_mailbox = message
@@ -195,7 +198,7 @@ impl TryFrom<EmailMessage> for Message {
             .email()
             .as_str()
             .parse::<Mailbox>()
-            .map_err(|err| MessageBuildError::InvalidEmailAddress(err.to_string()))?;
+            .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
 
         let mut builder = Message::builder()
             .from(from_mailbox)
@@ -206,7 +209,7 @@ impl TryFrom<EmailMessage> for Message {
                 .email()
                 .as_str()
                 .parse::<Mailbox>()
-                .map_err(|err| MessageBuildError::InvalidEmailAddress(err.to_string()))?;
+                .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
             builder = builder.to(mb);
         }
 
@@ -215,7 +218,7 @@ impl TryFrom<EmailMessage> for Message {
                 .email()
                 .as_str()
                 .parse::<Mailbox>()
-                .map_err(|err| MessageBuildError::InvalidEmailAddress(err.to_string()))?;
+                .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
             builder = builder.cc(mb);
         }
 
@@ -224,7 +227,7 @@ impl TryFrom<EmailMessage> for Message {
                 .email()
                 .as_str()
                 .parse::<Mailbox>()
-                .map_err(|err| MessageBuildError::InvalidEmailAddress(err.to_string()))?;
+                .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
             builder = builder.bcc(mb);
         }
 
@@ -233,7 +236,7 @@ impl TryFrom<EmailMessage> for Message {
                 .email()
                 .as_str()
                 .parse::<Mailbox>()
-                .map_err(|err| MessageBuildError::InvalidEmailAddress(err.to_string()))?;
+                .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
             builder = builder.reply_to(mb);
         }
 
@@ -252,15 +255,15 @@ impl TryFrom<EmailMessage> for Message {
 
         let email = builder
             .multipart(mixed)
-            .map_err(|err| MessageBuildError::BuildError(err.to_string()))?;
+            .map_err(|err| EmailMessageError::BuildError(err.to_string()))?;
         Ok(email)
     }
 }
 
-/// A high level email interface for sending emails.
+/// A high-level email interface for sending emails.
 ///
-/// This struct wraps a [`Transport`] implementation to provide
-/// methods for sending single or multiple email messages.
+/// This struct wraps a [`Transport`] implementation and provides
+///  convenient methods for sending single or multiple email messages.
 ///
 /// # Examples
 ///
@@ -307,7 +310,7 @@ impl Email {
     ///
     /// # Errors
     ///
-    /// Returns an `EmailError` if sending the email fails.
+    /// Returns an `EmailError::Transport` error if sending the email fails.
     ///
     /// # Examples
     ///
@@ -340,7 +343,7 @@ impl Email {
     ///
     /// # Errors
     ///
-    /// Returns an `EmailError` if sending any of the emails fails.
+    /// Returns an `EmailError::Transport` if sending any of the emails fails.
     ///
     /// # Examples
     ///
@@ -380,8 +383,8 @@ impl Email {
     ///
     /// # Errors
     ///
-    /// Returns an `EmailError` if creating the transport backend fails from the
-    /// config.
+    /// Returns an `EmailError::Transport` error if creating the transport
+    /// backend fails from the config.
     ///
     /// # Examples
     ///
@@ -421,7 +424,8 @@ impl Email {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::EmailUrl;
+    use crate::config::{EmailTransportConfig, EmailUrl};
+    use crate::email::transport::smtp::Mechanism;
 
     #[cot::test]
     async fn builder_errors_when_from_missing() {
@@ -431,7 +435,10 @@ mod tests {
             .build();
         assert!(res.is_err());
         let err = res.err().unwrap();
-        assert_eq!(err.to_string(), "email error: missing required field: from");
+        assert_eq!(
+            err.to_string(),
+            "email message build error: The `from` field is required but was not set"
+        );
     }
 
     #[cot::test]
@@ -453,27 +460,26 @@ mod tests {
     async fn from_config_console_builds() {
         use crate::config::{EmailConfig, EmailTransportTypeConfig};
         let cfg = EmailConfig {
-            transport: crate::config::EmailTransportConfig {
+            transport: EmailTransportConfig {
                 transport_type: EmailTransportTypeConfig::Console,
             },
         };
-        let _email = Email::from_config(&cfg);
+        let email = Email::from_config(&cfg);
+        assert!(email.is_ok());
     }
 
     #[cot::test]
     async fn from_config_smtp_builds() {
-        use crate::config::{EmailConfig, EmailTransportTypeConfig};
-        use crate::email::transport::smtp::Mechanism;
-
         let cfg = EmailConfig {
-            transport: crate::config::EmailTransportConfig {
+            transport: EmailTransportConfig {
                 transport_type: EmailTransportTypeConfig::Smtp {
                     url: EmailUrl::from("smtp://localhost:1025"),
                     mechanism: Mechanism::Plain,
                 },
             },
         };
-        let _email = Email::from_config(&cfg);
+        let email = Email::from_config(&cfg);
+        assert!(email.is_ok());
     }
 
     #[cot::test]
@@ -535,26 +541,11 @@ mod tests {
 
         let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
 
-        assert!(
-            formatted.contains("From: from@example.com"),
-            "missing From header: {formatted}"
-        );
-        assert!(
-            formatted.contains("To: to@example.com"),
-            "missing To header: {formatted}"
-        );
-        assert!(
-            formatted.contains("Subject: Hello World"),
-            "missing Subject header: {formatted}"
-        );
-        assert!(
-            formatted.contains("Content-Type: multipart/mixed"),
-            "message is not multipart/mixed: {formatted}"
-        );
-        assert!(
-            formatted.contains("This is the body."),
-            "body missing from formatted message: {formatted}"
-        );
+        assert!(formatted.contains("From: from@example.com"),);
+        assert!(formatted.contains("To: to@example.com"),);
+        assert!(formatted.contains("Subject: Hello World"),);
+        assert!(formatted.contains("Content-Type: multipart/mixed"),);
+        assert!(formatted.contains("This is the body."),);
     }
 
     #[cot::test]

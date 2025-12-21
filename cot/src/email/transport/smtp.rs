@@ -97,7 +97,7 @@ impl From<Mechanism> for smtp::authentication::Mechanism {
 /// use cot::common_types::Email;
 /// use cot::config::EmailUrl;
 ///
-/// # [tokio::main]
+/// # #[tokio::main]
 /// # async fn run() -> cot::Result<()> {
 /// let url = EmailUrl::from("smtps://johndoe:xxxx xxxxx xxxx xxxxx@smtp.gmail.com");
 /// let smtp = Smtp::new(&url, Mechanism::Plain)?;

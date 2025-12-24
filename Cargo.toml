@@ -41,6 +41,8 @@ unreachable_pub = "warn"
 unsafe_code = "warn"
 unstable_features = "warn"
 unused_import_braces = "warn"
+# TODO: change to "warn" when/if this is fixed and released:
+# https://github.com/askama-rs/askama/issues/642
 unused_qualifications = "allow"
 rust_2018_idioms = { level = "warn", priority = -1 }
 

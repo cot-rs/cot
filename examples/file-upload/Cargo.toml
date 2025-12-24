@@ -7,6 +7,6 @@ license = "MIT OR Apache-2.0"
 edition = "2024"
 
 [dependencies]
-askama = "0.14"
+askama = "0.15"
 base64 = "0.22"
 cot = { path = "../../cot" }

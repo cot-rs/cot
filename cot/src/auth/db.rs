@@ -6,7 +6,6 @@
 use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 
 use async_trait::async_trait;
 // Importing `Auto` from `cot` instead of `crate` so that the migration generator
@@ -469,7 +468,7 @@ impl DatabaseUserCredentials {
 /// [`DatabaseUserCredentials`] struct and ignores all other credential types.
 #[derive(Debug, Clone)]
 pub struct DatabaseUserBackend {
-    database: Arc<Database>,
+    database: Database,
 }
 
 impl DatabaseUserBackend {
@@ -495,7 +494,7 @@ impl DatabaseUserBackend {
     /// }
     /// ```
     #[must_use]
-    pub fn new(database: Arc<Database>) -> Self {
+    pub fn new(database: Database) -> Self {
         Self { database }
     }
 }

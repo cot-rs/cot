@@ -6,14 +6,14 @@ use chrono_tz::Tz;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{Auto, Model, model};
+use cot::db::{Auto, Database, Model, model};
 use cot::form::Form;
 use cot::form::fields::Step;
 use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::request::Request;
-use cot::request::extractors::{RequestDb, RequestForm, StaticFiles};
+use cot::request::extractors::{RequestForm, StaticFiles};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
@@ -75,7 +75,7 @@ async fn index(
     urls: Urls,
     static_files: StaticFiles,
     mut request: Request,
-    RequestDb(db): RequestDb,
+    db: Database,
 ) -> cot::Result<Html> {
     let example_form_items = ExampleFormItem::objects().all(&db).await?;
     let index_template = IndexTemplate {
@@ -91,7 +91,7 @@ async fn index(
 
 async fn add_example_form(
     urls: Urls,
-    RequestDb(db): RequestDb,
+    db: Database,
     RequestForm(example_form): RequestForm<ExampleForm>,
 ) -> cot::Result<Response> {
     let example_form = example_form.unwrap();

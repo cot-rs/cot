@@ -79,10 +79,10 @@ impl SymbolResolver {
 
         if let Some(first_segment) = first_segment {
             let mut ident = first_segment.ident.to_string();
-            if ident == "Self" {
-                if let Some(self_reference) = self_reference {
-                    ident.clone_from(self_reference);
-                }
+            if ident == "Self"
+                && let Some(self_reference) = self_reference
+            {
+                ident.clone_from(self_reference);
             }
             if let Some(symbol) = self.symbols.get(&ident) {
                 let mut new_segments: Vec<_> = symbol
@@ -144,13 +144,13 @@ impl SymbolResolver {
                 .expect("segments have exactly one element");
             if segment.arguments.is_none() {
                 let ident = segment.ident.to_string();
-                if let Some(symbol) = self.symbols.get(&ident) {
-                    if symbol.kind == VisibleSymbolKind::Const {
-                        let path = &symbol.full_path;
-                        return Some(syn::GenericArgument::Const(
-                            syn::parse_str(path).expect("full_path should be a valid path"),
-                        ));
-                    }
+                if let Some(symbol) = self.symbols.get(&ident)
+                    && symbol.kind == VisibleSymbolKind::Const
+                {
+                    let path = &symbol.full_path;
+                    return Some(syn::GenericArgument::Const(
+                        syn::parse_str(path).expect("full_path should be a valid path"),
+                    ));
                 }
             }
         }

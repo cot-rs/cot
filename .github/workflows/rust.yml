@@ -62,7 +62,7 @@ jobs:
           - rust: nightly
             version: nightly
           - rust: MSRV
-            version: "1.86" # MSRV
+            version: "1.88" # MSRV
 
     name: Build & test
     runs-on: ${{ matrix.os }}

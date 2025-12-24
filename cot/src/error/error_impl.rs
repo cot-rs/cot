@@ -239,10 +239,10 @@ impl Error {
     pub fn inner(&self) -> &Self {
         let mut error: &dyn StdError = self;
         while let Some(inner) = error.source() {
-            if let Some(error) = inner.downcast_ref::<Self>() {
-                if !error.is_wrapper() {
-                    return error;
-                }
+            if let Some(error) = inner.downcast_ref::<Self>()
+                && !error.is_wrapper()
+            {
+                return error;
             }
             error = inner;
         }

@@ -293,10 +293,10 @@ impl CliTask for RunServer {
         let bootstrapper = bootstrapper.boot().await?;
 
         let result = crate::run(bootstrapper, &addr_port).await;
-        if let Err(error) = &result {
-            if let Some(user_friendly_error) = Self::get_user_friendly_error(error, &addr_port) {
-                eprintln!("{user_friendly_error}");
-            }
+        if let Err(error) = &result
+            && let Some(user_friendly_error) = Self::get_user_friendly_error(error, &addr_port)
+        {
+            eprintln!("{user_friendly_error}");
         }
 
         result

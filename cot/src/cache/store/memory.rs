@@ -91,11 +91,11 @@ impl CacheStore for Memory {
     async fn get(&self, key: &str) -> CacheStoreResult<Option<Value>> {
         let mut map = self.map.lock().await;
         if let Some((value, timeout)) = map.get(key) {
-            if let Some(timeout) = timeout {
-                if timeout.is_expired(None) {
-                    map.remove(key);
-                    return Ok(None);
-                }
+            if let Some(timeout) = timeout
+                && timeout.is_expired(None)
+            {
+                map.remove(key);
+                return Ok(None);
             }
             return Ok(Some(value.clone()));
         }

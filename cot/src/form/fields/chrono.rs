@@ -185,10 +185,10 @@ impl Display for DateTimeField {
             );
         }
 
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
 
         if let Some(value) = &self.value {
@@ -218,16 +218,16 @@ impl AsFormField for NaiveDateTime {
         let date_time = parse_datetime_with_fallback(value)?;
         let opts = &field.custom_options;
 
-        if let Some(min) = &opts.min {
-            if date_time < *min {
-                return Err(FormFieldValidationError::minimum_value_not_met(min));
-            }
+        if let Some(min) = &opts.min
+            && date_time < *min
+        {
+            return Err(FormFieldValidationError::minimum_value_not_met(min));
         }
 
-        if let Some(max) = &opts.max {
-            if date_time > *max {
-                return Err(FormFieldValidationError::maximum_value_exceeded(max));
-            }
+        if let Some(max) = &opts.max
+            && date_time > *max
+        {
+            return Err(FormFieldValidationError::maximum_value_exceeded(max));
         }
 
         Ok(date_time)
@@ -369,10 +369,10 @@ impl Display for DateTimeWithTimezoneField {
             );
         }
 
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
 
         if let Some(value) = &self.value {
@@ -424,16 +424,16 @@ impl AsFormField for DateTime<FixedOffset> {
         // transform the timezone into a fixed offset.
         let date_time = date_time.with_timezone(&date_time.offset().fix());
 
-        if let Some(min) = &opts.min {
-            if date_time < *min {
-                return Err(FormFieldValidationError::minimum_value_not_met(min));
-            }
+        if let Some(min) = &opts.min
+            && date_time < *min
+        {
+            return Err(FormFieldValidationError::minimum_value_not_met(min));
         }
 
-        if let Some(max) = &opts.max {
-            if date_time > *max {
-                return Err(FormFieldValidationError::maximum_value_exceeded(max));
-            }
+        if let Some(max) = &opts.max
+            && date_time > *max
+        {
+            return Err(FormFieldValidationError::maximum_value_exceeded(max));
         }
 
         Ok(date_time)
@@ -515,10 +515,10 @@ impl Display for TimeField {
             tag.attr("value", value);
         }
 
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
 
         if let Some(step) = &self.custom_options.step {
@@ -544,16 +544,16 @@ impl AsFormField for NaiveTime {
         let time = parse_time_with_fallback(value)?;
         let opts = &field.custom_options;
 
-        if let Some(min) = &opts.min {
-            if time < *min {
-                return Err(FormFieldValidationError::minimum_value_not_met(min));
-            }
+        if let Some(min) = &opts.min
+            && time < *min
+        {
+            return Err(FormFieldValidationError::minimum_value_not_met(min));
         }
 
-        if let Some(max) = &opts.max {
-            if time > *max {
-                return Err(FormFieldValidationError::maximum_value_exceeded(max));
-            }
+        if let Some(max) = &opts.max
+            && time > *max
+        {
+            return Err(FormFieldValidationError::maximum_value_exceeded(max));
         }
 
         Ok(time)
@@ -636,10 +636,10 @@ impl Display for DateField {
             tag.attr("value", value);
         }
 
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
 
         if let Some(step) = &self.custom_options.step {
@@ -666,16 +666,16 @@ impl AsFormField for NaiveDate {
             .map_err(|err| FormFieldValidationError::from_string(err.to_string()))?;
         let opts = &field.custom_options;
 
-        if let Some(min) = &opts.min {
-            if date < *min {
-                return Err(FormFieldValidationError::minimum_value_not_met(min));
-            }
+        if let Some(min) = &opts.min
+            && date < *min
+        {
+            return Err(FormFieldValidationError::minimum_value_not_met(min));
         }
 
-        if let Some(max) = &opts.max {
-            if date > *max {
-                return Err(FormFieldValidationError::maximum_value_exceeded(max));
-            }
+        if let Some(max) = &opts.max
+            && date > *max
+        {
+            return Err(FormFieldValidationError::maximum_value_exceeded(max));
         }
 
         Ok(date)

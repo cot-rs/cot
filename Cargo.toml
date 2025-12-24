@@ -54,6 +54,9 @@ allow_attributes = "warn"
 # TODO: consider removing this if/when this is fixed:
 # https://github.com/rust-lang/rust-clippy/issues/16175
 needless_continue = "allow"
+# TODO: remove this if/when this is fixed and released:
+# https://github.com/askama-rs/askama/issues/643
+elidable_lifetime_names = "allow"
 
 [workspace.dependencies]
 ahash = { version = "0.8.12", default-features = false }

@@ -162,19 +162,6 @@ dependencies = [
 
 [[package]]
 name = "askama"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f75363874b771be265f4ffe307ca705ef6f3baa19011c149da8674a87f1b75c4"
-dependencies = [
- "askama_derive 0.14.0",
- "itoa",
- "percent-encoding",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "askama"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21c01049339e624573a8027fe9392219f64d315a0ad24712b469611b3138f042"
@@ -188,28 +175,11 @@ dependencies = [
 
 [[package]]
 name = "askama_derive"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "129397200fe83088e8a68407a8e2b1f826cf0086b21ccdb866a722c8bcd3a94f"
-dependencies = [
- "askama_parser 0.14.0",
- "basic-toml",
- "memchr",
- "proc-macro2",
- "quote",
- "rustc-hash",
- "serde",
- "serde_derive",
- "syn",
-]
-
-[[package]]
-name = "askama_derive"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e393a25182a000666df345c2bdaa9ab6b0c243974ec7d29e377d6feea651778d"
 dependencies = [
- "askama_parser 0.15.0",
+ "askama_parser",
  "basic-toml",
  "memchr",
  "proc-macro2",
@@ -226,19 +196,7 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e8bb77385d2954705452516f99511835be34b4c4a15a70800623b91406b1db9"
 dependencies = [
- "askama_derive 0.15.0",
-]
-
-[[package]]
-name = "askama_parser"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6ab5630b3d5eaf232620167977f95eb51f3432fc76852328774afbd242d4358"
-dependencies = [
- "memchr",
- "serde",
- "serde_derive",
- "winnow",
+ "askama_derive",
 ]
 
 [[package]]
@@ -901,7 +859,7 @@ version = "0.4.0"
 dependencies = [
  "ahash",
  "aide",
- "askama 0.15.0",
+ "askama",
  "async-stream",
  "async-trait",
  "axum",
@@ -1487,7 +1445,7 @@ dependencies = [
 name = "example-admin"
 version = "0.1.0"
 dependencies = [
- "askama 0.15.0",
+ "askama",
  "async-trait",
  "cot",
 ]
@@ -1496,7 +1454,7 @@ dependencies = [
 name = "example-custom-error-pages"
 version = "0.1.0"
 dependencies = [
- "askama 0.15.0",
+ "askama",
  "cot",
 ]
 
@@ -1513,7 +1471,7 @@ dependencies = [
 name = "example-file-upload"
 version = "0.1.0"
 dependencies = [
- "askama 0.15.0",
+ "askama",
  "base64",
  "cot",
 ]
@@ -1538,7 +1496,7 @@ dependencies = [
 name = "example-sessions"
 version = "0.1.0"
 dependencies = [
- "askama 0.15.0",
+ "askama",
  "cot",
 ]
 
@@ -1546,7 +1504,7 @@ dependencies = [
 name = "example-todo-list"
 version = "0.1.0"
 dependencies = [
- "askama 0.15.0",
+ "askama",
  "cot",
 ]
 
@@ -1656,7 +1614,7 @@ dependencies = [
 name = "forms"
 version = "0.1.0"
 dependencies = [
- "askama 0.15.0",
+ "askama",
  "chrono",
  "chrono-tz",
  "cot",
@@ -3526,7 +3484,7 @@ checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
 name = "send-email"
 version = "0.1.0"
 dependencies = [
- "askama 0.14.0",
+ "askama",
  "cot",
  "serde",
 ]

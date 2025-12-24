@@ -8,5 +8,5 @@ edition = "2021"
 
 [dependencies]
 cot = { path = "../../cot", features = ["email", "live-reload"] }
-askama = "0.14.0"
+askama = "0.15"
 serde = { version = "1.0.228", features = ["derive"] }

@@ -169,10 +169,10 @@ impl FieldOpts {
             }
 
             for arg in &type_path.path.segments {
-                if let syn::PathArguments::AngleBracketed(arg) = &arg.arguments {
-                    if let Some(ty) = Self::find_type_in_generics(arg, type_to_find) {
-                        return Some(ty);
-                    }
+                if let syn::PathArguments::AngleBracketed(arg) = &arg.arguments
+                    && let Some(ty) = Self::find_type_in_generics(arg, type_to_find)
+                {
+                    return Some(ty);
                 }
             }
         }

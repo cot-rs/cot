@@ -191,10 +191,10 @@ impl SessionStore for FileStore {
 
     async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
         let res = remove_file(self.dir_path.join(session_id.to_string())).await;
-        if let Err(e) = res {
-            if e.kind() != io::ErrorKind::NotFound {
-                return Err(FileStoreError::Io(Box::new(e)))?;
-            }
+        if let Err(e) = res
+            && e.kind() != io::ErrorKind::NotFound
+        {
+            return Err(FileStoreError::Io(Box::new(e)))?;
         }
         Ok(())
     }

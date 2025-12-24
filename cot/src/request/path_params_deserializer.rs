@@ -476,10 +476,10 @@ impl<'de> Deserializer<'de> for ValueDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let Some(key) = self.key {
-            if len == 2 {
-                return visitor.visit_seq(ArrayDeserializer::new([key, self.value]));
-            }
+        if let Some(key) = self.key
+            && len == 2
+        {
+            return visitor.visit_seq(ArrayDeserializer::new([key, self.value]));
         }
 
         Err(PathParamsDeserializerError::unsupported_type::<V>())

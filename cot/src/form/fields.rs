@@ -107,12 +107,12 @@ impl AsFormField for String {
     fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
         let value = check_required(field)?;
 
-        if let Some(max_length) = field.custom_options.max_length {
-            if value.len() > max_length as usize {
-                return Err(FormFieldValidationError::maximum_length_exceeded(
-                    max_length,
-                ));
-            }
+        if let Some(max_length) = field.custom_options.max_length
+            && value.len() > max_length as usize
+        {
+            return Err(FormFieldValidationError::maximum_length_exceeded(
+                max_length,
+            ));
         }
         Ok(value.to_owned())
     }
@@ -176,12 +176,12 @@ impl AsFormField for Password {
     fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
         let value = check_required(field)?;
 
-        if let Some(max_length) = field.custom_options.max_length {
-            if value.len() > max_length as usize {
-                return Err(FormFieldValidationError::maximum_length_exceeded(
-                    max_length,
-                ));
-            }
+        if let Some(max_length) = field.custom_options.max_length
+            && value.len() > max_length as usize
+        {
+            return Err(FormFieldValidationError::maximum_length_exceeded(
+                max_length,
+            ));
         }
 
         Ok(Password::new(value))
@@ -198,12 +198,12 @@ impl AsFormField for PasswordHash {
     fn clean_value(field: &Self::Type) -> Result<Self, FormFieldValidationError> {
         let value = check_required(field)?;
 
-        if let Some(max_length) = field.custom_options.max_length {
-            if value.len() > max_length as usize {
-                return Err(FormFieldValidationError::maximum_length_exceeded(
-                    max_length,
-                ));
-            }
+        if let Some(max_length) = field.custom_options.max_length
+            && value.len() > max_length as usize
+        {
+            return Err(FormFieldValidationError::maximum_length_exceeded(
+                max_length,
+            ));
         }
 
         Ok(PasswordHash::from_password(&Password::new(value)))
@@ -260,24 +260,24 @@ impl AsFormField for Email {
         let value = check_required(field)?;
         let opts = &field.custom_options;
 
-        if let (Some(min), Some(max)) = (opts.min_length, opts.max_length) {
-            if min > max {
-                return Err(FormFieldValidationError::from_string(format!(
-                    "min_length ({min}) exceeds max_length ({max})"
-                )));
-            }
+        if let (Some(min), Some(max)) = (opts.min_length, opts.max_length)
+            && min > max
+        {
+            return Err(FormFieldValidationError::from_string(format!(
+                "min_length ({min}) exceeds max_length ({max})"
+            )));
         }
 
-        if let Some(min) = opts.min_length {
-            if value.len() < min as usize {
-                return Err(FormFieldValidationError::minimum_length_not_met(min));
-            }
+        if let Some(min) = opts.min_length
+            && value.len() < min as usize
+        {
+            return Err(FormFieldValidationError::minimum_length_not_met(min));
         }
 
-        if let Some(max) = opts.max_length {
-            if value.len() > max as usize {
-                return Err(FormFieldValidationError::maximum_length_exceeded(max));
-            }
+        if let Some(max) = opts.max_length
+            && value.len() > max as usize
+        {
+            return Err(FormFieldValidationError::maximum_length_exceeded(max));
         }
 
         Ok(value.parse()?)
@@ -483,10 +483,10 @@ impl Display for BoolField {
             return write!(f, "{}", bool_input.render());
         }
 
-        if let Some(value) = &self.value {
-            if value == "1" {
-                bool_input.bool_attr("checked");
-            }
+        if let Some(value) = &self.value
+            && value == "1"
+        {
+            bool_input.bool_attr("checked");
         }
 
         // Web browsers don't send anything when a checkbox is unchecked, so we

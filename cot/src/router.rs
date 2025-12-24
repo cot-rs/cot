@@ -284,10 +284,10 @@ impl Router {
         }
 
         for route in &self.urls {
-            if let RouteInner::Router(router) = &route.view {
-                if let Some(url) = router.reverse_option(app_name, name, params)? {
-                    return Ok(Some(route.url.reverse(params)? + &url));
-                }
+            if let RouteInner::Router(router) = &route.view
+                && let Some(url) = router.reverse_option(app_name, name, params)?
+            {
+                return Ok(Some(route.url.reverse(params)? + &url));
             }
         }
         Ok(None)

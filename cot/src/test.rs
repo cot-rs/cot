@@ -233,7 +233,7 @@ pub struct TestRequestBuilder {
     json_data: Option<String>,
     static_files: Vec<StaticFile>,
     #[cfg(feature = "cache")]
-    cache: Option<Arc<Cache>>,
+    cache: Option<Cache>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -774,7 +774,7 @@ impl TestRequestBuilder {
             #[cfg(feature = "cache")]
             self.cache
                 .clone()
-                .unwrap_or_else(|| Arc::new(Cache::new(Memory::new(), None, Timeout::default()))),
+                .unwrap_or_else(|| Cache::new(Memory::new(), None, Timeout::default())),
         );
         prepare_request(&mut request, Arc::new(context));
 
@@ -1776,17 +1776,14 @@ enum CacheKind {
 #[cfg(feature = "cache")]
 #[derive(Debug, Clone)]
 pub struct TestCache {
-    cache: Arc<Cache>,
+    cache: Cache,
     kind: CacheKind,
 }
 
 #[cfg(feature = "cache")]
 impl TestCache {
     fn new(cache: Cache, kind: CacheKind) -> Self {
-        Self {
-            cache: Arc::new(cache),
-            kind,
-        }
+        Self { cache, kind }
     }
 
     /// Create a new in-memory test cache.
@@ -1905,7 +1902,7 @@ impl TestCache {
     /// # }
     /// ```
     #[must_use]
-    pub fn cache(&self) -> Arc<Cache> {
+    pub fn cache(&self) -> Cache {
         self.cache.clone()
     }
 

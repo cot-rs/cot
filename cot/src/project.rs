@@ -1334,8 +1334,8 @@ impl Bootstrapper<WithDatabase> {
     }
 
     #[cfg(feature = "cache")]
-    async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
-        let cache = Cache::from_config(config).await.map(Arc::new)?;
+    async fn init_cache(config: &CacheConfig) -> cot::Result<Cache> {
+        let cache = Cache::from_config(config).await?;
         Ok(cache)
     }
 }
@@ -1652,7 +1652,7 @@ impl BootstrapPhase for WithCache {
     type Database = Option<Arc<Database>>;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
     #[cfg(feature = "cache")]
-    type Cache = Arc<Cache>;
+    type Cache = Cache;
 }
 
 /// The final phase of bootstrapping a Cot project, the initialized phase.
@@ -1808,7 +1808,7 @@ impl ProjectContext<WithApps> {
 
 impl ProjectContext<WithDatabase> {
     #[must_use]
-    fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
+    fn with_cache(self, #[cfg(feature = "cache")] cache: Cache) -> ProjectContext<WithCache> {
         ProjectContext {
             config: self.config,
             apps: self.apps,
@@ -1908,7 +1908,7 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
 }
 
 #[cfg(feature = "cache")]
-impl<S: BootstrapPhase<Cache = Arc<Cache>>> ProjectContext<S> {
+impl<S: BootstrapPhase<Cache = Cache>> ProjectContext<S> {
     /// Returns the cache for the project.
     ///
     /// # Examples
@@ -1925,7 +1925,7 @@ impl<S: BootstrapPhase<Cache = Arc<Cache>>> ProjectContext<S> {
     /// ```
     #[must_use]
     #[cfg(feature = "cache")]
-    pub fn cache(&self) -> &Arc<Cache> {
+    pub fn cache(&self) -> &Cache {
         &self.cache
     }
 }
@@ -2521,11 +2521,11 @@ mod tests {
 
     #[cot::test]
     async fn default_auth_backend() {
-        let cache_memory = Arc::new(Cache::new(
+        let cache_memory = Cache::new(
             cache::store::memory::Memory::new(),
             None,
             Timeout::default(),
-        ));
+        );
 
         let context = ProjectContext::new()
             .with_config(

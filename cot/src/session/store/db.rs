@@ -23,7 +23,6 @@
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use thiserror::Error;
@@ -88,7 +87,7 @@ impl From<DbStoreError> for session_store::Error {
 /// ```
 #[derive(Clone, Debug)]
 pub struct DbStore {
-    connection: Arc<Database>,
+    connection: Database,
 }
 
 impl DbStore {
@@ -110,7 +109,7 @@ impl DbStore {
     /// }
     /// ```
     #[must_use]
-    pub fn new(connection: Arc<Database>) -> DbStore {
+    pub fn new(connection: Database) -> DbStore {
         DbStore { connection }
     }
 }

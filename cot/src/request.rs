@@ -207,7 +207,7 @@ pub trait RequestExt: private::Sealed {
     /// ```
     #[cfg(feature = "db")]
     #[must_use]
-    fn db(&self) -> &Arc<Database>;
+    fn db(&self) -> &Database;
 
     /// Get the content type of the request.
     ///
@@ -318,7 +318,7 @@ impl RequestExt for Request {
     }
 
     #[cfg(feature = "db")]
-    fn db(&self) -> &Arc<Database> {
+    fn db(&self) -> &Database {
         self.context().database()
     }
 
@@ -378,7 +378,7 @@ impl RequestExt for RequestHead {
     }
 
     #[cfg(feature = "db")]
-    fn db(&self) -> &Arc<Database> {
+    fn db(&self) -> &Database {
         self.context().database()
     }
 

@@ -1224,11 +1224,11 @@ impl Bootstrapper<WithApps> {
     }
 
     #[cfg(feature = "db")]
-    async fn init_database(config: &DatabaseConfig) -> cot::Result<Option<Arc<Database>>> {
+    async fn init_database(config: &DatabaseConfig) -> cot::Result<Option<Database>> {
         match &config.url {
             Some(url) => {
                 let database = Database::new(url.as_str()).await?;
-                Ok(Some(Arc::new(database)))
+                Ok(Some(database))
             }
             None => Ok(None),
         }
@@ -1626,7 +1626,7 @@ impl BootstrapPhase for WithDatabase {
     type Apps = <WithApps as BootstrapPhase>::Apps;
     type Router = <WithApps as BootstrapPhase>::Router;
     #[cfg(feature = "db")]
-    type Database = Option<Arc<Database>>;
+    type Database = Option<Database>;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
     #[cfg(feature = "cache")]
     type Cache = ();
@@ -1649,7 +1649,7 @@ impl BootstrapPhase for WithCache {
     type Apps = <WithApps as BootstrapPhase>::Apps;
     type Router = <WithApps as BootstrapPhase>::Router;
     #[cfg(feature = "db")]
-    type Database = Option<Arc<Database>>;
+    type Database = <WithDatabase as BootstrapPhase>::Database;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
     #[cfg(feature = "cache")]
     type Cache = Arc<Cache>;
@@ -1791,7 +1791,7 @@ impl ProjectContext<WithApps> {
     #[must_use]
     fn with_database(
         self,
-        #[cfg(feature = "db")] database: Option<Arc<Database>>,
+        #[cfg(feature = "db")] database: Option<Database>,
     ) -> ProjectContext<WithDatabase> {
         ProjectContext {
             config: self.config,
@@ -1931,7 +1931,7 @@ impl<S: BootstrapPhase<Cache = Arc<Cache>>> ProjectContext<S> {
 }
 
 #[cfg(feature = "db")]
-impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
+impl<S: BootstrapPhase<Database = Option<Database>>> ProjectContext<S> {
     /// Returns the database for the project, if it is enabled.
     ///
     /// # Examples
@@ -1952,7 +1952,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     /// ```
     #[must_use]
     #[cfg(feature = "db")]
-    pub fn try_database(&self) -> Option<&Arc<Database>> {
+    pub fn try_database(&self) -> Option<&Database> {
         self.database.as_ref()
     }
 
@@ -1980,7 +1980,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     #[cfg(feature = "db")]
     #[must_use]
     #[track_caller]
-    pub fn database(&self) -> &Arc<Database> {
+    pub fn database(&self) -> &Database {
         self.try_database().expect(
             "Database missing. Did you forget to add the database when configuring CotProject?",
         )

@@ -42,7 +42,7 @@ http-body.workspace = true
 http.workspace = true
 humantime.workspace = true
 indexmap.workspace = true
-lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-native-tls"], optional = true }
+lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls"], optional = true }
 mime.workspace = true
 mime_guess.workspace = true
 multer.workspace = true

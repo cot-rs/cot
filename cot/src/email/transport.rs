@@ -3,6 +3,7 @@
 //! It provides a `Transport` trait that can be implemented by different email
 //! backends (e.g., SMTP, console). The module also defines error handling for
 //! transport operations.
+use std::future::Future;
 use std::pin::Pin;
 
 use cot::email::EmailMessageError;

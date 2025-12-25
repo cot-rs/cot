@@ -239,7 +239,7 @@ pub struct TestRequestBuilder {
     #[cfg(feature = "cache")]
     cache: Option<Arc<Cache>>,
     #[cfg(feature = "email")]
-    email: Option<Arc<Email>>,
+    email: Option<Email>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -786,7 +786,7 @@ impl TestRequestBuilder {
             #[cfg(feature = "email")]
             self.email
                 .clone()
-                .unwrap_or_else(|| Arc::new(Email::new(Console::new()))),
+                .unwrap_or_else(|| Email::new(Console::new())),
         );
         prepare_request(&mut request, Arc::new(context));
 

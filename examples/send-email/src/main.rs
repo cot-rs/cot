@@ -12,7 +12,7 @@ use cot::request::{Request, RequestExt};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
-use cot::{reverse_redirect, static_files, App, AppBuilder, Project};
+use cot::{App, AppBuilder, Project, reverse_redirect, static_files};
 use serde::{Deserialize, Serialize};
 
 struct EmailApp;
@@ -110,7 +110,7 @@ async fn send_email(urls: Urls, mut request: Request) -> cot::Result<Response> {
 
     // Fixme: We should redirect with the status when reverse_redirect! supports
     // query parameters
-    Ok(reverse_redirect!(&urls, "index/",)?)
+    Ok(reverse_redirect!(&urls, "index/")?)
 }
 
 struct MyProject;
@@ -132,6 +132,7 @@ impl Project for MyProject {
             )
             .build())
     }
+
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views(EmailApp, "");
     }

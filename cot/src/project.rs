@@ -1585,7 +1585,7 @@ impl BootstrapPhase for WithConfig {
     type ErrorHandler = ();
     type Config = Arc<ProjectConfig>;
     #[cfg(feature = "email")]
-    type Email = Arc<Email>;
+    type Email = Email;
     type Apps = ();
     type Router = ();
     #[cfg(feature = "db")]
@@ -1733,10 +1733,9 @@ impl ProjectContext<Uninitialized> {
     fn with_config(self, config: ProjectConfig) -> ProjectContext<WithConfig> {
         #[cfg(feature = "email")]
         let email = {
-            let e = Email::from_config(&config.email).unwrap_or_else(|err| {
+            Email::from_config(&config.email).unwrap_or_else(|err| {
                 panic!("failed to initialize email service: {err:?}");
-            });
-            Arc::new(e)
+            })
         };
 
         ProjectContext {
@@ -1949,7 +1948,7 @@ impl<S: BootstrapPhase<AuthBackend = Arc<dyn AuthBackend>>> ProjectContext<S> {
 }
 
 #[cfg(feature = "email")]
-impl<S: BootstrapPhase<Email = Arc<Email>>> ProjectContext<S> {
+impl<S: BootstrapPhase<Email = Email>> ProjectContext<S> {
     #[must_use]
     /// Returns the email service for the project.
     ///
@@ -1965,7 +1964,7 @@ impl<S: BootstrapPhase<Email = Arc<Email>>> ProjectContext<S> {
     /// #    unimplemented!()
     /// }
     /// ```
-    pub fn email(&self) -> &Arc<Email> {
+    pub fn email(&self) -> &Email {
         &self.email
     }
 }

@@ -27,8 +27,6 @@
                     <p class="status__text">Failed to send email</p>
                 </div>
             {% endif %}
-            <p>{{ status }}</p>
-            <!-- Form -->
             <form id="email-form"
                   action="{{ cot::reverse!(urls, "send_email")? }}"
                   method="post">
@@ -60,8 +58,11 @@
                 </div>
                 <div class="form-field">
                     <label for="message">Message</label>
-                    <textarea id="message" name="message" placeholder="Write your message here..." rows="5" required>
-                </textarea>
+                    <textarea id="message"
+                              name="message"
+                              placeholder="Write your message here..."
+                              rows="5"
+                              required></textarea>
                 </div>
                 <button type="submit" class="submit-button">Send Email</button>
             </form>

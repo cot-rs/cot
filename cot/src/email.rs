@@ -8,7 +8,7 @@
 //!
 //! Send using the console transport backend (prints nicely formatted messages):
 //!
-//! ```no_run
+//! ```
 //! use cot::common_types::Email;
 //! use cot::email::EmailMessage;
 //! use cot::email::transport::console::Console;
@@ -66,11 +66,11 @@ pub type EmailResult<T> = Result<T, EmailError>;
 #[derive(Debug, Clone)]
 pub struct AttachmentData {
     /// The filename to display for the attachment.
-    filename: String,
+    pub filename: String,
     /// The MIME content type of the attachment (e.g., `image/png`).
-    content_type: String,
+    pub content_type: String,
     /// The raw bytes of the attachment.
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 /// A high-level email message representation.
@@ -267,21 +267,21 @@ impl TryFrom<EmailMessage> for Message {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
 /// use cot::email::EmailMessage;
 /// use cot::email::transport::console::Console;
 /// use cot::common_types::Email;
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
-///     let email = cot::email::Email::new(Console::new());
-///     let message = EmailMessage::builder()
-///         .from(Email::try_from("no-reply@example.com").unwrap())
-///         .to(vec![Email::try_from("user@example.com").unwrap()])
-///         .subject("Greetings")
-///         .body("Hello from cot!")
-///         .build()?;
-///     email.send(message).await?;
+///  let email = cot::email::Email::new(Console::new());
+///  let message = EmailMessage::builder()
+///     .from(Email::try_from("no-reply@example.com").unwrap())
+///     .to(vec![Email::try_from("user@example.com").unwrap()])
+///     .subject("Greetings")
+///     .body("Hello from cot!")
+///     .build()?;
+///  email.send(message).await?;
 /// # Ok(())
 /// }
 /// ```
@@ -314,21 +314,21 @@ impl Email {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use cot::email::EmailMessage;
     /// use cot::email::transport::console::Console;
     /// use cot::common_types::Email;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    ///     let email = cot::email::Email::new(Console::new());
-    ///     let message = EmailMessage::builder()
-    ///         .from(Email::try_from("no-reply@example.com").unwrap())
-    ///         .to(vec![Email::try_from("user@example.com").unwrap()])
-    ///         .subject("Greetings")
-    ///         .body("Hello from cot!")
-    ///         .build()?;
-    ///     email.send(message).await?;
+    ///  let email = cot::email::Email::new(Console::new());
+    ///  let message = EmailMessage::builder()
+    ///     .from(Email::try_from("no-reply@example.com").unwrap())
+    ///     .to(vec![Email::try_from("user@example.com").unwrap()])
+    ///     .subject("Greetings")
+    ///     .body("Hello from cot!")
+    ///     .build()?;
+    ///  email.send(message).await?;
     /// # Ok(())
     /// }
     /// ```
@@ -347,28 +347,28 @@ impl Email {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use cot::email::EmailMessage;
     /// use cot::email::transport::console::Console;
     /// use cot::common_types::Email;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    ///     let email = cot::email::Email::new(Console::new());
-    ///     let message1 = EmailMessage::builder()
-    ///         .from(Email::try_from("no-reply@email.com").unwrap())
-    ///         .to(vec![Email::try_from("user1@example.com").unwrap()])
-    ///         .subject("Hello User 1")
-    ///         .body("This is the first email.")
-    ///         .build()?;
+    ///  let email = cot::email::Email::new(Console::new());
+    ///  let message1 = EmailMessage::builder()
+    ///     .from(Email::try_from("no-reply@email.com").unwrap())
+    ///     .to(vec![Email::try_from("user1@example.com").unwrap()])
+    ///     .subject("Hello User 1")
+    ///     .body("This is the first email.")
+    ///     .build()?;
     ///
-    ///     let message2 = EmailMessage::builder()
-    ///         .from(Email::try_from("no-reply@email.com").unwrap())
-    ///         .to(vec![Email::try_from("user2@example.com").unwrap()])
-    ///         .subject("Hello User 2")
-    ///         .body("This is the second email.")
-    ///         .build()?;
-    ///     email.send_multiple(&[message1, message2]).await?;
+    ///  let message2 = EmailMessage::builder()
+    ///     .from(Email::try_from("no-reply@email.com").unwrap())
+    ///     .to(vec![Email::try_from("user2@example.com").unwrap()])
+    ///     .subject("Hello User 2")
+    ///     .body("This is the second email.")
+    ///     .build()?;
+    ///  email.send_multiple(&[message1, message2]).await?;
     /// # Ok(())
     /// }
     /// ```

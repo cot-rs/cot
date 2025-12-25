@@ -227,7 +227,7 @@ pub trait RequestExt: private::Sealed {
     /// ```
     #[cfg(feature = "email")]
     #[must_use]
-    fn email(&self) -> &Arc<Email>;
+    fn email(&self) -> &Email;
 
     /// Get the content type of the request.
     ///
@@ -343,7 +343,7 @@ impl RequestExt for Request {
     }
 
     #[cfg(feature = "email")]
-    fn email(&self) -> &Arc<Email> {
+    fn email(&self) -> &Email {
         self.context().email()
     }
 
@@ -408,7 +408,7 @@ impl RequestExt for RequestHead {
     }
 
     #[cfg(feature = "email")]
-    fn email(&self) -> &Arc<Email> {
+    fn email(&self) -> &Email {
         self.context().email()
     }
 

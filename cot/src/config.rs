@@ -2031,7 +2031,7 @@ pub struct EmailConfig {
 
 #[cfg(feature = "email")]
 impl EmailConfig {
-    /// Create a new [`EmailBackendConfigBuilder`] to build a
+    /// Create a new [`EmailConfigBuilder`] to build an
     /// [`EmailConfig`].
     ///
     /// # Examples

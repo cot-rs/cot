@@ -45,7 +45,7 @@ pub enum SMTPError {
     /// An error occurred while sending the email via SMTP.
     #[error("{ERROR_PREFIX} send error: {0}")]
     SmtpSend(Box<dyn std::error::Error + Send + Sync>),
-    /// An error occured while creating the transport.
+    /// An error occurred while creating the transport.
     #[error("{ERROR_PREFIX} transport creation error: {0}")]
     TransportCreation(Box<dyn std::error::Error + Send + Sync>),
 }

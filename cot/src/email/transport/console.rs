@@ -8,7 +8,7 @@
 //!
 //! ## Examples
 //!
-//! ```no_run
+//! ```
 //! use cot::common_types::Email;
 //! use cot::email::EmailMessage;
 //! use cot::email::transport::console::Console;

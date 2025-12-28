@@ -30,9 +30,9 @@ use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
 use crate::html::Html;
-use crate::router::{Router, Urls};
 use crate::static_files::StaticFile;
 use crate::{App, Error, Method, RequestHandler, reverse_redirect};
+use cot_core::router::{Router, Urls};
 
 struct AdminAuthenticated<T, H: Send + Sync>(H, PhantomData<fn() -> T>);
 
@@ -682,28 +682,28 @@ impl App for AdminApp {
 
     fn router(&self) -> Router {
         Router::with_urls([
-            crate::router::Route::with_handler_and_name(
+            cot_core::router::Route::with_handler_and_name(
                 "/",
                 AdminAuthenticated::new(index),
                 "index",
             ),
-            crate::router::Route::with_handler_and_name("/login/", login, "login"),
-            crate::router::Route::with_handler_and_name(
+            cot_core::router::Route::with_handler_and_name("/login/", login, "login"),
+            cot_core::router::Route::with_handler_and_name(
                 "/{model_name}/",
                 AdminAuthenticated::new(view_model),
                 "view_model",
             ),
-            crate::router::Route::with_handler_and_name(
+            cot_core::router::Route::with_handler_and_name(
                 "/{model_name}/create/",
                 AdminAuthenticated::new(create_model_instance),
                 "create_model_instance",
             ),
-            crate::router::Route::with_handler_and_name(
+            cot_core::router::Route::with_handler_and_name(
                 "/{model_name}/{pk}/edit/",
                 AdminAuthenticated::new(edit_model_instance),
                 "edit_model_instance",
             ),
-            crate::router::Route::with_handler_and_name(
+            cot_core::router::Route::with_handler_and_name(
                 "/{model_name}/{pk}/remove/",
                 AdminAuthenticated::new(remove_model_instance),
                 "remove_model_instance",

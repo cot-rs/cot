@@ -4,7 +4,7 @@ use http;
 
 use crate::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use crate::response::Response;
-use crate::{Body, Error, StatusCode, impl_into_cot_error};
+use crate::{Body, Error, StatusCode};
 
 /// Trait for generating responses.
 /// Types that implement `IntoResponse` can be returned from handlers.
@@ -193,7 +193,7 @@ where
 macro_rules! impl_into_response_for_type_and_mime {
     ($ty:ty, $mime:expr) => {
         impl IntoResponse for $ty {
-            fn into_response(self) -> cot::Result<Response> {
+            fn into_response(self) -> cot_core::Result<Response> {
                 Body::from(self)
                     .with_header(http::header::CONTENT_TYPE, $mime)
                     .into_response()

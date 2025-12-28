@@ -7,18 +7,18 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use cot_core::error::error_impl::impl_into_cot_error;
+use crate::impl_into_cot_error;
 use thiserror::Error;
 use tracing::debug;
 
 #[derive(Debug, Clone)]
-pub(super) struct PathMatcher {
+pub struct PathMatcher {
     parts: Vec<PathPart>,
 }
 
 impl PathMatcher {
     #[must_use]
-    pub(crate) fn new<T: Into<String>>(path_pattern: T) -> Self {
+    pub fn new<T: Into<String>>(path_pattern: T) -> Self {
         #[derive(Debug, Copy, Clone)]
         enum State {
             Literal { start: usize },
@@ -115,7 +115,7 @@ impl PathMatcher {
     }
 
     #[must_use]
-    pub(crate) fn capture<'matcher, 'path>(
+    pub fn capture<'matcher, 'path>(
         &'matcher self,
         path: &'path str,
     ) -> Option<CaptureResult<'matcher, 'path>> {
@@ -150,7 +150,7 @@ impl PathMatcher {
         Some(CaptureResult::new(params, current_path))
     }
 
-    pub(crate) fn reverse(&self, params: &ReverseParamMap) -> Result<String, ReverseError> {
+    pub fn reverse(&self, params: &ReverseParamMap) -> Result<String, ReverseError> {
         let mut result = String::new();
 
         for part in &self.parts {
@@ -173,7 +173,7 @@ impl PathMatcher {
         self.param_names().count()
     }
 
-    pub(super) fn param_names(&self) -> impl Iterator<Item = &str> {
+    pub fn param_names(&self) -> impl Iterator<Item = &str> {
         self.parts.iter().filter_map(|part| match part {
             PathPart::Literal(..) => None,
             PathPart::Param { name } => Some(name.as_str()),
@@ -197,7 +197,7 @@ impl Display for PathMatcher {
 /// # Examples
 ///
 /// ```
-/// use cot::router::path::ReverseParamMap;
+/// use cot_core::router::path::ReverseParamMap;
 ///
 /// let mut map = ReverseParamMap::new();
 /// map.insert("id", "123");
@@ -220,7 +220,7 @@ impl ReverseParamMap {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::path::ReverseParamMap;
+    /// use cot_core::router::path::ReverseParamMap;
     ///
     /// let mut map = ReverseParamMap::new();
     /// ```
@@ -237,7 +237,7 @@ impl ReverseParamMap {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::path::ReverseParamMap;
+    /// use cot_core::router::path::ReverseParamMap;
     ///
     /// let mut map = ReverseParamMap::new();
     /// map.insert("id", "123");
@@ -280,9 +280,9 @@ pub enum ReverseError {
 impl_into_cot_error!(ReverseError);
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct CaptureResult<'matcher, 'path> {
-    pub(super) params: Vec<PathParam<'matcher>>,
-    pub(super) remaining_path: &'path str,
+pub struct CaptureResult<'matcher, 'path> {
+    pub params: Vec<PathParam<'matcher>>,
+    pub remaining_path: &'path str,
 }
 
 impl<'matcher, 'path> CaptureResult<'matcher, 'path> {
@@ -295,7 +295,7 @@ impl<'matcher, 'path> CaptureResult<'matcher, 'path> {
     }
 
     #[must_use]
-    pub(crate) fn matches_fully(&self) -> bool {
+    pub fn matches_fully(&self) -> bool {
         self.remaining_path.is_empty()
     }
 }
@@ -319,14 +319,14 @@ impl Display for PathPart {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct PathParam<'a> {
-    pub(super) name: &'a str,
-    pub(super) value: String,
+pub struct PathParam<'a> {
+    pub name: &'a str,
+    pub value: String,
 }
 
 impl<'a> PathParam<'a> {
     #[must_use]
-    pub(crate) fn new(name: &'a str, value: &str) -> Self {
+    pub fn new(name: &'a str, value: &str) -> Self {
         Self {
             name,
             value: value.to_string(),

@@ -49,16 +49,16 @@
 //! ```
 
 use std::future::Future;
-use std::sync::Arc;
 
 use cot::auth::Auth;
 use cot::form::{Form, FormResult};
 use cot::router::Urls;
 use cot::session::Session;
 use serde::de::DeserializeOwned;
+use tower_sessions::Session;
 
-use crate::Body;
 pub use crate::request::{PathParams, Request, RequestExt, RequestHead};
+use crate::{Body, Method};
 
 /// Trait for extractors that consume the request body.
 ///
@@ -351,6 +351,7 @@ impl FromRequestHead for Auth {
 /// }
 /// ```
 pub use cot_macros::FromRequestHead;
+
 
 use crate::impl_into_cot_error;
 

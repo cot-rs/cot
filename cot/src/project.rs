@@ -53,13 +53,13 @@ use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error_page::Diagnostics;
-use cot_core::handler::BoxedHandler;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;
 use crate::utils::accept_header_parser::AcceptHeaderParser;
 use crate::{Body, Error, cli, error_page};
+use cot_core::handler::BoxedHandler;
+use cot_core::router::{Route, Router, RouterService};
 
 /// A building block for a Cot project.
 ///
@@ -116,7 +116,7 @@ pub trait App: Send + Sync {
     /// ```
     /// use cot::App;
     /// use cot::html::Html;
-    /// use cot::router::{Route, Router};
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn index() -> Html {
     ///     Html::new("Hello world!")

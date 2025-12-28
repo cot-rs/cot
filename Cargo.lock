@@ -793,6 +793,7 @@ dependencies = [
  "tokio",
  "tower",
  "tower-sessions",
+ "tracing",
 ]
 
 [[package]]

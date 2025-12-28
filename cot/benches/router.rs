@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 mod bench_utils;
 use bench_utils::bench;
 use cot::json::Json;
-use cot::router::{Route, Router};
+use cot_core::router::{Route, Router};
 
 async fn hello_world() -> &'static str {
     "Hello, World!"

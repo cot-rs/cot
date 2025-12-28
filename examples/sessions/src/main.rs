@@ -10,10 +10,10 @@ use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::SessionMiddleware;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
-use cot::router::{Route, Router, Urls};
-use cot::session::Session;
 use cot::session::db::SessionApp;
-use cot::{App, AppBuilder, Project, reverse_redirect};
+use cot::session::Session;
+use cot::{reverse_redirect, App, AppBuilder, Project};
+use cot_core::router::{Route, Router, Urls};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

@@ -3,10 +3,10 @@ use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::html::Html;
 use cot::project::RegisterAppsContext;
-use cot::router::{Route, Router};
 use cot::{App, AppBuilder, Project};
 use cot_core::error::handler::{DynErrorPageHandler, RequestError};
 use cot_core::response::{IntoResponse, Response};
+use cot_core::router::{Route, Router};
 
 async fn return_hello() -> cot::Result<Response> {
     panic!()

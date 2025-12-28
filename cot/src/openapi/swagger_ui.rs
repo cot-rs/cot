@@ -13,8 +13,8 @@ use crate::html::Html;
 use crate::json::Json;
 use crate::request::extractors::StaticFiles;
 use crate::request::{Request, RequestExt};
-use crate::router::{Route, Router};
 use crate::static_files::StaticFile;
+use cot_core::router::{Route, Router};
 
 /// A wrapper around the Swagger UI functionality.
 ///

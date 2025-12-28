@@ -3,9 +3,9 @@
 //! # Examples
 //!
 //! ```
-//! use cot::router::{Route, Router};
 //! use cot_core::request::Request;
 //! use cot_core::response::Response;
+//! use cot_core::router::{Route, Router};
 //!
 //! async fn home(request: Request) -> cot::Result<Response> {
 //!     Ok(cot::reverse_redirect!(request, "get_page", page = 123)?)
@@ -27,16 +27,16 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use cot_core::error::NotFound;
-use cot_core::error::error_impl::impl_into_cot_error;
-use cot_core::response::Response;
+use cot::project;
 use derive_more::with_trait::Debug;
 use tracing::debug;
 
-use cot_core::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
+use crate::error::NotFound;
+use crate::handler::{into_box_request_handler, BoxRequestHandler, RequestHandler};
 use crate::request::{AppName, PathParams, Request, RequestExt, RequestHead, RouteName};
+use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
-use crate::{Error, Result};
+use crate::{impl_into_cot_error, Error, Result};
 
 pub mod method;
 pub mod path;
@@ -45,14 +45,14 @@ pub mod path;
 ///
 /// This struct is used to route requests to their respective views. It can be
 /// created directly by calling the [`Router::with_urls`] method, and that's
-/// what is typically done in [`cot::App::router`] implementations.
+/// what is typically done in [`project::App::router`] implementations.
 ///
 /// # Examples
 ///
 /// ```
-/// use cot::router::{Route, Router};
 /// use cot_core::request::Request;
 /// use cot_core::response::Response;
+/// use cot_core::router::{Route, Router};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
 ///     unimplemented!()
@@ -75,7 +75,7 @@ impl Router {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::Router;
+    /// use cot_core::router::Router;
     ///
     /// let router = Router::empty();
     /// ```
@@ -89,9 +89,9 @@ impl Router {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -117,7 +117,7 @@ impl Router {
         }
     }
 
-    pub(crate) fn set_app_name(&mut self, app_name: AppName) {
+    pub fn set_app_name(&mut self, app_name: AppName) {
         self.app_name = Some(app_name);
     }
 
@@ -203,7 +203,7 @@ impl Router {
 
     /// Handle a request.
     ///
-    /// This method is called by the [`CotApp`](crate::App) to handle
+    /// This method is called by the [`CotApp`](cot::project::App) to handle
     /// a request.
     ///
     /// # Errors
@@ -299,9 +299,9 @@ impl Router {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -320,9 +320,9 @@ impl Router {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -421,7 +421,7 @@ impl Router {
 
                 let url = format!("{url}{}", route.url);
 
-                let mut route_context = crate::openapi::RouteContext::new();
+                let mut route_context = cot::openapi::RouteContext::new();
                 route_context.param_names = &params;
 
                 paths.paths.insert(
@@ -461,8 +461,8 @@ struct HandlerFound<'a> {
 
 /// A service that routes requests to their respective views.
 ///
-/// This is mostly an internal service used by the [`CotApp`](crate::App) to
-/// route requests to their respective views with an interface that is
+/// This is mostly an internal service used by the [`CotApp`](cot::project::App)
+/// to route requests to their respective views with an interface that is
 /// compatible with the [`tower::Service`] trait.
 #[derive(Debug, Clone)]
 pub struct RouterService {
@@ -477,9 +477,9 @@ impl RouterService {
     /// ```
     /// use std::sync::Arc;
     ///
-    /// use cot::router::{Route, Router, RouterService};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router, RouterService};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -528,9 +528,9 @@ pub fn split_view_name(view_name: &str) -> (Option<&str>, &str) {
 /// # Examples
 ///
 /// ```
-/// use cot::router::{Route, Router};
 /// use cot_core::request::Request;
 /// use cot_core::response::Response;
+/// use cot_core::router::{Route, Router};
 ///
 /// async fn home(request: Request) -> cot::Result<Response> {
 ///     unimplemented!()
@@ -551,9 +551,9 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     // ...
@@ -578,16 +578,16 @@ impl Route {
     /// Create a new route with the given handler for inclusion in the OpenAPI
     /// specs.
     ///
-    /// See [`crate::openapi`] module documentation for more details on how to
+    /// See [`cot::openapi`] module documentation for more details on how to
     /// generate OpenAPI specs automatically.
     ///
     /// # Examples
     ///
     /// ```
-    /// use cot::router::method::openapi::api_get;
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::method::openapi::api_get;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     // ...
@@ -601,12 +601,12 @@ impl Route {
     pub fn with_api_handler<HandlerParams, H>(url: &str, handler: H) -> Self
     where
         HandlerParams: 'static,
-        H: RequestHandler<HandlerParams> + crate::openapi::AsApiRoute + Send + Sync + 'static,
+        H: RequestHandler<HandlerParams> + cot::openapi::AsApiRoute + Send + Sync + 'static,
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                crate::openapi::into_box_api_endpoint_request_handler(handler),
+                cot::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: None,
         }
@@ -617,10 +617,10 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::method::openapi::api_get;
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::method::openapi::api_get;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     // ...
@@ -646,16 +646,16 @@ impl Route {
     /// Create a new route with the given handler and name for inclusion in the
     /// OpenAPI specs.
     ///
-    /// See [`crate::openapi`] module documentation for more details on how to
+    /// See [`cot::openapi`] module documentation for more details on how to
     /// generate OpenAPI specs automatically.
     ///
     /// # Examples
     ///
     /// ```
-    /// use cot::router::method::openapi::api_post;
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::method::openapi::api_post;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     // ...
@@ -670,12 +670,12 @@ impl Route {
     where
         N: Into<String>,
         HandlerParams: 'static,
-        H: RequestHandler<HandlerParams> + crate::openapi::AsApiRoute + Send + Sync + 'static,
+        H: RequestHandler<HandlerParams> + cot::openapi::AsApiRoute + Send + Sync + 'static,
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                crate::openapi::into_box_api_endpoint_request_handler(handler),
+                cot::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: Some(RouteName(name.into())),
         }
@@ -686,9 +686,9 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -711,9 +711,9 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -733,9 +733,9 @@ impl Route {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::{Route, Router};
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -750,7 +750,7 @@ impl Route {
     }
 
     #[must_use]
-    pub(crate) fn kind(&self) -> RouteKind {
+    pub fn kind(&self) -> RouteKind {
         match &self.view {
             RouteInner::Handler(_) => RouteKind::Handler,
             RouteInner::Router(_) => RouteKind::Router,
@@ -760,7 +760,7 @@ impl Route {
     }
 
     #[must_use]
-    pub(crate) fn router(&self) -> Option<&Router> {
+    pub fn router(&self) -> Option<&Router> {
         match &self.view {
             RouteInner::Router(router) => Some(router),
             RouteInner::Handler(_) => None,
@@ -771,7 +771,7 @@ impl Route {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum RouteKind {
+pub enum RouteKind {
     Handler,
     Router,
 }
@@ -781,7 +781,7 @@ enum RouteInner {
     Handler(Arc<dyn BoxRequestHandler + Send + Sync>),
     Router(Router),
     #[cfg(feature = "openapi")]
-    ApiHandler(Arc<dyn crate::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
+    ApiHandler(Arc<dyn cot::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
 }
 
 /// Get a URL for a view by its registered name and given params.
@@ -794,7 +794,7 @@ enum RouteInner {
 ///
 /// # Return value
 ///
-/// Returns a [`cot::Result<String>`] that contains the URL for the view. You
+/// Returns a [`crate::Result<String>`] that contains the URL for the view. You
 /// will typically want to append `?` to the macro call to get the URL.
 ///
 /// # Examples
@@ -802,9 +802,9 @@ enum RouteInner {
 /// ```
 /// use cot::html::Html;
 /// use cot::project::RegisterAppsContext;
-/// use cot::router::{Route, Router};
 /// use cot::{App, AppBuilder, Project, StatusCode, reverse};
 /// use cot_core::request::Request;
+/// use cot_core::router::{Route, Router};
 ///
 /// async fn home(request: Request) -> cot::Result<Html> {
 ///     // any of below two lines returns the same:
@@ -865,9 +865,9 @@ macro_rules! reverse {
 ///
 /// ```
 /// use cot::html::Html;
-/// use cot::router::{Route, Router, Urls};
 /// use cot::test::TestRequestBuilder;
 /// use cot::{RequestHandler, reverse};
+/// use cot_core::router::{Route, Router, Urls};
 ///
 /// async fn my_handler(urls: Urls) -> cot::Result<Html> {
 ///     let url = reverse!(urls, "home")?;
@@ -904,10 +904,10 @@ impl Urls {
     ///
     /// ```
     /// use cot::html::Html;
-    /// use cot::router::Urls;
     /// use cot::{Body, StatusCode, reverse};
     /// use cot_core::request::Request;
     /// use cot_core::response::{Response, ResponseExt};
+    /// use cot_core::router::Urls;
     ///
     /// async fn my_handler(request: Request) -> cot::Result<Html> {
     ///     let urls = Urls::from_request(&request);
@@ -925,7 +925,7 @@ impl Urls {
         }
     }
 
-    pub(crate) fn from_parts(request_head: &RequestHead) -> Self {
+    pub fn from_parts(request_head: &RequestHead) -> Self {
         Self {
             app_name: request_head.app_name().map(ToOwned::to_owned),
             router: Arc::clone(request_head.router()),
@@ -941,9 +941,9 @@ impl Urls {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::Urls;
     /// use cot_core::request::{Request, RequestExt};
     /// use cot_core::response::Response;
+    /// use cot_core::router::Urls;
     ///
     /// async fn my_handler(urls: Urls) -> cot::Result<Response> {
     ///     let app_name = urls.app_name();
@@ -961,9 +961,9 @@ impl Urls {
     /// # Examples
     ///
     /// ```
-    /// use cot::router::Urls;
     /// use cot_core::request::{Request, RequestExt};
     /// use cot_core::response::Response;
+    /// use cot_core::router::Urls;
     ///
     /// async fn my_handler(urls: Urls) -> cot::Result<Response> {
     ///     let router = urls.router();
@@ -998,7 +998,7 @@ impl Debug for RouteInner {
 ///
 /// # Return value
 ///
-/// Returns a [`cot::Result<Response>`] that contains the URL for
+/// Returns a [`crate::Result<Response>`] that contains the URL for
 /// the view. You will typically want to append `?` to the macro call to get the
 /// [`Response`] object.
 ///
@@ -1006,9 +1006,9 @@ impl Debug for RouteInner {
 ///
 /// ```
 /// use cot::reverse_redirect;
-/// use cot::router::{Route, Router};
 /// use cot_core::request::Request;
 /// use cot_core::response::Response;
+/// use cot_core::router::{Route, Router};
 ///
 /// async fn infinite_loop(request: Request) -> cot::Result<Response> {
 ///     Ok(reverse_redirect!(request, "home")?)
@@ -1029,13 +1029,13 @@ macro_rules! reverse_redirect {
 
 #[cfg(test)]
 mod tests {
-    use cot_core::response::{IntoResponse, Response};
+    use cot::html::Html;
+    use cot::test::TestRequestBuilder;
 
     use super::*;
-    use crate::StatusCode;
-    use crate::html::Html;
     use crate::request::Request;
-    use crate::test::TestRequestBuilder;
+    use crate::response::{IntoResponse, Response};
+    use crate::StatusCode;
 
     struct MockHandler;
 
@@ -1046,7 +1046,7 @@ mod tests {
     }
 
     #[cfg(feature = "openapi")]
-    impl crate::openapi::AsApiRoute for MockHandler {
+    impl cot::openapi::AsApiRoute for MockHandler {
         fn as_api_route(
             &self,
             _route_context: &cot::openapi::RouteContext<'_>,
@@ -1103,7 +1103,7 @@ mod tests {
         assert_eq!(router.routes().len(), 1);
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn router_route() {
         let route = Route::with_handler("/test", MockHandler);
         let router = Router::with_urls(vec![route.clone()]);
@@ -1111,7 +1111,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn router_handle() {
         let route = Route::with_handler("/test", MockHandler);
         let router = Router::with_urls(vec![route.clone()]);
@@ -1119,7 +1119,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn sub_router_handle() {
         let route_1 = Route::with_handler("/test", MockHandler);
         let sub_router_1 = Router::with_urls(vec![route_1.clone()]);

@@ -2,10 +2,10 @@ use bytes::Bytes;
 use cot::config::ProjectConfig;
 use cot::html::Html;
 use cot::project::RegisterAppsContext;
-use cot::router::{Route, Router};
 use cot::test::Client;
 use cot::{App, AppBuilder, Project, StatusCode, reverse};
 use cot_core::request::Request;
+use cot_core::router::{Route, Router};
 
 #[cot::test]
 #[cfg_attr(

@@ -75,7 +75,6 @@ pub mod openapi;
 pub mod project;
 pub mod request;
 mod response;
-pub mod router;
 mod serializers;
 pub mod session;
 pub mod static_files;
@@ -158,7 +157,7 @@ pub use cot_macros::test;
 pub use schemars;
 pub use {bytes, cot_core as core, http};
 
-pub use cot_core::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{
-    run, run_at, run_cli, App, AppBuilder, Bootstrapper, Project, ProjectContext,
+    App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };
+pub use cot_core::handler::{BoxedHandler, RequestHandler};

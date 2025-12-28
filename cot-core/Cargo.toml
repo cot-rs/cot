@@ -37,6 +37,7 @@ sync_wrapper.workspace = true
 thiserror.workspace = true
 tower = { workspace = true, features = ["util"] }
 tower-sessions = { workspace = true, features = ["memory-store"] }
+tracing = "0.1.41"
 
 [dev-dependencies]
 async-stream.workspace = true

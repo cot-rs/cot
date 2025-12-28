@@ -5,12 +5,11 @@ pub mod openapi;
 
 use std::fmt::{Debug, Formatter};
 
-use cot_core::error::MethodNotAllowed;
-use cot_core::response::Response;
-
-use cot_core::handler::{BoxRequestHandler, into_box_request_handler};
+use crate::error::MethodNotAllowed;
+use crate::handler::{into_box_request_handler, BoxRequestHandler, RequestHandler};
 use crate::request::Request;
-use crate::{Method, RequestHandler};
+use crate::response::Response;
+use crate::Method;
 
 /// A router that routes requests based on the HTTP method.
 ///
@@ -31,9 +30,9 @@ use crate::{Method, RequestHandler};
 ///
 /// ```
 /// use cot::html::Html;
-/// use cot::router::method::{MethodRouter, get};
-/// use cot::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
+/// use cot_core::router::method::{MethodRouter, get};
+/// use cot_core::router::{Route, Router};
 ///
 /// async fn get_handler() -> Html {
 ///     Html::new("GET response")
@@ -91,7 +90,7 @@ macro_rules! define_method {
         ///
         /// ```
         /// use cot::html::Html;
-        /// use cot::router::method::MethodRouter;
+        /// use cot_core::router::method::MethodRouter;
         ///
         /// async fn test_handler() -> Html {
         ///     Html::new("test")
@@ -149,16 +148,17 @@ impl MethodRouter {
     /// Create a new [`MethodRouter`].
     ///
     /// You might consider using [`get`], [`post`], or one of the other
-    /// functions defined in [`cot::router::method`] which serve as convenient
-    /// constructors for a [`MethodRouter`] with a specific handler.
+    /// functions defined in [`cot_core::router::method`] which serve as
+    /// convenient constructors for a [`MethodRouter`] with a specific
+    /// handler.
     ///
     /// # Examples
     ///
     /// ```
     /// use cot::html::Html;
-    /// use cot::router::method::MethodRouter;
-    /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::router::method::MethodRouter;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn test_handler() -> Html {
     ///     Html::new("GET response")
@@ -206,10 +206,10 @@ impl MethodRouter {
     /// ```
     /// use cot::StatusCode;
     /// use cot::html::Html;
-    /// use cot::router::method::MethodRouter;
-    /// use cot::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
     /// use cot_core::response::IntoResponse;
+    /// use cot_core::router::method::MethodRouter;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn fallback_handler() -> impl IntoResponse {
     ///     Html::new("Method Not Allowed").with_status(StatusCode::METHOD_NOT_ALLOWED)
@@ -245,7 +245,7 @@ impl MethodRouter {
 }
 
 impl RequestHandler for MethodRouter {
-    fn handle(&self, request: Request) -> impl Future<Output = cot::Result<Response>> + Send {
+    fn handle(&self, request: Request) -> impl Future<Output = crate::Result<Response>> + Send {
         self.inner.handle(request)
     }
 }
@@ -253,21 +253,21 @@ impl RequestHandler for MethodRouter {
 #[derive(Debug)]
 #[must_use]
 struct InnerMethodRouter<T> {
-    pub(self) get: Option<T>,
-    pub(self) head: Option<T>,
-    pub(self) delete: Option<T>,
-    pub(self) options: Option<T>,
-    pub(self) patch: Option<T>,
-    pub(self) post: Option<T>,
-    pub(self) put: Option<T>,
-    pub(self) trace: Option<T>,
+    pub get: Option<T>,
+    pub head: Option<T>,
+    pub delete: Option<T>,
+    pub options: Option<T>,
+    pub patch: Option<T>,
+    pub post: Option<T>,
+    pub put: Option<T>,
+    pub trace: Option<T>,
     // CONNECT can't be used in OpenAPI, so it's always a base handler
-    pub(self) connect: Option<InnerHandler>,
-    pub(self) fallback: InnerHandler,
+    pub connect: Option<InnerHandler>,
+    pub fallback: InnerHandler,
 }
 
 impl<T> InnerMethodRouter<T> {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             get: None,
             head: None,
@@ -284,7 +284,7 @@ impl<T> InnerMethodRouter<T> {
 }
 
 impl<T: RequestHandler + Send + Sync> RequestHandler for InnerMethodRouter<T> {
-    async fn handle(&self, request: Request) -> cot::Result<Response> {
+    async fn handle(&self, request: Request) -> crate::Result<Response> {
         macro_rules! handle_method {
             ($name:ident => $method:ident) => {
                 if request.method() == Method::$method {
@@ -337,7 +337,7 @@ impl Debug for InnerHandler {
 }
 
 impl RequestHandler for InnerHandler {
-    fn handle(&self, request: Request) -> impl Future<Output = cot::Result<Response>> + Send {
+    fn handle(&self, request: Request) -> impl Future<Output = crate::Result<Response>> + Send {
         self.0.handle(request)
     }
 }
@@ -420,10 +420,11 @@ async fn default_fallback(method: Method) -> crate::Error {
 
 #[cfg(test)]
 mod tests {
+    use cot::html::Html;
+    use cot::test::TestRequestBuilder;
+
     use super::*;
     use crate::StatusCode;
-    use crate::html::Html;
-    use crate::test::TestRequestBuilder;
 
     async fn test_handler(method: Method) -> Html {
         Html::new(method.as_str())
@@ -438,7 +439,7 @@ mod tests {
         assert_eq!(debug_str, "InnerHandler(..)");
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn method_router_fallback() {
         let router = MethodRouter::new();
 
@@ -450,7 +451,7 @@ mod tests {
         assert!(inner.is::<MethodNotAllowed>());
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn method_router_default_fallback() {
         let router = MethodRouter::default();
 
@@ -462,7 +463,7 @@ mod tests {
         assert!(inner.is::<MethodNotAllowed>());
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn method_router_custom_fallback() {
         let router = MethodRouter::new().fallback(test_handler);
 
@@ -473,7 +474,7 @@ mod tests {
         assert_eq!(response.into_body().into_bytes().await.unwrap(), "GET");
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn method_router_get() {
         let router = get(test_handler);
 
@@ -525,7 +526,7 @@ mod tests {
     test_method_router!(method_router_trace, trace, TRACE);
     test_method_router!(method_router_connect, connect, CONNECT);
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn method_router_default_head() {
         // verify that the default method router doesn't handle HEAD
         let router = MethodRouter::new();
@@ -546,7 +547,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    #[cot::test]
+    #[cot_macros::test]
     async fn method_router_multiple() {
         let router = MethodRouter::new()
             .get(test_handler)

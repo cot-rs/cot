@@ -8,7 +8,7 @@
 //! ```
 //! use cot::RequestHandler;
 //! use cot::html::Html;
-//! use cot::router::{Route, Router};
+//! use cot_core::router::{Route, Router};
 //! use cot::session::Session;
 //! use cot::test::TestRequestBuilder;
 //!
@@ -53,7 +53,7 @@ use std::ops::{Deref, DerefMut};
 /// use cot::RequestHandler;
 /// use cot::html::Html;
 /// use cot::request::Request;
-/// use cot::router::{Route, Router};
+/// use cot_core::router::{Route, Router};
 /// use cot::session::Session;
 /// use cot::test::TestRequestBuilder;
 ///
@@ -101,7 +101,7 @@ impl Session {
     /// use cot::RequestHandler;
     /// use cot::html::Html;
     /// use cot::request::Request;
-    /// use cot::router::{Route, Router};
+    /// use cot_core::router::{Route, Router};
     /// use cot::session::Session;
     /// use cot::test::TestRequestBuilder;
     ///

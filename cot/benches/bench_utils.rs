@@ -9,8 +9,8 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::project::RegisterAppsContext;
-use cot::router::Router;
 use cot::{App, AppBuilder, Project};
+use cot_core::router::Router;
 use criterion::{Criterion, Throughput};
 use futures_util::future::join_all;
 use reqwest::{Client, Request};

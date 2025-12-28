@@ -8,8 +8,8 @@ use cot_core::error::backtrace::{__cot_create_backtrace, Backtrace};
 use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
-use crate::router::Router;
 use crate::{Error, Result, StatusCode};
+use cot_core::router::Router;
 
 #[derive(Debug)]
 pub(super) struct Diagnostics {
@@ -142,13 +142,13 @@ impl ErrorPageTemplateBuilder {
                 index: format!("{index_prefix}{index}"),
                 path: format!("{url_prefix}{}", route.url()),
                 kind: match route.kind() {
-                    crate::router::RouteKind::Router => if route_data.is_empty() {
+                    cot_core::router::RouteKind::Router => if route_data.is_empty() {
                         "Root Router"
                     } else {
                         "Router"
                     }
                     .to_owned(),
-                    crate::router::RouteKind::Handler => "View".to_owned(),
+                    cot_core::router::RouteKind::Handler => "View".to_owned(),
                 },
                 name: route.name().unwrap_or_default().to_owned(),
             });
@@ -456,8 +456,8 @@ mod tests {
     use tracing_test::traced_test;
 
     use super::*;
-    use crate::router::{Route, Router};
     use crate::test::TestRequestBuilder;
+    use cot_core::router::{Route, Router};
 
     fn create_test_request_data() -> RequestData {
         RequestData {

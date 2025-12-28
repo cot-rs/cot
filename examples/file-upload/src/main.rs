@@ -7,9 +7,9 @@ use cot::form::fields::InMemoryUploadedFile;
 use cot::form::{Form, FormContext};
 use cot::html::Html;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
-use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Project};
+use cot_core::router::{Route, Router, Urls};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

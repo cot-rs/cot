@@ -9,16 +9,16 @@
 //!
 //! 1. Add [`#[derive(schemars::JsonSchema)]`](schemars::JsonSchema) to the
 //!    types used in the extractors and response types.
-//! 2. Use [`ApiMethodRouter`](crate::router::method::openapi::ApiMethodRouter)
+//! 2. Use [`ApiMethodRouter`](cot_core::router::method::openapi::ApiMethodRouter)
 //!    to set up your API routes and register them with a router (possibly using
 //!    convenience functions, such as
-//!    [`api_get`](crate::router::method::openapi::api_get) or
-//!    [`api_post`](crate::router::method::openapi::api_post)).
+//!    [`api_get`](cot_core::router::method::openapi::api_get) or
+//!    [`api_post`](cot_core::router::method::openapi::api_post)).
 //! 3. Register your
-//!    [`ApiMethodRouter`](crate::router::method::openapi::ApiMethodRouter)s
-//!    with a [`Router`](crate::router::Router) using
-//!    [`Route::with_api_handler`](crate::router::Route::with_api_handler) or
-//!    [`Route::with_api_handler_and_name`](crate::router::Route::with_api_handler_and_name).
+//!    [`ApiMethodRouter`](cot_core::router::method::openapi::ApiMethodRouter)s
+//!    with a [`Router`](cot_core::router::Router) using
+//!    [`Route::with_api_handler`](cot_core::router::Route::with_api_handler) or
+//!    [`Route::with_api_handler_and_name`](cot_core::router::Route::with_api_handler_and_name).
 //! 4. Register the [`SwaggerUi`](crate::openapi::swagger_ui::SwaggerUi) app
 //!    inside [`Project::register_apps`](crate::project::Project::register_apps)
 //!    using [`AppBuilder::register_with_views`](crate::project::AppBuilder::register_with_views).
@@ -34,8 +34,8 @@
 //! use cot::openapi::swagger_ui::SwaggerUi;
 //! use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 //! use cot::response::{Response, ResponseExt};
-//! use cot::router::method::openapi::api_post;
-//! use cot::router::{Route, Router};
+//! use cot_core::router::method::openapi::api_post;
+//! use cot_core::router::{Route, Router};
 //! use cot::static_files::StaticFilesMiddleware;
 //! use cot::{App, AppBuilder, Project, StatusCode};
 //! use serde::{Deserialize, Serialize};
@@ -207,14 +207,14 @@ use serde_json::Value;
 
 use crate::auth::Auth;
 use crate::form::Form;
-use cot_core::handler::BoxRequestHandler;
 use crate::json::Json;
 use crate::request::extractors::{FromRequest, FromRequestHead, Path, RequestForm, UrlQuery};
 use crate::request::{Request, RequestHead};
 use crate::response::{Response, WithExtension};
-use crate::router::Urls;
 use crate::session::Session;
 use crate::{Body, Method, RequestHandler};
+use cot_core::handler::BoxRequestHandler;
+use cot_core::router::Urls;
 
 /// Context for API route generation.
 ///
@@ -259,12 +259,12 @@ impl Default for RouteContext<'_> {
 /// HTTP operations (GET, POST, etc.) at a given URL.
 ///
 /// You usually shouldn't need to implement this directly. Instead, it's easiest
-/// to use [`ApiMethodRouter`](crate::router::method::openapi::ApiMethodRouter).
+/// to use [`ApiMethodRouter`](cot_core::router::method::openapi::ApiMethodRouter).
 /// You might want to implement this if you want to create a wrapper that
 /// modifies the OpenAPI spec or want to create it manually.
 ///
 /// An object implementing [`AsApiRoute`] can be used passed to
-/// [`Route::with_api_handler`](crate::router::Route::with_api_handler) to
+/// [`Route::with_api_handler`](cot_core::router::Route::with_api_handler) to
 /// generate the OpenAPI specs.
 ///
 /// # Examples
@@ -290,7 +290,7 @@ impl Default for RouteContext<'_> {
 /// }
 ///
 /// # assert_eq!(
-/// #     RouteWrapper(cot::router::method::openapi::ApiMethodRouter::new())
+/// #     RouteWrapper(cot_core::router::method::openapi::ApiMethodRouter::new())
 /// #         .as_api_route(&RouteContext::new(), &mut SchemaGenerator::default())
 /// #         .summary,
 /// #     Some("This route was wrapped with RouteWrapper".to_owned())
@@ -322,7 +322,7 @@ pub trait AsApiRoute {
     /// }
     ///
     /// # assert_eq!(
-    /// #     RouteWrapper(cot::router::method::openapi::ApiMethodRouter::new())
+    /// #     RouteWrapper(cot_core::router::method::openapi::ApiMethodRouter::new())
     /// #         .as_api_route(&RouteContext::new(), &mut SchemaGenerator::default())
     /// #         .summary,
     /// #     Some("This route was wrapped with RouteWrapper".to_owned())
@@ -512,8 +512,8 @@ where
 /// use cot::request::RequestHead;
 /// use cot::request::extractors::FromRequestHead;
 /// use cot::response::Response;
-/// use cot::router::Route;
-/// use cot::router::method::openapi::api_get;
+/// use cot_core::router::Route;
+/// use cot_core::router::method::openapi::api_get;
 ///
 /// struct MyExtractor;
 /// impl FromRequestHead for MyExtractor {
@@ -530,14 +530,14 @@ where
 /// }
 ///
 /// let router =
-///     cot::router::Router::with_urls([Route::with_api_handler("/with_api", api_get(handler))]);
+///     cot_core::router::Router::with_urls([Route::with_api_handler("/with_api", api_get(handler))]);
 /// ```
 ///
 /// ```
 /// use cot::openapi::NoApi;
 /// use cot::response::Response;
-/// use cot::router::Route;
-/// use cot::router::method::openapi::api_get;
+/// use cot_core::router::Route;
+/// use cot_core::router::method::openapi::api_get;
 ///
 /// async fn handler_with_openapi() -> cot::Result<Response> {
 ///     // ...
@@ -548,7 +548,7 @@ where
 /// #     unimplemented!()
 /// }
 ///
-/// let router = cot::router::Router::with_urls([Route::with_api_handler(
+/// let router = cot_core::router::Router::with_urls([Route::with_api_handler(
 ///     "/with_api",
 ///     // POST will be ignored in OpenAPI spec
 ///     api_get(handler_with_openapi).post(NoApi(handler_without_openapi)),

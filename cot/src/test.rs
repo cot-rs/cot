@@ -24,13 +24,13 @@ use crate::db::Database;
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
-use cot_core::handler::BoxedHandler;
 use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
 use crate::request::Request;
-use crate::router::Router;
 use crate::session::Session;
 use crate::static_files::{StaticFile, StaticFiles};
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
+use cot_core::handler::BoxedHandler;
+use cot_core::router::Router;
 
 /// A test client for making requests to a Cot project.
 ///
@@ -447,7 +447,7 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::request::Request;
-    /// use cot::router::{Route, Router};
+    /// use cot_core::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
     /// use cot_core::response::Response;
     ///

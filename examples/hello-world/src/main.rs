@@ -1,8 +1,8 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::project::RegisterAppsContext;
-use cot::router::{Route, Router};
 use cot::{App, AppBuilder, Project};
+use cot_core::router::{Route, Router};
 
 async fn return_hello() -> &'static str {
     "Hello Cot!"

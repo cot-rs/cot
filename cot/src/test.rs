@@ -563,9 +563,8 @@ impl TestRequestBuilder {
     /// use cot::db::Database;
     /// use cot::html::Html;
     /// use cot::test::TestRequestBuilder;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn index(RequestDb(db): RequestDb) -> Html {
+    /// async fn index(db: Database) -> Html {
     ///     // ... do something with db
     ///
     ///     Html::new("Hello world!")

@@ -191,10 +191,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
@@ -209,7 +209,7 @@ impl DatabaseUser {
     /// #     use cot::test::{TestDatabase, TestRequestBuilder};
     /// #     let mut test_database = TestDatabase::new_sqlite().await?;
     /// #     test_database.with_auth().run_migrations().await;
-    /// #     view(RequestDb(test_database.database())).await?;
+    /// #     view(test_database.database()).await?;
     /// #     test_database.cleanup().await?;
     /// #     Ok(())
     /// # }
@@ -283,10 +283,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
@@ -326,10 +326,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;

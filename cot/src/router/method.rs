@@ -8,7 +8,7 @@ use std::fmt::{Debug, Formatter};
 use cot_core::error::MethodNotAllowed;
 use cot_core::response::Response;
 
-use crate::handler::{BoxRequestHandler, into_box_request_handler};
+use cot_core::handler::{BoxRequestHandler, into_box_request_handler};
 use crate::request::Request;
 use crate::{Method, RequestHandler};
 

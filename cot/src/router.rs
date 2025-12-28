@@ -33,7 +33,7 @@ use cot_core::response::Response;
 use derive_more::with_trait::Debug;
 use tracing::debug;
 
-use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
+use cot_core::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
 use crate::request::{AppName, PathParams, Request, RequestExt, RequestHead, RouteName};
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};

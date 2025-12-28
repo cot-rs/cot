@@ -2,19 +2,19 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
-use cot_core::request::Request;
-use cot_core::request::extractors::{FromRequest, FromRequestHead};
-use cot_core::response::{IntoResponse, Response};
+use crate::request::extractors::{FromRequest, FromRequestHead};
+use crate::request::Request;
+use crate::response::{IntoResponse, Response};
+use crate::Error;
+use crate::Result;
 use tower::util::BoxCloneSyncService;
-
-use crate::{Error, Result};
 
 /// A function that takes a request and returns a response.
 ///
 /// This is the main building block of a Cot app. You shouldn't
 /// usually need to implement this directly, as it is already
 /// implemented for closures and functions that take some
-/// number of [extractors](crate::request::extractors) as parameters
+/// number of [extractors](cot::request::extractors) as parameters
 /// and return some type that [can be converted into a
 /// response](IntoResponse).
 ///
@@ -48,14 +48,14 @@ pub trait RequestHandler<T = ()> {
     fn handle(&self, request: Request) -> impl Future<Output = Result<Response>> + Send;
 }
 
-pub(crate) trait BoxRequestHandler {
+pub trait BoxRequestHandler {
     fn handle(
         &self,
         request: Request,
     ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + '_>>;
 }
 
-pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
+pub fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
     handler: H,
 ) -> impl BoxRequestHandler {
     struct Inner<T, H>(H, PhantomData<fn() -> T>);
@@ -142,6 +142,7 @@ macro_rules! impl_request_handler_from_request {
     };
 }
 
+#[macro_export]
 macro_rules! handle_all_parameters {
     ($name:ident) => {
         $name!();
@@ -227,18 +228,18 @@ macro_rules! handle_all_parameters_from_request {
     };
 }
 
-pub(crate) use handle_all_parameters;
+pub use handle_all_parameters;
 
 handle_all_parameters!(impl_request_handler);
 handle_all_parameters_from_request!(impl_request_handler_from_request);
 
 /// A wrapper around a handler that's used in
-/// [`Bootstrapper`](cot::Bootstrapper).
+/// [`Bootstrapper`](project::Bootstrapper).
 ///
 /// It is returned by
-/// [`Bootstrapper::into_bootstrapped_project`](cot::Bootstrapper::finish).
+/// [`Bootstrapper::into_bootstrapped_project`](project::Bootstrapper::finish).
 /// Typically, you don't need to interact with this type directly, except for
-/// creating it in [`Project::middlewares`](cot::Project::middlewares) through
+/// creating it in [`Project::middlewares`](project::Project::middlewares) through
 /// the [`RootHandlerBuilder::build`](cot::project::RootHandlerBuilder::build)
 /// method.
 ///

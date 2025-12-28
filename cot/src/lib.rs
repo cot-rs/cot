@@ -66,8 +66,6 @@ pub mod cli;
 pub mod common_types;
 pub mod config;
 mod error_page;
-#[macro_use]
-pub(crate) mod handler;
 pub mod html;
 #[cfg(feature = "json")]
 pub mod json;
@@ -160,7 +158,7 @@ pub use cot_macros::test;
 pub use schemars;
 pub use {bytes, cot_core as core, http};
 
-pub use crate::handler::{BoxedHandler, RequestHandler};
+pub use cot_core::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{
-    App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
+    run, run_at, run_cli, App, AppBuilder, Bootstrapper, Project, ProjectContext,
 };

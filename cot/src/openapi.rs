@@ -207,7 +207,7 @@ use serde_json::Value;
 
 use crate::auth::Auth;
 use crate::form::Form;
-use crate::handler::BoxRequestHandler;
+use cot_core::handler::BoxRequestHandler;
 use crate::json::Json;
 use crate::request::extractors::{FromRequest, FromRequestHead, Path, RequestForm, UrlQuery};
 use crate::request::{Request, RequestHead};

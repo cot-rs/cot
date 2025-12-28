@@ -24,7 +24,7 @@ use crate::db::Database;
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
-use crate::handler::BoxedHandler;
+use cot_core::handler::BoxedHandler;
 use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
 use crate::request::Request;
 use crate::router::Router;

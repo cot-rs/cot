@@ -10,6 +10,8 @@ pub mod error;
 pub mod headers;
 pub mod request;
 pub mod response;
+#[macro_use]
+pub mod handler;
 
 /// A type alias for a result that can return a [`cot_core::Error`].
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1255,6 +1255,7 @@ version = "0.1.0"
 dependencies = [
  "askama",
  "cot",
+ "cot_core",
 ]
 
 [[package]]
@@ -1287,6 +1288,7 @@ name = "example-json"
 version = "0.1.0"
 dependencies = [
  "cot",
+ "cot_core",
  "schemars",
  "serde",
 ]

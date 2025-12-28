@@ -53,7 +53,7 @@ use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error_page::Diagnostics;
-use crate::handler::BoxedHandler;
+use cot_core::handler::BoxedHandler;
 use crate::html::Html;
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::router::{Route, Router, RouterService};

@@ -7,13 +7,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use cot::handle_all_parameters;
-use cot::request::{Request, RequestHead};
-use cot::response::Response;
 use derive_more::with_trait::Debug;
 
-use crate::Error;
 use crate::request::extractors::FromRequestHead;
+use crate::request::{Request, RequestHead};
+use crate::response::Response;
+use crate::{handle_all_parameters, Error};
 
 /// A trait for handling error pages in Cot applications.
 ///

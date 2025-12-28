@@ -7,18 +7,18 @@
 //!
 //! # Examples
 //!
-//! ```no_run
+//! ```
 //! use std::sync::Arc;
 //!
 //! use cot::db::Database;
 //! use cot::session::store::db::DbStore;
 //!
-//! #[tokio::main]
-//! async fn main() -> cot::Result<()> {
-//!     let db = Arc::new(Database::new("sqlite://:memory:").await?);
-//!     let store = DbStore::new(db);
-//!     Ok(())
-//! }
+//! # #[tokio::main]
+//! # async fn main() -> cot::Result<()> {
+//! let db = Database::new("sqlite://:memory:").await?;
+//! let store = DbStore::new(db);
+//! # Ok(())
+//! # }
 //! ```
 
 use std::collections::HashMap;
@@ -72,18 +72,18 @@ impl From<DbStoreError> for session_store::Error {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
 /// use std::sync::Arc;
 ///
 /// use cot::db::Database;
 /// use cot::session::store::db::DbStore;
 ///
-/// #[tokio::main]
-/// async fn main() -> Result<(), cot::session::store::db::DbStoreError> {
-///     let db = Arc::new(Database::new("sqlite://:memory:").await?);
-///     let store = DbStore::new(db);
-///     Ok(())
-/// }
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), cot::session::store::db::DbStoreError> {
+/// let db = Database::new("sqlite://:memory:").await?;
+/// let store = DbStore::new(db);
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug)]
 pub struct DbStore {
@@ -95,18 +95,18 @@ impl DbStore {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use std::sync::Arc;
     ///
     /// use cot::db::Database;
     /// use cot::session::store::db::DbStore;
     ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), cot::session::store::db::DbStoreError> {
-    ///     let db = Arc::new(Database::new("sqlite://:memory:").await?);
-    ///     let store = DbStore::new(db);
-    ///     Ok(())
-    /// }
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), cot::session::store::db::DbStoreError> {
+    /// let db = Database::new("sqlite://:memory:").await?;
+    /// let store = DbStore::new(db);
+    /// # Ok(())
+    /// # }
     /// ```
     #[must_use]
     pub fn new(connection: Database) -> DbStore {

@@ -1,5 +1,5 @@
-use cot::middleware::{IntoCotErrorLayer, IntoCotResponseLayer};
 use cot::project::MiddlewareContext;
+use cot_core::middleware::{IntoCotErrorLayer, IntoCotResponseLayer};
 
 #[cfg(feature = "live-reload")]
 type LiveReloadLayerType = tower::util::Either<

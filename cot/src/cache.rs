@@ -191,8 +191,13 @@ pub type CacheResult<T> = Result<T, CacheError>;
 /// ```
 #[derive(Debug, Clone)]
 pub struct Cache {
+    inner: Arc<CacheImpl>,
+}
+
+#[derive(Debug)]
+struct CacheImpl {
     #[debug("..")]
-    store: Arc<dyn BoxCacheStore>,
+    store: Box<dyn BoxCacheStore>,
     prefix: Option<String>,
     expiry: Timeout,
 }
@@ -219,17 +224,19 @@ impl Cache {
     /// );
     /// ```
     pub fn new(store: impl CacheStore, prefix: Option<String>, expiry: Timeout) -> Self {
-        let store: Arc<dyn BoxCacheStore> = Arc::new(store);
+        let store: Box<dyn BoxCacheStore> = Box::new(store);
         Self {
-            store,
-            prefix,
-            expiry,
+            inner: Arc::new(CacheImpl {
+                store,
+                prefix,
+                expiry,
+            }),
         }
     }
 
     fn format_key<K: AsRef<str>>(&self, key: K) -> String {
         let k = key.as_ref();
-        if let Some(pref) = &self.prefix {
+        if let Some(pref) = &self.inner.prefix {
             return format!("{pref}:{k}");
         }
         k.to_string()
@@ -276,6 +283,7 @@ impl Cache {
     {
         let k = self.format_key(key.as_ref());
         let result = self
+            .inner
             .store
             .get(&k)
             .await?
@@ -334,8 +342,9 @@ impl Cache {
         V: Serialize,
     {
         let k = self.format_key(key.into());
-        self.store
-            .insert(k, serde_json::to_value(value)?, self.expiry)
+        self.inner
+            .store
+            .insert(k, serde_json::to_value(value)?, self.inner.expiry)
             .await?;
         Ok(())
     }
@@ -387,7 +396,8 @@ impl Cache {
         V: Serialize,
     {
         let k = self.format_key(key.into());
-        self.store
+        self.inner
+            .store
             .insert(k, serde_json::to_value(value)?, expiry)
             .await?;
         Ok(())
@@ -424,7 +434,7 @@ impl Cache {
     /// ```
     pub async fn remove<K: AsRef<str>>(&self, key: K) -> CacheResult<()> {
         let k = self.format_key(key.as_ref());
-        self.store.remove(&k).await?;
+        self.inner.store.remove(&k).await?;
         Ok(())
     }
 
@@ -465,7 +475,7 @@ impl Cache {
     /// # }
     /// ```
     pub async fn clear(&self) -> CacheResult<()> {
-        self.store.clear().await?;
+        self.inner.store.clear().await?;
         Ok(())
     }
 
@@ -505,7 +515,7 @@ impl Cache {
     /// # }
     /// ```
     pub async fn approx_size(&self) -> CacheResult<usize> {
-        let result = self.store.approx_size().await?;
+        let result = self.inner.store.approx_size().await?;
         Ok(result)
     }
 
@@ -542,7 +552,7 @@ impl Cache {
     /// ```
     pub async fn contains_key<K: AsRef<str>>(&self, key: K) -> CacheResult<bool> {
         let k = self.format_key(key.as_ref());
-        let result = self.store.contains_key(&k).await?;
+        let result = self.inner.store.contains_key(&k).await?;
         Ok(result)
     }
 

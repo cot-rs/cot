@@ -231,13 +231,13 @@ pub struct TestRequestBuilder {
     auth_backend: Option<AuthBackendWrapper>,
     auth: Option<Auth>,
     #[cfg(feature = "db")]
-    database: Option<Arc<Database>>,
+    database: Option<Database>,
     form_data: Option<Vec<(String, String)>>,
     #[cfg(feature = "json")]
     json_data: Option<String>,
     static_files: Vec<StaticFile>,
     #[cfg(feature = "cache")]
-    cache: Option<Arc<Cache>>,
+    cache: Option<Cache>,
     #[cfg(feature = "email")]
     email: Option<Email>,
 }
@@ -571,9 +571,8 @@ impl TestRequestBuilder {
     /// use cot::db::Database;
     /// use cot::html::Html;
     /// use cot::test::TestRequestBuilder;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn index(RequestDb(db): RequestDb) -> Html {
+    /// async fn index(db: Database) -> Html {
     ///     // ... do something with db
     ///
     ///     Html::new("Hello world!")
@@ -598,7 +597,7 @@ impl TestRequestBuilder {
     /// }
     /// ```
     #[cfg(feature = "db")]
-    pub fn database<DB: Into<Arc<Database>>>(&mut self, database: DB) -> &mut Self {
+    pub fn database<DB: Into<Database>>(&mut self, database: DB) -> &mut Self {
         self.database = Some(database.into());
         self
     }
@@ -630,8 +629,8 @@ impl TestRequestBuilder {
     /// # }
     /// ```
     #[cfg(feature = "db")]
-    pub async fn with_db_auth(&mut self, db: Arc<Database>) -> &mut Self {
-        self.auth_backend(DatabaseUserBackend::new(Arc::clone(&db)));
+    pub async fn with_db_auth(&mut self, db: Database) -> &mut Self {
+        self.auth_backend(DatabaseUserBackend::new(db.clone()));
         self.with_session();
         self.database(db);
         self.auth = Some(
@@ -782,7 +781,7 @@ impl TestRequestBuilder {
             #[cfg(feature = "cache")]
             self.cache
                 .clone()
-                .unwrap_or_else(|| Arc::new(Cache::new(Memory::new(), None, Timeout::default()))),
+                .unwrap_or_else(|| Cache::new(Memory::new(), None, Timeout::default())),
             #[cfg(feature = "email")]
             self.email
                 .clone()
@@ -863,7 +862,7 @@ impl TestRequestBuilder {
 #[cfg(feature = "db")]
 #[derive(Debug)]
 pub struct TestDatabase {
-    database: Arc<Database>,
+    database: Database,
     kind: TestDatabaseKind,
     migrations: Vec<MigrationWrapper>,
 }
@@ -872,7 +871,7 @@ pub struct TestDatabase {
 impl TestDatabase {
     fn new(database: Database, kind: TestDatabaseKind) -> TestDatabase {
         Self {
-            database: Arc::new(database),
+            database,
             kind,
             migrations: Vec::new(),
         }
@@ -1160,7 +1159,7 @@ impl TestDatabase {
     /// # }
     /// ```
     #[must_use]
-    pub fn database(&self) -> Arc<Database> {
+    pub fn database(&self) -> Database {
         self.database.clone()
     }
 
@@ -1788,17 +1787,14 @@ enum CacheKind {
 #[cfg(feature = "cache")]
 #[derive(Debug, Clone)]
 pub struct TestCache {
-    cache: Arc<Cache>,
+    cache: Cache,
     kind: CacheKind,
 }
 
 #[cfg(feature = "cache")]
 impl TestCache {
     fn new(cache: Cache, kind: CacheKind) -> Self {
-        Self {
-            cache: Arc::new(cache),
-            kind,
-        }
+        Self { cache, kind }
     }
 
     /// Create a new in-memory test cache.
@@ -1917,7 +1913,7 @@ impl TestCache {
     /// # }
     /// ```
     #[must_use]
-    pub fn cache(&self) -> Arc<Cache> {
+    pub fn cache(&self) -> Cache {
         self.cache.clone()
     }
 

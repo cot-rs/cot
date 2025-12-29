@@ -837,7 +837,7 @@ impl ApiOperationPart for Method {}
 impl ApiOperationPart for Session {}
 impl ApiOperationPart for Auth {}
 #[cfg(feature = "db")]
-impl ApiOperationPart for crate::request::extractors::RequestDb {}
+impl ApiOperationPart for crate::db::Database {}
 
 impl<D: JsonSchema> ApiOperationPart for Json<D> {
     fn modify_api_operation(

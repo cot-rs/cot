@@ -370,38 +370,10 @@ impl<F: Form> FromRequest for RequestForm<F> {
     }
 }
 
-/// An extractor that gets the database from the request extensions.
-///
-/// # Example
-///
-/// ```
-/// use cot::html::Html;
-/// use cot::request::extractors::RequestDb;
-///
-/// async fn my_handler(RequestDb(db): RequestDb) -> Html {
-///     // ... do something with the database
-///     # db.close().await.unwrap();
-///     # Html::new("")
-/// }
-///
-/// # #[tokio::main]
-/// # async fn main() -> cot::Result<()> {
-/// # use cot::RequestHandler;
-/// # let request = cot::test::TestRequestBuilder::get("/")
-/// #     .database(cot::test::TestDatabase::new_sqlite().await?.database())
-/// #     .build();
-/// # my_handler.handle(request).await?;
-/// # Ok(())
-/// # }
-/// ```
 #[cfg(feature = "db")]
-#[derive(Debug)]
-pub struct RequestDb(pub Arc<crate::db::Database>);
-
-#[cfg(feature = "db")]
-impl FromRequestHead for RequestDb {
+impl FromRequestHead for crate::db::Database {
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        Ok(Self(head.db().clone()))
+        Ok(head.db().clone())
     }
 }
 
@@ -787,7 +759,7 @@ mod tests {
         let db = crate::test::TestDatabase::new_sqlite().await.unwrap();
         let mut test_request = TestRequestBuilder::get("/").database(db.database()).build();
 
-        let RequestDb(extracted_db) = test_request.extract_from_head().await.unwrap();
+        let extracted_db: crate::db::Database = test_request.extract_from_head().await.unwrap();
 
         // check that we have a connection to the database
         extracted_db.close().await.unwrap();

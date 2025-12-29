@@ -6,7 +6,6 @@
 use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 
 use async_trait::async_trait;
 // Importing `Auto` from `cot` instead of `crate` so that the migration generator
@@ -192,10 +191,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
@@ -210,7 +209,7 @@ impl DatabaseUser {
     /// #     use cot::test::{TestDatabase, TestRequestBuilder};
     /// #     let mut test_database = TestDatabase::new_sqlite().await?;
     /// #     test_database.with_auth().run_migrations().await;
-    /// #     view(RequestDb(test_database.database())).await?;
+    /// #     view(test_database.database()).await?;
     /// #     test_database.cleanup().await?;
     /// #     Ok(())
     /// # }
@@ -284,10 +283,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
@@ -327,10 +326,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
@@ -469,7 +468,7 @@ impl DatabaseUserCredentials {
 /// [`DatabaseUserCredentials`] struct and ignores all other credential types.
 #[derive(Debug, Clone)]
 pub struct DatabaseUserBackend {
-    database: Arc<Database>,
+    database: Database,
 }
 
 impl DatabaseUserBackend {
@@ -495,7 +494,7 @@ impl DatabaseUserBackend {
     /// }
     /// ```
     #[must_use]
-    pub fn new(database: Arc<Database>) -> Self {
+    pub fn new(database: Database) -> Self {
         Self { database }
     }
 }

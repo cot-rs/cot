@@ -1226,11 +1226,11 @@ impl Bootstrapper<WithApps> {
     }
 
     #[cfg(feature = "db")]
-    async fn init_database(config: &DatabaseConfig) -> cot::Result<Option<Arc<Database>>> {
+    async fn init_database(config: &DatabaseConfig) -> cot::Result<Option<Database>> {
         match &config.url {
             Some(url) => {
                 let database = Database::new(url.as_str()).await?;
-                Ok(Some(Arc::new(database)))
+                Ok(Some(database))
             }
             None => Ok(None),
         }
@@ -1336,8 +1336,8 @@ impl Bootstrapper<WithDatabase> {
     }
 
     #[cfg(feature = "cache")]
-    async fn init_cache(config: &CacheConfig) -> cot::Result<Arc<Cache>> {
-        let cache = Cache::from_config(config).await.map(Arc::new)?;
+    async fn init_cache(config: &CacheConfig) -> cot::Result<Cache> {
+        let cache = Cache::from_config(config).await?;
         Ok(cache)
     }
 }
@@ -1639,7 +1639,7 @@ impl BootstrapPhase for WithDatabase {
     type Apps = <WithApps as BootstrapPhase>::Apps;
     type Router = <WithApps as BootstrapPhase>::Router;
     #[cfg(feature = "db")]
-    type Database = Option<Arc<Database>>;
+    type Database = Option<Database>;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
     #[cfg(feature = "cache")]
     type Cache = ();
@@ -1664,10 +1664,10 @@ impl BootstrapPhase for WithCache {
     type Apps = <WithApps as BootstrapPhase>::Apps;
     type Router = <WithApps as BootstrapPhase>::Router;
     #[cfg(feature = "db")]
-    type Database = Option<Arc<Database>>;
+    type Database = <WithDatabase as BootstrapPhase>::Database;
     type AuthBackend = <WithApps as BootstrapPhase>::AuthBackend;
     #[cfg(feature = "cache")]
-    type Cache = Arc<Cache>;
+    type Cache = Cache;
 }
 
 /// The final phase of bootstrapping a Cot project, the initialized phase.
@@ -1823,7 +1823,7 @@ impl ProjectContext<WithApps> {
     #[must_use]
     fn with_database(
         self,
-        #[cfg(feature = "db")] database: Option<Arc<Database>>,
+        #[cfg(feature = "db")] database: Option<Database>,
     ) -> ProjectContext<WithDatabase> {
         ProjectContext {
             config: self.config,
@@ -1842,7 +1842,7 @@ impl ProjectContext<WithApps> {
 
 impl ProjectContext<WithDatabase> {
     #[must_use]
-    fn with_cache(self, #[cfg(feature = "cache")] cache: Arc<Cache>) -> ProjectContext<WithCache> {
+    fn with_cache(self, #[cfg(feature = "cache")] cache: Cache) -> ProjectContext<WithCache> {
         ProjectContext {
             config: self.config,
             apps: self.apps,
@@ -1970,7 +1970,7 @@ impl<S: BootstrapPhase<Email = Email>> ProjectContext<S> {
 }
 
 #[cfg(feature = "cache")]
-impl<S: BootstrapPhase<Cache = Arc<Cache>>> ProjectContext<S> {
+impl<S: BootstrapPhase<Cache = Cache>> ProjectContext<S> {
     /// Returns the cache for the project.
     ///
     /// # Examples
@@ -1987,13 +1987,13 @@ impl<S: BootstrapPhase<Cache = Arc<Cache>>> ProjectContext<S> {
     /// ```
     #[must_use]
     #[cfg(feature = "cache")]
-    pub fn cache(&self) -> &Arc<Cache> {
+    pub fn cache(&self) -> &Cache {
         &self.cache
     }
 }
 
 #[cfg(feature = "db")]
-impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
+impl<S: BootstrapPhase<Database = Option<Database>>> ProjectContext<S> {
     /// Returns the database for the project, if it is enabled.
     ///
     /// # Examples
@@ -2014,7 +2014,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     /// ```
     #[must_use]
     #[cfg(feature = "db")]
-    pub fn try_database(&self) -> Option<&Arc<Database>> {
+    pub fn try_database(&self) -> Option<&Database> {
         self.database.as_ref()
     }
 
@@ -2042,7 +2042,7 @@ impl<S: BootstrapPhase<Database = Option<Arc<Database>>>> ProjectContext<S> {
     #[cfg(feature = "db")]
     #[must_use]
     #[track_caller]
-    pub fn database(&self) -> &Arc<Database> {
+    pub fn database(&self) -> &Database {
         self.try_database().expect(
             "Database missing. Did you forget to add the database when configuring CotProject?",
         )
@@ -2583,11 +2583,11 @@ mod tests {
 
     #[cot::test]
     async fn default_auth_backend() {
-        let cache_memory = Arc::new(Cache::new(
+        let cache_memory = Cache::new(
             cache::store::memory::Memory::new(),
             None,
             Timeout::default(),
-        ));
+        );
 
         let context = ProjectContext::new()
             .with_config(

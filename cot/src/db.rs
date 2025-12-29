@@ -18,6 +18,7 @@ mod sea_query_db;
 use std::fmt::{Display, Formatter, Write};
 use std::hash::Hash;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 pub use cot_macros::{model, query};
@@ -789,10 +790,9 @@ pub trait SqlxValueRef<'r>: Sized {
 /// It is used to execute queries and interact with the database. The connection
 /// is established when the structure is created and closed when
 /// [`Self::close()`] is called.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Database {
-    _url: String,
-    inner: DatabaseImpl,
+    inner: Arc<DatabaseImpl>,
 }
 
 #[derive(Debug)]
@@ -837,8 +837,7 @@ impl Database {
         if url.starts_with("sqlite:") {
             let inner = DatabaseSqlite::new(&url).await?;
             return Ok(Self {
-                _url: url,
-                inner: DatabaseImpl::Sqlite(inner),
+                inner: Arc::new(DatabaseImpl::Sqlite(inner)),
             });
         }
 
@@ -846,8 +845,7 @@ impl Database {
         if url.starts_with("postgresql:") {
             let inner = DatabasePostgres::new(&url).await?;
             return Ok(Self {
-                _url: url,
-                inner: DatabaseImpl::Postgres(inner),
+                inner: Arc::new(DatabaseImpl::Postgres(inner)),
             });
         }
 
@@ -855,8 +853,7 @@ impl Database {
         if url.starts_with("mysql:") {
             let inner = DatabaseMySql::new(&url).await?;
             return Ok(Self {
-                _url: url,
-                inner: DatabaseImpl::MySql(inner),
+                inner: Arc::new(DatabaseImpl::MySql(inner)),
             });
         }
 
@@ -886,7 +883,7 @@ impl Database {
     /// }
     /// ```
     pub async fn close(&self) -> Result<()> {
-        match &self.inner {
+        match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.close().await,
             #[cfg(feature = "postgres")]
@@ -1124,7 +1121,7 @@ impl Database {
             return Ok(());
         }
 
-        let max_params = match self.inner {
+        let max_params = match &*self.inner {
             // https://sqlite.org/limits.html#max_variable_number
             // Assuming SQLite > 3.32.0 (2020-05-22)
             #[cfg(feature = "sqlite")]
@@ -1471,7 +1468,7 @@ impl Database {
             .collect::<Vec<_>>();
         let values = SqlxValues(sea_query::Values(values));
 
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.raw_with(query, values).await?,
             #[cfg(feature = "postgres")]
@@ -1487,7 +1484,7 @@ impl Database {
     where
         T: SqlxBinder + Send + Sync,
     {
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.fetch_option(statement).await?.map(Row::Sqlite),
             #[cfg(feature = "postgres")]
@@ -1502,7 +1499,7 @@ impl Database {
     }
 
     fn supports_returning(&self) -> bool {
-        match self.inner {
+        match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(_) => true,
             #[cfg(feature = "postgres")]
@@ -1516,7 +1513,7 @@ impl Database {
     where
         T: SqlxBinder + Send + Sync,
     {
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner
                 .fetch_all(statement)
@@ -1547,7 +1544,7 @@ impl Database {
     where
         T: SqlxBinder + Send + Sync,
     {
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.execute_statement(statement).await?,
             #[cfg(feature = "postgres")]
@@ -1563,7 +1560,7 @@ impl Database {
         &self,
         statement: T,
     ) -> Result<StatementResult> {
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.execute_schema(statement).await?,
             #[cfg(feature = "postgres")]
@@ -1578,7 +1575,7 @@ impl Database {
 
 impl ColumnTypeMapper for Database {
     fn sea_query_column_type_for(&self, column_type: ColumnType) -> sea_query::ColumnType {
-        match &self.inner {
+        match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.sea_query_column_type_for(column_type),
             #[cfg(feature = "postgres")]
@@ -1698,45 +1695,6 @@ pub trait DatabaseBackend: Send + Sync {
 
 #[async_trait]
 impl DatabaseBackend for Database {
-    async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::insert_or_update(self, data).await
-    }
-
-    async fn insert<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::insert(self, data).await
-    }
-
-    async fn update<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::update(self, data).await
-    }
-
-    async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()> {
-        Database::bulk_insert(self, data).await
-    }
-
-    async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()> {
-        Database::bulk_insert_or_update(self, data).await
-    }
-
-    async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
-        Database::query(self, query).await
-    }
-
-    async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>> {
-        Database::get(self, query).await
-    }
-
-    async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool> {
-        Database::exists(self, query).await
-    }
-
-    async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult> {
-        Database::delete(self, query).await
-    }
-}
-
-#[async_trait]
-impl DatabaseBackend for std::sync::Arc<Database> {
     async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
         Database::insert_or_update(self, data).await
     }

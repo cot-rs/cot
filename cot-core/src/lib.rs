@@ -14,6 +14,7 @@ pub mod response;
 pub mod handler;
 pub mod html;
 pub mod middleware;
+pub mod openapi;
 pub mod router;
 
 /// A type alias for a result that can return a [`cot_core::Error`].

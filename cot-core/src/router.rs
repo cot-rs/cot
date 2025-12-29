@@ -420,7 +420,7 @@ impl Router {
 
                 let url = format!("{url}{}", route.url);
 
-                let mut route_context = cot::openapi::RouteContext::new();
+                let mut route_context = crate::openapi::RouteContext::new();
                 route_context.param_names = &params;
 
                 paths.paths.insert(
@@ -600,12 +600,12 @@ impl Route {
     pub fn with_api_handler<HandlerParams, H>(url: &str, handler: H) -> Self
     where
         HandlerParams: 'static,
-        H: RequestHandler<HandlerParams> + cot::openapi::AsApiRoute + Send + Sync + 'static,
+        H: RequestHandler<HandlerParams> + crate::openapi::AsApiRoute + Send + Sync + 'static,
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                cot::openapi::into_box_api_endpoint_request_handler(handler),
+                crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: None,
         }
@@ -669,12 +669,12 @@ impl Route {
     where
         N: Into<String>,
         HandlerParams: 'static,
-        H: RequestHandler<HandlerParams> + cot::openapi::AsApiRoute + Send + Sync + 'static,
+        H: RequestHandler<HandlerParams> + crate::openapi::AsApiRoute + Send + Sync + 'static,
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                cot::openapi::into_box_api_endpoint_request_handler(handler),
+                crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: Some(RouteName(name.into())),
         }
@@ -780,7 +780,7 @@ enum RouteInner {
     Handler(Arc<dyn BoxRequestHandler + Send + Sync>),
     Router(Router),
     #[cfg(feature = "openapi")]
-    ApiHandler(Arc<dyn cot::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
+    ApiHandler(Arc<dyn crate::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
 }
 
 /// Get a URL for a view by its registered name and given params.

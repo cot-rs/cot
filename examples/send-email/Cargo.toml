@@ -1,5 +1,5 @@
 [package]
-name = "send-email"
+name = "example-send-email"
 version = "0.1.0"
 publish = false
 description = "Send email - Cot example."

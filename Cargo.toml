@@ -41,9 +41,7 @@ unreachable_pub = "warn"
 unsafe_code = "warn"
 unstable_features = "warn"
 unused_import_braces = "warn"
-# TODO: change to "warn" when/if this is fixed and released:
-# https://github.com/askama-rs/askama/issues/642
-unused_qualifications = "allow"
+unused_qualifications = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
 
 [workspace.lints.clippy]
@@ -54,16 +52,13 @@ allow_attributes = "warn"
 # TODO: consider removing this if/when this is fixed:
 # https://github.com/rust-lang/rust-clippy/issues/16175
 needless_continue = "allow"
-# TODO: remove this if/when this is fixed and released:
-# https://github.com/askama-rs/askama/issues/643
-elidable_lifetime_names = "allow"
 
 [workspace.dependencies]
 ahash = { version = "0.8.12", default-features = false }
 aide = { version = "0.15", default-features = false }
 anstyle = "1.0.13"
 anyhow = "1.0.100"
-askama = { version = "0.15", default-features = false }
+askama = { version = "0.15.1", default-features = false }
 assert_cmd = "2"
 async-stream = "0.3"
 async-trait = "0.1"

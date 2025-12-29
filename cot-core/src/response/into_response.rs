@@ -192,7 +192,7 @@ where
 macro_rules! impl_into_response_for_type_and_mime {
     ($ty:ty, $mime:expr) => {
         impl IntoResponse for $ty {
-            fn into_response(self) -> cot_core::Result<Response> {
+            fn into_response(self) -> crate::Result<Response> {
                 Body::from(self)
                     .with_header(http::header::CONTENT_TYPE, $mime)
                     .into_response()

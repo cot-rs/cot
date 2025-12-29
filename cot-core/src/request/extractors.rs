@@ -51,7 +51,6 @@
 use std::future::Future;
 
 use serde::de::DeserializeOwned;
-use tower_sessions::Session;
 
 pub use crate::request::{PathParams, Request, RequestHead};
 use crate::{Body, Method};
@@ -231,12 +230,6 @@ impl FromRequestHead for RequestHead {
 impl FromRequestHead for Method {
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         Ok(head.method.clone())
-    }
-}
-
-impl FromRequestHead for Session {
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        Ok(Session::from_extensions(&head.extensions).clone())
     }
 }
 

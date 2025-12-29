@@ -43,6 +43,7 @@ tracing = "0.1.41"
 
 [dev-dependencies]
 async-stream.workspace = true
+cot.workspace = true
 futures.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 

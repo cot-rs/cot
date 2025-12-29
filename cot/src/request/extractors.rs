@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
+use cot::auth::Auth;
+use cot::form::{Form, FormResult};
 #[cfg(feature = "json")]
 use cot::json::Json;
-use cot_core::request::Request;
+use cot::router::Urls;
+use cot::session::Session;
 use cot_core::request::extractors::{FromRequest, FromRequestHead, RequestHead};
-use cot_core::{Body, impl_into_cot_error};
+use cot_core::request::Request;
+use cot_core::{impl_into_cot_error, Body};
 use serde::de::DeserializeOwned;
 
 use crate::request::RequestExt;
@@ -16,6 +20,12 @@ pub struct InvalidContentType {
     actual: String,
 }
 impl_into_cot_error!(InvalidContentType, BAD_REQUEST);
+
+impl FromRequestHead for Session {
+    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+        Ok(Session::from_extensions(&head.extensions).clone())
+    }
+}
 
 impl FromRequestHead for Urls {
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {

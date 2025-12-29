@@ -1,8 +1,5 @@
 //! Route to handlers based on HTTP methods.
 
-#[cfg(feature = "openapi")]
-pub mod openapi;
-
 use std::fmt::{Debug, Formatter};
 
 use crate::error::MethodNotAllowed;

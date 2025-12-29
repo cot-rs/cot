@@ -775,6 +775,7 @@ dependencies = [
  "axum",
  "backtrace",
  "bytes",
+ "cot",
  "cot_macros",
  "derive_more",
  "form_urlencoded",

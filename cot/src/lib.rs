@@ -74,6 +74,7 @@ pub mod openapi;
 pub mod project;
 pub mod request;
 mod response;
+mod router;
 mod serializers;
 pub mod session;
 pub mod static_files;
@@ -83,12 +84,12 @@ pub(crate) mod utils;
 
 #[cfg(feature = "openapi")]
 pub use aide;
+pub use cot_core::error::error_impl::Error;
+pub use cot_core::handler::{BoxedHandler, RequestHandler};
 /// A type alias for a result that can return a [`cot::Error`].
 pub use cot_core::Result;
 /// A type alias for an HTTP status code.
 pub use cot_core::StatusCode;
-pub use cot_core::error::error_impl::Error;
-pub use cot_core::handler::{BoxedHandler, RequestHandler};
 pub use cot_core::{Body, Method};
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
@@ -158,5 +159,5 @@ pub use schemars;
 pub use {bytes, cot_core as core, http};
 
 pub use crate::project::{
-    App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
+    run, run_at, run_cli, App, AppBuilder, Bootstrapper, Project, ProjectContext,
 };

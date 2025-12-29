@@ -4,6 +4,7 @@ members = [
     "cot-cli",
     "cot-codegen",
     "cot-macros",
+    "cot-core",
     # Examples
     "examples/admin",
     "examples/custom-error-pages",

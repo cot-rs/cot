@@ -1,7 +1,32 @@
-#[cfg(feature = "json")]
-use cot::core::headers::JSON_CONTENT_TYPE;
 use cot::core::impl_into_cot_error;
 use cot::core::response::{IntoResponse, Response};
+#[cfg(feature = "json")]
+use cot_core::headers::HTML_CONTENT_TYPE;
+use cot_core::html::Html;
+
+impl IntoResponse for Html {
+    /// Create a new HTML response.
+    ///
+    /// This creates a new [`Response`] object with a content type of
+    /// `text/html; charset=utf-8` and given body.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot_core::html::Html;
+    /// use cot_core::response::IntoResponse;
+    ///
+    /// let html = Html::new("<div>Hello</div>");
+    ///
+    /// let response = html.into_response();
+    /// ```
+    fn into_response(self) -> crate::Result<Response> {
+        self.0
+            .into_response()
+            .with_content_type(HTML_CONTENT_TYPE)
+            .into_response()
+    }
+}
 
 #[cfg(feature = "json")]
 impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {

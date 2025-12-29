@@ -420,10 +420,10 @@ async fn default_fallback(method: Method) -> crate::Error {
 
 #[cfg(test)]
 mod tests {
-    use cot::html::Html;
     use cot::test::TestRequestBuilder;
 
     use super::*;
+    use crate::html::Html;
     use crate::StatusCode;
 
     async fn test_handler(method: Method) -> Html {

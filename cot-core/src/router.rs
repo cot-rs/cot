@@ -27,13 +27,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use cot::project;
 use derive_more::with_trait::Debug;
 use tracing::debug;
 
 use crate::error::NotFound;
 use crate::handler::{into_box_request_handler, BoxRequestHandler, RequestHandler};
-use crate::request::{AppName, PathParams, Request, RequestExt, RequestHead, RouteName};
+use crate::request::{AppName, PathParams, Request, RequestHead, RouteName};
 use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{impl_into_cot_error, Error, Result};
@@ -619,7 +618,7 @@ impl Route {
     /// ```
     /// use cot_core::request::Request;
     /// use cot_core::response::Response;
-    /// use cot_core::router::method::openapi::api_get;
+    /// use cot_core::router::method::method::api_get;
     /// use cot_core::router::{Route, Router};
     ///
     /// async fn home(request: Request) -> cot::Result<Response> {
@@ -1029,9 +1028,6 @@ macro_rules! reverse_redirect {
 
 #[cfg(test)]
 mod tests {
-    use cot::html::Html;
-    use cot::test::TestRequestBuilder;
-
     use super::*;
     use crate::request::Request;
     use crate::response::{IntoResponse, Response};

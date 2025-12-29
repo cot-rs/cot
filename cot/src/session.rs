@@ -7,10 +7,10 @@
 //!
 //! ```
 //! use cot::RequestHandler;
-//! use cot::html::Html;
-//! use cot_core::router::{Route, Router};
 //! use cot::session::Session;
 //! use cot::test::TestRequestBuilder;
+//! use cot_core::html::Html;
+//! use cot_core::router::{Route, Router};
 //!
 //! async fn my_handler(session: Session) -> cot::Result<Html> {
 //!     session.insert("user_name", "world".to_string()).await?;
@@ -51,11 +51,11 @@ use std::ops::{Deref, DerefMut};
 ///
 /// ```
 /// use cot::RequestHandler;
-/// use cot::html::Html;
 /// use cot::request::Request;
-/// use cot_core::router::{Route, Router};
 /// use cot::session::Session;
 /// use cot::test::TestRequestBuilder;
+/// use cot_core::html::Html;
+/// use cot_core::router::{Route, Router};
 ///
 /// async fn my_handler(session: Session) -> cot::Result<Html> {
 ///     session.insert("user_name", "world".to_string()).await?;
@@ -99,11 +99,11 @@ impl Session {
     ///
     /// ```
     /// use cot::RequestHandler;
-    /// use cot::html::Html;
     /// use cot::request::Request;
-    /// use cot_core::router::{Route, Router};
     /// use cot::session::Session;
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::html::Html;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn my_handler(request: Request) -> cot::Result<Html> {
     ///     let session = Session::from_request(&request);

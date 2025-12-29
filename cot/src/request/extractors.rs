@@ -2,10 +2,12 @@ use std::sync::Arc;
 
 #[cfg(feature = "json")]
 use cot::json::Json;
-use cot_core::request::RequestExt;
+use cot_core::request::Request;
 use cot_core::request::extractors::{FromRequest, FromRequestHead, RequestHead};
 use cot_core::{Body, impl_into_cot_error};
 use serde::de::DeserializeOwned;
+
+use crate::request::RequestExt;
 
 #[derive(Debug, thiserror::Error)]
 #[error("invalid content type; expected `{expected}`, found `{actual}`")]
@@ -14,6 +16,79 @@ pub struct InvalidContentType {
     actual: String,
 }
 impl_into_cot_error!(InvalidContentType, BAD_REQUEST);
+
+impl FromRequestHead for Urls {
+    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+        Ok(Self::from_parts(head))
+    }
+}
+
+impl FromRequestHead for Auth {
+    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+        let auth = head
+            .extensions
+            .get::<Auth>()
+            .expect("AuthMiddleware not enabled for the route/project")
+            .clone();
+
+        Ok(auth)
+    }
+}
+
+/// An extractor that gets the request body as form data and deserializes it
+/// into a type `F` implementing `cot::form::Form`.
+///
+/// The content type of the request must be `application/x-www-form-urlencoded`.
+///
+/// # Errors
+///
+/// Throws an error if the content type is not
+/// `application/x-www-form-urlencoded`. Throws an error if the request body
+/// could not be read. Throws an error if the request body could not be
+/// deserialized - either because the form data is invalid or because the
+/// deserialization to the target structure failed.
+///
+/// # Example
+///
+/// ```
+/// use cot::form::{Form, FormResult};
+/// use cot::test::TestRequestBuilder;
+/// use cot_core::html::Html;
+/// use cot_core::request::extractors::RequestForm;
+///
+/// #[derive(Form)]
+/// struct MyForm {
+///     hello: String,
+/// }
+///
+/// async fn my_handler(RequestForm(form): RequestForm<MyForm>) -> Html {
+///     let form = match form {
+///         FormResult::Ok(form) => form,
+///         FormResult::ValidationError(error) => {
+///             panic!("Form validation error!")
+///         }
+///     };
+///
+///     Html::new(format!("Hello {}!", form.hello))
+/// }
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// # use cot::RequestHandler;
+/// # let request = TestRequestBuilder::post("/").form_data(&[("hello", "world")]).build();
+/// # my_handler.handle(request).await?;
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct RequestForm<F: Form>(pub FormResult<F>);
+
+impl<F: Form> FromRequest for RequestForm<F> {
+    async fn from_request(head: &RequestHead, body: Body) -> crate::Result<Self> {
+        let mut request = Request::from_parts(head.clone(), body);
+        Ok(Self(F::from_request(&mut request).await?))
+    }
+}
 
 #[cfg(feature = "json")]
 impl<D: DeserializeOwned> FromRequest for Json<D> {
@@ -52,8 +127,8 @@ impl_into_cot_error!(JsonDeserializeError, BAD_REQUEST);
 /// # Example
 ///
 /// ```
-/// use cot::html::Html;
 /// use cot::request::extractors::RequestDb;
+/// use cot_core::html::Html;
 ///
 /// async fn my_handler(RequestDb(db): RequestDb) -> Html {
 ///     // ... do something with the database
@@ -89,9 +164,9 @@ impl FromRequestHead for RequestDb {
 /// # Examples
 ///
 /// ```
-/// use cot::html::Html;
 /// use cot::request::extractors::StaticFiles;
 /// use cot::test::TestRequestBuilder;
+/// use cot_core::html::Html;
 /// use cot_core::request::Request;
 ///
 /// async fn my_handler(static_files: StaticFiles) -> cot::Result<Html> {
@@ -132,9 +207,9 @@ impl StaticFiles {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::Html;
     /// use cot::request::extractors::StaticFiles;
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::html::Html;
     ///
     /// async fn my_handler(static_files: StaticFiles) -> cot::Result<Html> {
     ///     let url = static_files.url_for("css/main.css")?;
@@ -197,7 +272,7 @@ impl FromRequestHead for StaticFiles {
 mod tests {
     use cot::request::extractors::Json;
     use cot::test::TestRequestBuilder;
-    use cot_core::request::extractors::{FromRequest, Path, UrlQuery};
+    use cot_core::request::extractors::FromRequest;
     use serde::Deserialize;
 
     use super::*;

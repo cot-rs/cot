@@ -22,6 +22,7 @@ use tower_sessions::{SessionManagerLayer, SessionStore};
 use crate::config::CacheType;
 use crate::config::{Expiry, SameSite, SessionStoreTypeConfig};
 use crate::project::MiddlewareContext;
+use crate::session::store::SessionStoreWrapper;
 #[cfg(all(feature = "db", feature = "json"))]
 use crate::session::store::db::DbStore;
 #[cfg(feature = "json")]
@@ -29,7 +30,6 @@ use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
 #[cfg(feature = "redis")]
 use crate::session::store::redis::RedisStore;
-use crate::session::store::SessionStoreWrapper;
 use crate::{Body, Error};
 
 #[cfg(feature = "live-reload")]

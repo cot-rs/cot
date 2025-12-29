@@ -28,10 +28,11 @@ use std::sync::Arc;
 use askama::Template;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
+use cot_core::error::UncaughtPanic;
 use cot_core::error::error_impl::impl_into_cot_error;
 use cot_core::error::handler::{DynErrorPageHandler, RequestOuterError};
-use cot_core::error::UncaughtPanic;
 use cot_core::handler::BoxedHandler;
+use cot_core::html::Html;
 use cot_core::middleware::{
     IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer,
 };
@@ -54,14 +55,13 @@ use crate::cli::Cli;
 use crate::config::DatabaseConfig;
 use crate::config::{AuthBackendConfig, ProjectConfig};
 #[cfg(feature = "db")]
-use crate::db::migrations::{MigrationEngine, SyncDynMigration};
-#[cfg(feature = "db")]
 use crate::db::Database;
+#[cfg(feature = "db")]
+use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 use crate::error_page::Diagnostics;
-use crate::html::Html;
 use crate::static_files::StaticFile;
 use crate::utils::accept_header_parser::AcceptHeaderParser;
-use crate::{cli, error_page, Body, Error};
+use crate::{Body, Error, cli, error_page};
 
 /// A building block for a Cot project.
 ///
@@ -117,7 +117,7 @@ pub trait App: Send + Sync {
     ///
     /// ```
     /// use cot::App;
-    /// use cot::html::Html;
+    /// use cot_core::html::Html;
     /// use cot_core::router::{Route, Router};
     ///
     /// async fn index() -> Html {
@@ -409,8 +409,8 @@ pub trait Project {
     ///
     /// ```
     /// use cot::Project;
-    /// use cot::html::Html;
     /// use cot_core::error::handler::{DynErrorPageHandler, RequestError};
+    /// use cot_core::html::Html;
     /// use cot_core::response::IntoResponse;
     ///
     /// struct MyProject;
@@ -2140,16 +2140,16 @@ mod tests {
     use std::task::{Context, Poll};
 
     use cot_core::error::handler::{RequestError, RequestOuterError};
+    use cot_core::html::Html;
     use cot_core::request::extractors::FromRequestHead;
     use tower::util::MapResultLayer;
-    use tower::{service_fn, ServiceExt};
+    use tower::{ServiceExt, service_fn};
 
     use super::*;
+    use crate::StatusCode;
     use crate::auth::UserId;
     use crate::config::SecretKey;
-    use crate::html::Html;
     use crate::test::serial_guard;
-    use crate::StatusCode;
 
     struct TestApp;
 

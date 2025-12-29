@@ -6,18 +6,16 @@
 
 use std::fmt::{Debug, Formatter};
 
-use crate::response::Response;
 use aide::openapi::Operation;
-use cot::openapi::RouteContext;
+use cot::openapi::{
+    AsApiOperation, AsApiRoute, BoxApiRequestHandler, RouteContext, into_box_api_request_handler,
+};
 use cot::request::Request;
-use cot_core::router::method::InnerHandler;
+use cot_core::router::method::{InnerHandler, InnerMethodRouter};
 use schemars::SchemaGenerator;
 
 use crate::handler::RequestHandler;
-use cot::openapi::{
-    into_box_api_request_handler, AsApiOperation, AsApiRoute, BoxApiRequestHandler,
-};
-use cot_core::router::method::InnerMethodRouter;
+use crate::response::Response;
 
 /// A version of [`MethodRouter`](crate::router::method::MethodRouter) that
 /// supports OpenAPI.
@@ -47,9 +45,9 @@ use cot_core::router::method::InnerMethodRouter;
 ///
 /// ```
 /// use cot::json::Json;
-/// use cot_core::router::method::openapi::api_post;
-/// use cot_core::router::{Route, Router};
 /// use cot::test::TestRequestBuilder;
+/// use cot_core::router::method::method::api_post;
+/// use cot_core::router::{Route, Router};
 /// use serde::{Deserialize, Serialize};
 ///
 /// #[derive(Serialize, Deserialize, schemars::JsonSchema)]
@@ -106,7 +104,7 @@ macro_rules! define_method {
         ///
         /// ```
         /// use cot::json::Json;
-        /// use cot_core::router::method::openapi::ApiMethodRouter;
+        /// use cot_core::router::method::method::ApiMethodRouter;
         ///
         /// async fn test_handler() -> Json<()> {
         ///     Json(())
@@ -169,18 +167,18 @@ impl ApiMethodRouter {
     /// Create a new [`ApiMethodRouter`].
     ///
     /// You might consider using [`api_get`], [`api_post`], or one of the other
-    /// functions defined in [`cot_core::router::method::openapi`] which serve as
-    /// convenient constructors for a [`ApiMethodRouter`] with a specific
+    /// functions defined in [`cot_core::router::method::openapi`] which serve
+    /// as convenient constructors for a [`ApiMethodRouter`] with a specific
     /// handler.
     ///
     /// # Examples
     ///
     /// ```
     /// use cot::json::Json;
-    /// use cot_core::router::method::MethodRouter;
-    /// use cot_core::router::method::openapi::ApiMethodRouter;
-    /// use cot_core::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::router::method::MethodRouter;
+    /// use cot_core::router::method::method::ApiMethodRouter;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn test_handler() -> Json<()> {
     ///     Json(())
@@ -232,7 +230,7 @@ impl ApiMethodRouter {
     ///
     /// ```
     /// use cot::json::Json;
-    /// use cot_core::router::method::openapi::ApiMethodRouter;
+    /// use cot_core::router::method::method::ApiMethodRouter;
     ///
     /// async fn test_handler() -> Json<()> {
     ///     Json(())
@@ -276,10 +274,10 @@ impl ApiMethodRouter {
     ///
     /// ```
     /// use cot::html::Html;
-    /// use cot_core::router::method::openapi::ApiMethodRouter;
-    /// use cot_core::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
     /// use cot::{Body, StatusCode};
+    /// use cot_core::router::method::method::ApiMethodRouter;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn fallback_handler() -> Html {
     ///     Html::new("fallback")
@@ -477,8 +475,8 @@ define_method_router!(api_trace, trace => TRACE);
 ///
 /// ```
 /// use cot::html::Html;
-/// use cot_core::router::method::openapi::api_connect;
 /// use cot::{Body, StatusCode};
+/// use cot_core::router::method::method::api_connect;
 ///
 /// async fn test_handler() -> Html {
 ///     Html::new("test")
@@ -517,14 +515,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::error::MethodNotAllowed;
-    use crate::response::{IntoResponse, Response};
-
-    use super::*;
-    use crate::request::extractors::Path;
     use cot::html::Html;
     use cot::json::Json;
     use cot::test::TestRequestBuilder;
+
+    use super::*;
+    use crate::error::MethodNotAllowed;
+    use crate::request::extractors::Path;
+    use crate::response::{IntoResponse, Response};
 
     async fn test_handler(method: Method) -> crate::Result<Response> {
         Html::new(method.as_str()).into_response()

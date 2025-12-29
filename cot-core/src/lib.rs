@@ -12,6 +12,7 @@ pub mod request;
 pub mod response;
 #[macro_use]
 pub mod handler;
+pub mod html;
 pub mod middleware;
 pub mod router;
 

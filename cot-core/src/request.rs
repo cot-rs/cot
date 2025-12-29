@@ -14,13 +14,10 @@
 
 use std::future::Future;
 
-#[cfg(feature = "db")]
-use cot::db::Database;
-use cot::router::Router;
 use indexmap::IndexMap;
 
+use crate::impl_into_cot_error;
 use crate::request::extractors::FromRequestHead;
-use crate::{impl_into_cot_error, Result};
 
 pub mod extractors;
 mod path_params_deserializer;
@@ -266,7 +263,7 @@ impl PathParams {
     /// ```
     pub fn parse<'de, T: serde::Deserialize<'de>>(
         &'de self,
-    ) -> std::result::Result<T, PathParamsDeserializerError> {
+    ) -> Result<T, PathParamsDeserializerError> {
         let deserializer = path_params_deserializer::PathParamsDeserializer::new(self);
         serde_path_to_error::deserialize(deserializer).map_err(PathParamsDeserializerError)
     }
@@ -282,14 +279,13 @@ pub struct PathParamsDeserializerError(
 );
 impl_into_cot_error!(PathParamsDeserializerError, BAD_REQUEST);
 
+#[repr(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AppName(pub String);
+
 #[cfg(test)]
 mod tests {
-    use cot::response::Response;
-    use cot::router::{Route, Router};
-    use cot::test::TestRequestBuilder;
-
     use super::*;
-    use crate::request::extractors::Path;
 
     #[test]
     fn path_params() {
@@ -319,162 +315,6 @@ mod tests {
                 hello: "world".to_string(),
                 foo: "bar".to_string(),
             }
-        );
-    }
-
-    #[test]
-    fn request_ext_app_name() {
-        let mut request = TestRequestBuilder::get("/").build();
-        assert_eq!(request.app_name(), None);
-
-        request
-            .extensions_mut()
-            .insert(AppName("test_app".to_string()));
-        assert_eq!(request.app_name(), Some("test_app"));
-    }
-
-    #[test]
-    fn request_ext_route_name() {
-        let mut request = TestRequestBuilder::get("/").build();
-        assert_eq!(request.route_name(), None);
-
-        request
-            .extensions_mut()
-            .insert(RouteName("test_route".to_string()));
-        assert_eq!(request.route_name(), Some("test_route"));
-    }
-
-    #[test]
-    fn request_ext_parts_route_name() {
-        let request = TestRequestBuilder::get("/").build();
-        let (mut head, _body) = request.into_parts();
-        assert_eq!(head.route_name(), None);
-
-        head.extensions.insert(RouteName("test_route".to_string()));
-        assert_eq!(head.route_name(), Some("test_route"));
-    }
-
-    #[test]
-    fn request_ext_path_params() {
-        let mut request = TestRequestBuilder::get("/").build();
-
-        let mut params = PathParams::new();
-        params.insert("id".to_string(), "42".to_string());
-        request.extensions_mut().insert(params);
-
-        assert_eq!(request.path_params().get("id"), Some("42"));
-    }
-
-    #[test]
-    fn request_ext_path_params_mut() {
-        let mut request = TestRequestBuilder::get("/").build();
-
-        request
-            .path_params_mut()
-            .insert("id".to_string(), "42".to_string());
-
-        assert_eq!(request.path_params().get("id"), Some("42"));
-    }
-
-    #[test]
-    fn request_ext_content_type() {
-        let mut request = TestRequestBuilder::get("/").build();
-        assert_eq!(request.content_type(), None);
-
-        request.headers_mut().insert(
-            http::header::CONTENT_TYPE,
-            http::HeaderValue::from_static("text/plain"),
-        );
-
-        assert_eq!(
-            request.content_type(),
-            Some(&http::HeaderValue::from_static("text/plain"))
-        );
-    }
-
-    #[test]
-    fn request_ext_expect_content_type() {
-        let mut request = TestRequestBuilder::get("/").build();
-
-        // Should fail with no content type
-        assert!(request.expect_content_type("text/plain").is_err());
-
-        request.headers_mut().insert(
-            http::header::CONTENT_TYPE,
-            http::HeaderValue::from_static("text/plain"),
-        );
-
-        // Should succeed with matching content type
-        assert!(request.expect_content_type("text/plain").is_ok());
-
-        // Should fail with non-matching content type
-        assert!(request.expect_content_type("application/json").is_err());
-    }
-
-    #[cot_macros::test]
-    async fn request_ext_extract_from_head() {
-        async fn handler(mut request: Request) -> Result<Response> {
-            let Path(id): Path<String> = request.extract_from_head().await?;
-            assert_eq!(id, "42");
-
-            Ok(Response::new(Body::empty()))
-        }
-
-        let router = Router::with_urls([Route::with_handler("/{id}/", handler)]);
-
-        let request = TestRequestBuilder::get("/42/")
-            .router(router.clone())
-            .build();
-
-        router.handle(request).await.unwrap();
-    }
-
-    #[test]
-    fn parts_ext_path_params() {
-        let (mut head, _) = Request::new(crate::Body::empty()).into_parts();
-        let mut params = PathParams::new();
-        params.insert("id".to_string(), "42".to_string());
-        head.extensions.insert(params);
-
-        assert_eq!(head.path_params().get("id"), Some("42"));
-    }
-
-    #[test]
-    fn parts_ext_mutating_path_params() {
-        let (mut head, _) = Request::new(crate::Body::empty()).into_parts();
-        head.path_params_mut()
-            .insert("page".to_string(), "1".to_string());
-
-        assert_eq!(head.path_params().get("page"), Some("1"));
-    }
-
-    #[test]
-    fn parts_ext_app_name() {
-        let (mut head, _) = Request::new(crate::Body::empty()).into_parts();
-        head.extensions.insert(AppName("test_app".to_string()));
-
-        assert_eq!(head.app_name(), Some("test_app"));
-    }
-
-    #[test]
-    fn parts_ext_route_name() {
-        let (mut head, _) = Request::new(crate::Body::empty()).into_parts();
-        head.extensions.insert(RouteName("test_route".to_string()));
-
-        assert_eq!(head.route_name(), Some("test_route"));
-    }
-
-    #[test]
-    fn parts_ext_content_type() {
-        let (mut head, _) = Request::new(crate::Body::empty()).into_parts();
-        head.headers.insert(
-            http::header::CONTENT_TYPE,
-            http::HeaderValue::from_static("text/plain"),
-        );
-
-        assert_eq!(
-            head.content_type(),
-            Some(&http::HeaderValue::from_static("text/plain"))
         );
     }
 

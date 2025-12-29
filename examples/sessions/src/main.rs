@@ -7,12 +7,12 @@ use cot::config::{
 use cot::core::request::Request;
 use cot::core::response::{IntoResponse, Response};
 use cot::form::Form;
-use cot::html::Html;
 use cot::middleware::SessionMiddleware;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
-use cot::session::db::SessionApp;
 use cot::session::Session;
-use cot::{reverse_redirect, App, AppBuilder, Project};
+use cot::session::db::SessionApp;
+use cot::{App, AppBuilder, Project, reverse_redirect};
+use cot_core::html::Html;
 use cot_core::router::{Route, Router, Urls};
 
 #[derive(Debug, Template)]

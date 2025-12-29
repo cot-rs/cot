@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use askama::filters::HtmlSafe;
 use bytes::Bytes;
 use cot::form::{AsFormField, FormFieldValidationError};
-use cot::html::HtmlTag;
+use cot_core::html::HtmlTag;
 
 use crate::form::{FormField, FormFieldOptions, FormFieldValue, FormFieldValueError};
 

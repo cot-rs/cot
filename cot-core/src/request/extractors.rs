@@ -50,14 +50,10 @@
 
 use std::future::Future;
 
-use cot::auth::Auth;
-use cot::form::{Form, FormResult};
-use cot::router::Urls;
-use cot::session::Session;
 use serde::de::DeserializeOwned;
 use tower_sessions::Session;
 
-pub use crate::request::{PathParams, Request, RequestExt, RequestHead};
+pub use crate::request::{PathParams, Request, RequestHead};
 use crate::{Body, Method};
 
 /// Trait for extractors that consume the request body.
@@ -103,12 +99,6 @@ pub trait FromRequestHead: Sized {
     /// Throws an error if the extractor fails to extract the data from the
     /// request head.
     fn from_request_head(head: &RequestHead) -> impl Future<Output = crate::Result<Self>> + Send;
-}
-
-impl FromRequestHead for Urls {
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        Ok(Self::from_parts(head))
-    }
 }
 
 /// An extractor that extracts data from the URL params.
@@ -231,61 +221,6 @@ where
 struct QueryParametersParseError(serde_path_to_error::Error<serde::de::value::Error>);
 impl_into_cot_error!(QueryParametersParseError, BAD_REQUEST);
 
-/// An extractor that gets the request body as form data and deserializes it
-/// into a type `F` implementing `cot::form::Form`.
-///
-/// The content type of the request must be `application/x-www-form-urlencoded`.
-///
-/// # Errors
-///
-/// Throws an error if the content type is not
-/// `application/x-www-form-urlencoded`. Throws an error if the request body
-/// could not be read. Throws an error if the request body could not be
-/// deserialized - either because the form data is invalid or because the
-/// deserialization to the target structure failed.
-///
-/// # Example
-///
-/// ```
-/// use cot::form::{Form, FormResult};
-/// use cot::html::Html;
-/// use cot::test::TestRequestBuilder;
-/// use cot_core::request::extractors::RequestForm;
-///
-/// #[derive(Form)]
-/// struct MyForm {
-///     hello: String,
-/// }
-///
-/// async fn my_handler(RequestForm(form): RequestForm<MyForm>) -> Html {
-///     let form = match form {
-///         FormResult::Ok(form) => form,
-///         FormResult::ValidationError(error) => {
-///             panic!("Form validation error!")
-///         }
-///     };
-///
-///     Html::new(format!("Hello {}!", form.hello))
-/// }
-///
-/// # #[tokio::main]
-/// # async fn main() -> cot::Result<()> {
-/// # use cot::RequestHandler;
-/// # let request = TestRequestBuilder::post("/").form_data(&[("hello", "world")]).build();
-/// # my_handler.handle(request).await?;
-/// # Ok(())
-/// # }
-/// ```
-#[derive(Debug)]
-pub struct RequestForm<F: Form>(pub FormResult<F>);
-
-impl<F: Form> FromRequest for RequestForm<F> {
-    async fn from_request(head: &RequestHead, body: Body) -> crate::Result<Self> {
-        let mut request = Request::from_parts(head.clone(), body);
-        Ok(Self(F::from_request(&mut request).await?))
-    }
-}
-
 // extractor impls for existing types
 impl FromRequestHead for RequestHead {
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
@@ -302,18 +237,6 @@ impl FromRequestHead for Method {
 impl FromRequestHead for Session {
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         Ok(Session::from_extensions(&head.extensions).clone())
-    }
-}
-
-impl FromRequestHead for Auth {
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        let auth = head
-            .extensions
-            .get::<Auth>()
-            .expect("AuthMiddleware not enabled for the route/project")
-            .clone();
-
-        Ok(auth)
     }
 }
 

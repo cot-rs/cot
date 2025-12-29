@@ -8,7 +8,7 @@ use chrono::{
 use chrono_tz::Tz;
 use cot::form::FormField;
 use cot::form::fields::impl_form_field;
-use cot::html::HtmlTag;
+use cot_core::html::HtmlTag;
 
 use crate::form::fields::{
     SelectChoice, SelectField, SelectMultipleField, Step, check_required, check_required_multiple,

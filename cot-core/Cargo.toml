@@ -16,6 +16,7 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
+aide = { workspace = true, optional = true }
 askama = { workspace = true, features = ["derive", "std"] }
 axum = { workspace = true, features = ["http1", "tokio"] }
 backtrace.workspace = true
@@ -29,6 +30,7 @@ http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
 indexmap.workspace = true
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_html_form = { workspace = true }
 serde_json = { workspace = true, optional = true }
@@ -43,3 +45,9 @@ tracing = "0.1.41"
 async-stream.workspace = true
 futures.workspace = true
 tokio = { workspace = true, features = ["macros"] }
+
+[features]
+default = []
+json = ["dep:serde_json"]
+db = []
+openapi = ["dep:aide", "dep:schemars"]

@@ -78,8 +78,8 @@ impl DatabaseUser {
     /// ```
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
-    /// use cot::html::Html;
     /// use cot::request::{Request, RequestExt};
+    /// use cot_core::html::Html;
     ///
     /// async fn view(request: &Request) -> cot::Result<Html> {
     ///     let user = DatabaseUser::create_user(
@@ -140,8 +140,8 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
-    /// use cot::html::Html;
     /// use cot::request::{Request, RequestExt};
+    /// use cot_core::html::Html;
     ///
     /// async fn view(request: &Request) -> cot::Result<Html> {
     ///     let user = DatabaseUser::create_user(
@@ -192,8 +192,8 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
-    /// use cot::html::Html;
     /// use cot::request::extractors::RequestDb;
+    /// use cot_core::html::Html;
     ///
     /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
     ///     let user =
@@ -284,8 +284,8 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
-    /// use cot::html::Html;
     /// use cot::request::extractors::RequestDb;
+    /// use cot_core::html::Html;
     ///
     /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
     ///     let user =
@@ -327,8 +327,8 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
-    /// use cot::html::Html;
     /// use cot::request::extractors::RequestDb;
+    /// use cot_core::html::Html;
     ///
     /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
     ///     let user =

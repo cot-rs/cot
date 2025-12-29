@@ -15,6 +15,7 @@ pub use chrono::{
     DateField, DateFieldOptions, DateTimeField, DateTimeFieldOptions, DateTimeWithTimezoneField,
     DateTimeWithTimezoneFieldOptions, TimeField, TimeFieldOptions,
 };
+use cot_core::html::HtmlTag;
 pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
 pub(crate) use select::check_required_multiple;
 pub use select::{
@@ -26,7 +27,6 @@ use crate::common_types::{Email, Password, Url};
 #[cfg(feature = "db")]
 use crate::db::{Auto, ForeignKey, LimitedString, Model};
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
-use crate::html::HtmlTag;
 
 macro_rules! impl_form_field {
     ($field_type_name:ident, $field_options_type_name:ident, $purpose:literal $(, $generic_param:ident $(: $generic_param_bound:ident $(+ $generic_param_bound_more:ident)*)?)?) => {

@@ -66,7 +66,6 @@ pub mod cli;
 pub mod common_types;
 pub mod config;
 mod error_page;
-pub mod html;
 #[cfg(feature = "json")]
 pub mod json;
 pub mod middleware;
@@ -89,6 +88,7 @@ pub use cot_core::Result;
 /// A type alias for an HTTP status code.
 pub use cot_core::StatusCode;
 pub use cot_core::error::error_impl::Error;
+pub use cot_core::handler::{BoxedHandler, RequestHandler};
 pub use cot_core::{Body, Method};
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
@@ -160,4 +160,3 @@ pub use {bytes, cot_core as core, http};
 pub use crate::project::{
     App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };
-pub use cot_core::handler::{BoxedHandler, RequestHandler};

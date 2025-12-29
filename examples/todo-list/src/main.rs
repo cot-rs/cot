@@ -9,11 +9,11 @@ use cot::core::response::Response;
 use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model, query};
 use cot::form::Form;
-use cot::html::Html;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::extractors::RequestDb;
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Project, reverse_redirect};
+use cot_core::html::Html;
 use cot_core::router::{Route, Router, Urls};
 
 #[derive(Debug, Clone)]

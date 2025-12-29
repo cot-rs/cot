@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use askama::filters::HtmlSafe;
+use cot_core::html::HtmlTag;
 /// Derive the [`SelectChoice`] trait for an enum.
 ///
 /// This macro automatically implements the [`SelectChoice`] trait for enums,
@@ -114,7 +115,6 @@ use crate::form::fields::impl_form_field;
 use crate::form::{
     FormField, FormFieldOptions, FormFieldValidationError, FormFieldValue, FormFieldValueError,
 };
-use crate::html::HtmlTag;
 
 impl_form_field!(SelectField, SelectFieldOptions, "a dropdown list", T: SelectChoice + Send);
 

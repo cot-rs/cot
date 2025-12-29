@@ -7,7 +7,7 @@ use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Project};
 use cot_core::error::handler::{DynErrorPageHandler, RequestError};
 use cot_core::response::IntoResponse;
-use cot_core::router::method::openapi::api_post;
+use cot_core::router::method::method::api_post;
 use cot_core::router::{Route, Router};
 use serde::{Deserialize, Serialize};
 

@@ -7,8 +7,9 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use cot_core::handler::BoxedHandler;
 use cot_core::response::Response;
-use derive_more::Debug;
+use cot_core::router::Router;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
@@ -29,8 +30,6 @@ use crate::request::Request;
 use crate::session::Session;
 use crate::static_files::{StaticFile, StaticFiles};
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
-use cot_core::handler::BoxedHandler;
-use cot_core::router::Router;
 
 /// A test client for making requests to a Cot project.
 ///
@@ -185,9 +184,9 @@ impl Client {
 /// # Examples
 ///
 /// ```
-/// use cot::html::Html;
 /// use cot::request::Request;
 /// use cot::test::TestRequestBuilder;
+/// use cot_core::html::Html;
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
@@ -280,8 +279,8 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::RequestHandler;
-    /// use cot::html::Html;
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::html::Html;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
@@ -314,8 +313,8 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::RequestHandler;
-    /// use cot::html::Html;
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::html::Html;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
@@ -348,9 +347,9 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::RequestHandler;
-    /// use cot::html::Html;
     /// use cot::http::Method;
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::html::Html;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
@@ -403,9 +402,9 @@ impl TestRequestBuilder {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::Html;
     /// use cot::request::Request;
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::html::Html;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
@@ -447,9 +446,9 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::request::Request;
-    /// use cot_core::router::{Route, Router};
     /// use cot::test::TestRequestBuilder;
     /// use cot_core::response::Response;
+    /// use cot_core::router::{Route, Router};
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     unimplemented!()
@@ -541,7 +540,7 @@ impl TestRequestBuilder {
     /// ```
     /// use cot::RequestHandler;
     /// use cot::db::Database;
-    /// use cot::html::Html;
+    /// use cot_core::html::Html;
     /// use cot::test::TestRequestBuilder;
     /// use cot::request::extractors::RequestDb;
     ///
@@ -704,8 +703,8 @@ impl TestRequestBuilder {
     ///
     /// ```
     /// use cot::RequestHandler;
-    /// use cot::html::Html;
     /// use cot::test::TestRequestBuilder;
+    /// use cot_core::html::Html;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {

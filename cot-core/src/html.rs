@@ -8,7 +8,7 @@
 //! ## Creating and rendering an HTML Tag
 //!
 //! ```
-//! use cot::html::HtmlTag;
+//! use cot_core::html::HtmlTag;
 //!
 //! let tag = HtmlTag::new("br");
 //! let html = tag.render();
@@ -18,7 +18,7 @@
 //! ## Adding Attributes to an HTML Tag
 //!
 //! ```
-//! use cot::html::HtmlTag;
+//! use cot_core::html::HtmlTag;
 //!
 //! let mut tag = HtmlTag::new("input");
 //! tag.attr("type", "text").attr("placeholder", "Enter text");
@@ -32,7 +32,7 @@
 //! ## Creating nested HTML elements
 //!
 //! ```
-//! use cot::html::{Html, HtmlTag};
+//! use cot_core::html::{Html, HtmlTag};
 //!
 //! let mut div = HtmlTag::new("div");
 //! div.attr("class", "container");
@@ -60,7 +60,7 @@ use derive_more::{Deref, Display, From};
 /// # Examples
 ///
 /// ```
-/// use cot::html::Html;
+/// use cot_core::html::Html;
 ///
 /// let html = Html::new("<div>Hello</div>");
 /// assert_eq!(html.as_str(), "<div>Hello</div>");
@@ -74,7 +74,7 @@ impl Html {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::Html;
+    /// use cot_core::html::Html;
     ///
     /// let html = Html::new("<div>Hello</div>");
     /// assert_eq!(html.as_str(), "<div>Hello</div>");
@@ -89,7 +89,7 @@ impl Html {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::Html;
+    /// use cot_core::html::Html;
     ///
     /// let html = Html::new("<div>Hello</div>");
     /// assert_eq!(html.as_str(), "<div>Hello</div>");
@@ -133,7 +133,7 @@ impl HtmlNode {
 /// # Examples
 ///
 /// ```
-/// use cot::html::HtmlTag;
+/// use cot_core::html::HtmlTag;
 ///
 /// let mut tag = HtmlTag::new("div");
 /// tag.attr("class", "container");
@@ -157,7 +157,7 @@ impl HtmlTag {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::HtmlTag;
+    /// use cot_core::html::HtmlTag;
     ///
     /// let tag = HtmlTag::new("div");
     /// assert_eq!(tag.render().as_str(), "<div/>");
@@ -177,7 +177,7 @@ impl HtmlTag {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::HtmlTag;
+    /// use cot_core::html::HtmlTag;
     ///
     /// let input = HtmlTag::input("text");
     /// assert_eq!(input.render().as_str(), "<input type=\"text\"/>");
@@ -203,7 +203,7 @@ impl HtmlTag {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::HtmlTag;
+    /// use cot_core::html::HtmlTag;
     ///
     /// let mut tag = HtmlTag::new("input");
     /// tag.attr("type", "text").attr("placeholder", "Enter text");
@@ -235,7 +235,7 @@ impl HtmlTag {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::HtmlTag;
+    /// use cot_core::html::HtmlTag;
     ///
     /// let mut tag = HtmlTag::new("input");
     /// tag.bool_attr("disabled");
@@ -260,7 +260,7 @@ impl HtmlTag {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::HtmlTag;
+    /// use cot_core::html::HtmlTag;
     ///
     /// let mut div = HtmlTag::new("div");
     /// div.push_str("Hello, world!");
@@ -275,7 +275,7 @@ impl HtmlTag {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::HtmlTag;
+    /// use cot_core::html::HtmlTag;
     ///
     /// let mut div = HtmlTag::new("div");
     /// let span = HtmlTag::new("span");
@@ -295,7 +295,7 @@ impl HtmlTag {
     /// # Examples
     ///
     /// ```
-    /// use cot::html::HtmlTag;
+    /// use cot_core::html::HtmlTag;
     ///
     /// let tag = HtmlTag::new("div");
     /// assert_eq!(tag.render().as_str(), "<div/>");

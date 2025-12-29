@@ -2156,15 +2156,18 @@ pub async fn run_at_with_shutdown(
     Ok(())
 }
 
-#[cfg(feature = "live-reload")]
 fn make_reset_listener(
     listener: tokio::net::TcpListener,
-) -> crate::middleware::live_reload::ResetListener {
-    crate::middleware::live_reload::ResetListener::new(listener)
-}
-#[cfg(not(feature = "live-reload"))]
-fn make_reset_listener(listener: tokio::net::TcpListener) -> tokio::net::TcpListener {
-    listener
+) -> impl axum::serve::Listener<Addr = std::net::SocketAddr> {
+    #[cfg(feature = "live-reload")]
+    {
+        crate::middleware::live_reload::ResetListener::new(listener)
+    }
+
+    #[cfg(not(feature = "live-reload"))]
+    {
+        listener
+    }
 }
 
 #[derive(Debug, Error)]

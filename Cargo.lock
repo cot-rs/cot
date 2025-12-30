@@ -1145,14 +1145,10 @@ dependencies = [
 [[package]]
 name = "dioxus-cli-config"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c59e9d9da2e7334fdae5d77e3989207aa549062f74ff1ca2171393bbdd7fda90"
 
 [[package]]
 name = "dioxus-core"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7400cbd21a98e585a13f8c29574da9b8afb2fd343f712618042b6c71761f0933"
 dependencies = [
  "anyhow",
  "const_format",
@@ -1173,14 +1169,10 @@ dependencies = [
 [[package]]
 name = "dioxus-core-types"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0652ab5f9c2c32261d44a3155debbfd909ed03d03434d7f70f5a796bf255c519"
 
 [[package]]
 name = "dioxus-devtools"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9748128bcd102b10e58c765939807053ccab542206a939b8bab228077455c259"
 dependencies = [
  "dioxus-cli-config",
  "dioxus-core",
@@ -1199,8 +1191,6 @@ dependencies = [
 [[package]]
 name = "dioxus-devtools-types"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48540ca8a0ab1ec81cd4db35f0c9713d43b158647fc1dcb0d79965fc3b41d96c"
 dependencies = [
  "dioxus-core",
  "serde",
@@ -1210,8 +1200,6 @@ dependencies = [
 [[package]]
 name = "dioxus-signals"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27fc4df7a31a7f02e5a0b40884bb66ee165226a05d75fce03baa44029e438762"
 dependencies = [
  "dioxus-core",
  "futures-channel",
@@ -1627,8 +1615,6 @@ dependencies = [
 [[package]]
 name = "generational-box"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e658d10252a15200ca4a1c67c7180fc0baffa3f92869bbd903025daf6f70fd65"
 dependencies = [
  "parking_lot",
  "tracing",
@@ -3760,8 +3746,6 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 [[package]]
 name = "subsecond"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c09bc2c9ef0381b403ab8b58122961cb83266d16b1f55f9486d5857ba4a9ae26"
 dependencies = [
  "js-sys",
  "libc",
@@ -3779,8 +3763,6 @@ dependencies = [
 [[package]]
 name = "subsecond-types"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d07aa455c66ddfdbb51507537402b961e027846468954ef8d974bce65dff9eb0"
 dependencies = [
  "serde",
 ]

@@ -28,5 +28,5 @@ pub use crate::utils::graph::apply_permutation;
 pub const COT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod hot_patching {
-    pub use crate::hot_patching::{call_hot, serve};
+    pub use crate::hot_patching::{call_async, call_hot, serve};
 }

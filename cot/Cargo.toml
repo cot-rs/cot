@@ -30,7 +30,8 @@ deadpool-redis = { workspace = true, features = ["tokio-comp", "rt_tokio_1"], op
 derive_builder.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
 digest.workspace = true
-dioxus-devtools = { version = "0.7.2", features = ["serve"], optional = true }
+#dioxus-devtools = { version = "0.7.2", features = ["serve"], optional = true }
+dioxus-devtools = { path = "/home/m4tx/projects/dioxus/packages/devtools/", features = ["serve"], optional = true }
 email_address.workspace = true
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 form_urlencoded.workspace = true
@@ -58,7 +59,8 @@ serde_json = { workspace = true, optional = true }
 serde_path_to_error = { workspace = true }
 sha2.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
-subsecond = { version = "0.7.2", optional = true }
+#subsecond = { version = "0.7.2", optional = true }
+subsecond = { path = "/home/m4tx/projects/dioxus/packages/subsecond/subsecond/", optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
 sync_wrapper.workspace = true

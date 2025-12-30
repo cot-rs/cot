@@ -1,19 +1,19 @@
 ---
 source: cot-cli/tests/snapshot_testing/new/mod.rs
+assertion_line: 19
 description: "Verbosity level: trace"
 info:
   program: cot
   args:
     - new
     - "-vvvvv"
-    - /tmp/cot-test-QUOaBC/project
+    - /tmp/cot-test-npgw5S/project
 ---
 success: true
 exit_code: 0
 ----- stdout -----
 TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/Cargo.toml"
 TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/Cargo.lock"
-TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/bacon.toml"
 TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/.gitignore"
 TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/src/main.rs"
 TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/src/migrations.rs"

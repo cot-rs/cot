@@ -66,7 +66,10 @@ pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
             request: Request,
         ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + '_>> {
             Box::pin(crate::hot_patching::call_hot(
-                |req| self.0.handle(req),
+                |req| {
+                    Box::pin(self.0.handle(req))
+                        as Pin<Box<dyn Future<Output = Result<Response>> + Send>>
+                },
                 request,
             ))
         }
@@ -81,8 +84,8 @@ macro_rules! impl_request_handler {
         where
             Func: FnOnce($($ty,)*) -> Fut + Clone + Send + Sync + 'static,
             $($ty: FromRequestHead + Send,)*
-            Fut: Future<Output = R> + Send,
-            R: IntoResponse,
+            Fut: Future<Output = R> + Send + 'static,
+            R: IntoResponse + 'static,
         {
             #[allow(
                 clippy::allow_attributes,
@@ -101,8 +104,8 @@ macro_rules! impl_request_handler {
                     let $ty = <$ty as FromRequestHead>::from_request_head(&head).await?;
                 )*
 
-                $crate::__private::hot_patching::call_hot(
-                    move |($($ty,)*)| self.clone()($($ty,)*),
+                $crate::__private::hot_patching::call_async(
+                    move |($($ty,)*)| Box::pin(self.clone()($($ty,)*)) as Pin<Box<dyn Future<Output = R> + Send>>,
                     ($($ty,)*),
                 )
                 .await
@@ -120,7 +123,7 @@ macro_rules! impl_request_handler_from_request {
             $($ty_lhs: FromRequestHead + Send,)*
             $ty_from_request: FromRequest + Send,
             $($ty_rhs: FromRequestHead + Send,)*
-            Fut: Future<Output = R> + Send,
+            Fut: Future<Output = R> + Send + 'static,
             R: IntoResponse,
         {
             #[allow(
@@ -144,7 +147,7 @@ macro_rules! impl_request_handler_from_request {
 
                 let $ty_from_request = $ty_from_request::from_request(&head, body).await?;
 
-                $crate::__private::hot_patching::call_hot(
+                $crate::__private::hot_patching::call_async(
                     move |($($ty_lhs,)* $ty_from_request, $($ty_rhs),*)| {
                         self.clone()($($ty_lhs,)* $ty_from_request, $($ty_rhs),*)
                     },

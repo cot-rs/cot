@@ -73,14 +73,15 @@ impl ErrorPageTemplateBuilder {
         if let Some(not_found) = error.inner().downcast_ref::<NotFound>() {
             use cot_core::error::NotFoundKind as Kind;
             match &not_found.kind {
-                Kind::FromRouter => {}
-                Kind::Custom => {
+                Kind::FromRouter { .. } => {}
+                Kind::Custom { .. } => {
                     Self::build_error_data(&mut error_data, error);
                 }
-                Kind::WithMessage(message) => {
+                Kind::WithMessage { 0: message, .. } => {
                     Self::build_error_data(&mut error_data, error);
                     error_message = Some(message.clone());
                 }
+                _ => {}
             }
         }
 
@@ -164,7 +165,7 @@ impl ErrorPageTemplateBuilder {
         }
     }
 
-    fn build_error_data(vec: &mut Vec<ErrorData>, error: &(dyn std::error::Error + 'static)) {
+fn build_error_data(vec: &mut Vec<ErrorData>, error: &(dyn std::error::Error + 'static)) {
         let data = ErrorData {
             description: error.to_string(),
             debug_str: format!("{error:#?}"),

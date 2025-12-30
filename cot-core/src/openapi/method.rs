@@ -520,6 +520,7 @@ mod tests {
     use cot::test::TestRequestBuilder;
 
     use super::*;
+    use crate::Method;
     use crate::error::MethodNotAllowed;
     use crate::request::extractors::Path;
     use crate::response::{IntoResponse, Response};

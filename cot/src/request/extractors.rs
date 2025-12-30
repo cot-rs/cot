@@ -17,8 +17,8 @@ use crate::request::RequestExt;
 #[derive(Debug, thiserror::Error)]
 #[error("invalid content type; expected `{expected}`, found `{actual}`")]
 pub struct InvalidContentType {
-    expected: &'static str,
-    actual: String,
+    pub(crate) expected: &'static str,
+    pub(crate) actual: String,
 }
 impl_into_cot_error!(InvalidContentType, BAD_REQUEST);
 

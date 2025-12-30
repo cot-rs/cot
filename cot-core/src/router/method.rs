@@ -249,7 +249,7 @@ impl RequestHandler for MethodRouter {
 
 #[derive(Debug)]
 #[must_use]
-struct InnerMethodRouter<T> {
+pub(crate) struct InnerMethodRouter<T> {
     pub get: Option<T>,
     pub head: Option<T>,
     pub delete: Option<T>,
@@ -315,10 +315,10 @@ impl<T: RequestHandler + Send + Sync> RequestHandler for InnerMethodRouter<T> {
     }
 }
 
-struct InnerHandler(Box<dyn BoxRequestHandler + Send + Sync>);
+pub(crate) struct InnerHandler(Box<dyn BoxRequestHandler + Send + Sync>);
 
 impl InnerHandler {
-    fn new<HandlerParams, H>(handler: H) -> Self
+    pub(crate) fn new<HandlerParams, H>(handler: H) -> Self
     where
         HandlerParams: 'static,
         H: RequestHandler<HandlerParams> + Send + Sync + 'static,

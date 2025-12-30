@@ -103,7 +103,6 @@
 //! # }
 //! ```
 
-pub mod method;
 #[cfg(feature = "swagger-ui")]
 pub mod swagger_ui;
 
@@ -115,8 +114,9 @@ use cot::router::Urls;
 use cot_core::handle_all_parameters;
 use cot_core::handler::BoxRequestHandler;
 use cot_core::impl_as_openapi_operation;
+use cot_core::openapi::add_query_param;
 #[doc(inline)]
-pub use cot_core::openapi::{RouteContext, AsApiRoute, BoxApiEndpointRequestHandler, AsApiOperation, into_box_api_endpoint_request_handler};
+pub use cot_core::openapi::{RouteContext, AsApiRoute, BoxApiEndpointRequestHandler, AsApiOperation, into_box_api_endpoint_request_handler, method, ApiOperationPart, ApiOperationResponse};
 use cot_core::request::extractors::{Path, UrlQuery};
 use cot_core::response::{Response, WithExtension};
 /// Derive macro for the [`ApiOperationResponse`] trait.
@@ -313,207 +313,8 @@ impl<T> AsApiOperation for NoApi<T> {
     }
 }
 
-handle_all_parameters!(impl_as_openapi_operation);
 
-/// A trait that can be implemented for types that should be taken into
-/// account when generating OpenAPI paths.
-///
-/// When implementing this trait for a type, you can modify the `Operation`
-/// object to add information about the type to the OpenAPI spec. The
-/// default implementation of [`ApiOperationPart::modify_api_operation`]
-/// does nothing to indicate that the type has no effect on the OpenAPI spec.
-///
-/// # Example
-///
-/// ```
-/// use cot::aide::openapi::{Operation, MediaType, ReferenceOr, RequestBody};
-/// use cot::openapi::{ApiOperationPart, RouteContext};
-/// use cot::request::Request;
-/// use cot::request::extractors::FromRequest;
-/// use indexmap::IndexMap;
-/// use cot::schemars::SchemaGenerator;
-/// use serde::de::DeserializeOwned;
-///
-/// pub struct Json<D>(pub D);
-///
-/// impl<D: DeserializeOwned> FromRequest for Json<D> {
-///     async fn from_request(head: &cot::request::RequestHead, body: cot::Body) -> cot::Result<Self> {
-///         // parse the request body as JSON
-/// #       unimplemented!()
-///     }
-/// }
-///
-/// impl<D: schemars::JsonSchema> ApiOperationPart for Json<D> {
-///     fn modify_api_operation(
-///         operation: &mut Operation,
-///         _route_context: &RouteContext<'_>,
-///         schema_generator: &mut SchemaGenerator,
-///     ) {
-///         operation.request_body = Some(ReferenceOr::Item(RequestBody {
-///             content: IndexMap::from([(
-///                 "application/json".to_owned(),
-///                 MediaType {
-///                     schema: Some(aide::openapi::SchemaObject {
-///                         json_schema: D::json_schema(schema_generator),
-///                         external_docs: None,
-///                         example: None,
-///                     }),
-///                     ..Default::default()
-///                 },
-///             )]),
-///             ..Default::default()
-///         }));
-///     }
-/// }
-///
-/// # let mut operation = Operation::default();
-/// # let route_context = RouteContext::new();
-/// # let mut schema_generator = SchemaGenerator::default();
-/// # Json::<String>::modify_api_operation(&mut operation, &route_context, &mut schema_generator);
-/// # assert!(operation.request_body.is_some());
-/// ```
-pub trait ApiOperationPart {
-    /// Modify the OpenAPI operation object.
-    ///
-    /// This function is called by the framework when generating the OpenAPI
-    /// spec for a route. You can use this function to add custom information
-    /// to the operation object.
-    ///
-    /// The default implementation does nothing.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use aide::openapi::Operation;
-    /// use cot::openapi::{ApiOperationPart, RouteContext};
-    /// use schemars::SchemaGenerator;
-    ///
-    /// struct MyExtractor<T>(T);
-    ///
-    /// impl<T> ApiOperationPart for MyExtractor<T> {
-    ///     fn modify_api_operation(
-    ///         operation: &mut Operation,
-    ///         _route_context: &RouteContext<'_>,
-    ///         _schema_generator: &mut SchemaGenerator,
-    ///     ) {
-    ///         // Add custom OpenAPI information to the operation
-    ///     }
-    /// }
-    /// ```
-    #[expect(unused)]
-    fn modify_api_operation(
-        operation: &mut Operation,
-        route_context: &RouteContext<'_>,
-        schema_generator: &mut SchemaGenerator,
-    ) {
-    }
-}
-
-/// A trait that generates OpenAPI response objects for handler return types.
-///
-/// This trait is implemented for types that can be returned from request
-/// handlers and need to be documented in the OpenAPI specification. It allows
-/// you to specify how a type should be represented in the OpenAPI
-/// documentation.
-///
-/// # Examples
-///
-/// ```
-/// use cot::aide::openapi::{MediaType, Operation, Response, StatusCode};
-/// use cot::openapi::{ApiOperationResponse, RouteContext};
-/// use indexmap::IndexMap;
-/// use schemars::SchemaGenerator;
-///
-/// // A custom response type
-/// struct MyResponse<T>(T);
-///
-/// impl<T: schemars::JsonSchema> ApiOperationResponse for MyResponse<T> {
-///     fn api_operation_responses(
-///         _operation: &mut Operation,
-///         _route_context: &RouteContext<'_>,
-///         schema_generator: &mut SchemaGenerator,
-///     ) -> Vec<(Option<StatusCode>, Response)> {
-///         vec![(
-///             Some(StatusCode::Code(201)),
-///             Response {
-///                 description: "Created".to_string(),
-///                 content: IndexMap::from([(
-///                     "application/json".to_string(),
-///                     MediaType {
-///                         schema: Some(aide::openapi::SchemaObject {
-///                             json_schema: T::json_schema(schema_generator),
-///                             external_docs: None,
-///                             example: None,
-///                         }),
-///                         ..Default::default()
-///                     },
-///                 )]),
-///                 ..Default::default()
-///             },
-///         )]
-///     }
-/// }
-/// ```
-pub trait ApiOperationResponse {
-    /// Returns a list of OpenAPI response objects for this type.
-    ///
-    /// This method is called by the framework when generating the OpenAPI
-    /// specification for a route. It should return a list of responses
-    /// that this type can produce, along with their status codes.
-    ///
-    /// The status code can be `None` to indicate a default response.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::aide::openapi::{MediaType, Operation, Response, StatusCode};
-    /// use cot::openapi::{ApiOperationResponse, RouteContext};
-    /// use indexmap::IndexMap;
-    /// use schemars::SchemaGenerator;
-    ///
-    /// // A custom response type that always returns 201 Created
-    /// struct CreatedResponse<T>(T);
-    ///
-    /// impl<T: schemars::JsonSchema> ApiOperationResponse for CreatedResponse<T> {
-    ///     fn api_operation_responses(
-    ///         _operation: &mut Operation,
-    ///         _route_context: &RouteContext<'_>,
-    ///         schema_generator: &mut SchemaGenerator,
-    ///     ) -> Vec<(Option<StatusCode>, Response)> {
-    ///         vec![(
-    ///             Some(StatusCode::Code(201)),
-    ///             Response {
-    ///                 description: "Created".to_string(),
-    ///                 content: IndexMap::from([(
-    ///                     "application/json".to_string(),
-    ///                     MediaType {
-    ///                         schema: Some(aide::openapi::SchemaObject {
-    ///                             json_schema: T::json_schema(schema_generator),
-    ///                             external_docs: None,
-    ///                             example: None,
-    ///                         }),
-    ///                         ..Default::default()
-    ///                     },
-    ///                 )]),
-    ///                 ..Default::default()
-    ///             },
-    ///         )]
-    ///     }
-    /// }
-    /// ```
-    #[expect(unused)]
-    fn api_operation_responses(
-        operation: &mut Operation,
-        route_context: &RouteContext<'_>,
-        schema_generator: &mut SchemaGenerator,
-    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
-        Vec::new()
-    }
-}
-
-impl ApiOperationPart for Request {}
 impl ApiOperationPart for Urls {}
-impl ApiOperationPart for Method {}
 impl ApiOperationPart for Session {}
 impl ApiOperationPart for Auth {}
 #[cfg(feature = "db")]
@@ -543,92 +344,6 @@ impl<D: JsonSchema> ApiOperationPart for Json<D> {
     }
 }
 
-impl<D: JsonSchema> ApiOperationPart for Path<D> {
-    #[track_caller]
-    fn modify_api_operation(
-        operation: &mut Operation,
-        route_context: &RouteContext<'_>,
-        schema_generator: &mut SchemaGenerator,
-    ) {
-        let mut schema = D::json_schema(schema_generator);
-        let schema_obj = schema.ensure_object();
-
-        if let Some(items) = schema_obj.get("prefixItems") {
-            // a tuple of path params, e.g. Path<(i32, String)>
-
-            if let Value::Array(item_list) = items {
-                assert_eq!(
-                    route_context.param_names.len(),
-                    item_list.len(),
-                    "the number of path parameters in the route URL must match \
-                    the number of params in the Path type (found path params: {:?})",
-                    route_context.param_names,
-                );
-
-                for (&param_name, item) in route_context.param_names.iter().zip(item_list.iter()) {
-                    let array_item = Schema::try_from(item.clone())
-                        .expect("schema.items must contain valid schemas");
-
-                    add_path_param(operation, array_item, param_name.to_owned());
-                }
-            }
-        } else if let Some(properties) = schema_obj.get("properties") {
-            // a struct of path params, e.g. Path<MyStruct>
-
-            if let Value::Object(properties) = properties {
-                let mut route_context_sorted = route_context.param_names.to_vec();
-                route_context_sorted.sort_unstable();
-                let mut object_props_sorted = properties.keys().collect::<Vec<_>>();
-                object_props_sorted.sort();
-
-                assert_eq!(
-                    route_context_sorted, object_props_sorted,
-                    "Path parameters in the route info must exactly match parameters \
-                    in the Path type. Make sure that the type you pass to Path contains \
-                    all the parameters for the route, and that the names match exactly."
-                );
-
-                for (key, item) in properties {
-                    let object_item = Schema::try_from(item.clone())
-                        .expect("schema.properties must contain valid schemas");
-
-                    add_path_param(operation, object_item, key.clone());
-                }
-            }
-        } else if schema_obj.contains_key("type") {
-            // single path param, e.g. Path<i32>
-
-            assert_eq!(
-                route_context.param_names.len(),
-                1,
-                "the number of path parameters in the route URL must equal \
-                to 1 if a single parameter was passed to the Path type (found path params: {:?})",
-                route_context.param_names,
-            );
-
-            add_path_param(operation, schema, route_context.param_names[0].to_owned());
-        }
-    }
-}
-
-impl<D: JsonSchema> ApiOperationPart for UrlQuery<D> {
-    fn modify_api_operation(
-        operation: &mut Operation,
-        _route_context: &RouteContext<'_>,
-        schema_generator: &mut SchemaGenerator,
-    ) {
-        let schema = D::json_schema(schema_generator);
-
-        if let Some(Value::Object(properties)) = schema.get("properties") {
-            for (key, item) in properties {
-                let object_item = Schema::try_from(item.clone())
-                    .expect("schema.properties must contain valid schemas");
-
-                add_query_param(operation, object_item, key.clone());
-            }
-        }
-    }
-}
 
 impl<F: Form + JsonSchema> ApiOperationPart for RequestForm<F> {
     fn modify_api_operation(
@@ -667,69 +382,6 @@ impl<F: Form + JsonSchema> ApiOperationPart for RequestForm<F> {
     }
 }
 
-fn add_path_param(operation: &mut Operation, mut schema: Schema, param_name: String) {
-    let required = extract_is_required(&mut schema);
-
-    operation
-        .parameters
-        .push(ReferenceOr::Item(Parameter::Path {
-            parameter_data: param_with_name(param_name, schema, required),
-            style: PathStyle::default(),
-        }));
-}
-
-fn add_query_param(operation: &mut Operation, mut schema: Schema, param_name: String) {
-    let required = extract_is_required(&mut schema);
-
-    operation
-        .parameters
-        .push(ReferenceOr::Item(Parameter::Query {
-            parameter_data: param_with_name(param_name, schema, required),
-            allow_reserved: false,
-            style: QueryStyle::default(),
-            allow_empty_value: None,
-        }));
-}
-
-fn extract_is_required(object_item: &mut Schema) -> bool {
-    let object = object_item.ensure_object();
-    let obj_type = object.get_mut("type");
-    let null_value = Value::String("null".to_string());
-
-    if let Some(Value::Array(types)) = obj_type {
-        if types.contains(&null_value) {
-            // If the type is nullable, we need to remove "null" from the types
-            // and return false, indicating that the parameter is not required.
-            types.retain(|t| t != &null_value);
-            false
-        } else {
-            // If "null" is not in the types, we assume it's a required parameter
-            true
-        }
-    } else {
-        // If the type is a single string (or some other unknown value), we assume it's
-        // a required parameter
-        true
-    }
-}
-
-fn param_with_name(param_name: String, schema: Schema, required: bool) -> ParameterData {
-    ParameterData {
-        name: param_name,
-        description: None,
-        required,
-        deprecated: None,
-        format: ParameterSchemaOrContent::Schema(aide::openapi::SchemaObject {
-            json_schema: schema,
-            external_docs: None,
-            example: None,
-        }),
-        example: None,
-        examples: IndexMap::default(),
-        explode: None,
-        extensions: IndexMap::default(),
-    }
-}
 
 impl<S: JsonSchema> ApiOperationResponse for Json<S> {
     fn api_operation_responses(
@@ -755,57 +407,6 @@ impl<S: JsonSchema> ApiOperationResponse for Json<S> {
                 ..Default::default()
             },
         )]
-    }
-}
-
-impl<T: ApiOperationResponse, D> ApiOperationResponse for WithExtension<T, D> {
-    fn api_operation_responses(
-        operation: &mut Operation,
-        route_context: &RouteContext<'_>,
-        schema_generator: &mut SchemaGenerator,
-    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
-        T::api_operation_responses(operation, route_context, schema_generator)
-    }
-}
-
-impl ApiOperationResponse for crate::Result<Response> {
-    fn api_operation_responses(
-        _operation: &mut Operation,
-        _route_context: &RouteContext<'_>,
-        _schema_generator: &mut SchemaGenerator,
-    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
-        vec![(
-            None,
-            aide::openapi::Response {
-                description: "*&lt;unspecified&gt;*".to_string(),
-                ..Default::default()
-            },
-        )]
-    }
-}
-
-// we don't require `E: ApiOperationResponse` here because a global error
-// handler will typically take care of generating OpenAPI responses for errors
-//
-// we might want to add a version for `E: ApiOperationResponse` when (if ever)
-// specialization lands in Rust: https://github.com/rust-lang/rust/issues/31844
-impl<T, E> ApiOperationResponse for Result<T, E>
-where
-    T: ApiOperationResponse,
-{
-    fn api_operation_responses(
-        operation: &mut Operation,
-        route_context: &RouteContext<'_>,
-        schema_generator: &mut SchemaGenerator,
-    ) -> Vec<(Option<StatusCode>, aide::openapi::Response)> {
-        let mut responses = Vec::new();
-
-        let ok_response = T::api_operation_responses(operation, route_context, schema_generator);
-        for (status_code, response) in ok_response {
-            responses.push((status_code, response));
-        }
-
-        responses
     }
 }
 

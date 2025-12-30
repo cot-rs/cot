@@ -7,10 +7,11 @@
 use std::fmt::{Debug, Formatter};
 
 use aide::openapi::Operation;
-use cot::openapi::{
-    AsApiOperation, AsApiRoute, RouteContext
+use crate::openapi::{
+    AsApiOperation, AsApiRoute, BoxApiRequestHandler, RouteContext, into_box_api_request_handler
 };
-use cot::request::Request;
+use crate::request::Request;
+use crate::router::method::{InnerHandler, InnerMethodRouter};
 use schemars::SchemaGenerator;
 
 use crate::handler::RequestHandler;
@@ -327,7 +328,7 @@ impl AsApiRoute for ApiMethodRouter {
             ($path_item:ident, $method_func:ident, $method:ident) => {
                 if let Some(handler) = &self.inner.$method_func {
                     let mut route_context = route_context.clone();
-                    route_context.method = Some(cot::Method::$method);
+                    route_context.method = Some(crate::Method::$method);
                     $path_item.$method_func =
                         handler.as_api_operation(&route_context, schema_generator);
                 }

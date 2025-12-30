@@ -12,8 +12,6 @@
 //! use cot_core::request::RequestExt;
 //! ```
 
-use std::future::Future;
-
 use indexmap::IndexMap;
 
 use crate::impl_into_cot_error;

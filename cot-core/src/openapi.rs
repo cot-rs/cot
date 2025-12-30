@@ -15,7 +15,6 @@ use crate::Method;
 use crate::handler::{BoxRequestHandler, RequestHandler};
 use crate::request::Request;
 use crate::response::Response;
-
 /// Context for API route generation.
 ///
 /// `RouteContext` is used to generate OpenAPI paths from routes. It provides

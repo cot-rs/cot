@@ -115,8 +115,7 @@ use cot::router::Urls;
 use cot_core::handle_all_parameters;
 use cot_core::handler::BoxRequestHandler;
 #[doc(inline)]
-pub use cot_core::openapi::*;
-use cot_core::openapi::{AsApiOperation, RouteContext};
+pub use cot_core::openapi::{RouteContext, AsApiRoute, BoxApiEndpointRequestHandler, AsApiOperation, into_box_api_endpoint_request_handler};
 use cot_core::request::extractors::{Path, UrlQuery};
 use cot_core::response::{Response, WithExtension};
 /// Derive macro for the [`ApiOperationResponse`] trait.

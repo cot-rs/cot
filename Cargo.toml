@@ -102,6 +102,7 @@ indexmap = "2"
 insta = { version = "1", features = ["filters"] }
 insta-cmd = "0.6"
 lettre = { version = "0.11", default-features = false }
+idna = { version = "1.1", default-features = false }
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 mockall = "0.14"

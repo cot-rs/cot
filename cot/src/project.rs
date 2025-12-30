@@ -28,17 +28,17 @@ use std::sync::Arc;
 use askama::Template;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
-use cot_core::error::UncaughtPanic;
-use cot_core::error::error_impl::impl_into_cot_error;
-use cot_core::error::handler::{DynErrorPageHandler, RequestOuterError};
-use cot_core::handler::BoxedHandler;
-use cot_core::html::Html;
-use cot_core::middleware::{
+use crate::error::UncaughtPanic;
+use crate::error::error_impl::impl_into_cot_error;
+use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
+use crate::handler::BoxedHandler;
+use crate::html::Html;
+use crate::middleware::{
     IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer,
 };
-use cot_core::request::{AppName, Request, RequestExt, RequestHead};
-use cot_core::response::{IntoResponse, Response};
-use cot_core::router::{Route, Router, RouterService};
+use crate::request::{AppName, Request, RequestExt, RequestHead};
+use crate::response::{IntoResponse, Response};
+use crate::router::{Route, Router, RouterService};
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;

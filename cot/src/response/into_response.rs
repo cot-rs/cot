@@ -1,6 +1,6 @@
-use cot::core::impl_into_cot_error;
-use cot_core::headers::JSON_CONTENT_TYPE;
-use cot_core::response::{IntoResponse, Response};
+use cot_core::impl_into_cot_error;
+use crate::headers::JSON_CONTENT_TYPE;
+use crate::response::{IntoResponse, Response};
 
 #[cfg(feature = "json")]
 impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {

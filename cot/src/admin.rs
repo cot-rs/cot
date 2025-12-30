@@ -9,12 +9,13 @@ use std::marker::PhantomData;
 use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
-use cot_core::error::NotFound;
-use cot_core::html::Html;
-use cot_core::request::extractors::{FromRequestHead, Path, StaticFiles, UrlQuery};
-use cot_core::request::{Request, RequestExt, RequestHead};
-use cot_core::response::{IntoResponse, Response};
-use cot_core::router::{Router, Urls};
+use crate::error::NotFound;
+use crate::html::Html;
+use crate::request::extractors::{FromRequestHead, Path, StaticFiles, UrlQuery};
+use crate::request::{Request, RequestExt, RequestHead};
+use crate::response::{IntoResponse, Response};
+use crate::reverse_redirect;
+use crate::router::{Router, Urls};
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.
@@ -32,7 +33,7 @@ use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
 use crate::static_files::StaticFile;
-use crate::{App, Error, Method, RequestHandler, reverse_redirect};
+use crate::{App, Error, Method, RequestHandler};
 
 struct AdminAuthenticated<T, H: Send + Sync>(H, PhantomData<fn() -> T>);
 

@@ -16,8 +16,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// backwards compatible shim for form Password type.
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
-use cot_core::error::error_impl::impl_into_cot_error;
-use cot_core::request::{Request, RequestExt};
+use crate::error::error_impl::impl_into_cot_error;
+use crate::request::{Request, RequestExt};
 use derive_more::with_trait::Debug;
 #[cfg(test)]
 use mockall::automock;

@@ -7,7 +7,7 @@ use cot::json::Json;
 use cot::router::Urls;
 use cot::session::Session;
 #[doc(inline)]
-pub use cot_core::request::extractors::{FromRequest, FromRequestHead};
+pub use cot_core::request::extractors::{FromRequest, FromRequestHead, Path, UrlQuery};
 use cot_core::request::{Request, RequestHead};
 use cot_core::{Body, impl_into_cot_error};
 use serde::de::DeserializeOwned;

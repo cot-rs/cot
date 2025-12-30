@@ -8,10 +8,9 @@ use std::fmt::{Debug, Formatter};
 
 use aide::openapi::Operation;
 use cot::openapi::{
-    AsApiOperation, AsApiRoute, BoxApiRequestHandler, RouteContext, into_box_api_request_handler,
+    AsApiOperation, AsApiRoute, RouteContext
 };
 use cot::request::Request;
-use cot_core::router::method::{InnerHandler, InnerMethodRouter};
 use schemars::SchemaGenerator;
 
 use crate::handler::RequestHandler;

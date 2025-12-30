@@ -14,6 +14,7 @@ use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
 use tower_sessions::MemoryStore;
+use derive_more::Debug;
 
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;

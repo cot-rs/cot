@@ -243,6 +243,58 @@ pub trait AsApiOperation<T = ()> {
     ) -> Option<Operation>;
 }
 
+#[macro_export]
+macro_rules! impl_as_openapi_operation {
+    ($($ty:ident),*) => {
+        impl<T, $($ty,)* R, Response> AsApiOperation<($($ty,)*)> for T
+        where
+            T: Fn($($ty,)*) -> R + Clone + Send + Sync + 'static,
+            $($ty: ApiOperationPart,)*
+            R: for<'a> Future<Output = Response> + Send,
+            Response: ApiOperationResponse,
+        {
+            #[allow(
+                clippy::allow_attributes,
+                non_snake_case,
+                reason = "for the case where there are no FromRequestHead params"
+            )]
+            fn as_api_operation(
+                &self,
+                route_context: &RouteContext<'_>,
+                schema_generator: &mut SchemaGenerator,
+            ) -> Option<Operation> {
+                let mut operation = Operation::default();
+
+                $(
+                    $ty::modify_api_operation(
+                        &mut operation,
+                        &route_context,
+                        schema_generator
+                    );
+                )*
+                let responses = Response::api_operation_responses(
+                    &mut operation,
+                    &route_context,
+                    schema_generator
+                );
+                let operation_responses = operation.responses.get_or_insert_default();
+                for (response_code, response) in responses {
+                    if let Some(response_code) = response_code {
+                        operation_responses.responses.insert(
+                            response_code,
+                            ReferenceOr::Item(response),
+                        );
+                    } else {
+                        operation_responses.default = Some(ReferenceOr::Item(response));
+                    }
+                }
+
+                Some(operation)
+            }
+        }
+    };
+}
+
 pub(crate) trait BoxApiRequestHandler: BoxRequestHandler + AsApiOperation {}
 
 pub(crate) fn into_box_api_request_handler<HandlerParams, ApiParams, H>(

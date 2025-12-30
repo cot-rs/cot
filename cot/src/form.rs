@@ -31,9 +31,9 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::NaiveDateTime;
 use chrono_tz::Tz;
-use cot_core::error::error_impl::impl_into_cot_error;
-use cot_core::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
-use cot_core::request::{Request, RequestExt};
+use crate::error::error_impl::impl_into_cot_error;
+use crate::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
+use crate::request::{Request, RequestExt};
 /// Derive the [`Form`] trait for a struct and create a [`FormContext`] for it.
 ///
 /// This macro will generate an implementation of the [`Form`] trait for the

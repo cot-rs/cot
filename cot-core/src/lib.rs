@@ -1,4 +1,4 @@
-use crate::error::error_impl::Error;
+pub use crate::error::error_impl::Error;
 
 pub mod body;
 /// Error handling types and utilities for Cot applications.

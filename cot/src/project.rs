@@ -1386,6 +1386,7 @@ impl Bootstrapper<WithCache> {
         let auth_backend = self.project.auth_backend(&self.context);
         let context = self.context.with_auth(auth_backend);
 
+        // dioxus_devtools::
         Ok(Bootstrapper {
             project: self.project,
             context,
@@ -2140,7 +2141,7 @@ pub async fn run_at_with_shutdown(
         };
         std::panic::set_hook(Box::new(new_hook));
     }
-    axum::serve(listener, handler.into_make_service())
+    axum::serve(make_reset_listener(listener), handler.into_make_service())
         .with_graceful_shutdown(shutdown_signal)
         .await
         .map_err(StartServerError)?;
@@ -2153,6 +2154,20 @@ pub async fn run_at_with_shutdown(
     }
 
     Ok(())
+}
+
+fn make_reset_listener(
+    listener: tokio::net::TcpListener,
+) -> impl axum::serve::Listener<Addr = std::net::SocketAddr> {
+    #[cfg(feature = "live-reload")]
+    {
+        crate::middleware::live_reload::ResetListener::new(listener)
+    }
+
+    #[cfg(not(feature = "live-reload"))]
+    {
+        listener
+    }
 }
 
 #[derive(Debug, Error)]

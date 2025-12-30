@@ -1,5 +1,12 @@
+mod reset_listener;
+
+use std::sync::Mutex;
+
 use cot::middleware::{IntoCotErrorLayer, IntoCotResponseLayer};
 use cot::project::MiddlewareContext;
+pub(crate) use reset_listener::ResetListener;
+use tower_livereload::Reloader;
+use tracing::trace;
 
 #[cfg(feature = "live-reload")]
 type LiveReloadLayerType = tower::util::Either<
@@ -131,12 +138,40 @@ impl LiveReloadMiddleware {
             (
                 IntoCotErrorLayer::new(),
                 IntoCotResponseLayer::new(),
-                tower_livereload::LiveReloadLayer::new(),
+                Self::create_live_reload_layer(),
             )
         });
         Self(tower::util::option_layer(option_layer))
     }
+
+    fn create_live_reload_layer() -> tower_livereload::LiveReloadLayer {
+        let layer = tower_livereload::LiveReloadLayer::new();
+
+        let mut reloaders = RELOADERS
+            .lock()
+            .expect("reloaders mutex was poisoned; please restart the server");
+        if reloaders.is_empty() {
+            subsecond::register_handler(std::sync::Arc::new(reload_clients));
+        }
+        reloaders.push(layer.reloader());
+        layer
+    }
 }
+
+fn reload_clients() {
+    let reloaders = RELOADERS
+        .lock()
+        .expect("reloaders mutex was poisoned; please restart the server");
+    for reloader in &*reloaders {
+        reloader.reload();
+    }
+    if let Some(notify) = reset_listener::RELOAD_NOTIFY.get() {
+        trace!("reloading connected clients");
+        notify.notify_waiters();
+    }
+}
+
+static RELOADERS: Mutex<Vec<Reloader>> = Mutex::new(Vec::new());
 
 #[cfg(feature = "live-reload")]
 impl Default for LiveReloadMiddleware {

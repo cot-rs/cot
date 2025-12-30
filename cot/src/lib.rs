@@ -76,6 +76,7 @@ pub mod config;
 mod error_page;
 #[macro_use]
 pub(crate) mod handler;
+pub(crate) mod hot_patching;
 pub mod html;
 #[cfg(feature = "json")]
 pub mod json;

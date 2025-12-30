@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use cot_core::request::{Request, RequestHead};
-use cot_core::router::Router;
+#[doc(inline)]
+pub use cot_core::router::{Route, Router, method::MethodRouter};
 
 use crate::request::RequestExt;
 

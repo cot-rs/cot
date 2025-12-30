@@ -17,8 +17,6 @@ use std::future::Future;
 use indexmap::IndexMap;
 
 use crate::impl_into_cot_error;
-use crate::request::extractors::FromRequestHead;
-
 pub mod extractors;
 mod path_params_deserializer;
 
@@ -35,7 +33,7 @@ pub struct RouteName(pub String);
 /// Path parameters extracted from the request URL, and available as a map of
 /// strings.
 ///
-/// This struct is meant to be mainly used using the [`PathParams::parse`]
+/// This struct is meant to be mainly used by the [`PathParams::parse`]
 /// method, which will deserialize the path parameters into a type `T`
 /// implementing `serde::DeserializeOwned`. If needed, you can also access the
 /// path parameters directly using the [`PathParams::get`] method.

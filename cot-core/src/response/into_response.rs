@@ -1,7 +1,8 @@
 use bytes::{Bytes, BytesMut};
 use http;
 
-use crate::headers::{OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
+use crate::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
+use crate::html::Html;
 use crate::response::Response;
 use crate::{Body, Error, StatusCode};
 
@@ -310,6 +311,30 @@ impl IntoResponse for crate::response::ResponseHead {
 impl IntoResponse for Body {
     fn into_response(self) -> crate::Result<Response> {
         Ok(Response::new(self))
+    }
+}
+
+impl IntoResponse for Html {
+    /// Create a new HTML response.
+    ///
+    /// This creates a new [`Response`] object with a content type of
+    /// `text/html; charset=utf-8` and given body.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot_core::html::Html;
+    /// use cot_core::response::IntoResponse;
+    ///
+    /// let html = Html::new("<div>Hello</div>");
+    ///
+    /// let response = html.into_response();
+    /// ```
+    fn into_response(self) -> crate::Result<Response> {
+        self.0
+            .into_response()
+            .with_content_type(HTML_CONTENT_TYPE)
+            .into_response()
     }
 }
 

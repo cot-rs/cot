@@ -31,11 +31,11 @@ use derive_more::with_trait::Debug;
 use tracing::debug;
 
 use crate::error::NotFound;
-use crate::handler::{into_box_request_handler, BoxRequestHandler, RequestHandler};
+use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
 use crate::request::{AppName, PathParams, Request, RequestHead, RouteName};
 use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
-use crate::{impl_into_cot_error, Error, Result};
+use crate::{Error, Result, impl_into_cot_error};
 
 pub mod method;
 pub mod path;
@@ -908,9 +908,9 @@ macro_rules! reverse_redirect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::StatusCode;
     use crate::request::Request;
     use crate::response::{IntoResponse, Response};
-    use crate::StatusCode;
 
     struct MockHandler;
 

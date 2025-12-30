@@ -84,13 +84,14 @@ pub(crate) mod utils;
 
 #[cfg(feature = "openapi")]
 pub use aide;
-pub use cot_core::error::error_impl::Error;
-pub use cot_core::handler::{BoxedHandler, RequestHandler};
 /// A type alias for a result that can return a [`cot::Error`].
 pub use cot_core::Result;
 /// A type alias for an HTTP status code.
 pub use cot_core::StatusCode;
-pub use cot_core::{Body, Method};
+pub use cot_core::error::error_impl::Error;
+pub use cot_core::handler::{BoxedHandler, RequestHandler};
+#[doc(inline)]
+pub use cot_core::{Body, Method, body, error, handler, headers, html};
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
 ///
@@ -156,8 +157,8 @@ pub use cot_macros::main;
 pub use cot_macros::test;
 #[cfg(feature = "openapi")]
 pub use schemars;
-pub use {bytes, cot_core as core, http};
+pub use {bytes, http};
 
 pub use crate::project::{
-    run, run_at, run_cli, App, AppBuilder, Bootstrapper, Project, ProjectContext,
+    App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };

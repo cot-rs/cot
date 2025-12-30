@@ -2,11 +2,11 @@
 
 use std::fmt::{Debug, Formatter};
 
+use crate::Method;
 use crate::error::MethodNotAllowed;
-use crate::handler::{into_box_request_handler, BoxRequestHandler, RequestHandler};
+use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
 use crate::request::Request;
 use crate::response::Response;
-use crate::Method;
 
 /// A router that routes requests based on the HTTP method.
 ///
@@ -420,8 +420,8 @@ mod tests {
     use cot::test::TestRequestBuilder;
 
     use super::*;
-    use crate::html::Html;
     use crate::StatusCode;
+    use crate::html::Html;
 
     async fn test_handler(method: Method) -> Html {
         Html::new(method.as_str())

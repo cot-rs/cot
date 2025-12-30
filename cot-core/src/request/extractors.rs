@@ -52,7 +52,7 @@ use std::future::Future;
 
 use serde::de::DeserializeOwned;
 
-pub use crate::request::{PathParams, Request, RequestHead};
+use crate::request::{PathParams, Request, RequestHead};
 use crate::{Body, Method};
 
 /// Trait for extractors that consume the request body.
@@ -267,7 +267,6 @@ impl FromRequestHead for Method {
 /// }
 /// ```
 pub use cot_macros::FromRequestHead;
-
 
 use crate::impl_into_cot_error;
 

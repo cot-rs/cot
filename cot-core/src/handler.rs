@@ -2,11 +2,11 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
-use crate::request::extractors::{FromRequest, FromRequestHead};
-use crate::request::Request;
-use crate::response::{IntoResponse, Response};
 use crate::Error;
 use crate::Result;
+use crate::request::Request;
+use crate::request::extractors::{FromRequest, FromRequestHead};
+use crate::response::{IntoResponse, Response};
 use tower::util::BoxCloneSyncService;
 
 /// A function that takes a request and returns a response.

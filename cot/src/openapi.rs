@@ -114,6 +114,8 @@ use aide::openapi::{
 use cot::router::Urls;
 use cot_core::handle_all_parameters;
 use cot_core::handler::BoxRequestHandler;
+#[doc(inline)]
+pub use cot_core::openapi::*;
 use cot_core::openapi::{AsApiOperation, RouteContext};
 use cot_core::request::extractors::{Path, UrlQuery};
 use cot_core::response::{Response, WithExtension};

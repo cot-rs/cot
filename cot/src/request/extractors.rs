@@ -6,9 +6,10 @@ use cot::form::{Form, FormResult};
 use cot::json::Json;
 use cot::router::Urls;
 use cot::session::Session;
-use cot_core::request::extractors::{FromRequest, FromRequestHead, RequestHead};
-use cot_core::request::Request;
-use cot_core::{impl_into_cot_error, Body};
+#[doc(inline)]
+pub use cot_core::request::extractors::{FromRequest, FromRequestHead};
+use cot_core::request::{Request, RequestHead};
+use cot_core::{Body, impl_into_cot_error};
 use serde::de::DeserializeOwned;
 
 use crate::request::RequestExt;

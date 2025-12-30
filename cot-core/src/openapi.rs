@@ -11,10 +11,10 @@ use std::pin::Pin;
 use aide::openapi::{Operation, PathItem};
 use schemars::SchemaGenerator;
 
+use crate::Method;
 use crate::handler::{BoxRequestHandler, RequestHandler};
 use crate::request::Request;
 use crate::response::Response;
-use crate::Method;
 
 /// Context for API route generation.
 ///

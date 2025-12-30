@@ -12,7 +12,7 @@ use derive_more::with_trait::Debug;
 use crate::request::extractors::FromRequestHead;
 use crate::request::{Request, RequestHead};
 use crate::response::Response;
-use crate::{handle_all_parameters, Error};
+use crate::{Error, handle_all_parameters};
 
 /// A trait for handling error pages in Cot applications.
 ///

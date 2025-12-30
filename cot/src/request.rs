@@ -2,12 +2,16 @@ use std::sync::Arc;
 
 use cot::db::Database;
 use cot::request::extractors::InvalidContentType;
-use cot_core::request::extractors::FromRequestHead;
-use cot_core::request::{PathParams, Request, RequestHead, RouteName};
 use cot_core::router::Router;
 use http::Extensions;
-
 pub mod extractors;
+
+#[doc(inline)]
+pub use cot_core::request::{
+    AppName, PathParams, PathParamsDeserializerError, Request, RequestHead, RouteName,
+};
+
+use crate::request::extractors::FromRequestHead;
 
 mod private {
     pub trait Sealed {}

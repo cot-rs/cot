@@ -9,6 +9,10 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+#[doc(inline)]
+pub use cot_core::middleware::{
+    IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer,
+};
 use cot_core::request::Request;
 use cot_core::response::Response;
 use futures_core::future::BoxFuture;

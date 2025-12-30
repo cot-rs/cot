@@ -2,14 +2,14 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use futures_util::TryFutureExt;
-use http_body_util::combinators::BoxBody;
 use http_body_util::BodyExt;
+use http_body_util::combinators::BoxBody;
 use tower::Service;
 
+use crate::Body;
 use crate::error::error_impl::Error;
 use crate::request::Request;
 use crate::response::Response;
-use crate::Body;
 
 /// Middleware that converts a any [`http::Response`] generic type to a
 /// [`crate::response::Response`].

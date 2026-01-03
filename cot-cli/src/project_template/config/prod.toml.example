@@ -15,3 +15,10 @@ cache_timeout = "1year"
 
 [middlewares.session.store]
 type = "database"
+
+[email.transport]
+type = "console"
+# Or:
+# type = "smtp"
+# url = "smtps://user:password@smtp.gmail.com"
+# mechanism = "plain"

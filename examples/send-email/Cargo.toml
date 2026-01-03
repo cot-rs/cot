@@ -1,0 +1,12 @@
+[package]
+name = "example-send-email"
+version = "0.1.0"
+publish = false
+description = "Send email - Cot example."
+license = "MIT OR Apache-2.0"
+edition = "2024"
+
+[dependencies]
+cot = { path = "../../cot", features = ["email", "live-reload"] }
+askama = "0.15"
+serde = { version = "1", features = ["derive"] }

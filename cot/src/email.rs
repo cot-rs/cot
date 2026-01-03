@@ -260,6 +260,12 @@ impl TryFrom<EmailMessage> for Message {
     }
 }
 
+#[derive(Debug)]
+struct EmailImpl {
+    #[debug("..")]
+    transport: Box<dyn BoxedTransport>,
+}
+
 /// A high-level email interface for sending emails.
 ///
 /// This struct wraps a [`Transport`] implementation and provides
@@ -287,8 +293,7 @@ impl TryFrom<EmailMessage> for Message {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Email {
-    #[debug("..")]
-    transport: Arc<dyn BoxedTransport>,
+    inner: Arc<EmailImpl>,
 }
 
 impl Email {
@@ -303,8 +308,10 @@ impl Email {
     /// let email = Email::new(Console::new());
     /// ```
     pub fn new(transport: impl Transport) -> Self {
-        let transport: Arc<dyn BoxedTransport> = Arc::new(transport);
-        Self { transport }
+        let transport: Box<dyn BoxedTransport> = Box::new(transport);
+        Self {
+            inner: Arc::new(EmailImpl { transport }),
+        }
     }
     /// Send a single [`EmailMessage`]
     ///
@@ -333,7 +340,8 @@ impl Email {
     /// }
     /// ```
     pub async fn send(&self, message: EmailMessage) -> EmailResult<()> {
-        self.transport
+        self.inner
+            .transport
             .send(&[message])
             .await
             .map_err(EmailError::Transport)
@@ -373,7 +381,8 @@ impl Email {
     /// }
     /// ```
     pub async fn send_multiple(&self, messages: &[EmailMessage]) -> EmailResult<()> {
-        self.transport
+        self.inner
+            .transport
             .send(messages)
             .await
             .map_err(EmailError::Transport)

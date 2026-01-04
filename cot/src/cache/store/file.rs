@@ -283,7 +283,23 @@ impl CacheStore for FileStore {
     }
 
     async fn approx_size(&self) -> CacheStoreResult<usize> {
-        todo!()
+        let mut entries = match tokio::fs::read_dir(&self.dir_path).await {
+            Ok(e) => e,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)).into()),
+        };
+
+        let mut total_size: usize = 0;
+
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if let Ok(meta) = entry.metadata().await {
+                if meta.is_file() {
+                    total_size += meta.len() as usize;
+                }
+            }
+        }
+
+        Ok(total_size)
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
@@ -293,6 +309,7 @@ impl CacheStore for FileStore {
 
 #[cfg(test)]
 mod tests {
+    use aide::IntoApi;
     use tempfile::tempdir;
 
     use crate::cache::store::CacheStore;
@@ -399,6 +416,33 @@ mod tests {
 
         assert!(path.is_dir(), "path must be dir");
         assert!(retrieved.is_none(), "retrieved value should not be Some");
+
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cot::test]
+    async fn test_approx_size() {
+        let path = make_store_path();
+
+        let store = FileStore::new(path.clone()).expect("failed to init store");
+        let key = "test_key".to_string();
+        let value = serde_json::json!({ "id": 1, "message": "hello world" });
+
+        store
+            .insert(key.clone(), value.clone(), Timeout::Never)
+            .await
+            .expect("failed to insert data to store");
+
+        let data_buffer: Vec<u8> =
+            serde_json::to_vec(&value).expect("failed to convert value into vector");
+        let data_length: usize = 8 + data_buffer.len(); // extra 8 for header size
+
+        let entry_length = store
+            .approx_size()
+            .await
+            .expect("failed to get approx file");
+
+        assert_eq!(data_length, entry_length);
 
         let _ = tokio::fs::remove_dir_all(&path).await;
     }

@@ -134,19 +134,16 @@ impl FileStore {
     }
 
     async fn read(&self, key: &str) -> CacheStoreResult<Option<Value>> {
-        let key_hash = self.create_key_hash(key);
-        let path = self.dir_path.join(&key_hash);
-        let mut file = match tokio::fs::OpenOptions::new().read(true).open(&path).await {
-            Ok(f) => f,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)).into()),
+        let (mut file, file_path) = match self.file_open(key).await? {
+            Some(f) => f,
+            None => return Ok(None),
         };
 
         match self.deserialize_data(&mut file).await? {
             Some(value) => Ok(Some(value)),
             None => {
                 // delete on expired when read
-                let _ = tokio::fs::remove_file(&path).await;
+                let _ = tokio::fs::remove_file(&file_path).await;
                 Ok(None)
             }
         }
@@ -233,6 +230,19 @@ impl FileStore {
 
         Ok((temp_file, temp_path))
     }
+
+    async fn file_open(
+        &self,
+        key: &str,
+    ) -> CacheStoreResult<Option<(tokio::fs::File, std::path::PathBuf)>> {
+        let key_hash = self.create_key_hash(key);
+        let path = self.dir_path.join(&key_hash);
+        match tokio::fs::OpenOptions::new().read(true).open(&path).await {
+            Ok(f) => Ok(Some((f, path))),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)).into()),
+        }
+    }
 }
 
 impl CacheStore for FileStore {
@@ -249,7 +259,13 @@ impl CacheStore for FileStore {
     }
 
     async fn remove(&self, key: &str) -> CacheStoreResult<()> {
-        todo!()
+        if let Some((_file, file_path)) = self.file_open(key).await? {
+            tokio::fs::remove_file(file_path)
+                .await
+                .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+        }
+
+        Ok(())
     }
 
     async fn clear(&self) -> CacheStoreResult<()> {
@@ -261,7 +277,7 @@ impl CacheStore for FileStore {
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
-        todo!()
+        Ok(self.file_open(key).await?.is_some())
     }
 }
 
@@ -325,6 +341,27 @@ mod tests {
             value,
             "retrieved value does not match inserted value"
         );
+
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cot::test]
+    async fn test_insert_and_read_after_delete_single() {
+        let path = make_store_path();
+
+        let store = FileStore::new(path.clone()).expect("failed to init store");
+        let key = "test_key".to_string();
+        let value = serde_json::json!({ "id": 1, "message": "hello world" });
+
+        store
+            .insert(key.clone(), value.clone(), Timeout::Never)
+            .await
+            .expect("failed to insert data to store");
+
+        store.remove(&key).await.expect("failed to delete entry");
+
+        let retrieved = store.read(&key).await.expect("failed to read from store");
+        assert!(retrieved.is_none(), "retrieved value should not be Some");
 
         let _ = tokio::fs::remove_dir_all(&path).await;
     }

@@ -269,7 +269,17 @@ impl CacheStore for FileStore {
     }
 
     async fn clear(&self) -> CacheStoreResult<()> {
-        todo!()
+        if let Err(e) = tokio::fs::remove_dir_all(&self.dir_path).await {
+            // if not found try to continue, don't dip
+            if e.kind() != std::io::ErrorKind::NotFound {
+                return Err(FileCacheStoreError::Io(Box::new(e)).into());
+            }
+        }
+        // even though write is self healing, this minimizes result variants on other methods
+        tokio::fs::create_dir_all(&self.dir_path)
+            .await
+            .map_err(|e| FileCacheStoreError::DirCreation(Box::new(e)))?;
+        Ok(())
     }
 
     async fn approx_size(&self) -> CacheStoreResult<usize> {
@@ -361,6 +371,33 @@ mod tests {
         store.remove(&key).await.expect("failed to delete entry");
 
         let retrieved = store.read(&key).await.expect("failed to read from store");
+        assert!(retrieved.is_none(), "retrieved value should not be Some");
+
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cot::test]
+    async fn test_clear_double_free() {
+        let path = make_store_path();
+
+        let store = FileStore::new(path.clone()).expect("failed to init store");
+        let key = "test_key".to_string();
+        let value = serde_json::json!({ "id": 1, "message": "hello world" });
+
+        store
+            .insert(key.clone(), value.clone(), Timeout::Never)
+            .await
+            .expect("failed to insert data to store");
+
+        store.clear().await.expect("failed to clear");
+        store
+            .clear()
+            .await
+            .expect("failed to clear the second time");
+
+        let retrieved = store.read(&key).await.expect("failed to read from store");
+
+        assert!(path.is_dir(), "path must be dir");
         assert!(retrieved.is_none(), "retrieved value should not be Some");
 
         let _ = tokio::fs::remove_dir_all(&path).await;

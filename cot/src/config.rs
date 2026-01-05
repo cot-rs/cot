@@ -1892,7 +1892,7 @@ pub enum EmailTransportTypeConfig {
         /// # TOML Configuration
         ///
         /// ```toml
-        /// [email]
+        /// [email.transport]
         /// type = "smtp"
         /// url = "smtp://johndoe:xxxx xxxx xxxx xxxx@smtp.gmail.com:587?tls=required"
         /// mechanism = "plain" # or "login", "xoauth2"
@@ -2014,11 +2014,11 @@ pub struct EmailConfig {
     /// # TOML Configuration
     ///
     /// ```toml
-    /// [email]
+    /// [email.transport]
     /// type = "console"
     ///
     /// # Or for SMTP:
-    /// # [email]
+    /// # [email.transport]
     /// # type = "smtp"
     /// # auth_id = "your_auth_id"
     /// # secret = "your_secret"

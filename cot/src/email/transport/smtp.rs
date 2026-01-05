@@ -104,10 +104,10 @@ impl From<Mechanism> for smtp::authentication::Mechanism {
 /// let email = cot::email::Email::new(smtp);
 ///
 /// let msg = EmailMessage::builder()
-///  .from(Email::try_from("testfrom@example.com").unwrap())
-///  .to(vec![Email::try_from("testreceipient@example.com").unwrap()])
-///  .body("This is a test email.")
-///  .build()?;
+///     .from(Email::try_from("testfrom@example.com").unwrap())
+///     .to(vec![Email::try_from("testreceipient@example.com").unwrap()])
+///     .body("This is a test email.")
+///     .build()?;
 /// email.send(msg).await?;
 /// # Ok(()) }
 #[derive(Debug, Clone)]

@@ -280,16 +280,16 @@ struct EmailImpl {
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
-///  let email = cot::email::Email::new(Console::new());
-///  let message = EmailMessage::builder()
+/// let email = cot::email::Email::new(Console::new());
+/// let message = EmailMessage::builder()
 ///     .from(Email::try_from("no-reply@example.com").unwrap())
 ///     .to(vec![Email::try_from("user@example.com").unwrap()])
 ///     .subject("Greetings")
 ///     .body("Hello from cot!")
 ///     .build()?;
-///  email.send(message).await?;
+/// email.send(message).await?;
 /// # Ok(())
-/// }
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Email {

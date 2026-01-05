@@ -38,13 +38,11 @@ pub enum FileCacheStoreError {
     Io(Box<dyn std::error::Error + Send + Sync>),
 
     // TODO: add more errors
-
-    // To fullfil trait
-    /// TODO: add docs
+    /// An error occured during data serialization
     #[error("{ERROR_PREFIX} serialization error: {0}")]
     Serialize(Box<dyn std::error::Error + Send + Sync>),
 
-    /// TODO: add docs
+    /// An error occured during data deserialization
     #[error("{ERROR_PREFIX} deserialization error: {0}")]
     Deserialize(Box<dyn std::error::Error + Send + Sync>),
 }
@@ -220,7 +218,7 @@ impl FileStore {
     ) -> CacheStoreResult<(tokio::fs::File, std::path::PathBuf)> {
         let temp_path = self.dir_path.join(format!("{}{TEMPFILE_SUFFIX}", key_hash));
 
-        let temp_file = tokio::fs::OpenOptions::new()
+        let temp_file = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
@@ -237,7 +235,7 @@ impl FileStore {
     ) -> CacheStoreResult<Option<(tokio::fs::File, std::path::PathBuf)>> {
         let key_hash = self.create_key_hash(key);
         let path = self.dir_path.join(&key_hash);
-        match tokio::fs::OpenOptions::new().read(true).open(&path).await {
+        match OpenOptions::new().read(true).open(&path).await {
             Ok(f) => Ok(Some((f, path))),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)).into()),
@@ -309,7 +307,6 @@ impl CacheStore for FileStore {
 
 #[cfg(test)]
 mod tests {
-    use aide::IntoApi;
     use tempfile::tempdir;
 
     use crate::cache::store::CacheStore;

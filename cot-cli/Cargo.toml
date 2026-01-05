@@ -1,6 +1,6 @@
 [package]
 name = "cot-cli"
-version = "0.4.0"
+version = "0.5.0"
 description = "The Rust web framework for lazy developers - CLI tool."
 categories = ["command-line-utilities", "web-programming"]
 edition.workspace = true

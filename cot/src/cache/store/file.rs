@@ -301,7 +301,21 @@ impl CacheStore for FileStore {
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
-        Ok(self.file_open(key).await?.is_some())
+        let Ok(Some(mut file_tuple)) = self.file_open(key).await else {
+            return Ok(false);
+        };
+
+        // cache eviction on contains_key() based on TTL
+        // currently parse the whole data, but can be optimized by checking TTL only
+        if self.deserialize_data(&mut file_tuple.0).await.is_ok() {
+            return Ok(true);
+        }
+
+        tokio::fs::remove_file(&file_tuple.1)
+            .await
+            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+
+        Ok(false)
     }
 }
 

@@ -345,8 +345,8 @@ mod tests {
     use chrono::Utc;
     use tempfile::tempdir;
 
-    use crate::cache::store::CacheStore;
-    use crate::cache::store::file::FileStore;
+    use crate::cache::store::file::{FileCacheStoreError, FileStore};
+    use crate::cache::store::{CacheStore, CacheStoreError};
     use crate::config::Timeout;
 
     fn make_store_path() -> std::path::PathBuf {
@@ -536,5 +536,47 @@ mod tests {
         assert_eq!(size, 0);
 
         let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cot::test]
+    async fn test_from_file_cache_store_error_to_cache_store_error() {
+        let file_error = FileCacheStoreError::Io(Box::new(std::io::Error::other("disk failure")));
+        let cache_error: CacheStoreError = file_error.into();
+        assert_eq!(
+            cache_error.to_string(),
+            "cache store error: backend error: file based cache store error: file io error: disk failure"
+        );
+
+        let file_error =
+            FileCacheStoreError::Serialize(Box::new(std::io::Error::other("json fail")));
+        let cache_error: CacheStoreError = file_error.into();
+        assert_eq!(
+            cache_error.to_string(),
+            "cache store error: serialization error: file based cache store error: serialization error: json fail"
+        );
+
+        let file_error =
+            FileCacheStoreError::Deserialize(Box::new(std::io::Error::other("corrupt header")));
+        let cache_error: CacheStoreError = file_error.into();
+        assert_eq!(
+            cache_error.to_string(),
+            "cache store error: deserialization error: file based cache store error: deserialization error: corrupt header"
+        );
+
+        let file_error =
+            FileCacheStoreError::DirCreation(Box::new(std::io::Error::other("permission denied")));
+        let cache_error: CacheStoreError = file_error.into();
+        assert_eq!(
+            cache_error.to_string(),
+            "cache store error: backend error: file based cache store error: file dir creation error: permission denied"
+        );
+
+        let file_error =
+            FileCacheStoreError::TempFileCreation(Box::new(std::io::Error::other("no space left")));
+        let cache_error: CacheStoreError = file_error.into();
+        assert_eq!(
+            cache_error.to_string(),
+            "cache store error: backend error: file based cache store error: file temp file creation error: no space left"
+        );
     }
 }

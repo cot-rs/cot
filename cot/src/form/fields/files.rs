@@ -5,6 +5,7 @@ use bytes::Bytes;
 use cot::form::{AsFormField, FormFieldValidationError};
 use cot::html::HtmlTag;
 
+use crate::form::fields::attrs::Capture;
 use crate::form::{FormField, FormFieldOptions, FormFieldValue, FormFieldValueError};
 
 #[derive(Debug)]
@@ -64,6 +65,8 @@ pub struct FileFieldOptions {
     ///
     /// [`accept` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/file#limiting_accepted_file_types
     pub accept: Option<Vec<String>>,
+    /// The [`Capture`] attribute specifies the source of the file input.
+    pub capture: Option<Capture>,
 }
 
 impl Display for FileField {
@@ -76,6 +79,10 @@ impl Display for FileField {
         }
         if let Some(accept) = &self.custom_options.accept {
             tag.attr("accept", accept.join(","));
+        }
+
+        if let Some(capture) = self.custom_options.capture {
+            tag.attr("capture", capture.to_string());
         }
 
         write!(f, "{}", tag.render())
@@ -161,6 +168,7 @@ mod tests {
             },
             FileFieldOptions {
                 accept: Some(vec!["image/*".to_string(), ".pdf".to_string()]),
+                capture: Some(Capture::Environment),
             },
         );
 
@@ -169,6 +177,7 @@ mod tests {
         assert!(html.contains("type=\"file\""));
         assert!(html.contains("required"));
         assert!(html.contains("accept=\"image/*,.pdf\""));
+        assert!(html.contains("capture=\"environment\""));
     }
 
     #[test]
@@ -179,7 +188,10 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FileFieldOptions { accept: None },
+            FileFieldOptions {
+                accept: None,
+                capture: Some(Capture::User),
+            },
         );
 
         let html = field.to_string();
@@ -187,6 +199,7 @@ mod tests {
         assert!(html.contains("type=\"file\""));
         assert!(html.contains("required"));
         assert!(!html.contains("accept="));
+        assert!(html.contains("capture=\"user\""));
     }
 
     #[cot::test]
@@ -197,7 +210,9 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FileFieldOptions { accept: None },
+            FileFieldOptions {
+                ..Default::default()
+            },
         );
 
         let boundary = "boundary";
@@ -232,7 +247,9 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FileFieldOptions { accept: None },
+            FileFieldOptions {
+                ..Default::default()
+            },
         );
 
         let value = InMemoryUploadedFile::clean_value(&field);

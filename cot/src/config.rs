@@ -1825,7 +1825,7 @@ impl Default for SessionMiddlewareConfig {
     }
 }
 
-/// The type of email backend to use.
+/// The type of email transport backend to use.
 ///
 /// This specifies what email backend is used for sending emails.
 /// The default backend if not specified is `console`.
@@ -1834,14 +1834,14 @@ impl Default for SessionMiddlewareConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum EmailTransportTypeConfig {
-    /// Console email transport.
+    /// Console email transport backend.
     ///
     /// This is a convenient transport backend for development and testing that
     /// simply prints the email contents to the console instead of actually
     /// sending them.
     #[default]
     Console,
-    /// SMTP email backend.
+    /// SMTP email transport backend.
     ///
     /// This transport backend sends emails using the Simple Mail Transfer
     /// Protocol (SMTP). It requires authentication details and server

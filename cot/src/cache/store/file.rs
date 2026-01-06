@@ -1,9 +1,34 @@
-//! File based cache store implementation.
+//! File-based cache store implementation.
 //!
-//! This implementation uses file system for caching
+//! This store uses the local file system as the backend for caching. It provides
+//! atomic writes via sync-then-rename and active validation for TTL-based expiration.
 //!
-//! TODO: add example
-
+//! # Examples
+//!
+//! ```no_run
+//! # use cot::cache::store::file::FileStore;
+//! # use cot::cache::store::{CacheStore, Timeout};
+//! # use std::path::PathBuf;
+//! # #[tokio::main]
+//! # async fn main() {
+//! let path = PathBuf::from("./cache_data");
+//! let store = FileStore::new(path).expect("Failed to initialize store");
+//!
+//! let key = "example_key".to_string();
+//! let value = serde_json::json!({"data": "example_value"});
+//!
+//! store.insert(key.clone(), value.clone(), Default::default()).await.unwrap();
+//!
+//! let retrieved = store.get(&key).await.unwrap();
+//! assert_eq!(retrieved, Some(value));
+//!
+//! # }
+//! ```
+//!
+//! # Expiration Policy
+//!
+//! Cache files are evicted on `contains_key` and `get`.
+//! No background collector is implemented.
 use chrono::{DateTime, Utc};
 use md5::{Digest, Md5};
 use std::borrow::Cow;
@@ -60,19 +85,45 @@ impl From<FileCacheStoreError> for CacheStoreError {
     }
 }
 
-/// File based cache store implementation
+/// A file-backed cache store implementation.
 ///
-/// This implementation uses file system for caching
+/// This store uses the local file system for caching.
 ///
-/// TODO: add example
-
+/// # Examples
+/// ```no_run
+/// use cot::cache::store::file::FileStore;
+/// use std::path::Path;
+///
+/// let store = FileStore::new(Path::new("./cache_dir")).unwrap();
+/// ```
 #[derive(Debug, Clone)]
 pub struct FileStore {
     dir_path: Cow<'static, Path>,
 }
 
 impl FileStore {
-    /// TODO: add docs
+    /// Creates a new `FileStore` at the specified directory.
+    ///
+    /// This will attempt to create the directory and its parents if they do not exist.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FileCacheStoreError::DirCreation`] if the directory cannot be created
+    /// due to permissions or other I/O issues.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::cache::store::file::FileStore;
+    /// use std::path::PathBuf;
+    ///
+    /// // Using a string slice
+    /// let store = FileStore::new("./cache").unwrap();
+    ///
+    /// // Using a PathBuf
+    /// let path = PathBuf::from("/var/lib/myapp/cache");
+    /// let store = FileStore::new(path).unwrap();
+    /// ```
     pub fn new(dir: impl Into<Cow<'static, Path>>) -> CacheStoreResult<Self> {
         let dir_path = dir.into();
 

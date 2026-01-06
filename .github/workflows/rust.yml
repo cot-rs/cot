@@ -60,9 +60,9 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - rust: stable
-            version: RUST_STABLE_VERSION
+            version: ${{ env.RUST_STABLE_VERSION }}
           - rust: nightly
-            version: RUST_NIGHTLY_VERSION
+            version: ${{ env.RUST_NIGHTLY_VERSION }}
           - rust: MSRV
             version: "1.88" # MSRV
 
@@ -151,7 +151,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # cot_macros ui tests require nightly
-          toolchain: RUST_NIGHTLY_VERSION
+          toolchain: ${{ env.RUST_NIGHTLY_VERSION }}
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -197,7 +197,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # branch coverage is currently optional and requires nightly
-          toolchain: RUST_NIGHTLY_VERSION
+          toolchain: ${{ env.RUST_NIGHTLY_VERSION }}
           components: llvm-tools-preview
 
       - name: Reclaim disk space
@@ -250,7 +250,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # nightly-only rustfmt settings
-          toolchain: RUST_NIGHTLY_VERSION
+          toolchain: ${{ env.RUST_NIGHTLY_VERSION }}
           components: rustfmt
 
       - name: Cache Cargo registry
@@ -301,7 +301,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # the `-Z` flag is only accepted on the nightly channel of Cargo
-          toolchain: RUST_NIGHTLY_VERSION
+          toolchain: ${{ env.RUST_NIGHTLY_VERSION }}
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -370,7 +370,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # miri requires nightly
-          toolchain: RUST_NIGHTLY_VERSION
+          toolchain: ${{ env.RUST_NIGHTLY_VERSION }}
           components: miri
 
       - name: Cache Cargo registry

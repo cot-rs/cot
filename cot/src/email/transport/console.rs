@@ -246,7 +246,6 @@ mod tests {
     }
 
     #[cot::test]
-    #[expect(clippy::default_constructed_unit_structs)]
     async fn display_minimal_message_renders_placeholders_and_omits_optional_headers() {
         let msg = EmailMessage::builder()
             .from(Addr::new("sender@example.com").unwrap())

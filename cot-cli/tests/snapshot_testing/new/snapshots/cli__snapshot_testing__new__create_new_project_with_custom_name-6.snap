@@ -8,7 +8,7 @@ info:
     - "--name"
     - my_project
     - "-vvvvv"
-    - /var/folders/xy/x4cxwym16gdddzy9qmvfngl80000gn/T/cot-test-HPo3ol/project
+    - /tmp/cot-test-sFO2nz/project
 ---
 success: true
 exit_code: 0

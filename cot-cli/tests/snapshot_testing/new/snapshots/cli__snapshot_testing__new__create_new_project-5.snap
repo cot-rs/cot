@@ -6,7 +6,7 @@ info:
   args:
     - new
     - "-vvvv"
-    - /var/folders/xy/x4cxwym16gdddzy9qmvfngl80000gn/T/cot-test-JQ0H2S/project
+    - /tmp/cot-test-s3CCv5/project
 ---
 success: true
 exit_code: 0

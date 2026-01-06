@@ -14,6 +14,8 @@ env:
   CI: true
   SCCACHE_GHA_ENABLED: true
   RUSTC_WRAPPER: sccache
+  RUST_NIGHTLY_VERSION: nightly-2025-11-11
+  RUST_STABLE_VERSION: stable
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
@@ -58,9 +60,9 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - rust: stable
-            version: stable
+            version: RUST_STABLE_VERSION
           - rust: nightly
-            version: nightly-2025-11-11
+            version: RUST_NIGHTLY_VERSION
           - rust: MSRV
             version: "1.88" # MSRV
 
@@ -149,7 +151,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # cot_macros ui tests require nightly
-          toolchain: nightly-2025-11-11
+          toolchain: RUST_NIGHTLY_VERSION
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -195,7 +197,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # branch coverage is currently optional and requires nightly
-          toolchain: nightly-2025-11-11
+          toolchain: RUST_NIGHTLY_VERSION
           components: llvm-tools-preview
 
       - name: Reclaim disk space
@@ -248,7 +250,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # nightly-only rustfmt settings
-          toolchain: nightly-2025-11-11
+          toolchain: RUST_NIGHTLY_VERSION
           components: rustfmt
 
       - name: Cache Cargo registry
@@ -299,7 +301,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # the `-Z` flag is only accepted on the nightly channel of Cargo
-          toolchain: nightly-2025-11-11
+          toolchain: RUST_NIGHTLY_VERSION
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -368,7 +370,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # miri requires nightly
-          toolchain: nightly-2025-11-11
+          toolchain: RUST_NIGHTLY_VERSION
           components: miri
 
       - name: Cache Cargo registry

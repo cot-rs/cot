@@ -16,7 +16,7 @@
 //! # #[tokio::main]
 //! # async fn main() -> cot::Result<()>{
 //! let email = cot::email::Email::new(Console::new());
-//! let recipients = vec![Email::try_from("testreceipient@example.com").unwrap()];
+//! let recipients = vec![Email::try_from("testrecipient@example.com").unwrap()];
 //! let msg = EmailMessage::builder()
 //!     .from(Email::try_from("no-reply@example.com").unwrap())
 //!     .to(vec![Email::try_from("user@example.com").unwrap()])

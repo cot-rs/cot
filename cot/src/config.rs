@@ -1853,7 +1853,7 @@ pub enum EmailTransportTypeConfig {
         /// domain for connecting to the SMTP server.
         ///
         /// The URL format is:
-        /// `scheme://user:password@host:port/?ehlo_domain=domain?tls=TLS`.
+        /// `scheme://user:password@host:port/?ehlo_domain=domain&tls=TLS`.
         ///
         /// `user`(username) and `password` are optional in the case the
         /// server does not require authentication.

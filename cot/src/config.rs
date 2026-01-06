@@ -261,7 +261,7 @@ pub struct ProjectConfig {
     ///
     /// let config = ProjectConfig::from_toml(
     ///     r#"
-    /// [email.backend]
+    /// [email.transport]
     /// type = "console"
     /// "#,
     /// )?;
@@ -1832,6 +1832,7 @@ impl Default for SessionMiddlewareConfig {
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum EmailTransportTypeConfig {
     /// Console email transport.
     ///

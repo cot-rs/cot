@@ -46,7 +46,7 @@ pub enum ConsoleError {
 
 impl From<ConsoleError> for TransportError {
     fn from(err: ConsoleError) -> Self {
-        TransportError::Backend(err.to_string())
+        TransportError::Backend(Box::new(err))
     }
 }
 
@@ -60,6 +60,7 @@ impl From<ConsoleError> for TransportError {
 /// let console_transport = Console::new();
 /// ```
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct Console;
 
 impl Console {

@@ -3,6 +3,7 @@
 //! It provides a `Transport` trait that can be implemented by different email
 //! backends (e.g., SMTP, console). The module also defines error handling for
 //! transport operations.
+use std::error::Error as StdError;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -23,7 +24,7 @@ const ERROR_PREFIX: &str = "email transport error:";
 pub enum TransportError {
     /// The underlying transport backend returned an error.
     #[error("{ERROR_PREFIX} transport error: {0}")]
-    Backend(String),
+    Backend(Box<dyn StdError + Send + Sync + 'static>),
     /// Failed to build the email message.
     #[error("{ERROR_PREFIX} message build error: {0}")]
     MessageBuildError(#[from] EmailMessageError),

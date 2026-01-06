@@ -27,14 +27,13 @@
 
 pub mod transport;
 
+use std::error::Error as StdError;
 use std::sync::Arc;
 
 use cot::config::{EmailConfig, EmailTransportTypeConfig};
 use cot::email::transport::smtp::Smtp;
 use derive_builder::Builder;
 use derive_more::with_trait::Debug;
-use lettre::message::header::ContentType;
-use lettre::message::{Attachment, Body, Mailbox, Message, MultiPart, SinglePart};
 use thiserror::Error;
 use transport::{BoxedTransport, Transport};
 
@@ -52,9 +51,6 @@ pub enum EmailError {
     /// An error occurred in the transport layer while sending the email.
     #[error(transparent)]
     Transport(TransportError),
-    /// An error occurred while building the email message.
-    #[error("{ERROR_PREFIX} message error: {0}")]
-    Message(String),
 }
 
 impl_into_cot_error!(EmailError);
@@ -173,92 +169,21 @@ impl EmailMessageBuilder {
 }
 
 /// Errors that can occur while building an email message.
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum EmailMessageError {
     /// An invalid email address was provided.
     #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} invalid email address: {0}")]
-    InvalidEmailAddress(String),
+    InvalidEmailAddress(Box<dyn StdError + Send + Sync + 'static>),
     /// Failed to build the email message.
     #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} failed to build email message: {0}")]
-    BuildError(String),
+    BuildError(Box<dyn StdError + Send + Sync + 'static>),
     /// A required field is missing in the email message.
     #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} The `{0}` field is required but was not set")]
     MissingField(String),
 }
 
 impl_into_cot_error!(EmailMessageError);
-
-impl TryFrom<EmailMessage> for Message {
-    type Error = EmailMessageError;
-
-    fn try_from(message: EmailMessage) -> Result<Self, Self::Error> {
-        let from_mailbox = message
-            .from
-            .email()
-            .as_str()
-            .parse::<Mailbox>()
-            .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
-
-        let mut builder = Message::builder()
-            .from(from_mailbox)
-            .subject(message.subject);
-
-        for to in message.to {
-            let mb = to
-                .email()
-                .as_str()
-                .parse::<Mailbox>()
-                .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
-            builder = builder.to(mb);
-        }
-
-        for cc in message.cc {
-            let mb = cc
-                .email()
-                .as_str()
-                .parse::<Mailbox>()
-                .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
-            builder = builder.cc(mb);
-        }
-
-        for bcc in message.bcc {
-            let mb = bcc
-                .email()
-                .as_str()
-                .parse::<Mailbox>()
-                .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
-            builder = builder.bcc(mb);
-        }
-
-        for r in message.reply_to {
-            let mb = r
-                .email()
-                .as_str()
-                .parse::<Mailbox>()
-                .map_err(|err| EmailMessageError::InvalidEmailAddress(err.to_string()))?;
-            builder = builder.reply_to(mb);
-        }
-
-        let mut mixed = MultiPart::mixed().singlepart(SinglePart::plain(message.body));
-
-        for attach in message.attachments {
-            let mime: ContentType = attach.content_type.parse().unwrap_or_else(|_| {
-                "application/octet-stream"
-                    .parse()
-                    .expect("could not parse default mime type")
-            });
-
-            let part = Attachment::new(attach.filename).body(Body::new(attach.data), mime);
-            mixed = mixed.singlepart(part);
-        }
-
-        let email = builder
-            .multipart(mixed)
-            .map_err(|err| EmailMessageError::BuildError(err.to_string()))?;
-        Ok(email)
-    }
-}
 
 #[derive(Debug)]
 struct EmailImpl {
@@ -274,9 +199,9 @@ struct EmailImpl {
 /// # Examples
 ///
 /// ```
+/// use cot::common_types::Email;
 /// use cot::email::EmailMessage;
 /// use cot::email::transport::console::Console;
-/// use cot::common_types::Email;
 ///
 /// # #[tokio::main]
 /// # async fn main() -> cot::Result<()> {
@@ -322,22 +247,22 @@ impl Email {
     /// # Examples
     ///
     /// ```
+    /// use cot::common_types::Email;
     /// use cot::email::EmailMessage;
     /// use cot::email::transport::console::Console;
-    /// use cot::common_types::Email;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    ///  let email = cot::email::Email::new(Console::new());
-    ///  let message = EmailMessage::builder()
+    /// let email = cot::email::Email::new(Console::new());
+    /// let message = EmailMessage::builder()
     ///     .from(Email::try_from("no-reply@example.com").unwrap())
     ///     .to(vec![Email::try_from("user@example.com").unwrap()])
     ///     .subject("Greetings")
     ///     .body("Hello from cot!")
     ///     .build()?;
-    ///  email.send(message).await?;
+    /// email.send(message).await?;
     /// # Ok(())
-    /// }
+    /// # }
     /// ```
     pub async fn send(&self, message: EmailMessage) -> EmailResult<()> {
         self.inner
@@ -356,29 +281,29 @@ impl Email {
     /// # Examples
     ///
     /// ```
+    /// use cot::common_types::Email;
     /// use cot::email::EmailMessage;
     /// use cot::email::transport::console::Console;
-    /// use cot::common_types::Email;
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    ///  let email = cot::email::Email::new(Console::new());
-    ///  let message1 = EmailMessage::builder()
+    /// let email = cot::email::Email::new(Console::new());
+    /// let message1 = EmailMessage::builder()
     ///     .from(Email::try_from("no-reply@email.com").unwrap())
     ///     .to(vec![Email::try_from("user1@example.com").unwrap()])
     ///     .subject("Hello User 1")
     ///     .body("This is the first email.")
     ///     .build()?;
     ///
-    ///  let message2 = EmailMessage::builder()
+    /// let message2 = EmailMessage::builder()
     ///     .from(Email::try_from("no-reply@email.com").unwrap())
     ///     .to(vec![Email::try_from("user2@example.com").unwrap()])
     ///     .subject("Hello User 2")
     ///     .body("This is the second email.")
     ///     .build()?;
-    ///  email.send_multiple(&[message1, message2]).await?;
+    /// email.send_multiple(&[message1, message2]).await?;
     /// # Ok(())
-    /// }
+    /// # }
     /// ```
     pub async fn send_multiple(&self, messages: &[EmailMessage]) -> EmailResult<()> {
         self.inner
@@ -532,89 +457,5 @@ mod tests {
             .build()
             .unwrap();
         assert!(email.send_multiple(&[msg1, msg2]).await.is_ok());
-    }
-
-    #[cot::test]
-    async fn try_from_basic_converts_and_contains_headers() {
-        let msg = EmailMessage::builder()
-            .from(crate::common_types::Email::new("from@example.com").unwrap())
-            .to(vec![
-                crate::common_types::Email::new("to@example.com").unwrap(),
-            ])
-            .subject("Hello World")
-            .body("This is the body.")
-            .build()
-            .unwrap();
-
-        let built: Message = Message::try_from(msg).expect("conversion to lettre::Message");
-
-        let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
-
-        assert!(formatted.contains("From: from@example.com"),);
-        assert!(formatted.contains("To: to@example.com"),);
-        assert!(formatted.contains("Subject: Hello World"),);
-        assert!(formatted.contains("Content-Type: multipart/mixed"),);
-        assert!(formatted.contains("This is the body."),);
-    }
-
-    #[cot::test]
-    async fn try_from_includes_cc_and_reply_to_headers() {
-        let msg = EmailMessage::builder()
-            .from(crate::common_types::Email::new("sender@example.com").unwrap())
-            .to(vec![
-                crate::common_types::Email::new("primary@example.com").unwrap(),
-            ])
-            .cc(vec![
-                crate::common_types::Email::new("cc1@example.com").unwrap(),
-                crate::common_types::Email::new("cc2@example.com").unwrap(),
-            ])
-            .bcc(vec![
-                crate::common_types::Email::new("hidden@example.com").unwrap(),
-            ])
-            .reply_to(vec![
-                crate::common_types::Email::new("replyto@example.com").unwrap(),
-            ])
-            .subject("Headers Test")
-            .body("Body")
-            .build()
-            .unwrap();
-
-        let built: Message = Message::try_from(msg).expect("conversion to lettre::Message");
-        let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
-
-        assert!(
-            formatted.contains("Cc: cc1@example.com, cc2@example.com")
-                || (formatted.contains("Cc: cc1@example.com")
-                    && formatted.contains("cc2@example.com")),
-        );
-        assert!(formatted.contains("Reply-To: replyto@example.com"),);
-    }
-
-    #[cot::test]
-    async fn try_from_with_attachment_uses_default_mime_on_parse_failure() {
-        let attachment = AttachmentData {
-            filename: "report.bin".to_string(),
-            content_type: "this/is not a valid mime".to_string(),
-            data: vec![0xDE, 0xAD, 0xBE, 0xEF],
-        };
-
-        let msg = EmailMessage::builder()
-            .from(crate::common_types::Email::new("sender@example.com").unwrap())
-            .to(vec![
-                crate::common_types::Email::new("to@example.com").unwrap(),
-            ])
-            .subject("Attachment Test")
-            .body("Please see attachment")
-            .attachments(vec![attachment])
-            .build()
-            .unwrap();
-
-        let built: Message = Message::try_from(msg).expect("conversion to lettre::Message");
-        let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
-
-        assert!(formatted.contains("Content-Disposition: attachment"),);
-        assert!(formatted.contains("report.bin"),);
-        assert!(formatted.contains("Content-Type: application/octet-stream"),);
-        assert!(formatted.contains("Please see attachment"));
     }
 }

@@ -37,7 +37,6 @@ pub enum FileCacheStoreError {
     #[error("{ERROR_PREFIX} file io error: {0}")]
     Io(Box<dyn std::error::Error + Send + Sync>),
 
-    // TODO: add more errors
     /// An error occured during data serialization
     #[error("{ERROR_PREFIX} serialization error: {0}")]
     Serialize(Box<dyn std::error::Error + Send + Sync>),
@@ -322,12 +321,12 @@ impl CacheStore for FileStore {
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
-        let Ok(Some(mut file_tuple)) = self.file_open(key).await else {
+        let Ok(Some(mut file_tuple)) = self.file_open(&key).await else {
             return Ok(false);
         };
 
         // cache eviction on contains_key() based on TTL
-        if self.parse_expiry(&mut file_tuple.0).await.is_ok() {
+        if let true = self.parse_expiry(&mut file_tuple.0).await? {
             return Ok(true);
         }
 
@@ -341,6 +340,9 @@ impl CacheStore for FileStore {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use chrono::Utc;
     use tempfile::tempdir;
 
     use crate::cache::store::CacheStore;
@@ -474,6 +476,64 @@ mod tests {
             .expect("failed to get approx file");
 
         assert_eq!(data_length, entry_length);
+
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cot::test]
+    async fn test_contains_key() {
+        let path = make_store_path();
+
+        let store = FileStore::new(path.clone()).expect("failed to init store");
+        let key = "test_key".to_string();
+        let value = serde_json::json!({ "id": 1, "message": "hello world" });
+
+        store
+            .insert(key.clone(), value.clone(), Timeout::Never)
+            .await
+            .expect("failed to insert data to store");
+
+        let exist = store
+            .contains_key(&key)
+            .await
+            .expect("failed to check key existence");
+
+        assert!(exist);
+
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cot::test]
+    async fn test_expiration_integrity() {
+        let path = make_store_path();
+
+        let store = FileStore::new(path.clone()).expect("failed to init store");
+        let key = "test_key".to_string();
+        let value = serde_json::json!({ "id": 1, "message": "hello world" });
+
+        let past = Utc::now() - Duration::from_secs(1);
+        let past_fixed = past.fixed_offset();
+        let expiry = Timeout::AtDateTime(past_fixed);
+
+        store
+            .insert(key.clone(), value.clone(), expiry)
+            .await
+            .expect("failed to insert data to store");
+
+        // test file is None
+        let retrieved = store.get(&key).await.expect("failed to read from store");
+        assert!(retrieved.is_none());
+
+        // test file doesn't exist
+        let exist = store
+            .contains_key(&key)
+            .await
+            .expect("failed to check key existence");
+        assert!(!exist);
+
+        // test size is 0
+        let size = store.approx_size().await.expect("failed to check size");
+        assert_eq!(size, 0);
 
         let _ = tokio::fs::remove_dir_all(&path).await;
     }

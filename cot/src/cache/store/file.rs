@@ -9,7 +9,7 @@ use md5::{Digest, Md5};
 use std::borrow::Cow;
 use std::path::Path;
 use tokio::fs::OpenOptions;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 
 use serde_json::Value;
 use thiserror::Error;
@@ -173,10 +173,7 @@ impl FileStore {
         Ok(buffer)
     }
 
-    async fn deserialize_data(
-        &self,
-        file: &mut tokio::fs::File,
-    ) -> CacheStoreResult<Option<Value>> {
+    async fn parse_expiry(&self, file: &mut tokio::fs::File) -> CacheStoreResult<bool> {
         let mut header: [u8; 8] = [0; 8];
 
         let _ = file
@@ -198,10 +195,34 @@ impl FileStore {
         };
 
         if expiry.is_expired(None) {
-            return Ok(None);
+            return Ok(false);
+        }
+
+        // This may look inefficient, but this ensures portability
+        // By making this method reset its own cursor,
+        // the logic is reusable without the risk of forgetting to reset cursor
+        file.seek(SeekFrom::Start(0))
+            .await
+            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+
+        Ok(true)
+    }
+
+    async fn deserialize_data(
+        &self,
+        file: &mut tokio::fs::File,
+    ) -> CacheStoreResult<Option<Value>> {
+        match self.parse_expiry(file).await? {
+            true => {}
+            false => return Ok(None),
         }
 
         let mut buffer = Vec::new();
+
+        // advances cursor by the expiry header offset
+        file.seek(SeekFrom::Start(8))
+            .await
+            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
         file.read_to_end(&mut buffer)
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
@@ -306,8 +327,7 @@ impl CacheStore for FileStore {
         };
 
         // cache eviction on contains_key() based on TTL
-        // currently parse the whole data, but can be optimized by checking TTL only
-        if self.deserialize_data(&mut file_tuple.0).await.is_ok() {
+        if self.parse_expiry(&mut file_tuple.0).await.is_ok() {
             return Ok(true);
         }
 

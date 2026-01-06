@@ -171,13 +171,13 @@ impl EmailMessageBuilder {
 #[non_exhaustive]
 pub enum EmailMessageError {
     /// An invalid email address was provided.
-    #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} invalid email address: {0}")]
+    #[error("{ERROR_PREFIX} invalid email address: {0}")]
     InvalidEmailAddress(Box<dyn StdError + Send + Sync + 'static>),
     /// Failed to build the email message.
-    #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} failed to build email message: {0}")]
+    #[error("{ERROR_PREFIX} failed to build email message: {0}")]
     BuildError(Box<dyn StdError + Send + Sync + 'static>),
     /// A required field is missing in the email message.
-    #[error("{EMAIL_MESSAGE_BUILD_ERROR_PREFIX} The `{0}` field is required but was not set")]
+    #[error("{ERROR_PREFIX} The `{0}` field is required but was not set")]
     MissingField(String),
 }
 

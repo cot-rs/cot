@@ -116,7 +116,10 @@ use cot_core::handler::BoxRequestHandler;
 use cot_core::impl_as_openapi_operation;
 use cot_core::openapi::add_query_param;
 #[doc(inline)]
-pub use cot_core::openapi::{RouteContext, AsApiRoute, BoxApiEndpointRequestHandler, AsApiOperation, into_box_api_endpoint_request_handler, method, ApiOperationPart, ApiOperationResponse};
+pub use cot_core::openapi::{
+    ApiOperationPart, ApiOperationResponse, AsApiOperation, AsApiRoute,
+    BoxApiEndpointRequestHandler, RouteContext, into_box_api_endpoint_request_handler, method,
+};
 use cot_core::request::extractors::{Path, UrlQuery};
 use cot_core::response::{Response, WithExtension};
 /// Derive macro for the [`ApiOperationResponse`] trait.
@@ -313,7 +316,6 @@ impl<T> AsApiOperation for NoApi<T> {
     }
 }
 
-
 impl ApiOperationPart for Urls {}
 impl ApiOperationPart for Session {}
 impl ApiOperationPart for Auth {}
@@ -343,7 +345,6 @@ impl<D: JsonSchema> ApiOperationPart for Json<D> {
         }));
     }
 }
-
 
 impl<F: Form + JsonSchema> ApiOperationPart for RequestForm<F> {
     fn modify_api_operation(
@@ -381,7 +382,6 @@ impl<F: Form + JsonSchema> ApiOperationPart for RequestForm<F> {
         }
     }
 }
-
 
 impl<S: JsonSchema> ApiOperationResponse for Json<S> {
     fn api_operation_responses(

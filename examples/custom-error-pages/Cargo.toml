@@ -9,4 +9,3 @@ edition = "2024"
 [dependencies]
 askama = "0.14"
 cot = { path = "../../cot" }
-cot_core = { path = "../../cot-core" }

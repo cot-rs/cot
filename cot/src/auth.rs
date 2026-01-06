@@ -13,11 +13,11 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::error::error_impl::impl_into_cot_error;
+use crate::request::{Request, RequestExt};
 /// backwards compatible shim for form Password type.
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
-use crate::error::error_impl::impl_into_cot_error;
-use crate::request::{Request, RequestExt};
 use derive_more::with_trait::Debug;
 #[cfg(test)]
 use mockall::automock;

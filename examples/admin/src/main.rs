@@ -15,13 +15,13 @@ use cot::config::{
 use cot::db::migrations::SyncDynMigration;
 use cot::db::{Auto, Model, model};
 use cot::form::Form;
+use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::extractors::RequestDb;
+use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{App, AppBuilder, Project, ProjectContext};
-use cot_core::html::Html;
-use cot_core::router::{Route, Router, Urls};
 
 #[derive(Debug, Clone, Form, AdminModel)]
 #[model]

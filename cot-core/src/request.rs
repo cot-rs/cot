@@ -282,6 +282,8 @@ pub struct AppName(pub String);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::request::extractors::Path;
+    use crate::Body;
 
     #[test]
     fn path_params() {

@@ -10,11 +10,11 @@ use async_trait::async_trait;
 use cot_core::handler::BoxedHandler;
 use cot_core::response::Response;
 use cot_core::router::Router;
+use derive_more::Debug;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
 use tower_sessions::MemoryStore;
-use derive_more::Debug;
 
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;

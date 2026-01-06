@@ -67,6 +67,7 @@ pub use into_response::{
     IntoResponse, WithBody, WithContentType, WithExtension, WithHeader, WithStatus,
 };
 
+
 use crate::{Body, StatusCode};
 
 const RESPONSE_BUILD_FAILURE: &str = "Failed to build response";
@@ -146,38 +147,8 @@ impl ResponseExt for Response {
 
 #[cfg(test)]
 mod tests {
-    use cot::headers::JSON_CONTENT_TYPE;
-
     use super::*;
-    use crate::body::BodyInner;
     use crate::response::{Response, ResponseExt};
-
-    #[test]
-    #[cfg(feature = "json")]
-    fn response_new_json() {
-        #[derive(serde::Serialize)]
-        struct MyData {
-            hello: String,
-        }
-
-        let data = MyData {
-            hello: String::from("world"),
-        };
-        let response = cot::json::Json(data).into_response().unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(
-            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
-            JSON_CONTENT_TYPE
-        );
-        match &response.body().inner {
-            BodyInner::Fixed(fixed) => {
-                assert_eq!(fixed, r#"{"hello":"world"}"#);
-            }
-            _ => {
-                panic!("Expected fixed body");
-            }
-        }
-    }
 
     #[test]
     fn response_new_redirect() {

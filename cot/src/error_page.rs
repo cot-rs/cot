@@ -165,7 +165,7 @@ impl ErrorPageTemplateBuilder {
         }
     }
 
-fn build_error_data(vec: &mut Vec<ErrorData>, error: &(dyn std::error::Error + 'static)) {
+    fn build_error_data(vec: &mut Vec<ErrorData>, error: &(dyn std::error::Error + 'static)) {
         let data = ErrorData {
             description: error.to_string(),
             debug_str: format!("{error:#?}"),

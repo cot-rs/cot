@@ -6,9 +6,6 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
-use askama::Template;
-use async_trait::async_trait;
-use bytes::Bytes;
 use crate::error::NotFound;
 use crate::html::Html;
 use crate::request::extractors::{FromRequestHead, Path, StaticFiles, UrlQuery};
@@ -16,6 +13,9 @@ use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::reverse_redirect;
 use crate::router::{Router, Urls};
+use askama::Template;
+use async_trait::async_trait;
+use bytes::Bytes;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.

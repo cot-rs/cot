@@ -25,20 +25,18 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use askama::Template;
-use async_trait::async_trait;
-use axum::handler::HandlerWithoutStateExt;
 use crate::error::UncaughtPanic;
 use crate::error::error_impl::impl_into_cot_error;
 use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
 use crate::handler::BoxedHandler;
 use crate::html::Html;
-use crate::middleware::{
-    IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer,
-};
+use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{AppName, Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
+use askama::Template;
+use async_trait::async_trait;
+use axum::handler::HandlerWithoutStateExt;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;

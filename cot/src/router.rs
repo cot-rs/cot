@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cot_core::request::{Request, RequestHead};
 pub use cot_core::reverse_param_map;
 #[doc(inline)]
-pub use cot_core::router::{Route, Router, method::MethodRouter, RouterService};
+pub use cot_core::router::{Route, Router, RouterService, method};
 
 use crate::request::RequestExt;
 

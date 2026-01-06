@@ -1,13 +1,13 @@
 use aide::openapi::{Parameter, PathItem, ReferenceOr};
+use cot::html::Html;
 use cot::json::Json;
+use cot::openapi::method::{api_get, api_post, ApiMethodRouter};
 use cot::openapi::{AsApiRoute, NoApi, RouteContext};
+use cot::request::extractors::{Path, UrlQuery};
+use cot::response::{IntoResponse, Response};
+use cot::router::{Route, Router};
 use cot::test::TestRequestBuilder;
 use cot::{RequestHandler, StatusCode};
-use cot_core::html::Html;
-use cot_core::request::extractors::{Path, UrlQuery};
-use cot_core::response::{IntoResponse, Response};
-use cot_core::router::method::method::{ApiMethodRouter, api_get, api_post};
-use cot_core::router::{Route, Router};
 use schemars::SchemaGenerator;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};

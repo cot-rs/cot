@@ -6,8 +6,7 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 pub use clap;
-use clap::{Arg, ArgMatches, Command, value_parser};
-use derive_more::Debug;
+use clap::{value_parser, Arg, ArgMatches, Command};
 
 use crate::{Bootstrapper, Error, Result};
 
@@ -62,7 +61,7 @@ const COLLECT_STATIC_DIR_PARAM: &str = "dir";
 ///     }
 /// }
 /// ```
-#[derive(Debug)]
+#[derive(derive_more::Debug)]
 pub struct Cli {
     command: Command,
     #[debug("..")]
@@ -407,7 +406,6 @@ mod tests {
     use clap::Command;
     use cot::test::serial_guard;
     use tempfile::tempdir;
-    use thiserror::__private::AsDisplay;
 
     use super::*;
     use crate::config::ProjectConfig;
@@ -437,7 +435,7 @@ mod tests {
         assert_eq!(cli.command.get_version().unwrap(), "1.0");
         assert_eq!(cli.command.get_author().unwrap(), "Author");
         assert_eq!(
-            cli.command.get_about().unwrap().as_display().to_string(),
+            cli.command.get_about().unwrap().to_string(),
             "Test application"
         );
     }

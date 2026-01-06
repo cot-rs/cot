@@ -7,15 +7,15 @@
 use std::fmt::{Debug, Formatter};
 
 use aide::openapi::Operation;
-use crate::openapi::{
-    AsApiOperation, AsApiRoute, BoxApiRequestHandler, RouteContext, into_box_api_request_handler
-};
-use crate::request::Request;
-use crate::router::method::{InnerHandler, InnerMethodRouter};
 use schemars::SchemaGenerator;
 
 use crate::handler::RequestHandler;
+use crate::openapi::{
+    into_box_api_request_handler, AsApiOperation, AsApiRoute, BoxApiRequestHandler, RouteContext,
+};
+use crate::request::Request;
 use crate::response::Response;
+use crate::router::method::{InnerHandler, InnerMethodRouter};
 
 /// A version of [`MethodRouter`](crate::router::method::MethodRouter) that
 /// supports OpenAPI.
@@ -520,10 +520,10 @@ mod tests {
     use cot::test::TestRequestBuilder;
 
     use super::*;
-    use crate::Method;
     use crate::error::MethodNotAllowed;
     use crate::request::extractors::Path;
     use crate::response::{IntoResponse, Response};
+    use crate::{Method, StatusCode};
 
     async fn test_handler(method: Method) -> crate::Result<Response> {
         Html::new(method.as_str()).into_response()

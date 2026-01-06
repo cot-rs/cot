@@ -1,4 +1,5 @@
 use cot_core::impl_into_cot_error;
+
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::response::{IntoResponse, Response};
 
@@ -44,9 +45,37 @@ impl_into_cot_error!(JsonSerializeError, INTERNAL_SERVER_ERROR);
 
 #[cfg(test)]
 mod tests {
+    use cot_core::body::BodyInner;
     use cot_core::StatusCode;
 
     use super::*;
+
+    #[test]
+    #[cfg(feature = "json")]
+    fn response_new_json() {
+        #[derive(serde::Serialize)]
+        struct MyData {
+            hello: String,
+        }
+
+        let data = MyData {
+            hello: String::from("world"),
+        };
+        let response = cot::json::Json(data).into_response().unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+            JSON_CONTENT_TYPE
+        );
+        match &response.body().inner {
+            BodyInner::Fixed(fixed) => {
+                assert_eq!(fixed, r#"{"hello":"world"}"#);
+            }
+            _ => {
+                panic!("Expected fixed body");
+            }
+        }
+    }
 
     #[cfg(feature = "json")]
     #[cot_macros::test]

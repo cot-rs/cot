@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use cot::auth::Auth;
 use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
+use cot::auth::Auth;
 use cot::common_types::Password;
+use cot::request::RequestExt;
 use cot::test::{TestDatabase, TestRequestBuilder};
-use cot_core::request::RequestExt;
 
 #[cot_macros::dbtest]
 async fn database_user(test_db: &mut TestDatabase) {

@@ -10,11 +10,11 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
-use aide::openapi::{Operation, PathItem, StatusCode};
 use aide::openapi::{
-    MediaType, Parameter, ParameterData, ParameterSchemaOrContent, PathStyle,
-    QueryStyle, ReferenceOr, RequestBody,
+    MediaType, Parameter, ParameterData, ParameterSchemaOrContent, PathStyle, QueryStyle,
+    ReferenceOr, RequestBody,
 };
+use aide::openapi::{Operation, PathItem, StatusCode};
 use indexmap::IndexMap;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde_json::Value;
@@ -126,7 +126,6 @@ pub trait AsApiRoute {
         schema_generator: &mut SchemaGenerator,
     ) -> PathItem;
 }
-
 
 /// A trait that can be implemented for types that should be taken into
 /// account when generating OpenAPI paths.
@@ -735,7 +734,6 @@ fn extract_is_required(object_item: &mut Schema) -> bool {
         true
     }
 }
-
 
 fn param_with_name(param_name: String, schema: Schema, required: bool) -> ParameterData {
     ParameterData {

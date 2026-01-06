@@ -31,11 +31,11 @@ use derive_more::with_trait::Debug;
 use tracing::debug;
 
 use crate::error::NotFound;
-use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
+use crate::handler::{into_box_request_handler, BoxRequestHandler, RequestHandler};
 use crate::request::{AppName, PathParams, Request, RequestHead, RouteName};
 use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
-use crate::{Error, Result, impl_into_cot_error};
+use crate::{impl_into_cot_error, Error, Result};
 
 pub mod method;
 pub mod path;
@@ -784,10 +784,14 @@ impl Debug for RouteInner {
 
 #[cfg(test)]
 mod tests {
+    use cot::reverse;
+    use cot::test::TestRequestBuilder;
+
     use super::*;
-    use crate::StatusCode;
+    use crate::html::Html;
     use crate::request::Request;
     use crate::response::{IntoResponse, Response};
+    use crate::StatusCode;
 
     struct MockHandler;
 
@@ -798,10 +802,10 @@ mod tests {
     }
 
     #[cfg(feature = "openapi")]
-    impl cot::openapi::AsApiRoute for MockHandler {
+    impl crate::openapi::AsApiRoute for MockHandler {
         fn as_api_route(
             &self,
-            _route_context: &cot::openapi::RouteContext<'_>,
+            _route_context: &crate::openapi::RouteContext<'_>,
             _schema_generator: &mut schemars::SchemaGenerator,
         ) -> aide::openapi::PathItem {
             aide::openapi::PathItem::default()

@@ -370,6 +370,8 @@ impl CacheStore for FileStore {
             }
         }
 
+        // when error is triggered, this would be because capacity overflow
+        // of trying to wrap usize on a 32-bit system
         let wrapped_size =
             usize::try_from(total_size).map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 

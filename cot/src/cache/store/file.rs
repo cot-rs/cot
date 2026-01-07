@@ -151,15 +151,11 @@ impl FileStore {
     async fn write(&self, key: String, value: Value, expiry: Timeout) -> CacheStoreResult<()> {
         self.create_dir_root().await?; // create the dir if not exist
 
-        let key_hash = self.create_key_hash(&key);
+        let key_hash = FileStore::create_key_hash(&key);
         let (mut file, file_path) = self.create_file_temp(&key_hash).await?;
 
         let proc_result: CacheStoreResult<()> = async {
-            let buffer = self.serialize_data(value, expiry).await?;
-
-            file.write_all(&buffer)
-                .await
-                .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+            self.serialize_data(value, expiry, &mut file).await?;
 
             Ok(())
         }
@@ -182,33 +178,36 @@ impl FileStore {
     }
 
     async fn read(&self, key: &str) -> CacheStoreResult<Option<Value>> {
-        let (mut file, file_path) = match self.file_open(key).await? {
-            Some(f) => f,
-            None => return Ok(None),
+        let Some((mut file, file_path)) = self.file_open(key).await? else {
+            return Ok(None);
         };
 
-        match self.deserialize_data(&mut file).await? {
-            Some(value) => Ok(Some(value)),
-            None => {
-                // delete on expired when read
-                let _ = tokio::fs::remove_file(&file_path).await;
-                Ok(None)
-            }
+        if let Some(value) = self.deserialize_data(&mut file).await? {
+            Ok(Some(value))
+        } else {
+            // delete on expired when read
+            let _ = tokio::fs::remove_file(&file_path).await;
+            Ok(None)
         }
     }
 
-    fn create_key_hash(&self, key: &str) -> String {
+    fn create_key_hash(key: &str) -> String {
         let mut hasher = Md5::new();
         hasher.update(key.as_bytes());
         let key_hash_hex = hasher.finalize();
-        format!("{:x}", key_hash_hex)
+        format!("{key_hash_hex:x}")
     }
 
-    async fn serialize_data(&self, value: Value, expiry: Timeout) -> CacheStoreResult<Vec<u8>> {
+    async fn serialize_data(
+        &self,
+        value: Value,
+        expiry: Timeout,
+        file: &mut tokio::fs::File,
+    ) -> CacheStoreResult<Vec<u8>> {
         let timeout = expiry.canonicalize();
         let seconds: u64 = match timeout {
             Timeout::Never => u64::MAX,
-            Timeout::AtDateTime(date_time) => date_time.timestamp() as u64,
+            Timeout::AtDateTime(date_time) => date_time.timestamp().cast_unsigned(),
             Timeout::After(_) => unreachable!("should've been converted by canonicalize"),
         };
         let timeout_header = seconds.to_le_bytes();
@@ -219,6 +218,10 @@ impl FileStore {
         let mut buffer: Vec<u8> = Vec::with_capacity(8 + data.len());
         buffer.extend_from_slice(&timeout_header);
         buffer.extend_from_slice(data.as_bytes());
+
+        file.write_all(&buffer)
+            .await
+            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
         Ok(buffer)
     }
@@ -232,16 +235,14 @@ impl FileStore {
             .map_err(|e| FileCacheStoreError::Deserialize(Box::new(e)))?;
         let seconds = u64::from_le_bytes(header);
 
-        let expiry = match seconds {
-            u64::MAX => Timeout::Never,
-            _ => {
-                let date_time = DateTime::from_timestamp(seconds as i64, 0)
-                    .ok_or_else(|| FileCacheStoreError::Deserialize("date time corrupted".into()))?
-                    .with_timezone(&Utc)
-                    .fixed_offset();
-
-                Timeout::AtDateTime(date_time)
-            }
+        let expiry = if seconds == u64::MAX {
+            Timeout::Never
+        } else {
+            let date_time = DateTime::from_timestamp(seconds.cast_signed(), 0)
+                .ok_or_else(|| FileCacheStoreError::Deserialize("date time corrupted".into()))?
+                .with_timezone(&Utc)
+                .fixed_offset();
+            Timeout::AtDateTime(date_time)
         };
 
         if expiry.is_expired(None) {
@@ -262,9 +263,8 @@ impl FileStore {
         &self,
         file: &mut tokio::fs::File,
     ) -> CacheStoreResult<Option<Value>> {
-        match self.parse_expiry(file).await? {
-            true => {}
-            false => return Ok(None),
+        if !self.parse_expiry(file).await? {
+            return Ok(None);
         }
 
         let mut buffer = Vec::new();
@@ -287,7 +287,7 @@ impl FileStore {
         &self,
         key_hash: &str,
     ) -> CacheStoreResult<(tokio::fs::File, std::path::PathBuf)> {
-        let temp_path = self.dir_path.join(format!("{}{TEMPFILE_SUFFIX}", key_hash));
+        let temp_path = self.dir_path.join(format!("{key_hash}{TEMPFILE_SUFFIX}"));
 
         let temp_file = OpenOptions::new()
             .write(true)
@@ -304,12 +304,12 @@ impl FileStore {
         &self,
         key: &str,
     ) -> CacheStoreResult<Option<(tokio::fs::File, std::path::PathBuf)>> {
-        let key_hash = self.create_key_hash(key);
+        let key_hash = FileStore::create_key_hash(key);
         let path = self.dir_path.join(&key_hash);
         match OpenOptions::new().read(true).open(&path).await {
             Ok(f) => Ok(Some((f, path))),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)).into()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(FileCacheStoreError::Io(Box::new(e)).into()),
         }
     }
 }
@@ -361,10 +361,12 @@ impl CacheStore for FileStore {
         let mut total_size: usize = 0;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
-            if let Ok(meta) = entry.metadata().await {
-                if meta.is_file() {
-                    total_size += meta.len() as usize;
-                }
+            if let Ok(meta) = entry.metadata().await
+                && meta.is_file()
+            {
+                let current_len = usize::try_from(meta.len())
+                    .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+                total_size += current_len;
             }
         }
 
@@ -372,12 +374,12 @@ impl CacheStore for FileStore {
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
-        let Ok(Some(mut file_tuple)) = self.file_open(&key).await else {
+        let Ok(Some(mut file_tuple)) = self.file_open(key).await else {
             return Ok(false);
         };
 
         // cache eviction on contains_key() based on TTL
-        if let true = self.parse_expiry(&mut file_tuple.0).await? {
+        if self.parse_expiry(&mut file_tuple.0).await? {
             return Ok(true);
         }
 

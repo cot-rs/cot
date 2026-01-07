@@ -7,7 +7,8 @@
 //!
 //! ```no_run
 //! # use cot::cache::store::file::FileStore;
-//! # use cot::cache::store::{CacheStore, Timeout};
+//! # use cot::cache::store::CacheStore;
+//! # use cot::config::Timeout;
 //! # use std::path::PathBuf;
 //! # #[tokio::main]
 //! # async fn main() {
@@ -118,7 +119,8 @@ impl FileStore {
     /// use std::path::PathBuf;
     ///
     /// // Using a string slice
-    /// let store = FileStore::new("./cache").unwrap();
+    /// let path = PathBuf::from("./cache");
+    /// let store = FileStore::new(path).unwrap();
     ///
     /// // Using a PathBuf
     /// let path = PathBuf::from("/var/lib/myapp/cache");

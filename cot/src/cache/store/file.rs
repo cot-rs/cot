@@ -1,7 +1,8 @@
 //! File-based cache store implementation.
 //!
-//! This store uses the local file system as the backend for caching. It provides
-//! atomic writes via sync-then-rename and active validation for TTL-based expiration.
+//! This store uses the local file system as the backend for caching. It
+//! provides atomic writes via sync-then-rename and active validation for
+//! TTL-based expiration.
 //!
 //! # Examples
 //!
@@ -30,15 +31,15 @@
 //!
 //! Cache files are evicted on `contains_key` and `get`.
 //! No background collector is implemented.
-use chrono::{DateTime, Utc};
-use md5::{Digest, Md5};
 use std::borrow::Cow;
 use std::path::Path;
-use tokio::fs::OpenOptions;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 
+use chrono::{DateTime, Utc};
+use md5::{Digest, Md5};
 use serde_json::Value;
 use thiserror::Error;
+use tokio::fs::OpenOptions;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 
 use crate::cache::store::{CacheStore, CacheStoreError, CacheStoreResult};
 use crate::config::Timeout;
@@ -92,8 +93,9 @@ impl From<FileCacheStoreError> for CacheStoreError {
 ///
 /// # Examples
 /// ```no_run
-/// use cot::cache::store::file::FileStore;
 /// use std::path::Path;
+///
+/// use cot::cache::store::file::FileStore;
 ///
 /// let store = FileStore::new(Path::new("./cache_dir")).unwrap();
 /// ```
@@ -105,18 +107,20 @@ pub struct FileStore {
 impl FileStore {
     /// Creates a new `FileStore` at the specified directory.
     ///
-    /// This will attempt to create the directory and its parents if they do not exist.
+    /// This will attempt to create the directory and its parents if they do not
+    /// exist.
     ///
     /// # Errors
     ///
-    /// Returns [`FileCacheStoreError::DirCreation`] if the directory cannot be created
-    /// due to permissions or other I/O issues.
+    /// Returns [`FileCacheStoreError::DirCreation`] if the directory cannot be
+    /// created due to permissions or other I/O issues.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use cot::cache::store::file::FileStore;
     /// use std::path::PathBuf;
+    ///
+    /// use cot::cache::store::file::FileStore;
     ///
     /// // Using a string slice
     /// let path = PathBuf::from("./cache");
@@ -346,7 +350,8 @@ impl CacheStore for FileStore {
                 return Err(FileCacheStoreError::Io(Box::new(e)).into());
             }
         }
-        // even though write is self healing, this minimizes result variants on other methods
+        // even though write is self healing, this minimizes result variants on other
+        // methods
         tokio::fs::create_dir_all(&self.dir_path)
             .await
             .map_err(|e| FileCacheStoreError::DirCreation(Box::new(e)))?;

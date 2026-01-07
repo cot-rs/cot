@@ -207,9 +207,9 @@ impl FileStore {
         file: &mut tokio::fs::File,
     ) -> CacheStoreResult<Vec<u8>> {
         let timeout = expiry.canonicalize();
-        let seconds: u64 = match timeout {
-            Timeout::Never => u64::MAX,
-            Timeout::AtDateTime(date_time) => date_time.timestamp().cast_unsigned(),
+        let seconds: i64 = match timeout {
+            Timeout::Never => i64::MAX,
+            Timeout::AtDateTime(date_time) => date_time.timestamp(),
             Timeout::After(_) => unreachable!("should've been converted by canonicalize"),
         };
         let timeout_header = seconds.to_le_bytes();
@@ -235,12 +235,12 @@ impl FileStore {
             .read_exact(&mut header)
             .await
             .map_err(|e| FileCacheStoreError::Deserialize(Box::new(e)))?;
-        let seconds = u64::from_le_bytes(header);
+        let seconds = i64::from_le_bytes(header);
 
-        let expiry = if seconds == u64::MAX {
+        let expiry = if seconds == i64::MAX {
             Timeout::Never
         } else {
-            let date_time = DateTime::from_timestamp(seconds.cast_signed(), 0)
+            let date_time = DateTime::from_timestamp(seconds, 0)
                 .ok_or_else(|| FileCacheStoreError::Deserialize("date time corrupted".into()))?
                 .with_timezone(&Utc)
                 .fixed_offset();

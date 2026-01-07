@@ -360,19 +360,20 @@ impl CacheStore for FileStore {
             Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)).into()),
         };
 
-        let mut total_size: usize = 0;
+        let mut total_size: u64 = 0;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
             if let Ok(meta) = entry.metadata().await
                 && meta.is_file()
             {
-                let current_len = usize::try_from(meta.len())
-                    .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
-                total_size += current_len;
+                total_size += meta.len();
             }
         }
 
-        Ok(total_size)
+        let wrapped_size =
+            usize::try_from(total_size).map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+
+        Ok(wrapped_size)
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {

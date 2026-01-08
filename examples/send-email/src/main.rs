@@ -109,7 +109,7 @@ async fn send_email(urls: Urls, mut request: Request) -> cot::Result<Response> {
     request.email().send(message).await?;
 
     // TODO: We should redirect with the status when reverse_redirect! supports
-    // query parameters
+    // query parameters.
     Ok(reverse_redirect!(&urls, "index/")?)
 }
 

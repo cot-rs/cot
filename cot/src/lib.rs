@@ -73,6 +73,8 @@ mod body;
 pub mod cli;
 pub mod common_types;
 pub mod config;
+#[cfg(feature = "email")]
+pub mod email;
 mod error_page;
 #[macro_use]
 pub(crate) mod handler;

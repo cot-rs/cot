@@ -2,6 +2,7 @@ mod body;
 
 pub mod error;
 pub mod headers;
+pub mod html;
 
 pub use body::{Body, BodyInner};
 pub use error::Error;

@@ -1,6 +1,8 @@
 mod body;
 
 pub mod error;
+#[macro_use]
+pub mod handler;
 pub mod headers;
 pub mod html;
 #[cfg(feature = "json")]

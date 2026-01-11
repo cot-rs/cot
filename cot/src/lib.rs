@@ -72,8 +72,8 @@ pub mod cli;
 pub mod common_types;
 pub mod config;
 mod error_page;
-#[macro_use]
-pub(crate) mod handler;
+#[doc(inline)]
+pub(crate) use cot_core::handler;
 pub mod middleware;
 #[cfg(feature = "openapi")]
 pub mod openapi;

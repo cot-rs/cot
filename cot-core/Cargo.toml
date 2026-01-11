@@ -17,3 +17,12 @@ workspace = true
 
 [dependencies]
 http.workspace = true
+derive_more.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+backtrace.workspace = true
+
+# Trait implementations
+askama.workspace = true
+tower-sessions.workspace = true

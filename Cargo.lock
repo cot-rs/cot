@@ -686,6 +686,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "clap",
+ "cot_core",
  "cot_macros",
  "criterion",
  "deadpool-redis",
@@ -778,10 +779,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cot-core"
-version = "0.4.0"
-
-[[package]]
 name = "cot_codegen"
 version = "0.4.0"
 dependencies = [
@@ -791,6 +788,13 @@ dependencies = [
  "quote",
  "syn",
  "tracing",
+]
+
+[[package]]
+name = "cot_core"
+version = "0.4.0"
+dependencies = [
+ "http 1.4.0",
 ]
 
 [[package]]

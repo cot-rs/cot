@@ -1,5 +1,5 @@
 [package]
-name = "cot-core"
+name = "cot_core"
 version = "0.4.0"
 description = "The Rust web framework for lazy developers - framework core."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
@@ -16,3 +16,4 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
+http.workspace = true

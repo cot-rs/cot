@@ -28,8 +28,6 @@ http-body.workspace = true
 http-body-util.workspace = true
 sync_wrapper.workspace = true
 axum.workspace = true
-
-# Trait implementations
 askama.workspace = true
 tower-sessions.workspace = true
 

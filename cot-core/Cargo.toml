@@ -1,0 +1,18 @@
+[package]
+name = "cot-core"
+version = "0.4.0"
+description = "The Rust web framework for lazy developers - framework core."
+categories = ["web-programming", "web-programming::http-server", "network-programming"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+readme.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

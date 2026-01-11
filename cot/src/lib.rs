@@ -74,8 +74,8 @@ pub mod config;
 #[cfg(feature = "email")]
 pub mod email;
 mod error_page;
-#[macro_use]
-pub(crate) mod handler;
+#[doc(inline)]
+pub(crate) use cot_core::handler;
 pub mod middleware;
 #[cfg(feature = "openapi")]
 pub mod openapi;

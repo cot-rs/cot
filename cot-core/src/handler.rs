@@ -48,14 +48,14 @@ pub trait RequestHandler<T = ()> {
     fn handle(&self, request: Request) -> impl Future<Output = Result<Response>> + Send;
 }
 
-pub(crate) trait BoxRequestHandler {
+pub trait BoxRequestHandler {
     fn handle(
         &self,
         request: Request,
     ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + '_>>;
 }
 
-pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
+pub fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
     handler: H,
 ) -> impl BoxRequestHandler {
     struct Inner<T, H>(H, PhantomData<fn() -> T>);
@@ -148,6 +148,7 @@ macro_rules! impl_request_handler_from_request {
     };
 }
 
+#[macro_export]
 macro_rules! handle_all_parameters {
     ($name:ident) => {
         $name!();
@@ -233,7 +234,7 @@ macro_rules! handle_all_parameters_from_request {
     };
 }
 
-pub(crate) use handle_all_parameters;
+pub use handle_all_parameters;
 
 handle_all_parameters!(impl_request_handler);
 handle_all_parameters_from_request!(impl_request_handler_from_request);

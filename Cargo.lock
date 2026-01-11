@@ -982,12 +982,22 @@ name = "cot_core"
 version = "0.4.0"
 dependencies = [
  "askama",
+ "async-stream",
+ "axum",
  "backtrace",
+ "bytes",
+ "cot",
  "derive_more",
+ "futures",
+ "futures-core",
  "http 1.4.0",
+ "http-body",
+ "http-body-util",
  "serde",
  "serde_json",
+ "sync_wrapper",
  "thiserror 2.0.17",
+ "tokio",
  "tower-sessions",
 ]
 

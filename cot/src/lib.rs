@@ -69,7 +69,6 @@ mod headers;
 pub mod __private;
 pub mod admin;
 pub mod auth;
-mod body;
 pub mod cli;
 pub mod common_types;
 pub mod config;
@@ -95,11 +94,16 @@ pub mod static_files;
 pub mod test;
 pub(crate) mod utils;
 
+pub(crate) mod body {
+    #[doc(inline)]
+    #[expect(unused_imports)]
+    pub(crate) use cot_core::BodyInner;
+}
+
 #[cfg(feature = "openapi")]
 pub use aide;
-pub use body::Body;
 #[doc(inline)]
-pub use cot_core::error::Error;
+pub use cot_core::{Body, Method, Result, StatusCode, error::Error};
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
 ///
@@ -173,9 +177,3 @@ pub use crate::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{
     App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };
-
-/// A type alias for a result that can return a [`cot::Error`].
-pub type Result<T> = std::result::Result<T, Error>;
-
-#[doc(inline)]
-pub use cot_core::{Method, StatusCode};

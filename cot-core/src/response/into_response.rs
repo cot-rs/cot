@@ -1,14 +1,14 @@
 use bytes::{Bytes, BytesMut};
-use cot::error::impl_into_cot_error;
-use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
-use cot::response::{RESPONSE_BUILD_FAILURE, Response};
-use cot::{Body, Error, StatusCode};
 use http;
 
+use crate::error::impl_into_cot_error;
 #[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
+use crate::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use crate::html::Html;
 use crate::response::Redirect;
+use crate::response::Response;
+use crate::{Body, Error, StatusCode};
 
 /// Trait for generating responses.
 /// Types that implement `IntoResponse` can be returned from handlers.
@@ -21,11 +21,11 @@ use crate::response::Redirect;
 /// However, it might be necessary if you have a custom error type that you want
 /// to return from handlers.
 pub trait IntoResponse {
-    /// Converts the implementing type into a `cot::Result<Response>`.
+    /// Converts the implementing type into a `crate::Result<Response>`.
     ///
     /// # Errors
     /// Returns an error if the conversion fails.
-    fn into_response(self) -> cot::Result<Response>;
+    fn into_response(self) -> crate::Result<Response>;
 
     /// Modifies the response by appending the specified header.
     ///
@@ -113,7 +113,7 @@ pub struct WithHeader<T> {
 }
 
 impl<T: IntoResponse> IntoResponse for WithHeader<T> {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.inner.into_response().map(|mut resp| {
             if let Some((key, value)) = self.header {
                 resp.headers_mut().append(key, value);
@@ -131,7 +131,7 @@ pub struct WithContentType<T> {
 }
 
 impl<T: IntoResponse> IntoResponse for WithContentType<T> {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.inner.into_response().map(|mut resp| {
             if let Some(content_type) = self.content_type {
                 resp.headers_mut()
@@ -150,7 +150,7 @@ pub struct WithStatus<T> {
 }
 
 impl<T: IntoResponse> IntoResponse for WithStatus<T> {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.inner.into_response().map(|mut resp| {
             *resp.status_mut() = self.status;
             resp
@@ -166,7 +166,7 @@ pub struct WithBody<T> {
 }
 
 impl<T: IntoResponse> IntoResponse for WithBody<T> {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.inner.into_response().map(|mut resp| {
             *resp.body_mut() = self.body;
             resp
@@ -186,7 +186,7 @@ where
     T: IntoResponse,
     D: Clone + Send + Sync + 'static,
 {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.inner.into_response().map(|mut resp| {
             resp.extensions_mut().insert(self.extension);
             resp
@@ -197,7 +197,7 @@ where
 macro_rules! impl_into_response_for_type_and_mime {
     ($ty:ty, $mime:expr) => {
         impl IntoResponse for $ty {
-            fn into_response(self) -> cot::Result<Response> {
+            fn into_response(self) -> crate::Result<Response> {
                 Body::from(self)
                     .with_header(http::header::CONTENT_TYPE, $mime)
                     .into_response()
@@ -209,7 +209,7 @@ macro_rules! impl_into_response_for_type_and_mime {
 // General implementations
 
 impl IntoResponse for () {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         Body::empty().into_response()
     }
 }
@@ -219,7 +219,7 @@ where
     R: IntoResponse,
     E: Into<Error>,
 {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         match self {
             Ok(value) => value.into_response(),
             Err(err) => Err(err.into()),
@@ -228,13 +228,13 @@ where
 }
 
 impl IntoResponse for Error {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         Err(self)
     }
 }
 
 impl IntoResponse for Response {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         Ok(self)
     }
 }
@@ -245,7 +245,7 @@ impl_into_response_for_type_and_mime!(&'static str, PLAIN_TEXT_CONTENT_TYPE);
 impl_into_response_for_type_and_mime!(String, PLAIN_TEXT_CONTENT_TYPE);
 
 impl IntoResponse for Box<str> {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         String::from(self).into_response()
     }
 }
@@ -257,25 +257,25 @@ impl_into_response_for_type_and_mime!(Vec<u8>, OCTET_STREAM_CONTENT_TYPE);
 impl_into_response_for_type_and_mime!(Bytes, OCTET_STREAM_CONTENT_TYPE);
 
 impl<const N: usize> IntoResponse for &'static [u8; N] {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.as_slice().into_response()
     }
 }
 
 impl<const N: usize> IntoResponse for [u8; N] {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.to_vec().into_response()
     }
 }
 
 impl IntoResponse for Box<[u8]> {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         Vec::from(self).into_response()
     }
 }
 
 impl IntoResponse for BytesMut {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.freeze().into_response()
     }
 }
@@ -283,13 +283,13 @@ impl IntoResponse for BytesMut {
 // HTTP structures for common uses
 
 impl IntoResponse for StatusCode {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         ().into_response().with_status(self).into_response()
     }
 }
 
 impl IntoResponse for http::HeaderMap {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         ().into_response().map(|mut resp| {
             *resp.headers_mut() = self;
             resp
@@ -298,7 +298,7 @@ impl IntoResponse for http::HeaderMap {
 }
 
 impl IntoResponse for http::Extensions {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         ().into_response().map(|mut resp| {
             *resp.extensions_mut() = self;
             resp
@@ -307,7 +307,7 @@ impl IntoResponse for http::Extensions {
 }
 
 impl IntoResponse for crate::response::ResponseHead {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         Ok(Response::from_parts(self, Body::empty()))
     }
 }
@@ -330,7 +330,7 @@ impl IntoResponse for Html {
     ///
     /// let response = html.into_response();
     /// ```
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         self.0
             .into_response()
             .with_content_type(HTML_CONTENT_TYPE)
@@ -339,7 +339,7 @@ impl IntoResponse for Html {
 }
 
 #[cfg(feature = "json")]
-impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {
+impl<D: serde::Serialize> IntoResponse for crate::json::Json<D> {
     /// Create a new JSON response.
     ///
     /// This creates a new [`Response`] object with a content type of
@@ -358,7 +358,7 @@ impl<D: serde::Serialize> IntoResponse for cot::json::Json<D> {
     ///
     /// let response = json.into_response();
     /// ```
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         // a "reasonable default" for a JSON response size
         const DEFAULT_JSON_SIZE: usize = 128;
 
@@ -381,7 +381,7 @@ impl_into_cot_error!(JsonSerializeError, INTERNAL_SERVER_ERROR);
 // Shortcuts for common uses
 
 impl IntoResponse for Body {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         Ok(Response::new(self))
     }
 }
@@ -400,13 +400,13 @@ impl IntoResponse for Redirect {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
-    use cot::response::Response;
-    use cot::{Body, StatusCode};
     use http::{self, HeaderMap, HeaderValue};
 
     use super::*;
     use crate::error::NotFound;
     use crate::html::Html;
+    use crate::response::Response;
+    use crate::{Body, StatusCode};
 
     #[cot::test]
     async fn test_unit_into_response() {
@@ -792,7 +792,7 @@ mod tests {
             name: "test".to_string(),
             value: 123,
         };
-        let json = cot::json::Json(data);
+        let json = crate::json::Json(data);
         let response = json.into_response().unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -813,7 +813,7 @@ mod tests {
         use std::collections::HashMap;
 
         let data = HashMap::from([("key", "value")]);
-        let json = cot::json::Json(data);
+        let json = crate::json::Json(data);
         let response = json.into_response().unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);

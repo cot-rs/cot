@@ -28,8 +28,10 @@ http-body.workspace = true
 http-body-util.workspace = true
 sync_wrapper.workspace = true
 axum.workspace = true
+cot_macros.workspace = true
 askama.workspace = true
 tower-sessions.workspace = true
+serde_path_to_error.workspace = true
 
 [dev-dependencies]
 async-stream.workspace = true

@@ -28,10 +28,10 @@ use crate::{Error, Result};
 /// ```
 #[derive(Debug)]
 pub struct Body {
-    pub(crate) inner: BodyInner,
+    pub inner: BodyInner,
 }
 
-pub(crate) enum BodyInner {
+pub enum BodyInner {
     Fixed(Bytes),
     Streaming(SyncWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>>),
     Axum(SyncWrapper<axum::body::Body>),
@@ -166,12 +166,12 @@ impl Body {
     }
 
     #[must_use]
-    pub(crate) fn axum(inner: axum::body::Body) -> Self {
+    pub fn axum(inner: axum::body::Body) -> Self {
         Self::new(BodyInner::Axum(SyncWrapper::new(inner)))
     }
 
     #[must_use]
-    pub(crate) fn wrapper(inner: BoxBody<Bytes, Error>) -> Self {
+    pub fn wrapper(inner: BoxBody<Bytes, Error>) -> Self {
         Self::new(BodyInner::Wrapper(inner))
     }
 }
@@ -261,9 +261,6 @@ impl_into_cot_error!(ReadRequestBody, BAD_REQUEST);
 
 #[cfg(test)]
 mod tests {
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
     use futures::stream;
     use http_body::Body as HttpBody;
 

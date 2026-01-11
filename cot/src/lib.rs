@@ -79,7 +79,6 @@ pub mod middleware;
 pub mod openapi;
 pub mod project;
 pub mod request;
-pub mod response;
 pub mod router;
 mod serializers;
 pub mod session;
@@ -87,12 +86,6 @@ pub mod static_files;
 #[cfg(feature = "test")]
 pub mod test;
 pub(crate) mod utils;
-
-pub(crate) mod body {
-    #[doc(inline)]
-    #[expect(unused_imports)]
-    pub(crate) use cot_core::BodyInner;
-}
 
 #[cfg(feature = "openapi")]
 pub use aide;
@@ -102,7 +95,7 @@ pub(crate) use cot_core::headers;
 #[doc(inline)]
 pub use cot_core::json;
 #[doc(inline)]
-pub use cot_core::{Body, Method, Result, StatusCode, error::Error, html};
+pub use cot_core::{Body, Method, Result, StatusCode, error::Error, html, response};
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
 ///

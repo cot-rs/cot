@@ -62,7 +62,6 @@ pub mod db;
 /// including 404 Not Found errors, uncaught panics, and custom error pages.
 pub mod error;
 pub mod form;
-mod headers;
 // Not public API. Referenced by macro-generated code.
 #[doc(hidden)]
 #[path = "private.rs"]
@@ -102,6 +101,8 @@ pub(crate) mod body {
 
 #[cfg(feature = "openapi")]
 pub use aide;
+#[doc(inline)]
+pub(crate) use cot_core::headers;
 #[doc(inline)]
 pub use cot_core::{Body, Method, Result, StatusCode, error::Error};
 /// An attribute macro that defines an end-to-end test function for a

@@ -1,6 +1,8 @@
 mod body;
 
 pub mod error;
+pub mod headers;
+
 pub use body::{Body, BodyInner};
 pub use error::Error;
 

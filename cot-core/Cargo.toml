@@ -38,3 +38,7 @@ async-stream.workspace = true
 cot = { workspace = true, features = ["test"] }
 futures.workspace = true
 tokio.workspace = true
+
+[features]
+default = []
+json = []

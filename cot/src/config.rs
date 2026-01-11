@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
 /// The configuration for a project.

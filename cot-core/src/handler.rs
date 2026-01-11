@@ -48,14 +48,14 @@ pub trait RequestHandler<T = ()> {
     fn handle(&self, request: Request) -> impl Future<Output = Result<Response>> + Send;
 }
 
-pub(crate) trait BoxRequestHandler {
+pub trait BoxRequestHandler {
     fn handle(
         &self,
         request: Request,
     ) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + '_>>;
 }
 
-pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
+pub fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
     handler: H,
 ) -> impl BoxRequestHandler {
     struct Inner<T, H>(H, PhantomData<fn() -> T>);
@@ -71,6 +71,12 @@ pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
 
     Inner(handler, PhantomData)
 }
+
+/// Private marker type used to distinguish `FromRequest` parameter position in
+/// trait impls. This is used instead of `()` to avoid coherence conflicts.
+#[doc(hidden)]
+#[expect(missing_copy_implementations, missing_debug_implementations)]
+pub struct FromRequestMarker(());
 
 macro_rules! impl_request_handler {
     ($($ty:ident),*) => {
@@ -106,7 +112,7 @@ macro_rules! impl_request_handler {
 
 macro_rules! impl_request_handler_from_request {
     ($($ty_lhs:ident,)* ($ty_from_request:ident) $(,$ty_rhs:ident)*) => {
-        impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for Func
+        impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, FromRequestMarker, $($ty_rhs,)*)> for Func
         where
             Func: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> Fut + Clone + Send + Sync + 'static,
             $($ty_lhs: FromRequestHead + Send,)*
@@ -142,6 +148,7 @@ macro_rules! impl_request_handler_from_request {
     };
 }
 
+#[macro_export]
 macro_rules! handle_all_parameters {
     ($name:ident) => {
         $name!();
@@ -227,7 +234,7 @@ macro_rules! handle_all_parameters_from_request {
     };
 }
 
-pub(crate) use handle_all_parameters;
+pub use handle_all_parameters;
 
 handle_all_parameters!(impl_request_handler);
 handle_all_parameters_from_request!(impl_request_handler_from_request);

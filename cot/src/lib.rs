@@ -62,29 +62,23 @@ pub mod db;
 /// including 404 Not Found errors, uncaught panics, and custom error pages.
 pub mod error;
 pub mod form;
-mod headers;
 // Not public API. Referenced by macro-generated code.
 #[doc(hidden)]
 #[path = "private.rs"]
 pub mod __private;
 pub mod admin;
 pub mod auth;
-mod body;
 pub mod cli;
 pub mod common_types;
 pub mod config;
 mod error_page;
-#[macro_use]
-pub(crate) mod handler;
-pub mod html;
-#[cfg(feature = "json")]
-pub mod json;
+#[doc(inline)]
+pub(crate) use cot_core::handler;
 pub mod middleware;
 #[cfg(feature = "openapi")]
 pub mod openapi;
 pub mod project;
 pub mod request;
-pub mod response;
 pub mod router;
 mod serializers;
 pub mod session;
@@ -95,7 +89,13 @@ pub(crate) mod utils;
 
 #[cfg(feature = "openapi")]
 pub use aide;
-pub use body::Body;
+#[doc(inline)]
+pub(crate) use cot_core::headers;
+#[cfg(feature = "json")]
+#[doc(inline)]
+pub use cot_core::json;
+#[doc(inline)]
+pub use cot_core::{Body, Method, Result, StatusCode, error::Error, html, response};
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
 ///
@@ -159,7 +159,6 @@ pub use cot_macros::e2e_test;
 /// ```
 pub use cot_macros::main;
 pub use cot_macros::test;
-pub use error::error_impl::Error;
 #[cfg(feature = "openapi")]
 pub use schemars;
 pub use {bytes, http};
@@ -168,12 +167,3 @@ pub use crate::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{
     App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };
-
-/// A type alias for a result that can return a [`cot::Error`].
-pub type Result<T> = std::result::Result<T, Error>;
-
-/// A type alias for an HTTP status code.
-pub type StatusCode = http::StatusCode;
-
-/// A type alias for an HTTP method.
-pub type Method = http::Method;

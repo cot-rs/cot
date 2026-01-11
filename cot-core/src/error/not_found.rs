@@ -72,7 +72,7 @@ impl NotFound {
     }
 
     #[must_use]
-    pub(crate) fn router() -> Self {
+    pub fn router() -> Self {
         Self::with_kind(Kind::FromRouter)
     }
 

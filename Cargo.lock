@@ -805,6 +805,7 @@ dependencies = [
  "form_urlencoded",
  "futures",
  "futures-core",
+ "futures-util",
  "http 1.4.0",
  "http-body",
  "http-body-util",
@@ -816,6 +817,7 @@ dependencies = [
  "sync_wrapper",
  "thiserror 2.0.17",
  "tokio",
+ "tower",
  "tower-sessions",
 ]
 

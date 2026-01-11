@@ -5,6 +5,7 @@ pub mod headers;
 pub mod html;
 #[cfg(feature = "json")]
 pub mod json;
+pub mod middleware;
 pub mod request;
 pub mod response;
 

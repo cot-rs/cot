@@ -76,8 +76,6 @@ pub mod email;
 mod error_page;
 #[macro_use]
 pub(crate) mod handler;
-#[cfg(feature = "json")]
-pub mod json;
 pub mod middleware;
 #[cfg(feature = "openapi")]
 pub mod openapi;
@@ -102,6 +100,9 @@ pub(crate) mod body {
 pub use aide;
 #[doc(inline)]
 pub(crate) use cot_core::headers;
+#[cfg(feature = "json")]
+#[doc(inline)]
+pub use cot_core::json;
 #[doc(inline)]
 pub use cot_core::{Body, Method, Result, StatusCode, error::Error, html};
 /// An attribute macro that defines an end-to-end test function for a

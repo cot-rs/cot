@@ -3,6 +3,8 @@ mod body;
 pub mod error;
 pub mod headers;
 pub mod html;
+#[cfg(feature = "json")]
+pub mod json;
 
 pub use body::{Body, BodyInner};
 pub use error::Error;

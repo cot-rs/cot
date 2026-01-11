@@ -4,6 +4,7 @@ members = [
     "cot-cli",
     "cot-codegen",
     "cot-macros",
+    "cot-core",
     # Examples
     "examples/admin",
     "examples/custom-error-pages",
@@ -76,6 +77,7 @@ clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.2.31"
 cot = { version = "0.5.0", path = "cot" }
+cot_core = { version = "0.5.0", path = "cot-core" }
 cot_codegen = { version = "0.5.0", path = "cot-codegen" }
 cot_macros = { version = "0.5.0", path = "cot-macros" }
 criterion = "0.8"

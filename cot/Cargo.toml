@@ -26,6 +26,7 @@ chrono = { workspace = true, features = ["alloc", "serde", "clock"] }
 chrono-tz.workspace = true
 chumsky = { workspace = true, optional = true }
 clap.workspace = true
+cot_core.workspace = true
 cot_macros.workspace = true
 deadpool-redis = { workspace = true, features = ["tokio-comp", "rt_tokio_1"], optional = true }
 derive_builder.workspace = true

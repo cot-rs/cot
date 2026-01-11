@@ -21,7 +21,7 @@ use tower::Service;
 
 use crate::Body;
 use crate::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
 

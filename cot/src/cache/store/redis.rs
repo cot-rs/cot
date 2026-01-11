@@ -25,7 +25,7 @@ use thiserror::Error;
 
 use crate::cache::store::{CacheStore, CacheStoreError};
 use crate::config::CacheUrl;
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "redis cache store error:";
 

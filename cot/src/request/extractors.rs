@@ -567,7 +567,7 @@ impl FromRequestHead for Auth {
 /// ```
 pub use cot_macros::FromRequestHead;
 
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 
 #[cfg(test)]
 mod tests {

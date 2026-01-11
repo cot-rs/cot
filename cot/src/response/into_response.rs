@@ -1,5 +1,5 @@
 use bytes::{Bytes, BytesMut};
-use cot::error::error_impl::impl_into_cot_error;
+use cot::error::impl_into_cot_error;
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use cot::response::{RESPONSE_BUILD_FAILURE, Response};
 use cot::{Body, Error, StatusCode};

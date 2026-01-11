@@ -27,7 +27,7 @@ use thiserror::Error;
 use crate::config::SecretKey;
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 use crate::request::{Request, RequestExt};
 use crate::session::Session;
 

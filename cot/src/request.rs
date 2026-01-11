@@ -18,7 +18,7 @@ use std::sync::Arc;
 use http::Extensions;
 use indexmap::IndexMap;
 
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 use crate::request::extractors::FromRequestHead;
 use crate::router::Router;
 use crate::{Body, Result};

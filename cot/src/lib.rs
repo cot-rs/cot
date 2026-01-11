@@ -98,6 +98,8 @@ pub(crate) mod utils;
 #[cfg(feature = "openapi")]
 pub use aide;
 pub use body::Body;
+#[doc(inline)]
+pub use cot_core::error::Error;
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
 ///

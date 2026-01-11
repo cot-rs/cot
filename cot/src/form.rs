@@ -61,7 +61,7 @@ pub use field_value::{FormFieldValue, FormFieldValueError};
 use http_body_util::BodyExt;
 use thiserror::Error;
 
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 use crate::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYPE};
 use crate::request::{Request, RequestExt};
 

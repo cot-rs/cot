@@ -126,7 +126,7 @@ use crate::cache::store::memory::Memory;
 use crate::cache::store::redis::Redis;
 use crate::cache::store::{BoxCacheStore, CacheStore};
 use crate::config::{CacheConfig, Timeout};
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 
 /// An error that can occur when interacting with the cache.
 #[derive(Debug, Error)]

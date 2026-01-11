@@ -72,6 +72,12 @@ pub(crate) fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
     Inner(handler, PhantomData)
 }
 
+/// Private marker type used to distinguish `FromRequest` parameter position in
+/// trait impls. This is used instead of `()` to avoid coherence conflicts.
+#[doc(hidden)]
+#[expect(missing_copy_implementations, missing_debug_implementations)]
+pub struct FromRequestMarker(());
+
 macro_rules! impl_request_handler {
     ($($ty:ident),*) => {
         impl<Func, $($ty,)* Fut, R> RequestHandler<($($ty,)*)> for Func
@@ -106,7 +112,7 @@ macro_rules! impl_request_handler {
 
 macro_rules! impl_request_handler_from_request {
     ($($ty_lhs:ident,)* ($ty_from_request:ident) $(,$ty_rhs:ident)*) => {
-        impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for Func
+        impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, FromRequestMarker, $($ty_rhs,)*)> for Func
         where
             Func: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> Fut + Clone + Send + Sync + 'static,
             $($ty_lhs: FromRequestHead + Send,)*

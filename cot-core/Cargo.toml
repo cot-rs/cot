@@ -32,6 +32,9 @@ cot_macros.workspace = true
 askama.workspace = true
 tower-sessions.workspace = true
 serde_path_to_error.workspace = true
+indexmap.workspace = true
+serde_html_form.workspace = true
+form_urlencoded.workspace = true
 
 [dev-dependencies]
 async-stream.workspace = true

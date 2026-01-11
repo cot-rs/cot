@@ -175,8 +175,5 @@ pub use crate::project::{
 /// A type alias for a result that can return a [`cot::Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// A type alias for an HTTP status code.
-pub type StatusCode = http::StatusCode;
-
-/// A type alias for an HTTP method.
-pub type Method = http::Method;
+#[doc(inline)]
+pub use cot_core::{Method, StatusCode};

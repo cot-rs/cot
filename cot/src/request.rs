@@ -21,11 +21,11 @@ pub(crate) use cot_core::request::{AppName, InvalidContentType, RouteName};
 pub use cot_core::request::{PathParams, PathParamsDeserializerError, Request, RequestHead};
 use http::Extensions;
 
+use crate::Result;
 #[cfg(feature = "db")]
 use crate::db::Database;
 use crate::request::extractors::FromRequestHead;
 use crate::router::Router;
-use crate::{Body, Result};
 
 pub mod extractors;
 mod private {
@@ -388,6 +388,7 @@ impl RequestExt for RequestHead {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Body;
     use crate::request::extractors::Path;
     use crate::response::Response;
     use crate::router::{Route, Router};

@@ -1,6 +1,7 @@
 // inline(never) is added to make sure there is a separate frame for this
 // function so that it can be used to find the start of the backtrace.
 #[inline(never)]
+#[must_use]
 pub fn __cot_create_backtrace() -> Backtrace {
     let mut backtrace = Vec::new();
     let mut start = false;

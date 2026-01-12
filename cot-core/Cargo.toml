@@ -17,7 +17,7 @@ workspace = true
 
 [dependencies]
 http.workspace = true
-derive_more.workspace = true
+derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -29,7 +29,7 @@ http-body-util.workspace = true
 sync_wrapper.workspace = true
 axum.workspace = true
 cot_macros.workspace = true
-askama.workspace = true
+askama = { workspace = true, features = ["alloc"] }
 tower-sessions.workspace = true
 serde_path_to_error.workspace = true
 indexmap.workspace = true

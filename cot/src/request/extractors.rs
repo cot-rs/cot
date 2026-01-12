@@ -48,12 +48,10 @@
 //! # }
 //! ```
 
-use std::future::Future;
 use std::sync::Arc;
 
 #[doc(inline)]
 pub use cot_core::request::extractors::*;
-use serde::de::DeserializeOwned;
 
 use crate::Body;
 use crate::auth::Auth;

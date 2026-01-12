@@ -390,6 +390,7 @@ impl RequestExt for RequestHead {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Body;
     use crate::request::extractors::Path;
     use crate::response::Response;
     use crate::router::{Route, Router};

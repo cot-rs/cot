@@ -15,8 +15,6 @@
 use indexmap::IndexMap;
 
 use crate::Body;
-#[cfg(feature = "db")]
-use crate::db::Database;
 use crate::error::impl_into_cot_error;
 
 pub mod extractors;
@@ -275,7 +273,7 @@ impl PathParams {
     /// ```
     pub fn parse<'de, T: serde::Deserialize<'de>>(
         &'de self,
-    ) -> std::result::Result<T, PathParamsDeserializerError> {
+    ) -> Result<T, PathParamsDeserializerError> {
         let deserializer = path_params_deserializer::PathParamsDeserializer::new(self);
         serde_path_to_error::deserialize(deserializer).map_err(PathParamsDeserializerError)
     }

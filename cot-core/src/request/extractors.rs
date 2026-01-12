@@ -359,7 +359,6 @@ mod tests {
     use serde::Deserialize;
 
     use super::*;
-    use crate::html::Html;
     use crate::request::extractors::{FromRequest, Json, Path, UrlQuery};
 
     #[cfg(feature = "json")]

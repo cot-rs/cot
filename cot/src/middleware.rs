@@ -10,12 +10,11 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use futures_core::future::BoxFuture;
-use futures_util::TryFutureExt;
-use http_body_util::BodyExt;
 use tower::Service;
 use tower_sessions::service::PlaintextCookie;
 use tower_sessions::{SessionManagerLayer, SessionStore};
 
+use crate::Error;
 #[cfg(feature = "cache")]
 use crate::config::CacheType;
 use crate::config::{Expiry, SameSite, SessionStoreTypeConfig};
@@ -30,7 +29,6 @@ use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
 #[cfg(feature = "redis")]
 use crate::session::store::redis::RedisStore;
-use crate::{Body, Error};
 
 #[cfg(feature = "live-reload")]
 mod live_reload;

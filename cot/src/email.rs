@@ -2,7 +2,7 @@
 //!
 //! This module exposes a high-level `Email` API that can send
 //! [`EmailMessage`] values through a chosen transport backend
-//! (see `transport` submodule for available backends).
+//! (see [`transport`] submodule for available backends).
 //!
 //! # Examples
 //!
@@ -95,7 +95,7 @@ pub struct EmailMessage {
 }
 
 impl EmailMessage {
-    /// Create a new builder for constructing an `EmailMessage`.
+    /// Create a new builder for constructing an [`EmailMessage`].
     ///
     /// # Examples
     ///
@@ -118,11 +118,11 @@ impl EmailMessage {
 }
 
 impl EmailMessageBuilder {
-    /// Build the `EmailMessage`, ensuring required fields are set.
+    /// Build the [`EmailMessage`], ensuring required fields are set.
     ///
     /// # Errors
     ///
-    /// This method returns an `EmailError` if required fields are missing.
+    /// This method returns an [`EmailMessageError`] if required fields are missing.
     ///
     /// # Examples
     ///
@@ -240,7 +240,7 @@ impl Email {
     ///
     /// # Errors
     ///
-    /// Returns an `EmailError::Transport` error if sending the email fails.
+    /// Returns an [`EmailError::Transport`] error if sending the email fails.
     ///
     /// # Examples
     ///
@@ -274,7 +274,7 @@ impl Email {
     ///
     /// # Errors
     ///
-    /// Returns an `EmailError::Transport` if sending any of the emails fails.
+    /// Returns an [`EmailError::Transport`] if sending any of the emails fails.
     ///
     /// # Examples
     ///
@@ -315,7 +315,7 @@ impl Email {
     ///
     /// # Errors
     ///
-    /// Returns an `EmailError::Transport` error if creating the transport
+    /// Returns an [`EmailError::Transport`] error if creating the transport
     /// backend fails from the config.
     ///
     /// # Examples

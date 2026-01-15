@@ -4,7 +4,7 @@
 //! It is intended primarily for development and testing environments where
 //! actually sending email is not required.
 //!
-//! Typical usage is through the high-level [`crate::email::Email`] API
+//! Typical usage is through the high-level [`crate::email::Email`] API.
 //!
 //! ## Examples
 //!
@@ -14,7 +14,7 @@
 //! use cot::email::transport::console::Console;
 //!
 //! # #[tokio::main]
-//! # async fn main() -> cot::Result<()>{
+//! # async fn main() -> cot::Result<()> {
 //! let email = cot::email::Email::new(Console::new());
 //! let recipients = vec![Email::try_from("testrecipient@example.com").unwrap()];
 //! let msg = EmailMessage::builder()

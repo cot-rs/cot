@@ -1855,7 +1855,7 @@ pub enum EmailTransportTypeConfig {
         /// The URL format is:
         /// `scheme://user:password@host:port/?ehlo_domain=domain&tls=TLS`.
         ///
-        /// `user`(username) and `password` are optional in the case the
+        /// `user` (username) and `password` are optional in the case the
         /// server does not require authentication.
         /// When `port` is not specified, it is automatically determined based
         /// on the `scheme` used.
@@ -2024,7 +2024,7 @@ pub struct EmailConfig {
     /// # auth_id = "your_auth_id"
     /// # secret = "your_secret"
     /// # mechanism = "plain" # or "login", "xoauth2"
-    /// # server = "gmail" # or "localhost"
+    /// # server = "smtp.gmail.com" # or "localhost"
     /// ```
     #[builder(default)]
     pub transport: EmailTransportConfig,

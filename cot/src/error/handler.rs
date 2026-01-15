@@ -20,7 +20,7 @@ use crate::response::Response;
 /// This trait is implemented by functions that can handle error pages. The
 /// trait is automatically implemented for async functions that take parameters
 /// implementing [`FromRequestHead`] and return a type that implements
-/// [`IntoResponse`].
+/// [`IntoResponse`](crate::response::IntoResponse).
 ///
 /// # Examples
 ///

@@ -2,11 +2,12 @@
 //!
 //! Cot uses the [`Request`](http::Request) type from the [`http`] crate
 //! to represent incoming HTTP requests. However, it also provides a
-//! [`RequestExt`] trait that contain various helper methods for working with
-//! HTTP requests. These methods are used to access the application context,
-//! project configuration, path parameters, and more. You probably want to have
-//! a `use` statement for [`RequestExt`] in your code most of the time to be
-//! able to use these functions:
+//! [`RequestExt`](../../cot/request/trait.RequestExt.html) trait that contain
+//! various helper methods for working with HTTP requests. These methods are
+//! used to access the application context, project configuration, path
+//! parameters, and more. You probably want to have a `use` statement for
+//! [`RequestExt`](../../cot/request/trait.RequestExt.html) in your code most of
+//! the time to be able to use these functions:
 //!
 //! ```
 //! use cot::request::RequestExt;
@@ -45,7 +46,7 @@ pub struct RouteName(pub String);
 /// Path parameters extracted from the request URL, and available as a map of
 /// strings.
 ///
-/// This struct is meant to be mainly used using the [`PathParams::parse`]
+/// This struct is meant to be mainly used via the [`PathParams::parse`]
 /// method, which will deserialize the path parameters into a type `T`
 /// implementing `serde::DeserializeOwned`. If needed, you can also access the
 /// path parameters directly using the [`PathParams::get`] method.

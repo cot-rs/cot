@@ -122,8 +122,9 @@ pub trait ResponseExt: Sized + private::Sealed {
     ///
     /// # See also
     ///
-    /// * [`crate::reverse_redirect!`] – a more ergonomic way to create
-    ///   redirects to internal views
+    /// * [`cot::reverse_redirect!`](../../cot/macro.reverse_redirect!.html) – a
+    ///   more ergonomic way to create redirects to internal views (available in
+    ///   the `cot` crate)
     #[must_use]
     #[deprecated(since = "0.5.0", note = "Use Redirect::new() instead")]
     fn new_redirect<T: Into<String>>(location: T) -> Self;

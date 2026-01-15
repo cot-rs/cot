@@ -1,3 +1,8 @@
+//! HTTP body type.
+//!
+//! This module provides the [`Body`] type for representing HTTP bodies,
+//! supporting both fixed in-memory buffers and streaming data sources.
+
 use std::error::Error as StdError;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;

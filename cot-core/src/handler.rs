@@ -1,3 +1,9 @@
+//! Request handler traits and utilities.
+//!
+//! This module provides the [`RequestHandler`] trait, which is the core
+//! abstraction for handling HTTP requests in Cot. It is automatically
+//! implemented for async functions taking extractors and returning responses.
+
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -72,12 +78,6 @@ pub fn into_box_request_handler<T, H: RequestHandler<T> + Send + Sync>(
     Inner(handler, PhantomData)
 }
 
-/// Private marker type used to distinguish `FromRequest` parameter position in
-/// trait impls. This is used instead of `()` to avoid coherence conflicts.
-#[doc(hidden)]
-#[expect(missing_copy_implementations, missing_debug_implementations)]
-pub struct FromRequestMarker(());
-
 macro_rules! impl_request_handler {
     ($($ty:ident),*) => {
         impl<Func, $($ty,)* Fut, R> RequestHandler<($($ty,)*)> for Func
@@ -112,7 +112,7 @@ macro_rules! impl_request_handler {
 
 macro_rules! impl_request_handler_from_request {
     ($($ty_lhs:ident,)* ($ty_from_request:ident) $(,$ty_rhs:ident)*) => {
-        impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, FromRequestMarker, $($ty_rhs,)*)> for Func
+        impl<Func, $($ty_lhs,)* $ty_from_request, $($ty_rhs,)* Fut, R> RequestHandler<($($ty_lhs,)* $ty_from_request, (), $($ty_rhs,)*)> for Func
         where
             Func: FnOnce($($ty_lhs,)* $ty_from_request, $($ty_rhs),*) -> Fut + Clone + Send + Sync + 'static,
             $($ty_lhs: FromRequestHead + Send,)*
@@ -239,14 +239,16 @@ pub use handle_all_parameters;
 handle_all_parameters!(impl_request_handler);
 handle_all_parameters_from_request!(impl_request_handler_from_request);
 
+#[rustfmt::skip] // `wrap_comments` breaks local links
 /// A wrapper around a handler that's used in
-/// [`Bootstrapper`](cot::Bootstrapper).
+/// [`Bootstrapper`](../../cot/project/struct.Bootstrapper.html).
 ///
 /// It is returned by
-/// [`Bootstrapper::into_bootstrapped_project`](cot::Bootstrapper::finish).
-/// Typically, you don't need to interact with this type directly, except for
-/// creating it in [`Project::middlewares`](cot::Project::middlewares) through
-/// the [`RootHandlerBuilder::build`](cot::project::RootHandlerBuilder::build)
+/// [`Bootstrapper::finish()`](../../cot/project/struct.Bootstrapper.html#method.finish).
+/// Typically, you don't need to interact with this type directly, except
+/// for creating it in
+/// [`Project::middlewares()`](../../cot/project/trait.Project.html#method.middlewares) through the
+/// [`RootHandlerBuilder::build()`](../../cot/project/struct.RootHandlerBuilder.html#method.build)
 /// method.
 ///
 /// # Examples

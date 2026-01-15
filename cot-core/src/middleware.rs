@@ -1,3 +1,9 @@
+//! Middlewares for modifying requests and responses.
+//!
+//! Middlewares are used to modify requests and responses in a pipeline. They
+//! are used to add functionality to the request/response cycle, such as
+//! session management, adding security headers, and more.
+
 use std::fmt::Debug;
 use std::task::{Context, Poll};
 
@@ -11,13 +17,14 @@ use crate::request::Request;
 use crate::response::Response;
 use crate::{Body, Error};
 
-/// Middleware that converts a any [`http::Response`] generic type to a
-/// [`cot::response::Response`].
+#[rustfmt::skip] // `wrap_comments` breaks local links
+/// Middleware that converts any [`http::Response`] generic type
+/// to a [`Response`].
 ///
 /// This is useful for converting a response from a middleware that is
 /// compatible with the `tower` crate to a response that is compatible with
 /// Cot. It's applied automatically by
-/// [`RootHandlerBuilder::middleware()`](cot::project::RootHandlerBuilder::middleware())
+/// [`RootHandlerBuilder::middleware()`](../../cot/project/struct.RootHandlerBuilder.html#method.middleware)
 /// and is not needed to be added manually.
 ///
 /// # Examples
@@ -74,8 +81,8 @@ impl<S> tower::Layer<S> for IntoCotResponseLayer {
     }
 }
 
-/// Service struct that converts any [`http::Response`] generic type to
-/// [`cot::response::Response`].
+/// Service struct that converts any [`http::Response`] generic
+/// type to [`Response`].
 ///
 /// Used by [`IntoCotResponseLayer`].
 ///
@@ -125,12 +132,13 @@ where
     response.map(|body| Body::wrapper(BoxBody::new(body.map_err(map_err))))
 }
 
-/// Middleware that converts any error type to [`cot::Error`].
+#[rustfmt::skip] // `wrap_comments` breaks local links
+/// Middleware that converts any error type to [`Error`].
 ///
 /// This is useful for converting a response from a middleware that is
 /// compatible with the `tower` crate to a response that is compatible with
 /// Cot. It's applied automatically by
-/// [`RootHandlerBuilder::middleware()`](cot::project::RootHandlerBuilder::middleware())
+/// [`RootHandlerBuilder::middleware`](../../cot/project/struct.RootHandlerBuilder.html#method.middleware)
 /// and is not needed to be added manually.
 ///
 /// # Examples
@@ -187,7 +195,7 @@ impl<S> tower::Layer<S> for IntoCotErrorLayer {
     }
 }
 
-/// Service struct that converts a any error type to a [`cot::Error`].
+/// Service struct that converts a any error type to a [`Error`].
 ///
 /// Used by [`IntoCotErrorLayer`].
 ///

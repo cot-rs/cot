@@ -1,3 +1,13 @@
+//! Core types and functionality for the Cot web framework.
+//!
+//! This crate provides the foundational building blocks for
+//! [Cot](https://docs.rs/cot/latest/cot/), including HTTP primitives, body handling, error
+//! types, handlers, middleware, and request/response types.
+//!
+//! Most applications should use the main `cot` crate rather than depending on
+//! `cot-core` directly. This crate is primarily intended for internal use by
+//! the Cot framework and for building custom extensions.
+
 mod body;
 
 pub mod error;

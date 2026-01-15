@@ -26,12 +26,13 @@ pub(crate) const MAX_COLLISION_RETRIES: u32 = 32;
 pub(crate) const ERROR_PREFIX: &str = "session store:";
 
 /// A wrapper that provides a concrete type for
-/// [`tower_session::SessionManagerLayer`] while delegating to a boxed
-/// [`SessionStore`] trait object.
+/// [`SessionManagerLayer`](tower_sessions::SessionManagerLayer) while
+/// delegating to a boxed [`SessionStore`] trait
+/// object.
 ///
 /// This enables runtime selection of session store implementations, as
-/// [`tower_sessions::SessionManagerLayer`] requires a concrete type rather than
-/// a boxed trait object.
+/// [`SessionManagerLayer`](tower_sessions::SessionManagerLayer) requires a
+/// concrete type rather than a boxed trait object.
 ///
 /// # Examples
 ///

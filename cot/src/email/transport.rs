@@ -1,6 +1,6 @@
 //! This module defines the email transport system for sending emails in Cot.
 //!
-//! It provides a `Transport` trait that can be implemented by different email
+//! It provides a [`Transport`] trait that can be implemented by different email
 //! backends (e.g., SMTP, console). The module also defines error handling for
 //! transport operations.
 use std::error::Error as StdError;
@@ -37,8 +37,8 @@ pub type TransportResult<T> = Result<T, TransportError>;
 
 /// A generic asynchronous email transport interface.
 ///
-/// The `Transport` trait abstracts over different email transport backends. It
-/// provides methods to manage sending email messages asynchronously.
+/// The [`Transport`] trait abstracts over different email transport backends.
+/// It provides methods to manage sending email messages asynchronously.
 pub trait Transport: Send + Sync + 'static {
     /// Send one or more email messages.
     ///

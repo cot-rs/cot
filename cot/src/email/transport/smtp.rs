@@ -132,7 +132,7 @@ impl Smtp {
     ///
     /// # Errors
     ///
-    /// Returns an `SMTP::TransportCreationError` if the SMTP backend creation
+    /// Returns an [`SMTPError::TransportCreation`] if the SMTP backend creation
     /// failed.
     ///
     /// # Examples

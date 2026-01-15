@@ -122,7 +122,8 @@ impl EmailMessageBuilder {
     ///
     /// # Errors
     ///
-    /// This method returns an [`EmailMessageError`] if required fields are missing.
+    /// This method returns an [`EmailMessageError`] if required fields are
+    /// missing.
     ///
     /// # Examples
     ///

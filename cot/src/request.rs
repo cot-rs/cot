@@ -716,12 +716,7 @@ impl_into_cot_error!(PathParamsDeserializerError, BAD_REQUEST);
 
 #[cfg(test)]
 mod tests {
-    use cot::config::{CacheConfig, ProjectConfig};
-
     use super::*;
-    use crate::ProjectContext;
-    use crate::cache::store::memory::Memory;
-    use crate::config::Timeout;
     use crate::request::extractors::Path;
     use crate::response::Response;
     use crate::router::{Route, Router};
@@ -869,7 +864,7 @@ mod tests {
     #[cot::test]
     async fn request_ext_cache() {
         let mut request_builder = TestRequestBuilder::get("/");
-        let mut request = request_builder.build();
+        let request = request_builder.build();
 
         // this will use the default in-memory cache
         let request_cache = request.cache();

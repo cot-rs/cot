@@ -18,6 +18,8 @@ use std::sync::Arc;
 use http::Extensions;
 use indexmap::IndexMap;
 
+#[cfg(feature = "cache")]
+use crate::cache::Cache;
 #[cfg(feature = "db")]
 use crate::db::Database;
 #[cfg(feature = "email")]
@@ -211,6 +213,24 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn db(&self) -> &Database;
 
+    /// Get the cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
+    ///     let cache = request.cache();
+    ///     // ... do something with the cache
+    ///  # unimplemented!()
+    /// }
+    /// ```
+    #[cfg(feature = "cache")]
+    #[must_use]
+    fn cache(&self) -> &Cache;
+
     /// Get the email service.
     ///
     /// # Examples
@@ -342,6 +362,11 @@ impl RequestExt for Request {
         self.context().database()
     }
 
+    #[cfg(feature = "cache")]
+    fn cache(&self) -> &Cache {
+        self.context().cache()
+    }
+
     #[cfg(feature = "email")]
     fn email(&self) -> &Email {
         self.context().email()
@@ -405,6 +430,11 @@ impl RequestExt for RequestHead {
     #[cfg(feature = "db")]
     fn db(&self) -> &Database {
         self.context().database()
+    }
+
+    #[cfg(feature = "cache")]
+    fn cache(&self) -> &Cache {
+        self.context().cache()
     }
 
     #[cfg(feature = "email")]

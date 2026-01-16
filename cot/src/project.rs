@@ -25,9 +25,9 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use askama::Template;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
+use cot::Template;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;

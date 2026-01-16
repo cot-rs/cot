@@ -6,7 +6,6 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
-use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
 /// Implements the [`AdminModel`] trait for a struct.
@@ -32,7 +31,7 @@ use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
 use crate::static_files::StaticFile;
-use crate::{App, Error, Method, RequestHandler, reverse_redirect};
+use crate::{App, Error, Method, RequestHandler, Template, reverse_redirect};
 
 struct AdminAuthenticated<T, H: Send + Sync>(H, PhantomData<fn() -> T>);
 

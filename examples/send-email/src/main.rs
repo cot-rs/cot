@@ -1,4 +1,3 @@
-use askama::Template;
 use cot::cli::CliMetadata;
 use cot::common_types::Email;
 use cot::config::{EmailConfig, EmailTransportConfig, EmailTransportTypeConfig, ProjectConfig};
@@ -12,7 +11,7 @@ use cot::request::{Request, RequestExt};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
-use cot::{App, AppBuilder, Project, reverse_redirect, static_files};
+use cot::{App, AppBuilder, Project, Template, reverse_redirect, static_files};
 use serde::{Deserialize, Serialize};
 
 struct EmailApp;

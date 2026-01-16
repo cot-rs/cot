@@ -21,8 +21,9 @@ path = "tests/compile_tests.rs"
 workspace = true
 
 [dependencies]
-darling.workspace = true
+askama_derive.workspace = true
 cot_codegen.workspace = true
+darling.workspace = true
 heck.workspace = true
 proc-macro-crate.workspace = true
 proc-macro2 = { workspace = true, features = ["proc-macro"] }

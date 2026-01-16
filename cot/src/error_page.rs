@@ -2,14 +2,13 @@ use std::any::Any;
 use std::panic::PanicHookInfo;
 use std::sync::Arc;
 
-use askama::Template;
 use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
 use crate::error::NotFound;
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace};
 use crate::router::Router;
-use crate::{Error, Result, StatusCode};
+use crate::{Error, Result, StatusCode, Template};
 
 #[derive(Debug)]
 pub(super) struct Diagnostics {

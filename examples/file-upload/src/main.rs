@@ -1,4 +1,3 @@
-use askama::Template;
 use base64::Engine;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
@@ -9,7 +8,7 @@ use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::extractors::RequestForm;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Project};
+use cot::{App, AppBuilder, Project, Template};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

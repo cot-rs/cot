@@ -180,13 +180,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ba5e7259a1580c61571e3116ebaaa01e3c001b2132b17c4cc5c70780ca3e994"
 dependencies = [
  "askama_parser",
- "basic-toml",
  "memchr",
  "proc-macro2",
  "quote",
  "rustc-hash",
- "serde",
- "serde_derive",
  "syn",
 ]
 
@@ -206,8 +203,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3c63392767bb2df6aa65a6e1e3b80fd89bb7af6d58359b924c0695620f1512e"
 dependencies = [
  "rustc-hash",
- "serde",
- "serde_derive",
  "unicode-ident",
  "winnow",
 ]
@@ -503,15 +498,6 @@ name = "base64ct"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e050f626429857a27ddccb31e0aca21356bfa709c04041aefddac081a8f068a"
-
-[[package]]
-name = "basic-toml"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba62675e8242a4c4e806d12f11d136e626e6c8361d6b829310732241652a178a"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "bitflags"
@@ -994,6 +980,7 @@ dependencies = [
 name = "cot_macros"
 version = "0.4.0"
 dependencies = [
+ "askama_derive",
  "cot",
  "cot_codegen",
  "darling 0.23.0",
@@ -1463,7 +1450,6 @@ dependencies = [
 name = "example-admin"
 version = "0.1.0"
 dependencies = [
- "askama",
  "async-trait",
  "cot",
 ]
@@ -1472,7 +1458,6 @@ dependencies = [
 name = "example-custom-error-pages"
 version = "0.1.0"
 dependencies = [
- "askama",
  "cot",
 ]
 
@@ -1489,7 +1474,6 @@ dependencies = [
 name = "example-file-upload"
 version = "0.1.0"
 dependencies = [
- "askama",
  "base64",
  "cot",
 ]
@@ -1514,7 +1498,6 @@ dependencies = [
 name = "example-send-email"
 version = "0.1.0"
 dependencies = [
- "askama",
  "cot",
  "serde",
 ]
@@ -1523,7 +1506,6 @@ dependencies = [
 name = "example-sessions"
 version = "0.1.0"
 dependencies = [
- "askama",
  "cot",
 ]
 
@@ -1531,7 +1513,6 @@ dependencies = [
 name = "example-todo-list"
 version = "0.1.0"
 dependencies = [
- "askama",
  "cot",
 ]
 
@@ -1641,7 +1622,6 @@ dependencies = [
 name = "forms"
 version = "0.1.0"
 dependencies = [
- "askama",
  "chrono",
  "chrono-tz",
  "cot",

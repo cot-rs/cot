@@ -24,6 +24,8 @@ use http::Extensions;
 use crate::Result;
 #[cfg(feature = "db")]
 use crate::db::Database;
+#[cfg(feature = "email")]
+use crate::email::Email;
 use crate::request::extractors::FromRequestHead;
 use crate::router::Router;
 
@@ -203,6 +205,24 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn db(&self) -> &Database;
 
+    /// Get the email service.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
+    ///     let email_service = request.email();
+    ///     // ... do something with the email service
+    ///  # unimplemented!()
+    /// }
+    /// ```
+    #[cfg(feature = "email")]
+    #[must_use]
+    fn email(&self) -> &Email;
+
     /// Get the content type of the request.
     ///
     /// # Examples
@@ -316,6 +336,11 @@ impl RequestExt for Request {
         self.context().database()
     }
 
+    #[cfg(feature = "email")]
+    fn email(&self) -> &Email {
+        self.context().email()
+    }
+
     fn content_type(&self) -> Option<&http::HeaderValue> {
         self.headers().get(http::header::CONTENT_TYPE)
     }
@@ -374,6 +399,11 @@ impl RequestExt for RequestHead {
     #[cfg(feature = "db")]
     fn db(&self) -> &Database {
         self.context().database()
+    }
+
+    #[cfg(feature = "email")]
+    fn email(&self) -> &Email {
+        self.context().email()
     }
 
     fn content_type(&self) -> Option<&http::HeaderValue> {

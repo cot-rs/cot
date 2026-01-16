@@ -24,6 +24,7 @@ backtrace.workspace = true
 bytes.workspace = true
 chrono = { workspace = true, features = ["alloc", "serde", "clock"] }
 chrono-tz.workspace = true
+chumsky = { workspace = true, optional = true }
 clap.workspace = true
 cot_macros.workspace = true
 deadpool-redis = { workspace = true, features = ["tokio-comp", "rt_tokio_1"], optional = true }
@@ -41,7 +42,9 @@ http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
 humantime.workspace = true
+idna = { workspace = true, optional = true }
 indexmap.workspace = true
+lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"], optional = true }
 mime.workspace = true
 mime_guess.workspace = true
 multer.workspace = true
@@ -97,15 +100,20 @@ ignored = [
     # Used indirectly by `grass`, but it doesn't work with the latest versions of Rust if minimal dependency versions
     # are used
     "ahash",
+    # Used by `lettre`, but it causes dependency issues if minimal dependency versions are used
+    "chumsky",
+    # Used by `lettre`, but it causes dependency issues if minimal dependency versions are used
+    "idna",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly
     "time",
 ]
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
-full = ["default", "fake", "live-reload", "test", "cache", "redis"]
+full = ["default", "fake", "live-reload", "test", "cache", "redis", "email"]
 fake = ["dep:fake"]
 db = ["dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
+email = ["dep:lettre", "dep:chumsky", "dep:idna"]
 sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
 postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres", "sqlx/postgres"]
 mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]

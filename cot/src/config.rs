@@ -25,6 +25,8 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 
+#[cfg(feature = "email")]
+use crate::email::transport::smtp::Mechanism;
 use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
@@ -250,6 +252,25 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub middlewares: MiddlewareConfig,
+    /// Configuration related to the email backend.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{EmailConfig, ProjectConfig};
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [email.transport]
+    /// type = "console"
+    /// "#,
+    /// )?;
+    ///
+    /// assert_eq!(config.email, EmailConfig::default());
+    /// # Ok::<(), cot::Error>(())
+    /// ```
+    #[cfg(feature = "email")]
+    pub email: EmailConfig,
 }
 
 const fn default_debug() -> bool {
@@ -359,6 +380,8 @@ impl ProjectConfigBuilder {
             cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
+            #[cfg(feature = "email")]
+            email: self.email.clone().unwrap_or_default(),
         }
     }
 }
@@ -1802,6 +1825,255 @@ impl Default for SessionMiddlewareConfig {
     }
 }
 
+/// The type of email transport backend to use.
+///
+/// This specifies what email backend is used for sending emails.
+/// The default backend if not specified is `console`.
+#[cfg(feature = "email")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum EmailTransportTypeConfig {
+    /// Console email transport backend.
+    ///
+    /// This is a convenient transport backend for development and testing that
+    /// simply prints the email contents to the console instead of actually
+    /// sending them.
+    #[default]
+    Console,
+    /// SMTP email transport backend.
+    ///
+    /// This transport backend sends emails using the Simple Mail Transfer
+    /// Protocol (SMTP). It requires authentication details and server
+    /// configuration.
+    Smtp {
+        /// The SMTP connection URL.
+        ///
+        /// This specifies the protocol, credentials, host, port, and EHLO
+        /// domain for connecting to the SMTP server.
+        ///
+        /// The URL format is:
+        /// `scheme://user:password@host:port/?ehlo_domain=domain&tls=TLS`.
+        ///
+        /// `user` (username) and `password` are optional in the case the
+        /// server does not require authentication.
+        /// When `port` is not specified, it is automatically determined based
+        /// on the `scheme` used.
+        /// `tls` is used to specify whether STARTTLS should be used for the
+        /// connection. Supported values for `tls` are:
+        /// - `required`: Always use STARTTLS. The connection will fail if the
+        ///   server does not support it.
+        /// - `opportunistic`: Use STARTTLS if the server supports it, otherwise
+        ///   fall back to plain connection.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use cot::config::{EmailTransportTypeConfig, EmailUrl};
+        /// use cot::email::transport::smtp::Mechanism;
+        ///
+        /// let smtp_config = EmailTransportTypeConfig::Smtp {
+        ///     url: EmailUrl::from("smtps://johndoe:xxxx xxxxx xxxx xxxxx@smtp.gmail.com"),
+        ///     mechanism: Mechanism::Plain,
+        /// };
+        /// ```
+        ///
+        /// # TOML Configuration
+        ///
+        /// ```toml
+        /// [email]
+        /// type = "smtp"
+        /// // If email is "johndoe@gmail.com", then the user is "johndoe"
+        /// url = "smtp://johndoe:xxxx xxxx xxxx xxxx@smtp.gmail.com:587?tls=required"
+        /// ```
+        url: EmailUrl,
+        /// The authentication mechanism to use.
+        /// Supported mechanisms are `plain`, `login`, and `xoauth2`.
+        ///
+        /// # TOML Configuration
+        ///
+        /// ```toml
+        /// [email.transport]
+        /// type = "smtp"
+        /// url = "smtp://johndoe:xxxx xxxx xxxx xxxx@smtp.gmail.com:587?tls=required"
+        /// mechanism = "plain" # or "login", "xoauth2"
+        /// ```
+        mechanism: Mechanism,
+    },
+}
+
+/// Configuration structure for email transport settings.
+///
+/// This specifies the email transport backend to use and its associated
+/// configuration.
+#[cfg(feature = "email")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct EmailTransportConfig {
+    /// The type of email transport backend to use.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{EmailTransportConfig, EmailTransportTypeConfig};
+    ///
+    /// let config = EmailTransportConfig::builder()
+    ///     .transport_type(EmailTransportTypeConfig::Console)
+    ///     .build();
+    /// ```
+    #[serde(flatten)]
+    pub transport_type: EmailTransportTypeConfig,
+}
+
+#[cfg(feature = "email")]
+impl EmailTransportConfig {
+    /// Create a new [`EmailTransportConfigBuilder`] to build a
+    /// [`EmailTransportConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailTransportConfig;
+    ///
+    /// let config = EmailTransportConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> EmailTransportConfigBuilder {
+        EmailTransportConfigBuilder::default()
+    }
+}
+
+#[cfg(feature = "email")]
+impl EmailTransportConfigBuilder {
+    /// Builds the email transport configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailTransportConfig;
+    ///
+    /// let config = EmailTransportConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> EmailTransportConfig {
+        EmailTransportConfig {
+            transport_type: self.transport_type.clone().unwrap_or_default(),
+        }
+    }
+}
+
+/// Configuration for the email system.
+///
+/// This specifies all the configuration options for sending emails.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::{EmailConfig, EmailTransportConfig, EmailTransportTypeConfig};
+///
+/// let config = EmailConfig::builder()
+///     .transport(
+///         EmailTransportConfig::builder()
+///             .transport_type(EmailTransportTypeConfig::Console)
+///             .build(),
+///     )
+///     .build();
+/// assert_eq!(
+///     config.transport.transport_type,
+///     EmailTransportTypeConfig::Console
+/// );
+/// ```
+#[cfg(feature = "email")]
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+pub struct EmailConfig {
+    /// The type of email transport backend to use.
+    ///
+    /// This determines which type of email transport backend to use (`console`
+    /// or `smtp`) along with its configuration options.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{EmailConfig, EmailTransportConfig, EmailTransportTypeConfig};
+    ///
+    /// let config = EmailConfig::builder()
+    ///     .transport(
+    ///         EmailTransportConfig::builder()
+    ///             .transport_type(EmailTransportTypeConfig::Console)
+    ///             .build(),
+    ///     )
+    ///     .build();
+    /// assert_eq!(
+    ///     config.transport.transport_type,
+    ///     EmailTransportTypeConfig::Console
+    /// );
+    /// ```
+    ///
+    /// # TOML Configuration
+    ///
+    /// ```toml
+    /// [email.transport]
+    /// type = "console"
+    ///
+    /// # Or for SMTP:
+    /// # [email.transport]
+    /// # type = "smtp"
+    /// # auth_id = "your_auth_id"
+    /// # secret = "your_secret"
+    /// # mechanism = "plain" # or "login", "xoauth2"
+    /// # server = "smtp.gmail.com" # or "localhost"
+    /// ```
+    #[builder(default)]
+    pub transport: EmailTransportConfig,
+}
+
+#[cfg(feature = "email")]
+impl EmailConfig {
+    /// Create a new [`EmailConfigBuilder`] to build an
+    /// [`EmailConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailConfig;
+    ///
+    /// let config = EmailConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> EmailConfigBuilder {
+        EmailConfigBuilder::default()
+    }
+}
+
+#[cfg(feature = "email")]
+impl EmailConfigBuilder {
+    /// Builds the email configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailConfig;
+    ///
+    /// let config = EmailConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> EmailConfig {
+        EmailConfig {
+            transport: self.transport.clone().unwrap_or_default(),
+        }
+    }
+}
+
+#[cfg(feature = "email")]
+impl Default for EmailConfig {
+    fn default() -> Self {
+        EmailConfig::builder().build()
+    }
+}
+
 /// A secret key.
 ///
 /// This is a wrapper over a byte array, which is used to store a cryptographic
@@ -2137,6 +2409,54 @@ fn conceal_url_parts(url: &url::Url) -> url::Url {
 impl std::fmt::Display for CacheUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.0.as_str())
+    }
+}
+
+/// A URL for email services.
+///
+/// This is a wrapper over the [`url::Url`] type, which is used to store the
+/// URL of an email service. It parses the URL and ensures that it is valid.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::EmailUrl;
+/// let url = EmailUrl::from("smtp://user:pass@hostname:587");
+/// ```
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+#[cfg(feature = "email")]
+pub struct EmailUrl(url::Url);
+
+#[cfg(feature = "email")]
+impl EmailUrl {
+    /// Returns the string representation of the email URL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::EmailUrl;
+    ///
+    /// let url = EmailUrl::from("smtp://user:pass@hostname:587");
+    /// assert_eq!(url.as_str(), "smtp://user:pass@hostname:587");
+    /// ```
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+#[cfg(feature = "email")]
+impl From<String> for EmailUrl {
+    fn from(url: String) -> Self {
+        Self(url::Url::parse(&url).expect("valid URL"))
+    }
+}
+
+#[cfg(feature = "email")]
+impl From<&str> for EmailUrl {
+    fn from(url: &str) -> Self {
+        Self(url::Url::parse(url).expect("valid URL"))
     }
 }
 
@@ -2742,5 +3062,60 @@ mod tests {
 
         let never = Timeout::Never;
         assert_eq!(never.canonicalize(), Timeout::Never);
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn email_config_from_toml_console() {
+        let toml_content = r#"
+            [email]
+            type = "console"
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(
+            config.email.transport.transport_type,
+            EmailTransportTypeConfig::Console
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn email_config_from_toml_smtp() {
+        let toml_content = r#"
+            [email.transport]
+            type = "smtp"
+            url = "smtp://user:pass@hostname:587"
+            mechanism = "plain"
+        "#;
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        if let EmailTransportTypeConfig::Smtp { url, mechanism } =
+            &config.email.transport.transport_type
+        {
+            assert_eq!(url.as_str(), "smtp://user:pass@hostname:587");
+            assert_eq!(*mechanism, Mechanism::Plain);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn email_config_builder_defaults() {
+        let config = EmailConfig::builder().build();
+        assert_eq!(
+            config.transport.transport_type,
+            EmailTransportTypeConfig::Console
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn email_url_from_str_and_string() {
+        let s = "smtp://user:pass@hostname:587";
+        let u1 = EmailUrl::from(s);
+        let u2 = EmailUrl::from(s.to_string());
+        assert_eq!(u1, u2);
+        assert_eq!(u1.as_str(), s);
     }
 }

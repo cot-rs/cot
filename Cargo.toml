@@ -7,6 +7,7 @@ members = [
     # Examples
     "examples/admin",
     "examples/custom-error-pages",
+    "examples/send-email",
     "examples/custom-task",
     "examples/file-upload",
     "examples/hello-world",
@@ -68,6 +69,7 @@ bytes = "1.11"
 cargo_toml = "0.22"
 chrono = { version = "0.4.42", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
+chumsky = { version = "0.9.3", default-features = false }
 clap = { version = "4.5.53", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
@@ -100,6 +102,8 @@ humantime = "2"
 indexmap = "2"
 insta = { version = "1", features = ["filters"] }
 insta-cmd = "0.6"
+lettre = { version = "0.11", default-features = false }
+idna = { version = "1.1", default-features = false }
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
 mockall = "0.14"

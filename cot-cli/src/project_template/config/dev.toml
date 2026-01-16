@@ -18,3 +18,6 @@ secure = false
 
 [middlewares.session.store]
 type = "database"
+
+[email.transport]
+type = "console"

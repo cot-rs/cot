@@ -717,6 +717,8 @@ impl_into_cot_error!(PathParamsDeserializerError, BAD_REQUEST);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common_types::Email;
+    use crate::email::EmailMessage;
     use crate::request::extractors::Path;
     use crate::response::Response;
     use crate::router::{Route, Router};
@@ -878,6 +880,24 @@ mod tests {
         assert_eq!(user.unwrap()["name"], "Alice");
     }
 
+    #[cfg(feature = "email")]
+    #[cot::test]
+    async fn request_ext_email() {
+        let mut request_builder = TestRequestBuilder::get("/");
+        let request = request_builder.build();
+        let email_service = request.email();
+
+        let message = EmailMessage::builder()
+            .from(Email::new("sender@example.com").unwrap())
+            .to(vec![Email::new("recipient@example.com").unwrap()])
+            .subject("Test Email")
+            .body("Hello, this is a test email.")
+            .build()
+            .unwrap();
+
+        assert!(email_service.send(message).await.is_ok());
+    }
+
     #[test]
     fn parts_ext_path_params() {
         let (mut head, _) = Request::new(Body::empty()).into_parts();
@@ -937,5 +957,60 @@ mod tests {
 
         let Path(id): Path<String> = head.extract_from_head().await.unwrap();
         assert_eq!(id, "42");
+    }
+
+    #[cfg(feature = "cache")]
+    #[cot::test]
+    async fn parts_ext_cache() {
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
+
+        let mut request_builder = TestRequestBuilder::get("/");
+        let request = request_builder.build();
+
+        let context = request
+            .extensions()
+            .get::<Arc<crate::ProjectContext>>()
+            .cloned();
+        if let Some(ctx) = context {
+            head.extensions.insert(ctx);
+        }
+
+        let head_cache = head.cache();
+        head_cache
+            .insert("user:1", serde_json::json!({"name": "Bob"}))
+            .await
+            .unwrap();
+
+        let user: Option<serde_json::Value> = head_cache.get("user:1").await.unwrap();
+        assert!(user.is_some());
+        assert_eq!(user.unwrap()["name"], "Bob");
+    }
+
+    #[cfg(feature = "email")]
+    #[cot::test]
+    async fn parts_ext_email() {
+        let (mut head, _) = Request::new(Body::empty()).into_parts();
+
+        let mut request_builder = TestRequestBuilder::get("/");
+        let request = request_builder.build();
+
+        let context = request
+            .extensions()
+            .get::<Arc<crate::ProjectContext>>()
+            .cloned();
+        if let Some(ctx) = context {
+            head.extensions.insert(ctx);
+        }
+
+        let email_service = head.email();
+
+        let message = EmailMessage::builder()
+            .from(Email::new("sender@example.com").unwrap())
+            .to(vec![Email::new("recipient@example.com").unwrap()])
+            .subject("Test Email")
+            .body("Hello, this is a test email.")
+            .build()
+            .unwrap();
+        assert!(email_service.send(message).await.is_ok());
     }
 }

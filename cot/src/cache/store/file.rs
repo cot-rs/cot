@@ -31,6 +31,17 @@
 //!
 //! Cache files are evicted on `contains_key` and `get`.
 //! No background collector is implemented.
+//!
+//! # Cache File Format
+//!
+//! The cache file consists of a timestamp header, which
+//! currently is as long as the byte representation of
+//! `DateTime`, an i64 integer.
+//!
+//! | Section       | Start-Index | End-Index | Size           |
+//! |---------------|-------------|-----------|----------------|
+//! | Expiry header | 0           | 7         | i64 (8 bytes)  |
+//! | Cache data    | 8           | EOF       | length of data |
 use std::borrow::Cow;
 use std::path::Path;
 
@@ -47,6 +58,10 @@ use crate::error::error_impl::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "file based cache store error:";
 const TEMPFILE_SUFFIX: &str = "tmp";
+
+// this header offset skips exactly one i64 integer,
+// which is the basis of our current expiry timestamp
+const EXPIRY_HEADER_OFFSET: usize = size_of::<i64>();
 
 /// Errors specific to the file based cache store.
 #[derive(Debug, Error)]
@@ -229,7 +244,7 @@ impl FileStore {
         file: &mut tokio::fs::File,
         file_path: &std::path::PathBuf,
     ) -> CacheStoreResult<bool> {
-        let mut header: [u8; 8] = [0; 8];
+        let mut header: [u8; EXPIRY_HEADER_OFFSET] = [0; EXPIRY_HEADER_OFFSET];
 
         let _ = file
             .read_exact(&mut header)
@@ -275,7 +290,12 @@ impl FileStore {
         let mut buffer = Vec::new();
 
         // advances cursor by the expiry header offset
-        file.seek(SeekFrom::Start(8))
+        // EXPIRY_HEADER_OFFSET is a usize that stores
+        // the size of i64. It is unlikely that this will
+        // overflow.
+        // This direct cast currently works without any other
+        // wrapping addition or fallback conversion
+        file.seek(SeekFrom::Start(EXPIRY_HEADER_OFFSET as u64))
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
         file.read_to_end(&mut buffer)

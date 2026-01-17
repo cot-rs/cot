@@ -240,7 +240,9 @@ impl FileStore {
     }
 
     // check expiry also removes the file
-    // when expired
+    // when expired. This makes the read
+    // process more efficient with less
+    // error propagation
     async fn check_expiry(
         &self,
         file: &mut tokio::fs::File,
@@ -643,7 +645,7 @@ mod tests {
         let cache_error: CacheStoreError = file_error.into();
         assert_eq!(
             cache_error.to_string(),
-            "cache store error: backend error: file based cache store error: file io error: disk failure"
+            "cache store error: backend error: file-based cache store error: io error: disk failure"
         );
 
         let file_error =
@@ -651,7 +653,7 @@ mod tests {
         let cache_error: CacheStoreError = file_error.into();
         assert_eq!(
             cache_error.to_string(),
-            "cache store error: serialization error: file based cache store error: serialization error: json fail"
+            "cache store error: serialization error: file-based cache store error: serialization error: json fail"
         );
 
         let file_error =
@@ -659,7 +661,7 @@ mod tests {
         let cache_error: CacheStoreError = file_error.into();
         assert_eq!(
             cache_error.to_string(),
-            "cache store error: deserialization error: file based cache store error: deserialization error: corrupt header"
+            "cache store error: deserialization error: file-based cache store error: deserialization error: corrupt header"
         );
 
         let file_error =
@@ -667,7 +669,7 @@ mod tests {
         let cache_error: CacheStoreError = file_error.into();
         assert_eq!(
             cache_error.to_string(),
-            "cache store error: backend error: file based cache store error: file dir creation error: permission denied"
+            "cache store error: backend error: file-based cache store error: dir creation error: permission denied"
         );
 
         let file_error =
@@ -675,7 +677,7 @@ mod tests {
         let cache_error: CacheStoreError = file_error.into();
         assert_eq!(
             cache_error.to_string(),
-            "cache store error: backend error: file based cache store error: file temp file creation error: no space left"
+            "cache store error: backend error: file-based cache store error: temp file creation error: no space left"
         );
     }
 }

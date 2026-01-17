@@ -13,17 +13,17 @@
 //! # use std::path::PathBuf;
 //! # #[tokio::main]
 //! # async fn main() {
+//!
 //! let path = PathBuf::from("./cache_data");
 //! let store = FileStore::new(path).expect("Failed to initialize store");
 //!
 //! let key = "example_key".to_string();
 //! let value = serde_json::json!({"data": "example_value"});
 //!
-//! store.insert(key.clone(), value.clone(), Default::default()).await.unwrap();
+//! store.insert(key.clone(), value.clone(), Timeout::default()).await.unwrap();
 //!
 //! let retrieved = store.get(&key).await.unwrap();
 //! assert_eq!(retrieved, Some(value));
-//!
 //! # }
 //! ```
 //!
@@ -56,7 +56,7 @@ use crate::cache::store::{CacheStore, CacheStoreError, CacheStoreResult};
 use crate::config::Timeout;
 use crate::error::error_impl::impl_into_cot_error;
 
-const ERROR_PREFIX: &str = "file based cache store error:";
+const ERROR_PREFIX: &str = "file-based cache store error:";
 const TEMPFILE_SUFFIX: &str = "tmp";
 
 // this header offset skips exactly one i64 integer,
@@ -68,15 +68,15 @@ const EXPIRY_HEADER_OFFSET: usize = size_of::<i64>();
 #[non_exhaustive]
 pub enum FileCacheStoreError {
     /// An error occured during directory creation
-    #[error("{ERROR_PREFIX} file dir creation error: {0}")]
+    #[error("{ERROR_PREFIX} dir creation error: {0}")]
     DirCreation(Box<dyn std::error::Error + Send + Sync>),
 
     /// An error occured during temp file creation
-    #[error("{ERROR_PREFIX} file temp file creation error: {0}")]
+    #[error("{ERROR_PREFIX} temp file creation error: {0}")]
     TempFileCreation(Box<dyn std::error::Error + Send + Sync>),
 
     /// An error occured during write/stream file
-    #[error("{ERROR_PREFIX} file io error: {0}")]
+    #[error("{ERROR_PREFIX} io error: {0}")]
     Io(Box<dyn std::error::Error + Send + Sync>),
 
     /// An error occured during data serialization

@@ -226,7 +226,7 @@ impl FileStore {
         Ok(buffer)
     }
 
-    async fn parse_expiry(
+    async fn check_expiry(
         &self,
         file: &mut tokio::fs::File,
         file_path: &std::path::PathBuf,
@@ -270,7 +270,7 @@ impl FileStore {
         file: &mut tokio::fs::File,
         file_path: &std::path::PathBuf,
     ) -> CacheStoreResult<Option<Value>> {
-        if !self.parse_expiry(file, file_path).await? {
+        if !self.check_expiry(file, file_path).await? {
             return Ok(None);
         }
 
@@ -390,7 +390,7 @@ impl CacheStore for FileStore {
         };
 
         // cache eviction on contains_key() based on TTL
-        self.parse_expiry(&mut file, &file_path).await
+        self.check_expiry(&mut file, &file_path).await
     }
 }
 

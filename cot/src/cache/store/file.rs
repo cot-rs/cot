@@ -149,12 +149,12 @@ impl FileStore {
         let dir_path = dir.into();
 
         let store = Self { dir_path };
-        store.create_dir_sync_root()?;
+        store.create_dir_root_sync()?;
 
         Ok(store)
     }
 
-    fn create_dir_sync_root(&self) -> CacheStoreResult<()> {
+    fn create_dir_root_sync(&self) -> CacheStoreResult<()> {
         std::fs::create_dir_all(&self.dir_path)
             .map_err(|e| FileCacheStoreError::DirCreation(Box::new(e)))?;
 
@@ -188,7 +188,7 @@ impl FileStore {
     }
 
     async fn read(&self, key: &str) -> CacheStoreResult<Option<Value>> {
-        let Some((mut file, file_path)) = self.file_open(key).await? else {
+        let Some((mut file, file_path)) = self.open_file_for_reading(key).await? else {
             return Ok(None);
         };
 
@@ -341,7 +341,7 @@ impl FileStore {
         Ok((temp_file, temp_path))
     }
 
-    async fn file_open(
+    async fn open_file_for_reading(
         &self,
         key: &str,
     ) -> CacheStoreResult<Option<(tokio::fs::File, std::path::PathBuf)>> {
@@ -369,7 +369,7 @@ impl CacheStore for FileStore {
     }
 
     async fn remove(&self, key: &str) -> CacheStoreResult<()> {
-        if let Some((_file, file_path)) = self.file_open(key).await? {
+        if let Some((_file, file_path)) = self.open_file_for_reading(key).await? {
             tokio::fs::remove_file(file_path)
                 .await
                 .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
@@ -418,7 +418,7 @@ impl CacheStore for FileStore {
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
-        let Ok(Some((mut file, file_path))) = self.file_open(key).await else {
+        let Ok(Some((mut file, file_path))) = self.open_file_for_reading(key).await else {
             return Ok(false);
         };
 

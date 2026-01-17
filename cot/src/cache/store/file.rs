@@ -46,7 +46,7 @@ use crate::config::Timeout;
 use crate::error::error_impl::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "file based cache store error:";
-const TEMPFILE_SUFFIX: &str = ".tmp";
+const TEMPFILE_SUFFIX: &str = "tmp";
 
 /// Errors specific to the file based cache store.
 #[derive(Debug, Error)]
@@ -292,7 +292,7 @@ impl FileStore {
         &self,
         key_hash: &str,
     ) -> CacheStoreResult<(tokio::fs::File, std::path::PathBuf)> {
-        let temp_path = self.dir_path.join(format!("{key_hash}{TEMPFILE_SUFFIX}"));
+        let temp_path = self.dir_path.join(format!("{key_hash}.{TEMPFILE_SUFFIX}"));
 
         let temp_file = match OpenOptions::new()
             .write(true)
@@ -380,22 +380,21 @@ impl CacheStore for FileStore {
             Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)).into()),
         };
 
-        let mut total_size: u64 = 0;
+        let mut total_size: usize = 0;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
+            let is_temp = path.extension().is_some_and(|ext| ext == TEMPFILE_SUFFIX);
+
             if let Ok(meta) = entry.metadata().await
                 && meta.is_file()
+                && !is_temp
             {
-                total_size += meta.len();
+                total_size += 1;
             }
         }
 
-        // when error is triggered, this would be because capacity overflow
-        // of trying to wrap usize on a 32-bit system
-        let wrapped_size =
-            usize::try_from(total_size).map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
-
-        Ok(wrapped_size)
+        Ok(total_size)
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
@@ -529,16 +528,24 @@ mod tests {
 
         let store = FileStore::new(path.clone()).expect("failed to init store");
         let key = "test_key".to_string();
+        let key_2 = "test_key_2".to_string();
+
         let value = serde_json::json!({ "id": 1, "message": "hello world" });
 
         store
             .insert(key.clone(), value.clone(), Timeout::Never)
             .await
             .expect("failed to insert data to store");
+        store
+            .insert(key.clone(), value.clone(), Timeout::Never)
+            .await
+            .expect("failed to insert data to store");
+        store
+            .insert(key_2.clone(), value.clone(), Timeout::Never)
+            .await
+            .expect("failed to insert data to store");
 
-        let data_buffer: Vec<u8> =
-            serde_json::to_vec(&value).expect("failed to convert value into vector");
-        let data_length: usize = 8 + data_buffer.len(); // extra 8 for header size
+        let data_length: usize = 2;
 
         let entry_length = store
             .approx_size()

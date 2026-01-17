@@ -155,8 +155,6 @@ impl FileStore {
     }
 
     async fn write(&self, key: String, value: Value, expiry: Timeout) -> CacheStoreResult<()> {
-        self.create_dir_root().await?; // create the dir if not exist
-
         let key_hash = FileStore::create_key_hash(&key);
         let (mut file, file_path) = self.create_file_temp(&key_hash).await?;
 
@@ -296,13 +294,29 @@ impl FileStore {
     ) -> CacheStoreResult<(tokio::fs::File, std::path::PathBuf)> {
         let temp_path = self.dir_path.join(format!("{key_hash}{TEMPFILE_SUFFIX}"));
 
-        let temp_file = OpenOptions::new()
+        let temp_file = match OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
             .open(&temp_path)
             .await
-            .map_err(|e| FileCacheStoreError::TempFileCreation(Box::new(e)))?;
+        {
+            Ok(handle) => handle,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // try creating parent directory
+                self.create_dir_root().await?;
+
+                // try again
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&temp_path)
+                    .await
+                    .map_err(|e| FileCacheStoreError::TempFileCreation(Box::new(e)))?
+            }
+            Err(e) => return Err(FileCacheStoreError::TempFileCreation(Box::new(e)))?,
+        };
 
         Ok((temp_file, temp_path))
     }

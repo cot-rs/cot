@@ -207,7 +207,7 @@ impl FileStore {
         value: Value,
         expiry: Timeout,
         file: &mut tokio::fs::File,
-        file_path: &std::path::PathBuf,
+        file_path: &Path,
     ) -> CacheStoreResult<()> {
         let result = async {
             let timeout = expiry.canonicalize();
@@ -246,7 +246,7 @@ impl FileStore {
     async fn check_expiry(
         &self,
         file: &mut tokio::fs::File,
-        file_path: &std::path::PathBuf,
+        file_path: &Path,
     ) -> CacheStoreResult<bool> {
         let mut header: [u8; EXPIRY_HEADER_OFFSET] = [0; EXPIRY_HEADER_OFFSET];
 
@@ -285,7 +285,7 @@ impl FileStore {
     async fn deserialize_data(
         &self,
         file: &mut tokio::fs::File,
-        file_path: &std::path::PathBuf,
+        file_path: &Path,
     ) -> CacheStoreResult<Option<Value>> {
         if !self.check_expiry(file, file_path).await? {
             return Ok(None);

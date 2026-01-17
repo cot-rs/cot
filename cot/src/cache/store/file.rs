@@ -239,6 +239,8 @@ impl FileStore {
         result
     }
 
+    // check expiry also removes the file
+    // when expired
     async fn check_expiry(
         &self,
         file: &mut tokio::fs::File,

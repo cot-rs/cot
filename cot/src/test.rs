@@ -37,10 +37,6 @@ use crate::db::Database;
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
-#[cfg(feature = "email")]
-use crate::email::Email;
-#[cfg(feature = "email")]
-use crate::email::transport::console::Console;
 #[cfg(feature = "redis")]
 use crate::error::error_impl::impl_into_cot_error;
 use crate::handler::BoxedHandler;
@@ -238,8 +234,6 @@ pub struct TestRequestBuilder {
     static_files: Vec<StaticFile>,
     #[cfg(feature = "cache")]
     cache: Option<Cache>,
-    #[cfg(feature = "email")]
-    email: Option<Email>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -295,8 +289,6 @@ impl Default for TestRequestBuilder {
             static_files: Vec::new(),
             #[cfg(feature = "cache")]
             cache: None,
-            #[cfg(feature = "email")]
-            email: None,
         }
     }
 }
@@ -782,10 +774,6 @@ impl TestRequestBuilder {
             self.cache
                 .clone()
                 .unwrap_or_else(|| Cache::new(Memory::new(), None, Timeout::default())),
-            #[cfg(feature = "email")]
-            self.email
-                .clone()
-                .unwrap_or_else(|| Email::new(Console::new())),
         );
         prepare_request(&mut request, Arc::new(context));
 

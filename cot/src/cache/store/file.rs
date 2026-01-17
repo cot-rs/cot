@@ -188,13 +188,7 @@ impl FileStore {
             return Ok(None);
         };
 
-        if let Some(value) = self.deserialize_data(&mut file).await? {
-            Ok(Some(value))
-        } else {
-            // delete on expired when read
-            let _ = tokio::fs::remove_file(&file_path).await;
-            Ok(None)
-        }
+        self.deserialize_data(&mut file, &file_path).await
     }
 
     fn create_key_hash(key: &str) -> String {
@@ -232,7 +226,11 @@ impl FileStore {
         Ok(buffer)
     }
 
-    async fn parse_expiry(&self, file: &mut tokio::fs::File) -> CacheStoreResult<bool> {
+    async fn parse_expiry(
+        &self,
+        file: &mut tokio::fs::File,
+        file_path: &std::path::PathBuf,
+    ) -> CacheStoreResult<bool> {
         let mut header: [u8; 8] = [0; 8];
 
         let _ = file
@@ -240,6 +238,12 @@ impl FileStore {
             .await
             .map_err(|e| FileCacheStoreError::Deserialize(Box::new(e)))?;
         let seconds = i64::from_le_bytes(header);
+        // This may look inefficient, but this ensures portability
+        // By making this method reset its own cursor,
+        // the logic is reusable without the risk of forgetting to reset cursor
+        file.seek(SeekFrom::Start(0))
+            .await
+            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
         let expiry = if seconds == i64::MAX {
             Timeout::Never
@@ -252,15 +256,11 @@ impl FileStore {
         };
 
         if expiry.is_expired(None) {
+            tokio::fs::remove_file(file_path)
+                .await
+                .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
             return Ok(false);
         }
-
-        // This may look inefficient, but this ensures portability
-        // By making this method reset its own cursor,
-        // the logic is reusable without the risk of forgetting to reset cursor
-        file.seek(SeekFrom::Start(0))
-            .await
-            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
         Ok(true)
     }
@@ -268,8 +268,9 @@ impl FileStore {
     async fn deserialize_data(
         &self,
         file: &mut tokio::fs::File,
+        file_path: &std::path::PathBuf,
     ) -> CacheStoreResult<Option<Value>> {
-        if !self.parse_expiry(file).await? {
+        if !self.parse_expiry(file, file_path).await? {
             return Ok(None);
         }
 
@@ -384,20 +385,12 @@ impl CacheStore for FileStore {
     }
 
     async fn contains_key(&self, key: &str) -> CacheStoreResult<bool> {
-        let Ok(Some(mut file_tuple)) = self.file_open(key).await else {
+        let Ok(Some((mut file, file_path))) = self.file_open(key).await else {
             return Ok(false);
         };
 
         // cache eviction on contains_key() based on TTL
-        if self.parse_expiry(&mut file_tuple.0).await? {
-            return Ok(true);
-        }
-
-        tokio::fs::remove_file(&file_tuple.1)
-            .await
-            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
-
-        Ok(false)
+        self.parse_expiry(&mut file, &file_path).await
     }
 }
 

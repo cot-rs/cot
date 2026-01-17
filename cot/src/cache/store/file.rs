@@ -160,20 +160,11 @@ impl FileStore {
         let key_hash = FileStore::create_key_hash(&key);
         let (mut file, file_path) = self.create_file_temp(&key_hash).await?;
 
-        let proc_result: CacheStoreResult<()> = async {
-            self.serialize_data(value, expiry, &mut file).await?;
-
-            Ok(())
-        }
-        .await;
-
-        if let Err(e) = proc_result {
-            let _ = tokio::fs::remove_file(&file_path).await;
-            return Err(e);
-        }
+        self.serialize_data(value, expiry, &mut file, &file_path)
+            .await?;
 
         // rename
-        file.sync_all()
+        file.sync_data()
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
         tokio::fs::rename(file_path, self.dir_path.join(&key_hash))
@@ -203,27 +194,36 @@ impl FileStore {
         value: Value,
         expiry: Timeout,
         file: &mut tokio::fs::File,
-    ) -> CacheStoreResult<Vec<u8>> {
-        let timeout = expiry.canonicalize();
-        let seconds: i64 = match timeout {
-            Timeout::Never => i64::MAX,
-            Timeout::AtDateTime(date_time) => date_time.timestamp(),
-            Timeout::After(_) => unreachable!("should've been converted by canonicalize"),
-        };
-        let timeout_header = seconds.to_le_bytes();
+        file_path: &std::path::PathBuf,
+    ) -> CacheStoreResult<()> {
+        let result = async {
+            let timeout = expiry.canonicalize();
+            let seconds: i64 = match timeout {
+                Timeout::Never => i64::MAX,
+                Timeout::AtDateTime(date_time) => date_time.timestamp(),
+                Timeout::After(_) => unreachable!("should've been converted by canonicalize"),
+            };
 
-        let data = serde_json::to_string(&value)
-            .map_err(|e| FileCacheStoreError::Serialize(Box::new(e)))?;
+            let data = serde_json::to_vec(&value)
+                .map_err(|e| FileCacheStoreError::Serialize(Box::new(e)))?;
 
-        let mut buffer: Vec<u8> = Vec::with_capacity(8 + data.len());
-        buffer.extend_from_slice(&timeout_header);
-        buffer.extend_from_slice(data.as_bytes());
+            file.write_all(&seconds.to_le_bytes())
+                .await
+                .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
-        file.write_all(&buffer)
-            .await
-            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+            file.write_all(&data)
+                .await
+                .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
-        Ok(buffer)
+            Ok(())
+        }
+        .await;
+
+        if result.is_err() {
+            let _ = tokio::fs::remove_file(file_path).await;
+        }
+
+        result
     }
 
     async fn check_expiry(

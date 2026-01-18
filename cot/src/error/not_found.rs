@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 
 #[expect(clippy::doc_link_with_quotes, reason = "404 Not Found link")]
 /// A ["404 Not Found"] error that can be returned by Cot applications.
@@ -72,7 +72,7 @@ impl NotFound {
     }
 
     #[must_use]
-    pub fn router() -> Self {
+    pub(crate) fn router() -> Self {
         Self::with_kind(Kind::FromRouter)
     }
 

@@ -72,10 +72,10 @@ impl ErrorPageTemplateBuilder {
         if let Some(not_found) = error.inner().downcast_ref::<NotFound>() {
             use crate::error::NotFoundKind as Kind;
             match &not_found.kind {
-                Kind::Custom { .. } => {
+                Kind::Custom => {
                     Self::build_error_data(&mut error_data, error);
                 }
-                Kind::WithMessage { 0: message, .. } => {
+                Kind::WithMessage(message) => {
                     Self::build_error_data(&mut error_data, error);
                     error_message = Some(message.clone());
                 }

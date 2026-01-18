@@ -42,7 +42,7 @@ use crate::email::Email;
 #[cfg(feature = "email")]
 use crate::email::transport::console::Console;
 #[cfg(feature = "redis")]
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 use crate::handler::BoxedHandler;
 use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
 use crate::request::Request;

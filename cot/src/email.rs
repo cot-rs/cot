@@ -39,7 +39,7 @@ use transport::{BoxedTransport, Transport};
 
 use crate::email::transport::TransportError;
 use crate::email::transport::console::Console;
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 const ERROR_PREFIX: &str = "email message build error:";
 
 /// Represents errors that can occur when sending an email.

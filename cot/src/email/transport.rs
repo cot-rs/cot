@@ -11,7 +11,7 @@ use cot::email::EmailMessageError;
 use thiserror::Error;
 
 use crate::email::EmailMessage;
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 
 pub mod console;
 pub mod smtp;

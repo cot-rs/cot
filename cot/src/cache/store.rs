@@ -16,7 +16,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::Timeout;
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 
 const CACHE_STORE_ERROR_PREFIX: &str = "cache store error:";
 

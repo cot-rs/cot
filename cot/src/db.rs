@@ -42,7 +42,7 @@ use crate::db::impl_postgres::{DatabasePostgres, PostgresRow, PostgresValueRef};
 #[cfg(feature = "sqlite")]
 use crate::db::impl_sqlite::{DatabaseSqlite, SqliteRow, SqliteValueRef};
 use crate::db::migrations::ColumnTypeMapper;
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "database error:";
 /// An error that can occur when interacting with the database.

@@ -53,9 +53,8 @@ use crate::db::Database;
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 #[cfg(feature = "email")]
 use crate::email::Email;
-use crate::error::UncaughtPanic;
-use crate::error::error_impl::impl_into_cot_error;
 use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
+use crate::error::{UncaughtPanic, impl_into_cot_error};
 use crate::error_page::Diagnostics;
 use crate::handler::BoxedHandler;
 use crate::html::Html;

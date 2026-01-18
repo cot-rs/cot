@@ -27,7 +27,7 @@ use thiserror::Error;
 
 #[cfg(feature = "email")]
 use crate::email::transport::smtp::Mechanism;
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
 /// The configuration for a project.

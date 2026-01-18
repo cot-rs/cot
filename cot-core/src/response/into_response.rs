@@ -400,10 +400,10 @@ impl IntoResponse for Redirect {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
-    use http::{self, HeaderMap, HeaderValue};
+    use http::{self, HeaderMap, HeaderValue, Method};
 
     use super::*;
-    use crate::error::NotFound;
+    use crate::error::MethodNotAllowed;
     use crate::html::Html;
     use crate::response::Response;
     use crate::{Body, StatusCode};
@@ -433,13 +433,13 @@ mod tests {
 
     #[cot::test]
     async fn test_result_err_into_response() {
-        let err = Error::from(NotFound::with_message("test"));
+        let err = Error::from(MethodNotAllowed::new(Method::POST));
         let res: Result<&'static str, Error> = Err(err);
 
         let error_result = res.into_response();
 
         assert!(error_result.is_err());
-        assert!(error_result.err().unwrap().to_string().contains("test"));
+        assert!(error_result.err().unwrap().to_string().contains("POST"));
     }
 
     #[cot::test]

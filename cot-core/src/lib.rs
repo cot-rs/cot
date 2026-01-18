@@ -21,7 +21,7 @@ pub mod middleware;
 pub mod request;
 pub mod response;
 
-pub use body::{Body, BodyInner};
+pub use body::Body;
 pub use error::Error;
 
 /// A type alias for an HTTP status code.

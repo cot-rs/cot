@@ -33,10 +33,10 @@ use crate::{Error, Result};
 /// ```
 #[derive(Debug)]
 pub struct Body {
-    pub inner: BodyInner,
+    pub(crate) inner: BodyInner,
 }
 
-pub enum BodyInner {
+pub(crate) enum BodyInner {
     Fixed(Bytes),
     Streaming(SyncWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>>),
     Axum(SyncWrapper<axum::body::Body>),
@@ -171,12 +171,13 @@ impl Body {
     }
 
     #[must_use]
+    #[doc(hidden)]
     pub fn axum(inner: axum::body::Body) -> Self {
         Self::new(BodyInner::Axum(SyncWrapper::new(inner)))
     }
 
     #[must_use]
-    pub fn wrapper(inner: BoxBody<Bytes, Error>) -> Self {
+    pub(crate) fn wrapper(inner: BoxBody<Bytes, Error>) -> Self {
         Self::new(BodyInner::Wrapper(inner))
     }
 }

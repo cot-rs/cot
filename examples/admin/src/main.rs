@@ -3,7 +3,6 @@ mod migrations;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
-use askama::Template;
 use async_trait::async_trait;
 use cot::admin::{AdminApp, AdminModel, AdminModelManager, DefaultAdminModelManager};
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
@@ -20,7 +19,7 @@ use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Project, ProjectContext};
+use cot::{App, AppBuilder, Project, ProjectContext, Template};
 
 #[derive(Debug, Clone, Form, AdminModel)]
 #[model]

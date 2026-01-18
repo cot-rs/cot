@@ -1,4 +1,3 @@
-use askama::Template;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::error::handler::{DynErrorPageHandler, RequestError};
@@ -6,7 +5,7 @@ use cot::html::Html;
 use cot::project::RegisterAppsContext;
 use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router};
-use cot::{App, AppBuilder, Project};
+use cot::{App, AppBuilder, Project, Template};
 
 async fn return_hello() -> cot::Result<Response> {
     panic!()

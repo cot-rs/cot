@@ -1,6 +1,5 @@
 mod migrations;
 
-use askama::Template;
 use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
@@ -11,7 +10,7 @@ use cot::request::extractors::StaticFiles;
 use cot::router::{Route, Router};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
 use cot::session::db::SessionApp;
-use cot::{App, AppBuilder, Project, static_files};
+use cot::{App, AppBuilder, Project, static_files, Template};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

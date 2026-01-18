@@ -1,6 +1,5 @@
 mod migrations;
 
-use askama::Template;
 use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::config::{DatabaseConfig, ProjectConfig};
@@ -13,7 +12,7 @@ use cot::request::extractors::{Path, RequestForm};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Project, reverse_redirect};
+use cot::{App, AppBuilder, Project, Template, reverse_redirect};
 
 #[derive(Debug, Clone)]
 #[model]

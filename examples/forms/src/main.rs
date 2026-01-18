@@ -1,6 +1,5 @@
 mod migrations;
 
-use askama::Template;
 use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
 use chrono_tz::Tz;
 use cot::cli::CliMetadata;
@@ -17,7 +16,7 @@ use cot::request::extractors::{RequestForm, StaticFiles};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
-use cot::{App, AppBuilder, Project, reverse_redirect, static_files};
+use cot::{App, AppBuilder, Project, Template, reverse_redirect, static_files};
 
 #[derive(Debug, Clone)]
 #[model]

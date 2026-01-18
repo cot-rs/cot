@@ -699,9 +699,8 @@ impl Display for Email {
 mod tests {
     use std::convert::TryFrom;
 
-    use askama::Template;
-
     use super::*;
+    use crate::Template;
 
     #[test]
     fn url_new() {

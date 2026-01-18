@@ -240,3 +240,26 @@ pub fn derive_api_operation_response(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     impl_api_operation_response_for_enum(&ast).into()
 }
+
+/// The `Template` derive macro and its `template()` attribute.
+///
+/// Please see our [template guide](https://cot.rs/guide/latest/templates/) and [askama's book](
+/// https://askama.readthedocs.io/en/stable/creating_templates.html) for more information.
+#[proc_macro_derive(Template, attributes(template))]
+pub fn derive_template(input: TokenStream) -> TokenStream {
+    askama_derive::derive_template(input.into(), import_askama).into()
+}
+
+/// A macro attribute to write custom filters for askama templates.
+///
+/// Please see [askama's book](https://askama.readthedocs.io/en/stable/filters.html#custom-filters)
+/// for more information.
+#[proc_macro_attribute]
+pub fn filter_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
+    askama_derive::derive_filter_fn(attr.into(), item.into(), import_askama).into()
+}
+
+fn import_askama() -> proc_macro2::TokenStream {
+    let cot = cot_ident();
+    quote!(use #cot::__private::askama;)
+}

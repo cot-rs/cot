@@ -161,7 +161,6 @@ pub use schemars;
 pub use {bytes, http};
 
 pub use crate::__private::askama::{Template, filter_fn};
-pub use crate::error::error_impl::Error;
 pub use crate::handler::{BoxedHandler, RequestHandler};
 pub use crate::project::{
     App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,

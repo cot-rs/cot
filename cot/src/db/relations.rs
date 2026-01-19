@@ -9,7 +9,6 @@ use crate::db::{DatabaseBackend, DatabaseError, Model, Result};
 ///
 /// ```
 /// use cot::db::{Auto, Database, ForeignKey, Model, model};
-/// use cot::request::{Request, RequestExt};
 /// use cot::response::Response;
 ///
 /// #[model]

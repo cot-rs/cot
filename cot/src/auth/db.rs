@@ -79,7 +79,6 @@ impl DatabaseUser {
     /// use cot::common_types::Password;
     /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::{Request, RequestExt};
     ///
     /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
@@ -135,7 +134,6 @@ impl DatabaseUser {
     /// use cot::common_types::Password;
     /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::{Request, RequestExt};
     ///
     /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =

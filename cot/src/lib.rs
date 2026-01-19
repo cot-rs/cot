@@ -161,7 +161,35 @@ pub use schemars;
 pub use {bytes, http};
 
 pub use crate::__private::askama::{Template, filter_fn};
-pub use crate::handler::{BoxedHandler, RequestHandler};
+/// A wrapper around a handler that's used in [`Bootstrapper`].
+///
+/// It is returned by [`Bootstrapper::finish`]. Typically, you don't need to
+/// interact with this type directly, except for creating it in
+/// [`Project::middlewares`] through the
+/// [`RootHandlerBuilder::build`](crate::project::RootHandlerBuilder::build)
+/// method.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::ProjectConfig;
+/// use cot::{Bootstrapper, BoxedHandler, Project};
+///
+/// struct MyProject;
+/// impl Project for MyProject {}
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// let bootstrapper = Bootstrapper::new(MyProject)
+///     .with_config(ProjectConfig::default())
+///     .boot()
+///     .await?;
+/// let handler: BoxedHandler = bootstrapper.finish().handler;
+/// # Ok(())
+/// # }
+/// ```
+pub use crate::handler::BoxedHandler;
+pub use crate::handler::RequestHandler;
 pub use crate::project::{
     App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };

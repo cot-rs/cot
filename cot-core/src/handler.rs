@@ -239,35 +239,4 @@ pub use handle_all_parameters;
 handle_all_parameters!(impl_request_handler);
 handle_all_parameters_from_request!(impl_request_handler_from_request);
 
-#[rustfmt::skip] // `wrap_comments` breaks local links
-/// A wrapper around a handler that's used in
-/// [`Bootstrapper`](../../cot/project/struct.Bootstrapper.html).
-///
-/// It is returned by
-/// [`Bootstrapper::finish()`](../../cot/project/struct.Bootstrapper.html#method.finish).
-/// Typically, you don't need to interact with this type directly, except
-/// for creating it in
-/// [`Project::middlewares()`](../../cot/project/trait.Project.html#method.middlewares) through the
-/// [`RootHandlerBuilder::build()`](../../cot/project/struct.RootHandlerBuilder.html#method.build)
-/// method.
-///
-/// # Examples
-///
-/// ```
-/// use cot::config::ProjectConfig;
-/// use cot::{Bootstrapper, BoxedHandler, Project};
-///
-/// struct MyProject;
-/// impl Project for MyProject {}
-///
-/// # #[tokio::main]
-/// # async fn main() -> cot::Result<()> {
-/// let bootstrapper = Bootstrapper::new(MyProject)
-///     .with_config(ProjectConfig::default())
-///     .boot()
-///     .await?;
-/// let handler: BoxedHandler = bootstrapper.finish().handler;
-/// # Ok(())
-/// # }
-/// ```
 pub type BoxedHandler = BoxCloneSyncService<Request, Response, Error>;

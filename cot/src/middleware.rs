@@ -33,10 +33,69 @@ use crate::session::store::redis::RedisStore;
 #[cfg(feature = "live-reload")]
 mod live_reload;
 
+/// Middleware that converts any error type to [`Error`].
+///
+/// This is useful for converting a response from a middleware that is
+/// compatible with the `tower` crate to a response that is compatible with
+/// Cot. It's applied automatically by
+/// [`RootHandlerBuilder::middleware`](crate::project::RootHandlerBuilder::middleware) and is not needed to be added
+/// manually.
+///
+/// # Examples
+///
+/// ```
+/// use cot::Project;
+/// use cot::middleware::LiveReloadMiddleware;
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+///
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn middlewares(
+///         &self,
+///         handler: RootHandlerBuilder,
+///         context: &MiddlewareContext,
+///     ) -> RootHandler {
+///         handler
+///             // IntoCotErrorLayer used internally in middleware()
+///             .middleware(LiveReloadMiddleware::from_context(context))
+///             .build()
+///     }
+/// }
+/// ```
+pub use cot_core::middleware::IntoCotErrorLayer;
+/// Middleware that converts any `http::Response` generic type
+/// to a [`Response`].
+///
+/// This is useful for converting a response from a middleware that is
+/// compatible with the `tower` crate to a response that is compatible with
+/// Cot. It's applied automatically by
+/// [`RootHandlerBuilder::middleware`](crate::project::RootHandlerBuilder::middleware)
+/// and is not needed to be added manually.
+///
+/// # Examples
+///
+/// ```
+/// use cot::Project;
+/// use cot::middleware::LiveReloadMiddleware;
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+///
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn middlewares(
+///         &self,
+///         handler: RootHandlerBuilder,
+///         context: &MiddlewareContext,
+///     ) -> RootHandler {
+///         handler
+///             // IntoCotResponseLayer used internally in middleware()
+///             .middleware(LiveReloadMiddleware::from_context(context))
+///             .build()
+///     }
+/// }
+/// ```
+pub use cot_core::middleware::IntoCotResponseLayer;
 #[doc(inline)]
-pub use cot_core::middleware::{
-    IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer,
-};
+pub use cot_core::middleware::{IntoCotError, IntoCotResponse};
 #[cfg(feature = "live-reload")]
 pub use live_reload::LiveReloadMiddleware;
 

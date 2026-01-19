@@ -17,37 +17,6 @@ use crate::request::Request;
 use crate::response::Response;
 use crate::{Body, Error};
 
-#[rustfmt::skip] // `wrap_comments` breaks local links
-/// Middleware that converts any [`http::Response`] generic type
-/// to a [`Response`].
-///
-/// This is useful for converting a response from a middleware that is
-/// compatible with the `tower` crate to a response that is compatible with
-/// Cot. It's applied automatically by
-/// [`RootHandlerBuilder::middleware()`](../../cot/project/struct.RootHandlerBuilder.html#method.middleware)
-/// and is not needed to be added manually.
-///
-/// # Examples
-///
-/// ```
-/// use cot::Project;
-/// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
-///
-/// struct MyProject;
-/// impl Project for MyProject {
-///     fn middlewares(
-///         &self,
-///         handler: RootHandlerBuilder,
-///         context: &MiddlewareContext,
-///     ) -> RootHandler {
-///         handler
-///             // IntoCotResponseLayer used internally in middleware()
-///             .middleware(LiveReloadMiddleware::from_context(context))
-///             .build()
-///     }
-/// }
-/// ```
 #[derive(Debug, Copy, Clone)]
 pub struct IntoCotResponseLayer;
 
@@ -132,36 +101,6 @@ where
     response.map(|body| Body::wrapper(BoxBody::new(body.map_err(map_err))))
 }
 
-#[rustfmt::skip] // `wrap_comments` breaks local links
-/// Middleware that converts any error type to [`Error`].
-///
-/// This is useful for converting a response from a middleware that is
-/// compatible with the `tower` crate to a response that is compatible with
-/// Cot. It's applied automatically by
-/// [`RootHandlerBuilder::middleware`](../../cot/project/struct.RootHandlerBuilder.html#method.middleware)
-/// and is not needed to be added manually.
-///
-/// # Examples
-///
-/// ```
-/// use cot::Project;
-/// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
-///
-/// struct MyProject;
-/// impl Project for MyProject {
-///     fn middlewares(
-///         &self,
-///         handler: RootHandlerBuilder,
-///         context: &MiddlewareContext,
-///     ) -> RootHandler {
-///         handler
-///             // IntoCotErrorLayer used internally in middleware()
-///             .middleware(LiveReloadMiddleware::from_context(context))
-///             .build()
-///     }
-/// }
-/// ```
 #[derive(Debug, Copy, Clone)]
 pub struct IntoCotErrorLayer;
 

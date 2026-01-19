@@ -373,7 +373,21 @@ impl<F: Form> FromRequest for RequestForm<F> {
 #[cfg(feature = "db")]
 impl FromRequestHead for crate::db::Database {
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        Ok(head.db().clone())
+        Ok(head.context().database().clone())
+    }
+}
+
+#[cfg(feature = "cache")]
+impl FromRequestHead for crate::cache::Cache {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        Ok(head.context().cache().clone())
+    }
+}
+
+#[cfg(feature = "email")]
+impl FromRequestHead for crate::email::Email {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        Ok(head.context().email().clone())
     }
 }
 
@@ -763,5 +777,25 @@ mod tests {
 
         // check that we have a connection to the database
         extracted_db.close().await.unwrap();
+    }
+
+    #[cfg(feature = "cache")]
+    #[cot::test]
+    async fn request_cache() {
+        let mut request_builder = TestRequestBuilder::get("/");
+        let mut request = request_builder.build();
+
+        let extracted_cache = request.extract_from_head::<crate::cache::Cache>().await;
+        assert!(extracted_cache.is_ok());
+    }
+
+    #[cfg(feature = "email")]
+    #[cot::test]
+    async fn request_email() {
+        let mut request_builder = TestRequestBuilder::get("/");
+        let mut request = request_builder.build();
+
+        let email_service = request.extract_from_head::<crate::email::Email>().await;
+        assert!(email_service.is_ok());
     }
 }

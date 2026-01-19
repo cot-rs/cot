@@ -2032,10 +2032,7 @@ impl<S: BootstrapPhase<Database = Option<Database>>> ProjectContext<S> {
     ///
     /// async fn index(request: Request) -> cot::Result<Response> {
     ///     let database = request.context().database();
-    ///     // can also be accessed via:
-    ///     request.db();
-    ///
-    ///     // ...
+    ///     // use the database
     /// #    unimplemented!()
     /// }
     /// ```

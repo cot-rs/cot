@@ -58,8 +58,9 @@ type InMemoryMap = HashMap<String, (Value, Option<Timeout>)>;
 
 /// An in-memory cache store implementation.
 ///
-/// This store keeps all cache entries in memory using a thread-safe hashmap.
-/// It's primarily useful for development and testing environments.
+/// This is an in-memory implementation of the [`CacheStore`] trait that uses a
+/// thread-safe hashmap to store entries. It's primarily useful for development
+/// and testing environments.
 ///
 /// # Examples
 /// ```
@@ -72,7 +73,7 @@ pub struct Memory {
 }
 
 impl Memory {
-    /// Create a new, empty `Memory` cache store.
+    /// Creates a new, empty `Memory` cache store.
     ///
     /// # Examples
     /// ```

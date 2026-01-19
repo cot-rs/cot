@@ -87,7 +87,7 @@ pub struct ProjectConfig {
     /// ```
     pub register_panic_hook: bool,
     /// The secret key used for signing cookies and other sensitive data. This
-    /// is a cryptographic key, should be kept secret, and should a set to a
+    /// is a cryptographic key, should be kept secret, and should be set to a
     /// random and unique value for each project.
     ///
     /// When you want to rotate the secret key, you can move the current key to
@@ -302,8 +302,7 @@ impl ProjectConfig {
     ///
     /// This is useful for development purposes, where you want to have a
     /// configuration that you can just run as quickly as possible. This is
-    /// mainly useful for tests and other things that are run in the local
-    /// environment.
+    /// mainly useful for tests and other local development activities.
     ///
     /// Note that what this function returns exactly is not guaranteed to be
     /// the same across different versions of Cot. It's meant to be used as a
@@ -505,8 +504,7 @@ impl Timeout {
     ///
     /// # Panics
     ///
-    /// This function will panic if the timeout variant is `After` and the
-    /// `insertion_time` is `None`.
+    /// Panics if the timeout variant is `After` and `insertion_time` is `None`.
     ///
     /// # Examples
     ///
@@ -620,7 +618,7 @@ pub struct CacheConfig {
     /// Timeout for cache operations.
     ///
     /// This controls how long to wait for cache operations to complete before
-    /// timing out. The default is 300 seconds(5 minutes).
+    /// timing out. The default is 300 seconds (5 minutes).
     ///
     /// # Examples
     ///
@@ -1314,7 +1312,7 @@ pub enum SessionStoreTypeConfig {
     /// Database-backed session storage.
     ///
     /// This stores session data in the configured database. This requires the
-    /// "db" and "json" features enabled.
+    /// "db" and "json" features to be enabled.
     #[cfg(all(feature = "db", feature = "json"))]
     Database,
 
@@ -1855,8 +1853,8 @@ pub enum EmailTransportTypeConfig {
         /// The URL format is:
         /// `scheme://user:password@host:port/?ehlo_domain=domain&tls=TLS`.
         ///
-        /// `user` (username) and `password` are optional in the case the
-        /// server does not require authentication.
+        /// `user` (username) and `password` are optional if the server does not
+        /// require authentication.
         /// When `port` is not specified, it is automatically determined based
         /// on the `scheme` used.
         /// `tls` is used to specify whether STARTTLS should be used for the

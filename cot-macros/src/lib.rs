@@ -73,14 +73,14 @@ pub fn derive_admin_model(input: TokenStream) -> TokenStream {
 ///   types for you.
 ///
 ///   Migration models have two major uses. The first is so that the migration
-///   engine uses knows what was the state of model at the time the last
-///   migration was generated. This allows the engine to automatically detect
-///   the changes and generate the necessary migration code. The second use is
-///   to allow custom code in the migrations: you might want the migration to
-///   fill in some data, for instance. You can't use the actual model for this
-///   because the model might have changed since the migration was generated.
-///   You can, however, use the migration model, which will always represent
-///   the state of the model at the time the migration runs.
+///   engine knows what the state of model was at the time the last migration
+///   was generated. This allows the engine to automatically detect the changes
+///   and generate the necessary migration code. The second use is to allow
+///   custom code in the migrations: you might want the migration to fill in
+///   some data, for example. You can't use the actual model for this because
+///   the model might have changed since the migration was generated. You can,
+///   however, use the migration model, which will always represent the state of
+///   the model at the time the migration runs.
 /// ```
 /// // In a migration file
 /// use cot::db::model;
@@ -168,7 +168,7 @@ pub fn cachetest(_args: TokenStream, input: TokenStream) -> TokenStream {
 /// An attribute macro that defines an `async` test function for a Cot-powered
 /// app.
 ///
-/// This is pretty much an equivalent to `#[tokio::test]` provided so that you
+/// This is equivalent to `#[tokio::test]`, but provided so that you
 /// don't have to declare `tokio` as a dependency in your tests.
 ///
 /// # Examples

@@ -1,7 +1,7 @@
 //! Database-backed user authentication backend.
 //!
 //! This module provides a user type and an authentication backend that stores
-//! the user data in a database using the Cot ORM.
+//! user data in a database using the Cot ORM.
 
 use std::any::Any;
 use std::borrow::Cow;
@@ -66,11 +66,11 @@ impl DatabaseUser {
         }
     }
 
-    /// Create a new user and save it to the database.
+    /// Creates a new user and saves it to the database.
     ///
     /// # Errors
     ///
-    /// Returns an error if the user could not be saved to the database.
+    /// Returns an error if the user could not be saved.
     ///
     /// # Example
     ///
@@ -122,8 +122,8 @@ impl DatabaseUser {
         Ok(user)
     }
 
-    /// Get a user by their integer ID. Returns [`None`] if the user does not
-    /// exist.
+    /// Retrieves a user by their integer ID. It returns [`None`] if the user
+    /// does not exist.
     ///
     /// # Errors
     ///
@@ -178,8 +178,8 @@ impl DatabaseUser {
         Ok(db_user)
     }
 
-    /// Get a user by their username. Returns [`None`] if the user does not
-    /// exist.
+    /// Retrieves a user by their username. It returns [`None`] if the user does
+    /// not exist.
     ///
     /// # Errors
     ///
@@ -229,7 +229,7 @@ impl DatabaseUser {
         Ok(db_user)
     }
 
-    /// Authenticate a user.
+    /// Authenticates a user using the provided credentials.
     ///
     /// # Errors
     ///
@@ -275,7 +275,7 @@ impl DatabaseUser {
         }
     }
 
-    /// Get the ID of the user.
+    /// Returns the ID of the user.
     ///
     /// # Example
     ///
@@ -318,7 +318,7 @@ impl DatabaseUser {
         }
     }
 
-    /// Get the username of the user.
+    /// Returns the username of the user.
     ///
     /// # Example
     ///
@@ -424,7 +424,7 @@ impl DatabaseUserCredentials {
         Self { username, password }
     }
 
-    /// Get the username of the user.
+    /// Returns the username of the user.
     ///
     /// # Example
     ///
@@ -441,7 +441,7 @@ impl DatabaseUserCredentials {
         &self.username
     }
 
-    /// Get the password of the user.
+    /// Returns the password of the user.
     ///
     /// # Example
     ///

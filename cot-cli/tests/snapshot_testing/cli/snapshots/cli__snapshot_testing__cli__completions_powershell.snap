@@ -82,7 +82,7 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
         }
         'cot;migration;make' {
             [CompletionResult]::new('--app-name', '--app-name', [CompletionResultType]::ParameterName, 'Name of the app to use in the migration (default: crate name)')
-            [CompletionResult]::new('--output-dir', '--output-dir', [CompletionResultType]::ParameterName, 'Directory to write the migrations to (default: migrations/ directory in the crate''s src/ directory)')
+            [CompletionResult]::new('--output-dir', '--output-dir', [CompletionResultType]::ParameterName, 'Directory to write the migrations to (default: the migrations/ directory in the crate''s src/ directory)')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')

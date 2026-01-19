@@ -40,7 +40,7 @@ mod live_reload;
 #[cfg(feature = "live-reload")]
 pub use live_reload::LiveReloadMiddleware;
 
-/// Middleware that converts a any [`http::Response`] generic type to a
+/// Middleware that converts any [`http::Response`] generic type to a
 /// [`cot::response::Response`].
 ///
 /// This is useful for converting a response from a middleware that is
@@ -216,7 +216,7 @@ impl<S> tower::Layer<S> for IntoCotErrorLayer {
     }
 }
 
-/// Service struct that converts a any error type to a [`cot::Error`].
+/// Service struct that converts any error type to a [`cot::Error`].
 ///
 /// Used by [`IntoCotErrorLayer`].
 ///
@@ -277,7 +277,7 @@ pub struct SessionMiddleware {
 }
 
 impl SessionMiddleware {
-    /// Crates a new instance of [`SessionMiddleware`].
+    /// Creates a new instance of [`SessionMiddleware`].
     #[must_use]
     pub fn new<S: SessionStore + Send + Sync + 'static>(store: S) -> Self {
         let layer = SessionManagerLayer::new(SessionStoreWrapper::new(Arc::new(store)));

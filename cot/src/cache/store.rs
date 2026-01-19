@@ -2,8 +2,8 @@
 //!
 //! This module defines a generic `CacheStore` trait and common types used by
 //! in-memory, file and Redis-backed cache implementations. The main goal is to
-//! provide a simple asynchronous interface for putting, getting, and managing
-//! cached values, optionally with expiration policies.
+//! provide a simple asynchronous interface for storing, retrieving, and
+//! managing cached values, optionally with expiration policies.
 
 pub mod memory;
 #[cfg(feature = "redis")]
@@ -50,14 +50,14 @@ pub trait CacheStore: Send + Sync + 'static {
     ///
     /// # Errors
     ///
-    /// This method can return error if there is an issue retrieving the key.
+    /// This method can return an error if there is an issue retrieving the key.
     fn get(&self, key: &str) -> impl Future<Output = CacheStoreResult<Option<Value>>> + Send;
 
     /// Insert a value under the given key.
     ///
     /// # Errors
     ///
-    /// This method can return error if there is an issue inserting the
+    /// This method can return an error if there is an issue inserting the
     /// key-value pair.
     fn insert(
         &self,
@@ -70,14 +70,14 @@ pub trait CacheStore: Send + Sync + 'static {
     ///
     /// # Errors
     ///
-    /// This method can return error if there is an issue removing the key.
+    /// This method can return an error if there is an issue removing the key.
     fn remove(&self, key: &str) -> impl Future<Output = CacheStoreResult<()>> + Send;
 
     /// Clear all entries in the cache.
     ///
     /// # Errors
     ///
-    /// This method can return error if there is an issue clearing the cache.
+    /// This method can return an error if there is an issue clearing the cache.
     fn clear(&self) -> impl Future<Output = CacheStoreResult<()>> + Send;
 
     /// Get an approximate count of entries in the cache.
@@ -87,15 +87,16 @@ pub trait CacheStore: Send + Sync + 'static {
     ///
     /// # Errors
     ///
-    /// This method can return error if there is an issue retrieving the length.
+    /// This method can return an error if there is an issue retrieving the
+    /// length.
     fn approx_size(&self) -> impl Future<Output = CacheStoreResult<usize>> + Send;
 
     /// Returns `true` if the cache contains the specified key.
     ///
     /// # Errors
     ///
-    /// This method can return error if there is an issue checking the presence
-    /// of the key.
+    /// This method can return an error if there is an issue checking the
+    /// presence of the key.
     fn contains_key(&self, key: &str) -> impl Future<Output = CacheStoreResult<bool>> + Send;
 }
 

@@ -60,7 +60,7 @@ complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subco
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l app-name -d 'Name of the app to use in the migration (default: crate name)' -r
-complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l output-dir -d 'Directory to write the migrations to (default: migrations/ directory in the crate\'s src/ directory)' -r -F
+complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l output-dir -d 'Directory to write the migrations to (default: the migrations/ directory in the crate\'s src/ directory)' -r -F
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s h -l help -d 'Print help'

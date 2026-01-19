@@ -75,7 +75,7 @@ set edit:completion:arg-completer[cot] = {|@words|
         }
         &'cot;migration;make'= {
             cand --app-name 'Name of the app to use in the migration (default: crate name)'
-            cand --output-dir 'Directory to write the migrations to (default: migrations/ directory in the crate''s src/ directory)'
+            cand --output-dir 'Directory to write the migrations to (default: the migrations/ directory in the crate''s src/ directory)'
             cand -v 'Increase logging verbosity'
             cand --verbose 'Increase logging verbosity'
             cand -q 'Decrease logging verbosity'

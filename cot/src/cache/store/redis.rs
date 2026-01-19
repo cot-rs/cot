@@ -1,7 +1,9 @@
 //! Redis cache store implementation.
 //!
-//! This store uses Redis as the backend for caching.
+//! This is a Redis-backed implementation of the [`CacheStore`] trait.
+//!
 //! # Examples
+//!
 //! ```no_run
 //! # use cot::cache::store::redis::Redis;
 //! # use cot::cache::store::CacheStore;
@@ -74,7 +76,7 @@ impl From<RedisCacheStoreError> for CacheStoreError {
 
 /// A Redis-backed cache store implementation.
 ///
-/// This store uses Redis as the backend for caching.
+/// This is a Redis-backed implementation of the [`CacheStore`] trait.
 ///
 /// # Examples
 /// ```
@@ -89,7 +91,7 @@ pub struct Redis {
 }
 
 impl Redis {
-    /// Creates and configures a new Redis cache store.
+    /// Creates and configures a new Redis cache store instance.
     ///
     /// This initializes a connection pool to the Redis server specified by the
     /// provided URL.
@@ -98,8 +100,8 @@ impl Redis {
     ///
     /// Returns [`RedisCacheStoreError::InvalidConnectionString`] if the
     /// provided URL is not a valid Redis URL
-    /// and [`RedisCacheStoreError::PoolCreation`] if the connection pool could
-    /// not be created.
+    /// and [`RedisCacheStoreError::PoolCreation`] if an error occurs during
+    /// connection pool creation.
     ///
     /// # Examples
     ///

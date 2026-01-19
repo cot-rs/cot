@@ -193,7 +193,7 @@ impl HtmlTag {
     ///
     /// # Safety
     ///
-    /// This function will escape the attribute value. Note that it does not
+    /// This function escapes the attribute value. Note that it does not
     /// escape the attribute name.
     ///
     /// # Panics
@@ -226,7 +226,7 @@ impl HtmlTag {
     ///
     /// # Safety
     ///
-    /// This function will not escape the attribute name.
+    /// This function does not escape the attribute name.
     ///
     /// # Panics
     ///

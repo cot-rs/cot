@@ -2,7 +2,7 @@
 //!
 //! Cot uses the [`Response`](http::Response) type from the [`http`] crate
 //! to represent outgoing HTTP responses. However, it also provides a
-//! [`ResponseExt`] trait that contain various helper methods for working with
+//! [`ResponseExt`] trait that contains various helper methods for working with
 //! HTTP responses. These methods are used to create new responses with HTML
 //! content types, redirects, and more. You probably want to have a `use`
 //! statement for [`ResponseExt`] in your code most of the time to be able to
@@ -20,7 +20,8 @@ mod into_response;
 ///
 /// This macro can be applied to enums to automatically implement the
 /// [`IntoResponse`] trait. The enum must consist of tuple variants with
-/// exactly one field each, where each field type implements [`IntoResponse`].
+/// exactly one field each, with each variant containing a single field that
+/// implements [`IntoResponse`].
 ///
 /// # Requirements
 ///
@@ -82,7 +83,7 @@ mod private {
 }
 
 /// Extension trait for [`http::Response`] that provides helper methods for
-/// working with HTTP response.
+/// working with HTTP responses.
 ///
 /// # Sealed
 ///
@@ -108,7 +109,7 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// Create a new redirect response.
     ///
     /// This creates a new [`Response`] object with a status code of
-    /// [`StatusCode::SEE_OTHER`] and a location header set to the provided
+    /// [`StatusCode::SEE_OTHER`] and a `Location` header set to the provided
     /// location.
     ///
     /// # Examples

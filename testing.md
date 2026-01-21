@@ -18,7 +18,7 @@ By employing Cot's testing utilities, you'll be able to verify that each piece o
 
 ## General Overview
 
-Cot provides several built-in utilities located in the [`cot::test` module](https://docs.rs/cot/0.3/cot/test/index.html) to help you create and run tests for your application.
+Cot provides several built-in utilities located in the [`cot::test` module](https://docs.rs/cot/0.5/cot/test/index.html) to help you create and run tests for your application.
 
 Typical Rust projects keep their tests in:
 - A dedicated `tests/` directory (for integration tests).
@@ -168,6 +168,32 @@ test_db.cleanup().await?;
 - Form data is currently only supported with POST requests.
 - Custom migrations can be added using the `add_migrations` method on `TestDatabase`.
 
+## Test Cache
+
+Cot's testing utilities also include the `TestCache` struct, which helps you create temporary caches for your tests. This allows you to test how your application interacts with the cache without polluting your real cache.
+
+```rust
+use cot::test::TestCache;
+
+// Create a memory cache
+let test_cache = TestCache::new_memory();
+let cache = test_cache.cache();
+
+// Or Redis (requires `redis` feature and a running Redis instance)
+let test_cache = TestCache::new_redis().await?;
+let cache = test_cache.cache();
+
+// Use the cache in requests
+let request = TestRequestBuilder::get("/")
+    .cache(cache)
+    .build();
+
+// Clean up after testing (important for Redis)
+test_cache.cleanup().await?;
+```
+
+The Redis test cache uses a randomized key prefix to ensure isolation between tests.
+
 ## End-to-end testing
 
 Cot provides an end-to-end testing framework that allows you to test your entire application in a near-production environment. This is particularly useful for testing complex workflows that involve multiple components, such as user authentication, database interactions, external API calls, and your application's UI. By using the end-to-end testing framework you will be able to send real HTTP requests or use web automation tools to simulate user interactions with your application.
@@ -210,7 +236,7 @@ Please refer to the documentation of these crates for more information on how to
 Cot's testing framework provides a robust and flexible approach to ensuring the quality of your application.
 
 - **Unit tests** with `TestRequestBuilder` help you verify that individual components behave as expected.
-- **Integration tests** with `Client` let you test your entire application in a near-production environment, while `TestDatabase` give you confidence that your data layer is functioning correctly, whether you're using SQLite, PostgreSQL, or MySQL.
-- **End-to-end tests** TODO
+- **Integration tests** with `Client` let you test your entire application in a near-production environment, while `TestDatabase` and `TestCache` give you confidence that your data and caching layers are functioning correctly.
+- **End-to-end tests** with `TestServerBuilder` allow you to verify your full application workflows in a real-world scenario.
 
 By integrating these testing tools into your workflow, you can deploy your Cot applications with greater confidence. Happy testing!

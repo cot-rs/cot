@@ -4,9 +4,33 @@ title: Upgrade Guide
 
 Each version of Cot introduces new features, improvements, and sometimes breaking changes. This guide will help you understand the changes made in each version and how to adapt your code accordingly.
 
-As a general rule, try to upgrade one minor version at a time. Many breaking changes are introduced by first deprecating a feature in one minor version and then removing it in the next. This gives you time to adapt your code before the feature is removed, while the Rust compiler will notice you about the exact changes you need to make.
+As a general rule, try to upgrade one minor version at a time. Many breaking changes are introduced by first deprecating a feature in one minor version and then removing it in the next. This gives you time to adapt your code before the feature is removed, while the Rust compiler will notify you about the exact changes you need to make.
 
 Sometimes, though, the changes need to be made in a backwards-incompatible manner. This page will help you understand those changes and how to adapt your code.
+
+## From 0.4 to 0.5
+
+### General
+
+* **MSRV Bump**: The Minimum Supported Rust Version (MSRV) has been bumped to 1.88.
+* **Templates**: `cot` now re-exports `Template` trait and `#[derive(Template)]` macro. You should update your imports from `use askama::Template;` to `use cot::Template;`. This change allows you to remove `askama` from your `Cargo.toml` dependencies.
+* **Database**: `Database` struct now uses `Arc` internally. If you were wrapping `Database` in `Arc` (e.g. `Arc<Database>`), you should remove the `Arc` wrapper as `Database` is now cheap to clone.
+
+### Forms
+
+* **Attribute Rename**: The `opt` attribute parameter in `#[form(...)]` macro has been renamed to `opts`.
+    ```rust
+    // Before
+    #[form(opt(max_length = 100))]
+
+    // After
+    #[form(opts(max_length = 100))]
+    ```
+
+### Configuration
+
+* **Cache Support**: Cot now includes a built-in caching system. This brings a new `[cache]` section in the configuration. If you have any existing configuration that conflicts with this, you might need to adjust it.
+* **Email Support**: Similar to caching, email support has been added with a new `[email]` configuration section.
 
 ## From 0.3 to 0.4
 

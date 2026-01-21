@@ -30,7 +30,7 @@ impl Project for MyProject {
         app_context: &MiddlewareContext,
     ) -> RootHandler {
         handler
-            .middleware(StaticFilesMiddleware::from_app_context(app_context))
+            .middleware(StaticFilesMiddleware::from_context(app_context))
             .middleware(SessionMiddleware::new())  // Required for admin login
             .build()
     }

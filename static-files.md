@@ -15,7 +15,7 @@ The Cot CLI generates a `static` directory in your project root, which serves as
 To serve static files, you'll need to register them in your application's `static_files()` method within the `CotApp` implementation. Here's a basic example:
 
 ```rust
-impl CotApp for MyApp {
+impl App for MyApp {
     fn static_files(&self) -> Vec<StaticFile> {
         static_files!("css/main.css")
     }
@@ -25,7 +25,7 @@ impl CotApp for MyApp {
 To add more files, simply include them in the `static_files!` macro. For example, after adding a logo to your project:
 
 ```rust
-impl CotApp for MyApp {
+impl App for MyApp {
     fn static_files(&self) -> Vec<StaticFile> {
         static_files!(
             "css/main.css",
@@ -40,8 +40,8 @@ You can get the URL for a static file using the `StaticFiles` extractor. For exa
 ```rust
 use cot::request::extractors::StaticFiles;
 
-async fn get_logo_url(static_files: StaticFiles) -> String {
-    static_files.url_for("images/logo.png")
+async fn get_logo_url(static_files: StaticFiles) -> cot::Result<String> {
+    Ok(static_files.url_for("images/logo.png")?.to_string())
 }
 ```
 

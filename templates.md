@@ -6,7 +6,7 @@ Cot does not require you to use any specific templating engine. However, it prov
 
 ## Basic Syntax
 
-A Askama template is simply a text file that includes both static text and dynamic content. The dynamic content is introduced using variables, tags, and filters. Below is a simple Askama template:
+An Askama template is simply a text file that includes both static text and dynamic content. The dynamic content is introduced using variables, tags, and filters. Below is a simple Askama template:
 
 ```html.j2
 <ul>
@@ -42,7 +42,7 @@ Here is a simple demonstration of templating with Askama in Cot:
 use cot::request::Request;
 use cot::response::{Response, ResponseExt};
 use cot::{Body, StatusCode};
-use askama::Template;
+use cot::Template;
 
 struct Item {
     title: String,
@@ -167,7 +167,7 @@ use cot::request::Request;
 use cot::response::{Response, ResponseExt};
 use cot::router::{Router, Route, Urls};
 use cot::{Body, StatusCode};
-use askama::Template;
+use cot::Template;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -336,7 +336,7 @@ impl HtmlSafe for Item {}
 
 Be very cautious when marking output as safe; you are responsible for ensuring that the content doesn’t introduce security risks.
 
-To simplify generating safe HTML in Rust, Cot provides the [`HtmlTag`](https://docs.rs/cot/0.3/cot/html/struct.HtmlTag.html) type. It automatically applies escaping where necessary.
+To simplify generating safe HTML in Rust, Cot provides the [`HtmlTag`](https://docs.rs/cot/0.5/cot/html/struct.HtmlTag.html) type. It automatically applies escaping where necessary.
 
 ```rust
 impl Display for Item {

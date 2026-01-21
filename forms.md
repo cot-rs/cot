@@ -15,7 +15,7 @@ use cot::form::Form;
 struct ContactForm {
     name: String,
     email: String,
-    #[form(opt(max_length = 1000))]
+    #[form(opts(max_length = 1000))]
     message: String,
 }
 ```
@@ -24,6 +24,7 @@ And here is how you can process the form inside a request handler:
 
 ```rust
 use cot::form::{Form, FormResult};
+use cot::html::Html;
 use cot::request::{Request, RequestExt};
 use cot::response::{Response, ResponseExt};
 
@@ -32,8 +33,7 @@ async fn contact(mut request: Request) -> cot::Result<Response> {
     if request.method() == Method::POST {
         match ContactForm::from_request(&mut request).await? {
             FormResult::Ok(form) => {
-                // Form is valid! Process the datause cot::html::Html;
-
+                // Form is valid! Process the data
                 println!("Message from {}: {}", form.name, form.message);
 
                 // Redirect after successful submission
@@ -45,10 +45,7 @@ async fn contact(mut request: Request) -> cot::Result<Response> {
                     request: &request,
                     form: context,
                 };
-                Ok(Response::new_html(
-                    StatusCode::OK,
-                    Body::fixed(template.render()?)
-                ))
+                Ok(Html::new(template.render()?).into())
             }
         }
     } else {
@@ -58,10 +55,7 @@ async fn contact(mut request: Request) -> cot::Result<Response> {
             form: ContactForm::build_context(&mut request).await?,
         };
 
-        Ok(Response::new_html(
-            StatusCode::OK,
-            Body::fixed(template.render()?)
-        ))
+        Ok(Html::new(template.render()?).into())
     }
 }
 ```
@@ -117,11 +111,11 @@ Cot provides several ways to validate form data:
 #[derive(Form)]
 struct ArticleForm {
     // Maximum length validation
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     title: String,
 
     // Required checkbox
-    #[form(opt(must_be_true = true))]
+    #[form(opts(must_be_true = true))]
     confirm_publish: bool,
 }
 ```
@@ -143,10 +137,7 @@ async fn handle_form(mut request: Request) -> cot::Result<Response> {
                 );
 
                 // Re-render form with error
-                return Ok(Response::new_html(
-                    StatusCode::OK,
-                    Body::fixed(render_template(context)?)
-                ));
+                return Ok(Html::new(render_template(context)?).into());
             }
 
             // Process valid form...
@@ -154,10 +145,7 @@ async fn handle_form(mut request: Request) -> cot::Result<Response> {
         }
         FormResult::ValidationError(context) => {
             // Handle validation errors...
-            Ok(Response::new_html(
-                StatusCode::OK,
-                Body::fixed(render_template(context)?)
-            ))
+            Ok(Html::new(render_template(context)?).into())
         }
     }
 }
@@ -165,7 +153,7 @@ async fn handle_form(mut request: Request) -> cot::Result<Response> {
 
 ## Summary
 
-In this you learned how to handle forms and validate form data in Cot applications. Remember:
+In this chapter you learned how to handle forms and validate form data in Cot applications. Remember:
 
 * Always validate form data server-side
 * Provide clear error messages
@@ -173,4 +161,4 @@ In this you learned how to handle forms and validate form data in Cot applicatio
 * Consider user experience in form layout
 * Handle both GET and POST requests appropriately
 
-In the next chapter, we'll explore database models and how can you use them to persist data in your services.
+In the next chapter, we'll explore database models and how you can use them to persist data in your services.

@@ -21,7 +21,7 @@ To use OpenAPI features in Cot, you need to enable the `openapi` and `swagger-ui
 ```toml
 [dependencies]
 cot = { version = "...", features = ["openapi", "swagger-ui"] }
-schemars = "0.8" # Required for JSON Schema generation
+schemars = "0.9" # Required for JSON Schema generation
 ```
 
 The `schemars` crate is necessary for creating JSON Schema definitions for your request and response types.
@@ -297,11 +297,11 @@ Each method will be properly documented in the OpenAPI specification.
 
 ### Implement your own OpenAPI extractor
 
-In order for your parameter or response type to generate OpenAPI specification, you need to implement the [`ApiOperationPart`](https://docs.rs/cot/0.3/cot/openapi/trait.ApiOperationPart.html) trait. You can study their implementations to understand how to design your own:
+In order for your parameter or response type to generate OpenAPI specification, you need to implement the [`ApiOperationPart`](https://docs.rs/cot/0.5/cot/openapi/trait.ApiOperationPart.html) trait. You can study their implementations to understand how to design your own:
 
-* [`Json<T>`](https://docs.rs/cot/0.3/cot/json/struct.Json.html) adds a request or response body to the operation
-* [`Path<T>`](https://docs.rs/cot/0.3/cot/request/extractors/struct.Path.html) adds path parameters
-* [`UrlQuery<T>`](https://docs.rs/cot/0.3/cot/request/extractors/struct.UrlQuery.html) adds query parameters
+* [`Json<T>`](https://docs.rs/cot/0.5/cot/json/struct.Json.html) adds a request or response body to the operation
+* [`Path<T>`](https://docs.rs/cot/0.5/cot/request/extractors/struct.Path.html) adds path parameters
+* [`UrlQuery<T>`](https://docs.rs/cot/0.5/cot/request/extractors/struct.UrlQuery.html) adds query parameters
 
 The key is to modify the `Operation` object appropriately for your extractor, adding parameters, request bodies, or other OpenAPI elements as needed.
 

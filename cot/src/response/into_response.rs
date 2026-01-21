@@ -1,13 +1,14 @@
 use bytes::{Bytes, BytesMut};
 use cot::error::error_impl::impl_into_cot_error;
 use cot::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
-use cot::response::Response;
+use cot::response::{RESPONSE_BUILD_FAILURE, Response};
 use cot::{Body, Error, StatusCode};
 use http;
 
 #[cfg(feature = "json")]
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::html::Html;
+use crate::response::Redirect;
 
 /// Trait for generating responses.
 /// Types that implement `IntoResponse` can be returned from handlers.
@@ -382,6 +383,17 @@ impl_into_cot_error!(JsonSerializeError, INTERNAL_SERVER_ERROR);
 impl IntoResponse for Body {
     fn into_response(self) -> cot::Result<Response> {
         Ok(Response::new(self))
+    }
+}
+
+impl IntoResponse for Redirect {
+    fn into_response(self) -> cot::Result<Response> {
+        let response = http::Response::builder()
+            .status(StatusCode::SEE_OTHER)
+            .header(http::header::LOCATION, self.0)
+            .body(Body::empty())
+            .expect(RESPONSE_BUILD_FAILURE);
+        Ok(response)
     }
 }
 

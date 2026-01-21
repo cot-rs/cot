@@ -108,8 +108,8 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// Create a new redirect response.
     ///
     /// This creates a new [`Response`] object with a status code of
-    /// [`StatusCode::SEE_OTHER`] and a location header set to the provided
-    /// location.
+    /// [`StatusCode::SEE_OTHER`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/303)
+    /// and a location header set to the provided location.
     ///
     /// # Examples
     ///
@@ -148,15 +148,16 @@ impl ResponseExt for Response {
 /// A redirect response.
 ///
 /// This type creates an HTTP redirect response with a status code of
-/// [`StatusCode::SEE_OTHER`] (303) and a `Location` header set to the
-/// specified URL.
+/// [`StatusCode::SEE_OTHER`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/303)
+/// (303) and a `Location` header set to the specified URL.
 ///
 /// # Examples
 ///
 /// ```
 /// use cot::response::{IntoResponse, Redirect};
 ///
-/// let response = Redirect::new("https://example.com");
+/// let redirect = Redirect::new("https://example.com");
+/// let response = redirect.into_response().unwrap();
 ///
 /// assert_eq!(response.status(), cot::StatusCode::SEE_OTHER);
 /// ```
@@ -172,24 +173,22 @@ impl Redirect {
     /// Creates a new redirect response to the specified location.
     ///
     /// Creates an HTTP redirect response with a status code of
-    /// [`StatusCode::SEE_OTHER`] (303) and a `Location` header set to the
-    /// specified URL.
+    /// [`StatusCode::SEE_OTHER`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/303)
+    /// (303) and a `Location` header set to the specified URL.
     ///
     /// # Examples
     ///
     /// ```
-    /// use cot::response::Redirect;
+    /// use cot::response::{IntoResponse, Redirect};
     ///
-    /// let redirect = Redirect::new("/login");
+    /// let redirect = Redirect::new("https://example.com");
+    /// let response = redirect.into_response().unwrap();
+    ///
+    /// assert_eq!(response.status(), cot::StatusCode::SEE_OTHER);
     /// ```
     #[must_use]
-    #[expect(clippy::new_ret_no_self)]
-    pub fn new<T: Into<String>>(location: T) -> Response {
-        http::Response::builder()
-            .status(StatusCode::SEE_OTHER)
-            .header(http::header::LOCATION, location.into())
-            .body(Body::empty())
-            .expect(RESPONSE_BUILD_FAILURE)
+    pub fn new<T: Into<String>>(location: T) -> Self {
+        Self(location.into())
     }
 }
 
@@ -232,6 +231,17 @@ mod tests {
     fn response_new_redirect() {
         let location = "http://example.com";
         let response = Response::new_redirect(location);
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(
+            response.headers().get(http::header::LOCATION).unwrap(),
+            location
+        );
+    }
+
+    #[test]
+    fn response_new_redirect_struct() {
+        let location = "http://example.com";
+        let response = Redirect::new(location).into_response().unwrap();
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
         assert_eq!(
             response.headers().get(http::header::LOCATION).unwrap(),

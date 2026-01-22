@@ -21,9 +21,9 @@ pub(crate) use cot_core::request::{AppName, InvalidContentType, RouteName};
 pub use cot_core::request::{PathParams, PathParamsDeserializerError, Request, RequestHead};
 use http::Extensions;
 
+use crate::Result;
 use crate::request::extractors::FromRequestHead;
 use crate::router::Router;
-use crate::{Body, Result};
 
 pub mod extractors;
 mod private {

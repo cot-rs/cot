@@ -6,8 +6,7 @@ use crate::error::impl_into_cot_error;
 use crate::headers::JSON_CONTENT_TYPE;
 use crate::headers::{HTML_CONTENT_TYPE, OCTET_STREAM_CONTENT_TYPE, PLAIN_TEXT_CONTENT_TYPE};
 use crate::html::Html;
-use crate::response::Redirect;
-use crate::response::Response;
+use crate::response::{RESPONSE_BUILD_FAILURE, Redirect, Response};
 use crate::{Body, Error, StatusCode};
 
 /// Trait for generating responses.
@@ -387,7 +386,7 @@ impl IntoResponse for Body {
 }
 
 impl IntoResponse for Redirect {
-    fn into_response(self) -> cot::Result<Response> {
+    fn into_response(self) -> crate::Result<Response> {
         let response = http::Response::builder()
             .status(StatusCode::SEE_OTHER)
             .header(http::header::LOCATION, self.0)

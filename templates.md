@@ -297,7 +297,7 @@ To display custom types in Askama templates, the type must implement `Display`. 
 
 ```rust
 use std::fmt::Display;
-use askama::Template;
+use cot::Template;
 
 struct Item {
     title: String,

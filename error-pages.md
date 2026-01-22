@@ -32,10 +32,10 @@ When the debug mode is disabled, Cot provides default error pages that do not sh
 Let's implement a custom error handler in your project:
 
 ```rust
-use askama::Template;
 use cot::html::Html;
 use cot::response::{IntoResponse, Response};
 use cot::error::handler::{DynErrorPageHandler, RequestError};
+use cot::Template;
 
 async fn error_page_handler(error: RequestError) -> cot::Result<impl IntoResponse> {
     #[derive(Template)]

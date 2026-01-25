@@ -44,9 +44,11 @@ impl Project for MyProject {
 By default, the admin interface uses Cot's authentication system. Therefore, you need to create an admin user if it doesn't exist:
 
 ```rust
+use async_trait::async_trait; // cargo add async-trait
+use cot::ProjectContext;
+use cot::auth::db::DatabaseUser;
+use cot::common_types::Password;
 use std::env;
-use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
-use cot::auth::Password;
 
 // In your main.rs:
 #[async_trait]
@@ -55,7 +57,7 @@ impl App for MyApp {
         // Check if admin user exists
         let admin_username = env::var("ADMIN_USER")
                 .unwrap_or_else(|_| "admin".to_string());
-        let user = DatabaseUser::get_by_username(context.database(), "admin").await?;
+        let user = DatabaseUser::get_by_username(context.database(), &admin_username).await?;
         if user.is_none() {
             let password = env::var("ADMIN_PASSWORD")
                     .unwrap_or_else(|_| "change_me".to_string());

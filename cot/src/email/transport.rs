@@ -8,10 +8,10 @@ use std::future::Future;
 use std::pin::Pin;
 
 use cot::email::EmailMessageError;
+use cot_core::error::impl_into_cot_error;
 use thiserror::Error;
 
 use crate::email::EmailMessage;
-use crate::error::error_impl::impl_into_cot_error;
 
 pub mod console;
 pub mod smtp;

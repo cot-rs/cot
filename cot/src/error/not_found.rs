@@ -1,8 +1,7 @@
 //! Error types and utilities for handling "404 Not Found" errors.
 
+use cot_core::error::impl_into_cot_error;
 use thiserror::Error;
-
-use crate::error::error_impl::impl_into_cot_error;
 
 #[expect(clippy::doc_link_with_quotes, reason = "404 Not Found link")]
 /// A ["404 Not Found"] error that can be returned by Cot applications.

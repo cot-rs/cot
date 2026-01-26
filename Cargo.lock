@@ -862,15 +862,14 @@ dependencies = [
  "ahash",
  "aide",
  "askama",
- "async-stream",
  "async-trait",
  "axum",
- "backtrace",
  "bytes",
  "chrono",
  "chrono-tz",
  "chumsky",
  "clap",
+ "cot_core",
  "cot_macros",
  "criterion",
  "deadpool-redis",
@@ -881,14 +880,12 @@ dependencies = [
  "fake",
  "fantoccini",
  "form_urlencoded",
- "futures",
  "futures-core",
  "futures-util",
  "grass",
  "hex",
  "hmac",
  "http 1.4.0",
- "http-body",
  "http-body-util",
  "humantime",
  "idna",
@@ -907,15 +904,12 @@ dependencies = [
  "sea-query",
  "sea-query-binder",
  "serde",
- "serde_html_form",
  "serde_json",
- "serde_path_to_error",
  "serde_urlencoded",
  "sha2",
  "sqlx",
  "subtle",
  "swagger-ui-redist",
- "sync_wrapper",
  "tempfile",
  "thiserror 2.0.17",
  "time",
@@ -974,6 +968,37 @@ dependencies = [
  "quote",
  "syn",
  "tracing",
+]
+
+[[package]]
+name = "cot_core"
+version = "0.5.0"
+dependencies = [
+ "askama",
+ "async-stream",
+ "axum",
+ "backtrace",
+ "bytes",
+ "cot",
+ "cot_macros",
+ "derive_more",
+ "form_urlencoded",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "http 1.4.0",
+ "http-body",
+ "http-body-util",
+ "indexmap",
+ "serde",
+ "serde_html_form",
+ "serde_json",
+ "serde_path_to_error",
+ "sync_wrapper",
+ "thiserror 2.0.17",
+ "tokio",
+ "tower",
+ "tower-sessions",
 ]
 
 [[package]]
@@ -3672,9 +3697,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.148"
+version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3084b546a1dd6289475996f182a22aba973866ea8e8b02c51d9f46b1336a22da"
+checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
  "itoa",
  "memchr",

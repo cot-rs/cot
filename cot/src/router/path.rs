@@ -7,10 +7,9 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use cot_core::error::impl_into_cot_error;
 use thiserror::Error;
 use tracing::debug;
-
-use crate::error::error_impl::impl_into_cot_error;
 
 #[derive(Debug, Clone)]
 pub(super) struct PathMatcher {

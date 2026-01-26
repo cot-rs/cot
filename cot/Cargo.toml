@@ -20,12 +20,12 @@ aide = { workspace = true, optional = true }
 askama = { workspace = true, features = ["std"] }
 async-trait.workspace = true
 axum = { workspace = true, features = ["http1", "tokio"] }
-backtrace.workspace = true
 bytes.workspace = true
 chrono = { workspace = true, features = ["alloc", "serde", "clock"] }
 chrono-tz.workspace = true
 chumsky = { workspace = true, optional = true }
 clap.workspace = true
+cot_core.workspace = true
 cot_macros.workspace = true
 deadpool-redis = { workspace = true, features = ["tokio-comp", "rt_tokio_1"], optional = true }
 derive_builder.workspace = true
@@ -39,7 +39,6 @@ futures-util.workspace = true
 hex.workspace = true
 hmac.workspace = true
 http-body-util.workspace = true
-http-body.workspace = true
 http.workspace = true
 humantime.workspace = true
 idna = { workspace = true, optional = true }
@@ -55,14 +54,11 @@ schemars = { workspace = true, optional = true }
 sea-query = { workspace = true, optional = true }
 sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"], optional = true }
 serde = { workspace = true, features = ["derive"] }
-serde_html_form = { workspace = true }
 serde_json = { workspace = true, optional = true }
-serde_path_to_error = { workspace = true }
 sha2.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
-sync_wrapper.workspace = true
 thiserror.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs", "io-util"] }
@@ -74,11 +70,9 @@ tracing.workspace = true
 url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
-async-stream.workspace = true
 criterion = { workspace = true, features = ["async_tokio"] }
 fake.workspace = true
 fantoccini.workspace = true
-futures.workspace = true
 mockall.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 rustversion.workspace = true
@@ -118,7 +112,7 @@ sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sql
 postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres", "sqlx/postgres"]
 mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
 redis = ["cache", "dep:deadpool-redis", "dep:redis", "json"]
-json = ["dep:serde_json"]
+json = ["dep:serde_json", "cot_core/json"]
 openapi = ["json", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]

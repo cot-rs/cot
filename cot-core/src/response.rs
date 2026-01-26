@@ -1,17 +1,3 @@
-//! HTTP response type and helper methods.
-//!
-//! Cot uses the [`Response`](http::Response) type from the [`http`] crate
-//! to represent outgoing HTTP responses. However, it also provides a
-//! [`ResponseExt`] trait that contain various helper methods for working with
-//! HTTP responses. These methods are used to create new responses with HTML
-//! content types, redirects, and more. You probably want to have a `use`
-//! statement for [`ResponseExt`] in your code most of the time to be able to
-//! use these functions:
-//!
-//! ```
-//! use cot::response::ResponseExt;
-//! ```
-
 use crate::{Body, StatusCode};
 
 mod into_response;
@@ -122,8 +108,9 @@ pub trait ResponseExt: Sized + private::Sealed {
     ///
     /// # See also
     ///
-    /// * [`crate::reverse_redirect!`] – a more ergonomic way to create
-    ///   redirects to internal views
+    /// * [`cot::reverse_redirect!`](../../cot/macro.reverse_redirect!.html) – a
+    ///   more ergonomic way to create redirects to internal views (available in
+    ///   the `cot` crate)
     #[must_use]
     #[deprecated(since = "0.5.0", note = "Use Redirect::new() instead")]
     fn new_redirect<T: Into<String>>(location: T) -> Self;

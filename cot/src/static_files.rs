@@ -12,6 +12,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use bytes::Bytes;
+use cot_core::error::impl_into_cot_error;
 use digest::Digest;
 use futures_core::ready;
 use http::{Request, header};
@@ -21,7 +22,6 @@ use tower::Service;
 
 use crate::Body;
 use crate::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
-use crate::error::error_impl::impl_into_cot_error;
 use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
 

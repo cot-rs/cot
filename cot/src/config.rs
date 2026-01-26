@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, Utc};
+use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use serde::{Deserialize, Serialize};
@@ -27,7 +28,6 @@ use thiserror::Error;
 
 #[cfg(feature = "email")]
 use crate::email::transport::smtp::Mechanism;
-use crate::error::error_impl::impl_into_cot_error;
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
 
 /// The configuration for a project.

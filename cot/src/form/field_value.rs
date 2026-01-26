@@ -2,9 +2,8 @@ use std::error::Error as StdError;
 use std::fmt::Display;
 
 use bytes::Bytes;
+use cot_core::error::impl_into_cot_error;
 use thiserror::Error;
-
-use crate::error::error_impl::impl_into_cot_error;
 
 /// A value from a form field.
 ///

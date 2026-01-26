@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// backwards compatible shim for form Password type.
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
+use cot_core::error::impl_into_cot_error;
 use derive_more::with_trait::Debug;
 #[cfg(test)]
 use mockall::automock;
@@ -27,7 +28,6 @@ use thiserror::Error;
 use crate::config::SecretKey;
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
-use crate::error::error_impl::impl_into_cot_error;
 use crate::request::{Request, RequestExt};
 use crate::session::Session;
 

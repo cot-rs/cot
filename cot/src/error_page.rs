@@ -2,11 +2,11 @@ use std::any::Any;
 use std::panic::PanicHookInfo;
 use std::sync::Arc;
 
+use cot_core::error::backtrace::{__cot_create_backtrace, Backtrace};
 use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
 use crate::error::NotFound;
-use crate::error::backtrace::{__cot_create_backtrace, Backtrace};
 use crate::router::Router;
 use crate::{Error, Result, StatusCode, Template};
 
@@ -72,7 +72,6 @@ impl ErrorPageTemplateBuilder {
         if let Some(not_found) = error.inner().downcast_ref::<NotFound>() {
             use crate::error::NotFoundKind as Kind;
             match &not_found.kind {
-                Kind::FromRouter => {}
                 Kind::Custom => {
                     Self::build_error_data(&mut error_data, error);
                 }
@@ -80,6 +79,8 @@ impl ErrorPageTemplateBuilder {
                     Self::build_error_data(&mut error_data, error);
                     error_message = Some(message.clone());
                 }
+                // We don't need to build error data for Kind::FromRouter
+                _ => {}
             }
         }
 
@@ -326,7 +327,7 @@ fn build_response(
             .status(status_code)
             .header(
                 http::header::CONTENT_TYPE,
-                crate::headers::HTML_CONTENT_TYPE,
+                cot_core::headers::HTML_CONTENT_TYPE,
             )
             .body(axum::body::Body::new(error_str))
             .unwrap_or_else(|_| build_cot_failure_page()),

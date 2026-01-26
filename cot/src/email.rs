@@ -32,6 +32,7 @@ use std::sync::Arc;
 
 use cot::config::{EmailConfig, EmailTransportTypeConfig};
 use cot::email::transport::smtp::Smtp;
+use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::Debug;
 use thiserror::Error;
@@ -39,7 +40,6 @@ use transport::{BoxedTransport, Transport};
 
 use crate::email::transport::TransportError;
 use crate::email::transport::console::Console;
-use crate::error::error_impl::impl_into_cot_error;
 const ERROR_PREFIX: &str = "email message build error:";
 
 /// Represents errors that can occur when sending an email.

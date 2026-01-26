@@ -1,0 +1,49 @@
+[package]
+name = "cot_core"
+version = "0.5.0"
+description = "The Rust web framework for lazy developers - framework core."
+categories = ["web-programming", "web-programming::http-server", "network-programming"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+readme.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+http.workspace = true
+derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+backtrace.workspace = true
+bytes.workspace = true
+futures-core.workspace = true
+http-body.workspace = true
+http-body-util.workspace = true
+sync_wrapper.workspace = true
+axum.workspace = true
+cot_macros.workspace = true
+askama = { workspace = true, features = ["alloc"] }
+tower-sessions.workspace = true
+serde_path_to_error.workspace = true
+indexmap.workspace = true
+serde_html_form.workspace = true
+form_urlencoded.workspace = true
+tower.workspace = true
+futures-util.workspace = true
+
+[dev-dependencies]
+async-stream.workspace = true
+cot = { workspace = true, features = ["test"] }
+futures.workspace = true
+tokio.workspace = true
+
+[features]
+default = []
+json = []

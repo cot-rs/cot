@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/cot-rs/cot/compare/cot-v0.4.0...cot-v0.5.0) - 2026-01-21
+
+[View diff on diff.rs](https://diff.rs/cot/0.4.0/cot/0.5.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Cache support with pluggable backends ([#399](https://github.com/cot-rs/cot/pull/399)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- [**breaking**] Add Redis Cache store ([#410](https://github.com/cot-rs/cot/pull/410)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- [**breaking**] *(db)* Add `bulk_insert` ([#414](https://github.com/cot-rs/cot/pull/414)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Email support using lettre ([#419](https://github.com/cot-rs/cot/pull/419)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add derive macro `SelectAsFormField` ([#397](https://github.com/cot-rs/cot/pull/397)) (by [@kumarUjjawal](https://github.com/kumarUjjawal))
+- Expose cache in request API ([#448](https://github.com/cot-rs/cot/pull/448)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add Redirect and deprecate new_redirect ([#451](https://github.com/cot-rs/cot/pull/451)) (by [@seqre](https://github.com/seqre))
+
+### Fixes
+
+- Clippy errors ([#402](https://github.com/cot-rs/cot/pull/402)) (by [@m4tx](https://github.com/m4tx))
+
+### Other
+
+- [**breaking**] Rename opt to opts ([#398](https://github.com/cot-rs/cot/pull/398)) (by [@seqre](https://github.com/seqre))
+- [**breaking**] Use `trait_upcasting`, bump MSRV to 1.86 ([#412](https://github.com/cot-rs/cot/pull/412)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Bump deps, bump MSRV to 1.88 ([#431](https://github.com/cot-rs/cot/pull/431)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Use `Arc` internally in `Database` ([#432](https://github.com/cot-rs/cot/pull/432)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Fix includes for `#[derive(Template)]` ([#446](https://github.com/cot-rs/cot/pull/446)) (by [@Kijewski](https://github.com/Kijewski))
+- [**breaking**] Cleanup `RequestExt`; use extractors instead ([#449](https://github.com/cot-rs/cot/pull/449)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump the dependencies group with 22 updates ([#401](https://github.com/cot-rs/cot/pull/401)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- Remove `#[cfg(doc_auto_cfg)]` ([#406](https://github.com/cot-rs/cot/pull/406)) (by [@m4tx](https://github.com/m4tx))
+- Remove rust-lang/rust#145288 workaround ([#411](https://github.com/cot-rs/cot/pull/411)) (by [@m4tx](https://github.com/m4tx))
+- `Cache` instead of `Arc<Cache>` in public APIs ([#433](https://github.com/cot-rs/cot/pull/433)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.4.0](https://github.com/cot-rs/cot/compare/cot-v0.3.1...cot-v0.4.0) - 2025-09-11
 
 [View diff on diff.rs](https://diff.rs/cot/0.3.1/cot/0.4.0/Cargo.toml)

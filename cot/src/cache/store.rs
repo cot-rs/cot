@@ -12,11 +12,11 @@ pub mod redis;
 use std::fmt::Debug;
 use std::pin::Pin;
 
+use cot_core::error::impl_into_cot_error;
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::config::Timeout;
-use crate::error::error_impl::impl_into_cot_error;
 
 const CACHE_STORE_ERROR_PREFIX: &str = "cache store error:";
 

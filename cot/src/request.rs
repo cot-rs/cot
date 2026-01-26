@@ -120,7 +120,7 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn router(&self) -> &Arc<Router>;
 
-    /// Returns the name of the app the current route belongs to, or [`None`] if
+    /// Returns the name of the app that the current route belongs to, or [`None`] if
     /// the request is not routed.
     ///
     /// This is mainly useful for providing context to reverse redirects, where

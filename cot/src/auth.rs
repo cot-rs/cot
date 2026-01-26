@@ -540,8 +540,8 @@ impl PasswordHash {
     ///
     /// * [`PasswordVerificationResult::Ok`]: The password is valid.
     /// * [`PasswordVerificationResult::OkObsolete`]: The password is valid, but
-    ///   the hash is obsolete. The new hash calculated with the currently
-    ///   preferred algorithm is provided, and it should be saved to the
+    ///   the hash is obsolete. The new hash, calculated with the currently
+    ///   preferred algorithm, is provided and should be saved to the
     ///   database.
     /// * [`PasswordVerificationResult::Invalid`]: The password is invalid.
     ///

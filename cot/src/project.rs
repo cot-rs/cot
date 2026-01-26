@@ -79,7 +79,7 @@ use crate::{Body, Error, cli, error_page};
 /// * etc.
 ///
 /// Each app can have its own set of URLs that can be mounted on the project's
-/// router, its own set of middleware, database migrations (which can depend on
+/// router, its own set of middlewares, database migrations (which can depend on
 /// other apps), etc.
 #[async_trait]
 pub trait App: Send + Sync {

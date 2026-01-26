@@ -168,7 +168,7 @@ pub fn cachetest(_args: TokenStream, input: TokenStream) -> TokenStream {
 /// An attribute macro that defines an `async` test function for a Cot-powered
 /// app.
 ///
-/// This is equivalent to `#[tokio::test]`, but provided so that you
+/// This is equivalent to `#[tokio::test]`, but is provided so that you
 /// don't have to declare `tokio` as a dependency in your tests.
 ///
 /// # Examples

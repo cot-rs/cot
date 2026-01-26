@@ -243,7 +243,7 @@ impl Router {
             })?)
     }
 
-    /// Generates a URL for a view by its name.
+    /// Generates a URL for a view using its name.
     ///
     /// The `app_name` parameter specifies the name of the app that the view
     /// should be found in. If it is `None`, the view is searched for across all

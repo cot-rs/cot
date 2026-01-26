@@ -37,7 +37,7 @@ const ERROR_PREFIX: &str = "failed to authenticate user:";
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum AuthError {
-    /// The password hash that is provided to [`PasswordHash::new`] is invalid.
+    /// The password hash that was provided to [`PasswordHash::new`] is invalid.
     #[error("{ERROR_PREFIX} password hash is invalid")]
     PasswordHashInvalid,
     /// An error occurred while accessing the session object.

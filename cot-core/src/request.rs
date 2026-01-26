@@ -1,18 +1,3 @@
-//! HTTP request type and helper methods.
-//!
-//! Cot uses the [`Request`](http::Request) type from the [`http`] crate
-//! to represent incoming HTTP requests. However, it also provides a
-//! [`RequestExt`](../../cot/request/trait.RequestExt.html) trait that contain
-//! various helper methods for working with HTTP requests. These methods are
-//! used to access the application context, project configuration, path
-//! parameters, and more. You probably want to have a `use` statement for
-//! [`RequestExt`](../../cot/request/trait.RequestExt.html) in your code most of
-//! the time to be able to use these functions:
-//!
-//! ```
-//! use cot::request::RequestExt;
-//! ```
-
 use indexmap::IndexMap;
 
 use crate::Body;

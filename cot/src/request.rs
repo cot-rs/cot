@@ -15,8 +15,7 @@
 use std::future::Future;
 use std::sync::Arc;
 
-#[doc(inline)]
-pub(crate) use cot_core::request::{AppName, InvalidContentType, RouteName};
+use cot_core::request::{AppName, InvalidContentType, RouteName};
 #[doc(inline)]
 pub use cot_core::request::{PathParams, PathParamsDeserializerError, Request, RequestHead};
 use http::Extensions;

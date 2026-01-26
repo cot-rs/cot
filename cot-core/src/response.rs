@@ -1,17 +1,3 @@
-//! HTTP response type and helper methods.
-//!
-//! Cot uses the [`Response`](http::Response) type from the [`http`] crate
-//! to represent outgoing HTTP responses. However, it also provides a
-//! [`ResponseExt`] trait that contain various helper methods for working with
-//! HTTP responses. These methods are used to create new responses with HTML
-//! content types, redirects, and more. You probably want to have a `use`
-//! statement for [`ResponseExt`] in your code most of the time to be able to
-//! use these functions:
-//!
-//! ```
-//! use cot::response::ResponseExt;
-//! ```
-
 use crate::{Body, StatusCode};
 
 mod into_response;

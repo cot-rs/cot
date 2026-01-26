@@ -50,12 +50,29 @@
 
 use std::sync::Arc;
 
+use cot_core::error::impl_into_cot_error;
+/// Trait for extractors that consume the request body.
+///
+/// Extractors implementing this trait are used in route handlers that consume
+/// the request body and therefore can only be used once per request.
+///
+/// See [`crate::request::extractors`] documentation for more information about
+/// extractors.
+pub use cot_core::request::extractors::FromRequest;
+/// Trait for extractors that don't consume the request body.
+///
+/// Extractors implementing this trait are used in route handlers that don't
+/// consume the request and therefore can be used multiple times per request.
+///
+/// If you need to consume the body of the request, use [`FromRequest`] instead.
+///
+/// See [`crate::request::extractors`] documentation for more information about
+pub use cot_core::request::extractors::FromRequestHead;
 #[doc(inline)]
-pub use cot_core::request::extractors::*;
+pub use cot_core::request::extractors::{Path, UrlQuery};
 
 use crate::Body;
 use crate::auth::Auth;
-use crate::error::impl_into_cot_error;
 use crate::form::{Form, FormResult};
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::router::Urls;
@@ -68,7 +85,7 @@ impl FromRequestHead for Urls {
 }
 
 /// An extractor that gets the request body as form data and deserializes it
-/// into a type `F` implementing `cot::form::Form`.
+/// into a type `F` implementing [`Form`].
 ///
 /// The content type of the request must be `application/x-www-form-urlencoded`.
 ///

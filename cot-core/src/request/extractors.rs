@@ -57,13 +57,6 @@ use crate::json::Json;
 use crate::request::{InvalidContentType, PathParams, Request, RequestHead};
 use crate::{Body, Method};
 
-/// Trait for extractors that consume the request body.
-///
-/// Extractors implementing this trait are used in route handlers that consume
-/// the request body and therefore can only be used once per request.
-///
-/// See [`crate::request::extractors`] documentation for more information about
-/// extractors.
 pub trait FromRequest: Sized {
     /// Extracts data from the request.
     ///
@@ -83,14 +76,6 @@ impl FromRequest for Request {
     }
 }
 
-/// Trait for extractors that don't consume the request body.
-///
-/// Extractors implementing this trait are used in route handlers that don't
-/// consume the request and therefore can be used multiple times per request.
-///
-/// If you need to consume the body of the request, use [`FromRequest`] instead.
-///
-/// See [`crate::request::extractors`] documentation for more information about
 /// extractors.
 pub trait FromRequestHead: Sized {
     /// Extracts data from the request head.
@@ -105,7 +90,7 @@ pub trait FromRequestHead: Sized {
 /// An extractor that extracts data from the URL params.
 ///
 /// The extractor is generic over a type that implements
-/// `serde::de::DeserializeOwned`.
+/// [`DeserializeOwned`].
 ///
 /// # Examples
 ///
@@ -160,7 +145,7 @@ impl<D: DeserializeOwned> FromRequestHead for Path<D> {
 /// An extractor that extracts data from the URL query parameters.
 ///
 /// The extractor is generic over a type that implements
-/// `serde::de::DeserializeOwned`.
+/// [`DeserializeOwned`].
 ///
 /// # Example
 ///
@@ -223,7 +208,7 @@ struct QueryParametersParseError(serde_path_to_error::Error<serde::de::value::Er
 impl_into_cot_error!(QueryParametersParseError, BAD_REQUEST);
 
 /// Extractor that gets the request body as JSON and deserializes it into a type
-/// `T` implementing `serde::de::DeserializeOwned`.
+/// `T` implementing [`DeserializeOwned`].
 ///
 /// The content type of the request must be `application/json`.
 ///

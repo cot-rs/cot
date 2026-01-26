@@ -213,7 +213,7 @@ impl Router {
         self.route(request, &path).await
     }
 
-    /// Generates a URL for a view by its name.
+    /// Generates a URL for a view using its name.
     ///
     /// Instead of using this method directly, consider using the
     /// [`reverse!`](crate::reverse) macro which provides much more ergonomic

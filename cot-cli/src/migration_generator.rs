@@ -30,7 +30,7 @@ pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyho
             let Some(package) = workspace.get_current_package_manager() else {
                 bail!(
                     "Generating migrations for workspaces is not supported yet. \
-                        Please run the command from within a specific package directory."
+                        Please generate migrations for each package separately."
                 );
             };
             make_package_migrations(package, options)

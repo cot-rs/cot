@@ -1,7 +1,8 @@
 // inline(never) is added to make sure there is a separate frame for this
 // function so that it can be used to find the start of the backtrace.
 #[inline(never)]
-pub(crate) fn __cot_create_backtrace() -> Backtrace {
+#[must_use]
+pub fn __cot_create_backtrace() -> Backtrace {
     let mut backtrace = Vec::new();
     let mut start = false;
     backtrace::trace(|frame| {
@@ -21,19 +22,19 @@ pub(crate) fn __cot_create_backtrace() -> Backtrace {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Backtrace {
+pub struct Backtrace {
     frames: Vec<StackFrame>,
 }
 
 impl Backtrace {
     #[must_use]
-    pub(crate) fn frames(&self) -> &[StackFrame] {
+    pub fn frames(&self) -> &[StackFrame] {
         &self.frames
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct StackFrame {
+pub struct StackFrame {
     symbol_name: Option<String>,
     filename: Option<String>,
     lineno: Option<u32>,
@@ -42,7 +43,7 @@ pub(crate) struct StackFrame {
 
 impl StackFrame {
     #[must_use]
-    pub(crate) fn symbol_name(&self) -> String {
+    pub fn symbol_name(&self) -> String {
         self.symbol_name
             .as_deref()
             .unwrap_or("<unknown>")
@@ -50,7 +51,7 @@ impl StackFrame {
     }
 
     #[must_use]
-    pub(crate) fn location(&self) -> String {
+    pub fn location(&self) -> String {
         if let Some(filename) = self.filename.as_deref() {
             let mut s = filename.to_owned();
 

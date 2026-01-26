@@ -77,16 +77,13 @@ impl DatabaseUser {
     /// ```
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::{Request, RequestExt};
     ///
-    /// async fn view(request: &Request) -> cot::Result<Html> {
-    ///     let user = DatabaseUser::create_user(
-    ///         request.db(),
-    ///         "testuser".to_string(),
-    ///         &Password::new("password123"),
-    ///     )
-    ///     .await?;
+    /// async fn view(db: Database) -> cot::Result<Html> {
+    ///     let user =
+    ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
+    ///             .await?;
     ///
     ///     Ok(Html::new("User created!"))
     /// }
@@ -96,11 +93,7 @@ impl DatabaseUser {
     /// #     use cot::test::{TestDatabase, TestRequestBuilder};
     /// #     let mut test_database = TestDatabase::new_sqlite().await?;
     /// #     test_database.with_auth().run_migrations().await;
-    /// #     let request = TestRequestBuilder::get("/")
-    /// #         .with_db_auth(test_database.database())
-    /// #         .await
-    /// #         .build();
-    /// #     view(&request).await?;
+    /// #     view(test_database.database()).await?;
     /// #     test_database.cleanup().await?;
     /// #     Ok(())
     /// # }
@@ -139,18 +132,15 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::{Request, RequestExt};
     ///
-    /// async fn view(request: &Request) -> cot::Result<Html> {
-    ///     let user = DatabaseUser::create_user(
-    ///         request.db(),
-    ///         "testuser".to_string(),
-    ///         &Password::new("password123"),
-    ///     )
-    ///     .await?;
+    /// async fn view(db: Database) -> cot::Result<Html> {
+    ///     let user =
+    ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
+    ///             .await?;
     ///
-    ///     let user_from_db = DatabaseUser::get_by_id(request.db(), user.id()).await?;
+    ///     let user_from_db = DatabaseUser::get_by_id(&db, user.id()).await?;
     ///
     ///     Ok(Html::new("User created!"))
     /// }
@@ -160,11 +150,7 @@ impl DatabaseUser {
     /// #     use cot::test::{TestDatabase, TestRequestBuilder};
     /// #     let mut test_database = TestDatabase::new_sqlite().await?;
     /// #     test_database.with_auth().run_migrations().await;
-    /// #     let request = TestRequestBuilder::get("/")
-    /// #         .with_db_auth(test_database.database())
-    /// #         .await
-    /// #         .build();
-    /// #     view(&request).await?;
+    /// #     view(test_database.database()).await?;
     /// #     test_database.cleanup().await?;
     /// #     Ok(())
     /// # }

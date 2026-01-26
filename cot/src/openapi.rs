@@ -113,6 +113,7 @@ use aide::openapi::{
     MediaType, Operation, Parameter, ParameterData, ParameterSchemaOrContent, PathItem, PathStyle,
     QueryStyle, ReferenceOr, RequestBody, StatusCode,
 };
+use cot_core::handler::{BoxRequestHandler, RequestHandler, handle_all_parameters};
 /// Derive macro for the [`ApiOperationResponse`] trait.
 ///
 /// This macro can be applied to enums to automatically implement the
@@ -207,14 +208,13 @@ use serde_json::Value;
 
 use crate::auth::Auth;
 use crate::form::Form;
-use crate::handler::BoxRequestHandler;
 use crate::json::Json;
 use crate::request::extractors::{FromRequest, FromRequestHead, Path, RequestForm, UrlQuery};
 use crate::request::{Request, RequestHead};
 use crate::response::{Response, WithExtension};
 use crate::router::Urls;
 use crate::session::Session;
-use crate::{Body, Method, RequestHandler};
+use crate::{Body, Method};
 
 /// Context for API route generation.
 ///
@@ -847,7 +847,7 @@ impl<D: JsonSchema> ApiOperationPart for Json<D> {
     ) {
         operation.request_body = Some(ReferenceOr::Item(RequestBody {
             content: IndexMap::from([(
-                crate::headers::JSON_CONTENT_TYPE.to_string(),
+                cot_core::headers::JSON_CONTENT_TYPE.to_string(),
                 MediaType {
                     schema: Some(aide::openapi::SchemaObject {
                         json_schema: D::json_schema(schema_generator),
@@ -970,7 +970,7 @@ impl<F: Form + JsonSchema> ApiOperationPart for RequestForm<F> {
         } else {
             operation.request_body = Some(ReferenceOr::Item(RequestBody {
                 content: IndexMap::from([(
-                    crate::headers::URLENCODED_FORM_CONTENT_TYPE.to_string(),
+                    cot_core::headers::URLENCODED_FORM_CONTENT_TYPE.to_string(),
                     MediaType {
                         schema: Some(aide::openapi::SchemaObject {
                             json_schema: F::json_schema(schema_generator),
@@ -1062,7 +1062,7 @@ impl<S: JsonSchema> ApiOperationResponse for Json<S> {
             aide::openapi::Response {
                 description: "OK".to_string(),
                 content: IndexMap::from([(
-                    crate::headers::JSON_CONTENT_TYPE.to_string(),
+                    cot_core::headers::JSON_CONTENT_TYPE.to_string(),
                     MediaType {
                         schema: Some(aide::openapi::SchemaObject {
                             json_schema: S::json_schema(schema_generator),

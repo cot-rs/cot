@@ -18,6 +18,7 @@
 //! # }
 use cot::cache::store::CacheStoreResult;
 use cot::config::Timeout;
+use cot_core::error::impl_into_cot_error;
 use deadpool_redis::{Config, Connection, Pool, Runtime};
 use redis::{AsyncCommands, SetExpiry, SetOptions};
 use serde_json::Value;
@@ -25,7 +26,6 @@ use thiserror::Error;
 
 use crate::cache::store::{CacheStore, CacheStoreError};
 use crate::config::CacheUrl;
-use crate::error::error_impl::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "redis cache store error:";
 

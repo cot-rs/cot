@@ -1,4 +1,3 @@
-use askama::Template;
 use cot::cli::CliMetadata;
 use cot::common_types::Email;
 use cot::config::{EmailConfig, EmailTransportConfig, EmailTransportTypeConfig, ProjectConfig};
@@ -7,12 +6,12 @@ use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::LiveReloadMiddleware;
 use cot::project::{RegisterAppsContext, RootHandler};
+use cot::request::Request;
 use cot::request::extractors::{StaticFiles, UrlQuery};
-use cot::request::{Request, RequestExt};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
-use cot::{App, AppBuilder, Project, reverse_redirect, static_files};
+use cot::{App, AppBuilder, Project, Template, reverse_redirect, static_files};
 use serde::{Deserialize, Serialize};
 
 struct EmailApp;
@@ -94,7 +93,11 @@ async fn index(
     Ok(Html::new(rendered))
 }
 
-async fn send_email(urls: Urls, mut request: Request) -> cot::Result<Response> {
+async fn send_email(
+    urls: Urls,
+    mut request: Request,
+    email_service: cot::email::Email,
+) -> cot::Result<Response> {
     let form = EmailForm::from_request(&mut request).await?;
 
     let form = form.unwrap();
@@ -106,7 +109,7 @@ async fn send_email(urls: Urls, mut request: Request) -> cot::Result<Response> {
         .body(form.message)
         .build()?;
 
-    request.email().send(message).await?;
+    email_service.send(message).await?;
 
     // TODO: We should redirect with the status when reverse_redirect! supports
     // query parameters.

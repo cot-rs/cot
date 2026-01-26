@@ -1,6 +1,6 @@
 [package]
 name = "cot_macros"
-version = "0.4.0"
+version = "0.5.0"
 description = "The Rust web framework for lazy developers - macros."
 edition.workspace = true
 rust-version.workspace = true
@@ -21,8 +21,9 @@ path = "tests/compile_tests.rs"
 workspace = true
 
 [dependencies]
-darling.workspace = true
+askama_derive.workspace = true
 cot_codegen.workspace = true
+darling.workspace = true
 heck.workspace = true
 proc-macro-crate.workspace = true
 proc-macro2 = { workspace = true, features = ["proc-macro"] }

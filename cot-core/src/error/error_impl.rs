@@ -8,7 +8,6 @@ use crate::StatusCode;
 // Need to rename Backtrace to CotBacktrace, because otherwise it triggers special behavior
 // in the thiserror library
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace as CotBacktrace};
-use crate::error::not_found::NotFound;
 
 /// An error that can occur while using Cot.
 pub struct Error {
@@ -151,46 +150,6 @@ impl Error {
         Self::internal(error)
     }
 
-    /// Create a new "404 Not Found" error without a message.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::Error;
-    ///
-    /// let error = Error::not_found();
-    /// ```
-    #[must_use]
-    #[deprecated(
-        note = "Use `cot::Error::from(cot::error::NotFound::new())` instead",
-        since = "0.4.0"
-    )]
-    pub fn not_found() -> Self {
-        Self::from(NotFound::new())
-    }
-
-    /// Create a new "404 Not Found" error with a message.
-    ///
-    /// Note that the message is only displayed when Cot's debug mode is
-    /// enabled. It will not be exposed to the user in production.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::Error;
-    ///
-    /// let id = 123;
-    /// let error = Error::not_found_message(format!("User with id={id} not found"));
-    /// ```
-    #[must_use]
-    #[deprecated(
-        note = "Use `cot::Error::from(cot::error::NotFound::with_message())` instead",
-        since = "0.4.0"
-    )]
-    pub fn not_found_message(message: String) -> Self {
-        Self::from(NotFound::with_message(message))
-    }
-
     /// Returns the HTTP status code associated with this error.
     ///
     /// This method returns the appropriate HTTP status code that should be
@@ -216,7 +175,8 @@ impl Error {
     }
 
     #[must_use]
-    pub(crate) fn backtrace(&self) -> &CotBacktrace {
+    #[doc(hidden)]
+    pub fn backtrace(&self) -> &CotBacktrace {
         &self.repr.backtrace
     }
 
@@ -319,6 +279,7 @@ impl From<Error> for askama::Error {
     }
 }
 
+#[macro_export]
 macro_rules! impl_into_cot_error {
     ($error_ty:ty) => {
         impl From<$error_ty> for $crate::Error {
@@ -335,7 +296,7 @@ macro_rules! impl_into_cot_error {
         }
     };
 }
-pub(crate) use impl_into_cot_error;
+pub use impl_into_cot_error;
 
 #[derive(Debug, thiserror::Error)]
 #[error("failed to render template: {0}")]

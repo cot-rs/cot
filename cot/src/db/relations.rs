@@ -8,8 +8,7 @@ use crate::db::{DatabaseBackend, DatabaseError, Model, Result};
 /// # Examples
 ///
 /// ```
-/// use cot::db::{Auto, ForeignKey, Model, model};
-/// use cot::request::{Request, RequestExt};
+/// use cot::db::{Auto, Database, ForeignKey, Model, model};
 /// use cot::response::Response;
 ///
 /// #[model]
@@ -25,15 +24,15 @@ use crate::db::{DatabaseBackend, DatabaseError, Model, Result};
 ///     id: Auto<i32>,
 /// }
 ///
-/// async fn index(request: &Request) -> cot::Result<Response> {
+/// async fn index(db: Database) -> cot::Result<Response> {
 ///     let mut user = User { id: Auto::auto() };
-///     user.save(request.db()).await?;
+///     user.save(&db).await?;
 ///
 ///     let mut my_model = MyModel {
 ///         id: Auto::auto(),
 ///         user: ForeignKey::from(user),
 ///     };
-///     my_model.save(request.db()).await?;
+///     my_model.save(&db).await?;
 ///
 ///     // ...
 /// #   unimplemented!()

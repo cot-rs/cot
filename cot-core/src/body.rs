@@ -1,3 +1,8 @@
+//! HTTP body type.
+//!
+//! This module provides the [`Body`] type for representing HTTP bodies,
+//! supporting both fixed in-memory buffers and streaming data sources.
+
 use std::error::Error as StdError;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
@@ -9,7 +14,7 @@ use http_body::{Frame, SizeHint};
 use http_body_util::combinators::BoxBody;
 use sync_wrapper::SyncWrapper;
 
-use crate::error::error_impl::impl_into_cot_error;
+use crate::error::impl_into_cot_error;
 use crate::{Error, Result};
 
 /// A type that represents an HTTP request or response body.
@@ -166,7 +171,8 @@ impl Body {
     }
 
     #[must_use]
-    pub(crate) fn axum(inner: axum::body::Body) -> Self {
+    #[doc(hidden)]
+    pub fn axum(inner: axum::body::Body) -> Self {
         Self::new(BodyInner::Axum(SyncWrapper::new(inner)))
     }
 
@@ -261,9 +267,6 @@ impl_into_cot_error!(ReadRequestBody, BAD_REQUEST);
 
 #[cfg(test)]
 mod tests {
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
     use futures::stream;
     use http_body::Body as HttpBody;
 

@@ -1,4 +1,3 @@
-use askama::Template;
 use cot::cli::CliMetadata;
 use cot::config::{
     DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig, SessionStoreConfig,
@@ -13,7 +12,7 @@ use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router, Urls};
 use cot::session::Session;
 use cot::session::db::SessionApp;
-use cot::{App, AppBuilder, Project, reverse_redirect};
+use cot::{App, AppBuilder, Project, Template, reverse_redirect};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]

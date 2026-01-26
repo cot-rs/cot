@@ -103,7 +103,7 @@ impl AdminModelDeriveBuilder {
                     use #crate_ident::db::Model;
                     use #crate_ident::request::RequestExt;
 
-                    Ok(Self::objects().count(request.db()).await?)
+                    Ok(Self::objects().count(request.context().database()).await?)
                 }
 
                 async fn get_objects(
@@ -113,7 +113,7 @@ impl AdminModelDeriveBuilder {
                     use #crate_ident::db::Model;
                     use #crate_ident::request::RequestExt;
 
-                    Ok(Self::objects().limit(pagination.limit()).offset(pagination.offset()).all(request.db()).await?)
+                    Ok(Self::objects().limit(pagination.limit()).offset(pagination.offset()).all(request.context().database()).await?)
                 }
 
                 async fn get_object_by_id(
@@ -127,7 +127,7 @@ impl AdminModelDeriveBuilder {
 
                     let id = parse_id::<Self>(id)?;
 
-                    Ok(#crate_ident::db::query!(Self, $#pk_name == id).get(request.db()).await?)
+                    Ok(#crate_ident::db::query!(Self, $#pk_name == id).get(request.context().database()).await?)
                 }
 
                 fn name() -> &'static str {
@@ -177,9 +177,9 @@ impl AdminModelDeriveBuilder {
                                 let id = parse_id::<Self>(object_id)?;
 
                                 object_from_form.set_primary_key(id);
-                                object_from_form.update(request.db()).await?;
+                                object_from_form.update(request.context().database()).await?;
                             } else {
-                                object_from_form.insert(request.db()).await?;
+                                object_from_form.insert(request.context().database()).await?;
                             }
                             ::std::result::Result::Ok(None)
                         }
@@ -200,7 +200,7 @@ impl AdminModelDeriveBuilder {
 
                     let id = parse_id::<Self>(object_id)?;
 
-                    #crate_ident::db::query!(Self, $#pk_name == id).delete(request.db()).await?;
+                    #crate_ident::db::query!(Self, $#pk_name == id).delete(request.context().database()).await?;
 
                     Ok(())
                 }

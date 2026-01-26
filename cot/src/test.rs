@@ -10,8 +10,10 @@ use async_trait::async_trait;
 #[cfg(feature = "cache")]
 use cot::config::CacheUrl;
 #[cfg(feature = "redis")]
+use cot_core::error::impl_into_cot_error;
+use cot_core::handler::BoxedHandler;
+#[cfg(feature = "redis")]
 use deadpool_redis::Connection;
-use derive_more::Debug;
 #[cfg(feature = "redis")]
 use redis::AsyncCommands;
 use tokio::net::TcpListener;
@@ -41,9 +43,6 @@ use crate::db::migrations::{
 use crate::email::Email;
 #[cfg(feature = "email")]
 use crate::email::transport::console::Console;
-#[cfg(feature = "redis")]
-use crate::error::error_impl::impl_into_cot_error;
-use crate::handler::BoxedHandler;
 use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
 use crate::request::Request;
 use crate::response::Response;
@@ -243,7 +242,7 @@ pub struct TestRequestBuilder {
 }
 
 /// A wrapper over an auth backend that is cloneable.
-#[derive(Debug, Clone)]
+#[derive(derive_more::Debug, Clone)]
 struct AuthBackendWrapper {
     #[debug("..")]
     inner: Arc<dyn AuthBackend>,

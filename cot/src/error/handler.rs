@@ -7,10 +7,10 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+use cot_core::handler::handle_all_parameters;
 use derive_more::with_trait::Debug;
 
 use crate::Error;
-use crate::handler::handle_all_parameters;
 use crate::request::extractors::FromRequestHead;
 use crate::request::{Request, RequestHead};
 use crate::response::Response;
@@ -20,7 +20,7 @@ use crate::response::Response;
 /// This trait is implemented by functions that can handle error pages. The
 /// trait is automatically implemented for async functions that take parameters
 /// implementing [`FromRequestHead`] and return a type that implements
-/// [`IntoResponse`].
+/// [`IntoResponse`](crate::response::IntoResponse).
 ///
 /// # Examples
 ///

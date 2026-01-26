@@ -4,9 +4,11 @@
 //! handling various types of errors that can occur in Cot applications,
 //! including 404 Not Found errors, uncaught panics, and custom error pages.
 
-pub mod handler;
-mod not_found;
+pub mod backtrace;
+pub(crate) mod error_impl;
+mod method_not_allowed;
+mod uncaught_panic;
 
-#[doc(inline)]
-pub use cot_core::error::{MethodNotAllowed, UncaughtPanic};
-pub use not_found::{Kind as NotFoundKind, NotFound};
+pub use error_impl::{Error, impl_into_cot_error};
+pub use method_not_allowed::MethodNotAllowed;
+pub use uncaught_panic::UncaughtPanic;

@@ -21,6 +21,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use cot_core::error::impl_into_cot_error;
 pub use cot_macros::{model, query};
 use derive_more::{Debug, Deref, Display};
 #[cfg(test)]
@@ -42,7 +43,6 @@ use crate::db::impl_postgres::{DatabasePostgres, PostgresRow, PostgresValueRef};
 #[cfg(feature = "sqlite")]
 use crate::db::impl_sqlite::{DatabaseSqlite, SqliteRow, SqliteValueRef};
 use crate::db::migrations::ColumnTypeMapper;
-use crate::error::error_impl::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "database error:";
 /// An error that can occur when interacting with the database.

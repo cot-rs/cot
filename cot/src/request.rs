@@ -120,8 +120,8 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn router(&self) -> &Arc<Router>;
 
-    /// Returns the name of the app that the current route belongs to, or [`None`] if
-    /// the request is not routed.
+    /// Returns the name of the app that the current route belongs to, or
+    /// [`None`] if the request is not routed.
     ///
     /// This is mainly useful for providing context to reverse redirects, where
     /// you want to redirect to a route in the same app.
@@ -140,8 +140,11 @@ pub trait RequestExt: private::Sealed {
     /// ```
     fn app_name(&self) -> Option<&str>;
 
-    /// Returns the name of the current route, or [`None`] if the request is not
-    /// routed or doesn't have a route name.
+    /// Returns the name of the current route.
+    ///
+    /// This returns [`None`] if:
+    /// - the request is not routed, or
+    /// - the route has no name.
     ///
     /// This is mainly useful for use in templates, where you want to know which
     /// route is being rendered, for instance to mark the active tab.

@@ -249,7 +249,7 @@ impl Router {
     /// should be found in. If it is `None`, the view is searched for across all
     /// registered apps.
     ///
-    /// It returns `None` if the view name is not found.
+    /// It returns [`None`] if the view name is not found.
     ///
     /// # Errors
     ///

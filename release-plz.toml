@@ -70,7 +70,7 @@ commit_preprocessors = [
 [[package]]
 name = "cot"
 changelog_update = true
-changelog_include = ["cot-codegen", "cot-macros"]
+changelog_include = ["cot-codegen", "cot-macros", "cot-core"]
 changelog_path = "./CHANGELOG.md"
 git_release_enable = true
 

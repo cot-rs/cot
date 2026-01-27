@@ -195,7 +195,7 @@ fn custom_migration_compile_test() {
     let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
 
     let migration_opt = generator
-        .generate_custom_migration_from_files("m_0001_custom", source_files)
+        .generate_custom_migration_from_files("custom", source_files)
         .unwrap();
     let MigrationAsSource {
         name: migration_name,

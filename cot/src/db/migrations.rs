@@ -439,7 +439,7 @@ impl Operation {
     /// use cot::db::migrations::{MigrationContext, Operation, migration_op};
     ///
     /// #[migration_op]
-    /// async fn forwards(ctx: MigrationContext) -> Result<()> {
+    /// async fn forwards(ctx: MigrationContext<'_>) -> Result<()> {
     ///     // do something
     ///     Ok(())
     /// }
@@ -1622,13 +1622,13 @@ impl RemoveModelBuilder {
 /// use cot::db::migrations::{MigrationContext, Operation, migration_op};
 ///
 /// #[migration_op]
-/// async fn forwards(ctx: MigrationContext) -> Result<()> {
+/// async fn forwards(ctx: MigrationContext<'_>) -> Result<()> {
 ///     // do something
 ///     Ok(())
 /// }
 ///
 /// #[migration_op]
-/// async fn backwards(ctx: MigrationContext) -> Result<()> {
+/// async fn backwards(ctx: MigrationContext<'_>) -> Result<()> {
 ///     // undo something
 ///     Ok(())
 /// }

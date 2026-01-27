@@ -9,13 +9,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 #[cfg(feature = "cache")]
 use cot::config::CacheUrl;
-#[cfg(feature = "redis")]
-use cot_core::error::impl_into_cot_error;
 use cot_core::handler::BoxedHandler;
-#[cfg(feature = "redis")]
-use deadpool_redis::Connection;
-#[cfg(feature = "redis")]
-use redis::AsyncCommands;
+use cot_core::impl_into_cot_error;
+use testcontainers::runners::AsyncRunner;
+use testcontainers::{ContainerAsync, ImageExt};
+use testcontainers_modules::redis::Redis;
+use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
@@ -28,8 +27,6 @@ use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 use crate::cache::Cache;
 #[cfg(feature = "cache")]
 use crate::cache::store::memory::Memory;
-#[cfg(feature = "redis")]
-use crate::cache::store::redis::Redis;
 use crate::config::ProjectConfig;
 #[cfg(feature = "cache")]
 use crate::config::Timeout;
@@ -950,8 +947,30 @@ impl TestDatabase {
     /// # }
     /// ```
     pub async fn new_postgres(test_name: &str) -> Result<Self> {
-        let db_url = std::env::var("POSTGRES_URL")
-            .unwrap_or_else(|_| "postgresql://cot:cot@localhost".to_string());
+        let (db_url, container) = if let Ok(db_url) = std::env::var("POSTGRES_URL") {
+            (db_url, None)
+        } else {
+            use testcontainers_modules::postgres::Postgres;
+
+            const POSTGRES_PORT: u16 = 5432;
+
+            let container = Postgres::default()
+                .start()
+                .await
+                .map_err(|e| TestcontainersError::new("failed to start PostgreSQL container", e))?;
+            let host_port = container
+                .get_host_port_ipv4(POSTGRES_PORT)
+                .await
+                .map_err(|e| {
+                    TestcontainersError::new("failed to get PostgreSQL container port", e)
+                })?;
+            let host_port: u16 = host_port;
+            (
+                format!("postgresql://postgres:postgres@localhost:{host_port}"),
+                Some(Box::new(container)),
+            )
+        };
+
         let database = Database::new(format!("{db_url}/postgres")).await?;
 
         let test_database_name = format!("test_cot__{test_name}");
@@ -970,6 +989,7 @@ impl TestDatabase {
             TestDatabaseKind::Postgres {
                 db_url,
                 db_name: test_database_name,
+                _container: container,
             },
         ))
     }
@@ -1018,8 +1038,28 @@ impl TestDatabase {
     /// # }
     /// ```
     pub async fn new_mysql(test_name: &str) -> Result<Self> {
-        let db_url =
-            std::env::var("MYSQL_URL").unwrap_or_else(|_| "mysql://root:@localhost".to_string());
+        let (db_url, container) = if let Ok(db_url) = std::env::var("MYSQL_URL") {
+            (db_url, None)
+        } else {
+            use testcontainers_modules::mariadb::Mariadb;
+
+            const MYSQL_PORT: u16 = 3306;
+
+            let container = Mariadb::default()
+                .start()
+                .await
+                .map_err(|e| TestcontainersError::new("failed to start MariaDB container", e))?;
+            let host_port = container
+                .get_host_port_ipv4(MYSQL_PORT)
+                .await
+                .map_err(|e| TestcontainersError::new("failed to get MariaDB container port", e))?;
+            let host_port: u16 = host_port;
+            (
+                format!("mysql://root:@localhost:{host_port}"),
+                Some(Box::new(container)),
+            )
+        };
+
         let database = Database::new(format!("{db_url}/mysql")).await?;
 
         let test_database_name = format!("test_cot__{test_name}");
@@ -1038,6 +1078,7 @@ impl TestDatabase {
             TestDatabaseKind::MySql {
                 db_url,
                 db_name: test_database_name,
+                _container: container,
             },
         ))
     }
@@ -1190,15 +1231,26 @@ impl TestDatabase {
         self.database.close().await?;
         match &self.kind {
             TestDatabaseKind::Sqlite => {}
-            TestDatabaseKind::Postgres { db_url, db_name } => {
+            TestDatabaseKind::Postgres {
+                db_url, db_name, ..
+            } => {
                 let database = Database::new(format!("{db_url}/postgres")).await?;
 
                 database
-                    .raw(&format!("DROP DATABASE {db_name} WITH (FORCE)"))
+                    .raw(&format!(
+                        "SELECT pg_terminate_backend(pg_stat_activity.pid) \
+                         FROM pg_stat_activity \
+                         WHERE pg_stat_activity.datname = '{db_name}' \
+                         AND pid <> pg_backend_pid()"
+                    ))
                     .await?;
+
+                database.raw(&format!("DROP DATABASE {db_name}")).await?;
                 database.close().await?;
             }
-            TestDatabaseKind::MySql { db_url, db_name } => {
+            TestDatabaseKind::MySql {
+                db_url, db_name, ..
+            } => {
                 let database = Database::new(format!("{db_url}/mysql")).await?;
 
                 database.raw(&format!("DROP DATABASE {db_name}")).await?;
@@ -1220,11 +1272,19 @@ impl std::ops::Deref for TestDatabase {
 }
 
 #[cfg(feature = "db")]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum TestDatabaseKind {
     Sqlite,
-    Postgres { db_url: String, db_name: String },
-    MySql { db_url: String, db_name: String },
+    Postgres {
+        db_url: String,
+        db_name: String,
+        _container: Option<Box<ContainerAsync<testcontainers_modules::postgres::Postgres>>>,
+    },
+    MySql {
+        db_url: String,
+        db_name: String,
+        _container: Option<Box<ContainerAsync<testcontainers_modules::mariadb::Mariadb>>>,
+    },
 }
 
 /// A test migration.
@@ -1439,6 +1499,7 @@ impl<T: Project + 'static> TestServerBuilder<T> {
 #[derive(Debug)]
 pub struct TestServer<T> {
     address: SocketAddr,
+    host: Option<String>,
     channel_send: oneshot::Sender<()>,
     server_handle: tokio::task::JoinHandle<()>,
     project: PhantomData<fn() -> T>,
@@ -1472,6 +1533,7 @@ impl<T: Project + 'static> TestServer<T> {
 
         Self {
             address,
+            host: None,
             channel_send: send,
             server_handle,
             project: PhantomData,
@@ -1515,7 +1577,8 @@ impl<T: Project + 'static> TestServer<T> {
     /// server (127.0.0.1) and not the public address of the machine. This might
     /// be a problem if you are making requests from a different machine or a
     /// Docker container. If you need to override the host returned by this
-    /// function, you can set the `COT_TEST_SERVER_HOST` environment variable.
+    /// function, you can set the `COT_TEST_SERVER_HOST` environment variable
+    /// or call [`Self::set_host`].
     ///
     /// # Examples
     ///
@@ -1538,7 +1601,9 @@ impl<T: Project + 'static> TestServer<T> {
     /// ```
     #[must_use]
     pub fn url(&self) -> String {
-        if let Ok(host) = std::env::var("COT_TEST_SERVER_HOST") {
+        if let Some(host) = &self.host {
+            format!("http://{}:{}", host, self.address.port())
+        } else if let Ok(host) = std::env::var("COT_TEST_SERVER_HOST") {
             format!("http://{}:{}", host, self.address.port())
         } else {
             format!("http://{}", self.address)
@@ -1581,188 +1646,154 @@ impl<T: Project + 'static> TestServer<T> {
     }
 }
 
-/// A guard for running tests serially.
+/// A test Webdriver container.
 ///
-/// This is mostly useful for tests that need to modify some global state (e.g.
-/// environment variables or current working directory).
-#[doc(hidden)] // not part of the public API; used in cot-cli
-pub fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
-    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-    let lock = LOCK.get_or_init(|| std::sync::Mutex::new(()));
-    match lock.lock() {
-        Ok(guard) => guard,
-        Err(poison_error) => {
-            lock.clear_poison();
-            // We can ignore poisoned mutexes because we don't store any data inside
-            poison_error.into_inner()
+/// This is used to start a Webdriver container for end-to-end tests using
+/// Testcontainers.
+#[derive(Debug)]
+pub struct TestWebDriver {
+    _container: ContainerAsync<testcontainers_modules::selenium::Selenium>,
+    host_port: u16,
+}
+
+impl TestWebDriver {
+    /// Create a new Webdriver container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container could not be started.
+    pub async fn new() -> Result<Self> {
+        Self::new_impl(None).await
+    }
+
+    /// Create a new Webdriver container and expose a host port to it.
+    ///
+    /// This is useful if you want to reach a service running on the host from
+    /// the container (e.g. the Cot server). The host will be reachable at
+    /// `host.testcontainers.internal`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container could not be started.
+    pub async fn with_host_port_exposure(port: u16) -> Result<Self> {
+        Self::new_impl(Some(port)).await
+    }
+
+    async fn new_impl(port: Option<u16>) -> Result<Self> {
+        use testcontainers_modules::selenium::Selenium;
+
+        const WEBDRIVER_PORT: u16 = 4444;
+
+        let selenium = Selenium::default();
+
+        let container = if let Some(port) = port {
+            selenium.with_exposed_host_port(port).start().await
+        } else {
+            selenium.start().await
+        }
+        .map_err(|e| TestcontainersError::new("failed to start Selenium container", e))?;
+
+        let host_port = container
+            .get_host_port_ipv4(WEBDRIVER_PORT)
+            .await
+            .map_err(|e| TestcontainersError::new("failed to get Selenium container port", e))?;
+
+        Ok(Self {
+            _container: container,
+            host_port,
+        })
+    }
+
+    /// Get the Webdriver URL.
+    #[must_use]
+    pub fn url(&self) -> String {
+        format!("http://localhost:{}", self.host_port)
+    }
+}
+
+/// A test server with a WebDriver instance.
+///
+/// This struct wraps a `TestServer` and manages a WebDriver instance for
+/// running end-to-end tests. It automatically handles the lifecycle of the
+/// WebDriver container or connects to an external WebDriver if configured.
+#[derive(Debug)]
+pub struct TestServerWithWebDriver<T> {
+    server: TestServer<T>,
+    inner: TestServerWithWebDriverImpl,
+}
+
+#[derive(Debug)]
+enum TestServerWithWebDriverImpl {
+    Testcontainers { test_web_driver: Box<TestWebDriver> },
+    External { web_driver_url: String },
+}
+
+impl<T: Project + 'static> TestServerWithWebDriver<T> {
+    /// Creates a new `TestServerWithWebDriver` instance.
+    ///
+    /// This will start a new WebDriver container (using `testcontainers`)
+    /// unless the `COT_WEBDRIVER_URL` environment variable is set, in which
+    /// case it will use the provided URL.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the WebDriver container fails to start.
+    pub async fn new(server: TestServer<T>) -> Result<Self> {
+        let inner = if let Ok(web_driver_url) = std::env::var("COT_WEBDRIVER_URL") {
+            TestServerWithWebDriverImpl::External { web_driver_url }
+        } else {
+            let test_web_driver =
+                TestWebDriver::with_host_port_exposure(server.address.port()).await?;
+            TestServerWithWebDriverImpl::Testcontainers {
+                test_web_driver: Box::new(test_web_driver),
+            }
+        };
+
+        Ok(Self { server, inner })
+    }
+
+    /// Returns the URL of the WebDriver instance.
+    #[must_use]
+    pub fn web_driver_url(&self) -> String {
+        match &self.inner {
+            TestServerWithWebDriverImpl::Testcontainers { test_web_driver } => {
+                test_web_driver.url()
+            }
+            TestServerWithWebDriverImpl::External { web_driver_url } => web_driver_url.clone(),
         }
     }
-}
 
-#[cfg(feature = "redis")]
-const POOL_KEY: &str = "cot:test:db_pool";
-
-#[cfg(feature = "redis")]
-async fn get_db_num(conn: &mut Connection) -> usize {
-    let cfg = redis::cmd("CONFIG")
-        .arg("GET")
-        .arg("databases")
-        .query_async::<Vec<String>>(conn)
-        .await
-        .expect("Failed to get Redis config");
-    cfg.get(1)
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(16)
-}
-
-#[cfg(feature = "redis")]
-async fn set_current_db(conn: &mut Connection, db_num: usize) {
-    redis::cmd("SELECT")
-        .arg(db_num)
-        .query_async::<()>(conn)
-        .await
-        .expect("Failed to select Redis database");
-}
-
-#[cfg(feature = "redis")]
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-enum RedisDbAllocatorError {
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error("Redis error: {0}")]
-    Redis(String),
-}
-
-#[cfg(feature = "redis")]
-impl_into_cot_error!(RedisDbAllocatorError);
-
-#[cfg(feature = "redis")]
-#[derive(Debug, Clone)]
-struct RedisDbAllocator {
-    alloc_db: usize,
-    redis: Redis,
-}
-
-#[cfg(feature = "redis")]
-type RedisAllocatorResult<T> = std::result::Result<T, RedisDbAllocatorError>;
-#[cfg(feature = "redis")]
-impl RedisDbAllocator {
-    fn new(alloc_db: usize, redis: Redis) -> Self {
-        Self { alloc_db, redis }
-    }
-
-    async fn get_conn(&self) -> RedisAllocatorResult<Connection> {
-        let conn = self
-            .redis
-            .get_connection()
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-        Ok(conn)
-    }
-
-    /// Initialize the Redis database allocator.
+    /// Returns the URL of the test server accessible from the WebDriver.
     ///
-    /// The goal here is to ensure that DB IDs are initialized once.
-    /// Since we run tests using `nextest`, the tests are run per process.
-    /// Thus, we run this in a transaction to guarantee a deterministic
-    /// behavior.
-    ///
-    /// On initializing the IDs, we check for the existence of an "init" key in
-    /// the DB. If the key does not exist, or if the length of the pool list
-    /// does not match the expected count, we  reinitialize the pool by
-    /// populating it with database indices from 1 to `alloc_db - 1`.
-    async fn init(&self) -> RedisAllocatorResult<Option<String>> {
-        const KEY_TIMEOUT_SECS: u64 = 300;
-        const INIT_KEY: &str = "cot:test:db_pool:initialized";
-
-        let mut con = self.get_conn().await?;
-        let last_eligible_db = self.alloc_db - 1;
-
-        redis::cmd("WATCH")
-            .arg(INIT_KEY)
-            .query_async::<redis::Value>(&mut con)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-
-        let prev = redis::cmd("GET")
-            .arg(INIT_KEY)
-            .query_async::<Option<String>>(&mut con)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-
-        if prev.is_some() {
-            redis::cmd("UNWATCH")
-                .query_async::<redis::Value>(&mut con)
-                .await
-                .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-            return Ok(prev);
-        }
-
-        // start a transaction so this is atomic across processes
-        redis::cmd("MULTI")
-            .query_async::<redis::Value>(&mut con)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-
-        let mut set_cmd = redis::cmd("SET");
-        set_cmd.arg(INIT_KEY).arg("1");
-        set_cmd.arg("EX").arg(KEY_TIMEOUT_SECS);
-        set_cmd
-            .query_async::<redis::Value>(&mut con)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-
-        // delete and reinit IDs
-        redis::cmd("DEL")
-            .arg(POOL_KEY)
-            .query_async::<redis::Value>(&mut con)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-
-        let vals: Vec<String> = (1..=last_eligible_db).map(|i| i.to_string()).collect();
-        redis::cmd("RPUSH")
-            .arg(POOL_KEY)
-            .arg(vals)
-            .query_async::<redis::Value>(&mut con)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-
-        // keys should expire after a short while, a double defense against reuse by
-        // subsequent runs
-        redis::cmd("EXPIRE")
-            .arg(POOL_KEY)
-            .arg(KEY_TIMEOUT_SECS)
-            .query_async::<redis::Value>(&mut con)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-
-        redis::cmd("EXEC")
-            .query_async::<Option<Vec<redis::Value>>>(&mut con)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-        Ok(None)
+    /// If running inside a container, this will use the host's internal
+    /// address. Otherwise, it uses `localhost`.
+    #[must_use]
+    pub fn server_url(&self) -> String {
+        let host = match &self.inner {
+            TestServerWithWebDriverImpl::Testcontainers { .. } => "host.testcontainers.internal",
+            TestServerWithWebDriverImpl::External { .. } => "localhost",
+        };
+        format!("http://{}:{}", host, self.server.address.port())
     }
 
-    async fn allocate(&self) -> RedisAllocatorResult<Option<usize>> {
-        let mut connection = self.get_conn().await?;
+    /// Returns a reference to the underlying `TestServer`.
+    pub fn server(&self) -> &TestServer<T> {
+        &self.server
+    }
 
-        let db_index: Option<String> = connection
-            .lpop(POOL_KEY, None)
-            .await
-            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
-        Ok(db_index.and_then(|i| i.parse::<usize>().ok()))
+    /// Closes the test server and cleans up resources.
+    pub async fn close(self) {
+        self.server.close().await;
     }
 }
 
 #[cfg(feature = "cache")]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum CacheKind {
     Memory,
     #[cfg(feature = "redis")]
     Redis {
-        #[expect(unused)]
-        allocator: RedisDbAllocator,
+        _container: Option<Box<ContainerAsync<Redis>>>,
     },
 }
 
@@ -1786,7 +1817,7 @@ enum CacheKind {
 /// # }
 /// ```
 #[cfg(feature = "cache")]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestCache {
     cache: Cache,
     kind: CacheKind,
@@ -1827,24 +1858,11 @@ impl TestCache {
 
     /// Create a new Redis test cache.
     ///
-    /// The Redis URL is read from the `REDIS_URL` environment variable. If not
-    /// provided, it defaults to `redis://localhost`.
-    ///
-    /// Running with redis makes use of an internal allocator that selects what
-    /// DB a test will run. Every test requires its own database to avoid
-    /// conflicts. The allocator, by design, will reserve the last database
-    /// number for allocation purposes, so make sure your Redis instance is
-    /// configured with at least 2 databases. For example if your redis
-    /// instance has 16 logical databases, database 15 will be used for
-    /// allocations, and databases 0-14 will be used for tests.
+    /// This starts a new Redis container for the test.
     ///
     /// # Errors
     ///
     /// Returns an error if the Redis cache could not be created.
-    ///
-    /// # Panics
-    ///
-    /// Panics if Redis is not configured with at least 2 databases.
     ///
     /// # Examples
     ///
@@ -1863,39 +1881,19 @@ impl TestCache {
     /// ```
     #[cfg(feature = "redis")]
     pub async fn new_redis() -> Result<Self> {
-        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost".to_string());
-        let mut url = CacheUrl::from(url);
+        let (container, url) = run_redis_container().await?;
+        let url = CacheUrl::from(url);
 
-        let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
-        let mut conn = redis.get_connection().await?;
-        // get the total number of DBs
-        let db_num = get_db_num(&mut conn).await;
-        assert!(
-            db_num > 1,
-            "Redis must be configured with at least 2 databases for testing"
-        );
-
-        let alloc_db = db_num - 1;
-
-        // switch to the allocation DB to perform initialization
-        set_current_db(&mut conn, db_num - 1).await;
-
-        let allocator = RedisDbAllocator::new(alloc_db, redis);
-        allocator.init().await?;
-        // get the db number for the current test
-        let current_db = allocator
-            .allocate()
-            .await?
-            .expect("Failed to allocate a Redis database for testing");
-
-        // create a new connection to the correct DB
-        url.inner_mut().set_path(current_db.to_string().as_str());
-        let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
+        let redis =
+            crate::cache::store::redis::Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
         let cache = Cache::new(redis, Some("test_harness".to_string()), Timeout::default());
 
-        let this = Self::new(cache, CacheKind::Redis { allocator });
-
-        Ok(this)
+        Ok(Self::new(
+            cache,
+            CacheKind::Redis {
+                _container: Some(Box::new(container)),
+            },
+        ))
     }
 
     /// Get the cache.
@@ -1944,9 +1942,70 @@ impl TestCache {
     /// ```
     pub async fn cleanup(&self) -> Result<()> {
         #[cfg(feature = "redis")]
-        if let CacheKind::Redis { allocator: _ } = &self.kind {
+        if let CacheKind::Redis { .. } = &self.kind {
             self.cache.clear().await?;
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "redis")]
+pub(crate) async fn run_redis_container() -> Result<(ContainerAsync<Redis>, String)> {
+    use testcontainers_modules::redis::Redis;
+
+    const REDIS_PORT: u16 = 6379;
+
+    let container = Redis::default()
+        .with_tag("8-alpine")
+        .start()
+        .await
+        .map_err(|e| TestcontainersError::new("failed to start Redis container", e))?;
+    let host_port = container
+        .get_host_port_ipv4(REDIS_PORT)
+        .await
+        .map_err(|e| TestcontainersError::new("failed to get Redis container port", e))?;
+    let url = format!("redis://localhost:{host_port}");
+
+    Ok((container, url))
+}
+
+#[derive(Debug, Error)]
+#[error("{message}: {inner}")]
+struct TestcontainersError {
+    message: String,
+    #[source]
+    inner: testcontainers::core::error::TestcontainersError,
+}
+
+impl TestcontainersError {
+    #[must_use]
+    fn new(
+        message: impl Into<String>,
+        inner: testcontainers::core::error::TestcontainersError,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            inner,
+        }
+    }
+}
+
+impl_into_cot_error!(TestcontainersError);
+
+/// A guard for running tests serially.
+///
+/// This is mostly useful for tests that need to modify some global state (e.g.
+/// environment variables or current working directory).
+#[doc(hidden)] // not part of the public API; used in cot-cli
+pub fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    let lock = LOCK.get_or_init(|| std::sync::Mutex::new(()));
+    match lock.lock() {
+        Ok(guard) => guard,
+        Err(poison_error) => {
+            lock.clear_poison();
+            // We can ignore poisoned mutexes because we don't store any data inside
+            poison_error.into_inner()
+        }
     }
 }

@@ -10,7 +10,7 @@ use cot::config::{
 use cot::middleware::{AuthMiddleware, SessionMiddleware};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::static_files::StaticFilesMiddleware;
-use cot::test::{TestServer, TestServerBuilder};
+use cot::test::{TestServer, TestServerBuilder, TestServerWithWebDriver};
 use cot::{App, AppBuilder, Project, ProjectContext};
 use fantoccini::{Client, ClientBuilder, Locator};
 
@@ -70,11 +70,11 @@ impl Project for AdminProject {
     }
 }
 
-#[ignore = "This test requires a Webdriver to be running"]
+#[ignore = "This test requires a Webdriver"]
 #[cot::e2e_test]
 async fn admin_e2e_login() -> Result<(), Box<dyn Error>> {
     let server = TestServerBuilder::new(AdminProject).start().await;
-    let driver = create_webdriver().await?;
+    let (driver, server) = create_webdriver(server).await?;
 
     login(&server, &driver).await?;
 
@@ -90,13 +90,13 @@ async fn admin_e2e_login() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[ignore = "This test requires a Webdriver to be running"]
+#[ignore = "This test requires a Webdriver"]
 #[cot::e2e_test]
 async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
     const NEW_PASSWORD: &str = "test";
 
     let server = TestServerBuilder::new(AdminProject).start().await;
-    let driver = create_webdriver().await?;
+    let (driver, server) = create_webdriver(server).await?;
 
     login(&server, &driver).await?;
 
@@ -136,17 +136,22 @@ async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn login(server: &TestServer<AdminProject>, driver: &Client) -> Result<(), Box<dyn Error>> {
+async fn login(
+    server: &TestServerWithWebDriver<AdminProject>,
+    driver: &Client,
+) -> Result<(), Box<dyn Error>> {
     login_with(server, driver, DEFAULT_USERNAME, DEFAULT_PASSWORD).await
 }
 
 async fn login_with(
-    server: &TestServer<AdminProject>,
+    server: &TestServerWithWebDriver<AdminProject>,
     driver: &Client,
     username: &str,
     password: &str,
 ) -> Result<(), Box<dyn Error>> {
-    driver.goto(&format!("{}/admin/", server.url())).await?;
+    driver
+        .goto(&format!("{}/admin/", server.server_url()))
+        .await?;
 
     let username_form = driver.find(Locator::Id("username")).await?;
     username_form.send_keys(username).await?;
@@ -158,8 +163,13 @@ async fn login_with(
     Ok(())
 }
 
-async fn create_webdriver() -> Result<Client, Box<dyn Error>> {
-    Ok(ClientBuilder::native()
-        .connect("http://localhost:4444")
-        .await?)
+async fn create_webdriver<P: Project + 'static>(
+    server: TestServer<P>,
+) -> Result<(Client, TestServerWithWebDriver<P>), Box<dyn Error>> {
+    let server_with_web_driver = TestServerWithWebDriver::new(server).await?;
+
+    let client = ClientBuilder::native()
+        .connect(&server_with_web_driver.web_driver_url())
+        .await?;
+    Ok((client, server_with_web_driver))
 }

@@ -60,6 +60,8 @@ sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = tr
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
 thiserror.workspace = true
+testcontainers = { workspace = true, optional = true, features = ["host-port-exposure"] }
+testcontainers-modules = { workspace = true, optional = true, features = ["postgres", "mariadb", "redis", "selenium"] }
 time.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs", "io-util"] }
 toml = { workspace = true, features = ["parse", "serde"] }
@@ -104,7 +106,7 @@ ignored = [
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
-full = ["default", "fake", "live-reload", "test", "cache", "redis", "email"]
+full = ["default", "fake", "live-reload", "cache", "redis", "email"]
 fake = ["dep:fake"]
 db = ["dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
 email = ["dep:lettre", "dep:chumsky", "dep:idna"]
@@ -117,7 +119,7 @@ openapi = ["json", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
 cache = ["json"]
-test = []
+test = ["dep:testcontainers", "dep:testcontainers-modules"]
 
 [lib]
 bench = false

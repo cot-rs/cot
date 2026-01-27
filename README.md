@@ -83,14 +83,7 @@ Tests that require using external databases are ignored by default. In order to 
 root of the repository:
 
 ```shell
-docker compose up -d
-cargo test --all-features -- --include-ignored
-```
-
-You can them execute the following command to stop the database:
-
-```shell
-docker compose down
+cargo nextest run --all-features --run-ignored only
 ```
 
 ## Star History

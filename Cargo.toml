@@ -137,6 +137,8 @@ swagger-ui-redist = { version = "0.1" }
 syn = { version = "2", default-features = false }
 sync_wrapper = "1"
 tempfile = "3"
+testcontainers = { version = "0.26", default-features = false }
+testcontainers-modules = { version = "0.14", default-features = false }
 thiserror = "2"
 time = { version = "0.3.46", default-features = false }
 tokio = { version = "1.49", default-features = false }

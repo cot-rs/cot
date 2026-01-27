@@ -292,8 +292,7 @@ impl Cache {
         Ok(result)
     }
 
-    /// Stores a value in the cache with the default expiration time of 5
-    /// minutes.
+    /// Stores a value in the cache with the default expiration time.
     ///
     /// The value will be serialized to JSON before storage. If the key already
     /// exists, the value will be overwritten.
@@ -469,7 +468,7 @@ impl Cache {
     ///
     /// // Check that cache is empty
     /// let size = cache.approx_size().await?;
-    /// assert_eq!(size, 0); // 0
+    /// assert_eq!(size, 0);
     ///
     /// # Ok(())
     /// # }
@@ -612,7 +611,6 @@ impl Cache {
     /// key doesn't exist, it executes the provided closure to compute the
     /// value, stores the result in the cache with the default expiration
     /// time, and returns the computed value.
-    ///
     ///
     /// # Errors
     ///

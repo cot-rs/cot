@@ -2,7 +2,7 @@
 //!
 //! Cot uses the [`Request`](http::Request) type from the [`http`] crate
 //! to represent incoming HTTP requests. However, it also provides a
-//! [`RequestExt`] trait that contain various helper methods for working with
+//! [`RequestExt`] trait that contains various helper methods for working with
 //! HTTP requests. These methods are used to access the application context,
 //! project configuration, path parameters, and more. You probably want to have
 //! a `use` statement for [`RequestExt`] in your code most of the time to be
@@ -107,8 +107,8 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn router(&self) -> &Arc<Router>;
 
-    /// Get the app name the current route belongs to, or [`None`] if the
-    /// request is not routed.
+    /// Returns the name of the app that the current route belongs to, or
+    /// [`None`] if the request is not routed.
     ///
     /// This is mainly useful for providing context to reverse redirects, where
     /// you want to redirect to a route in the same app.
@@ -127,8 +127,11 @@ pub trait RequestExt: private::Sealed {
     /// ```
     fn app_name(&self) -> Option<&str>;
 
-    /// Get the route name, or [`None`] if the request is not routed or doesn't
-    /// have a route name.
+    /// Returns the name of the current route.
+    ///
+    /// This returns [`None`] if:
+    /// - the request is not routed, or
+    /// - the route has no name.
     ///
     /// This is mainly useful for use in templates, where you want to know which
     /// route is being rendered, for instance to mark the active tab.
@@ -225,7 +228,7 @@ pub trait RequestExt: private::Sealed {
     ///
     /// # Errors
     ///
-    /// Throws an error if the content type is not the expected value.
+    /// Returns an error if the content type is not the expected value.
     ///
     /// # Examples
     ///

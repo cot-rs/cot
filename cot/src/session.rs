@@ -1,7 +1,7 @@
 //! Session management
 //!
-//! This module provides a session management system that allows you to store
-//! and retrieve session data.
+//! This module provides a session management system that allows for storing
+//! and retrieving session data.
 //!
 //! # Examples
 //!

@@ -189,8 +189,8 @@ impl MigrationGenerator {
         Ok(migrations)
     }
 
-    /// Generate migrations and return internal structures that can be used to
-    /// generate source code.
+    /// Generates migrations and returns an intermediate structure that can be
+    /// converted into Rust source code.
     pub fn generate_migrations_as_generated_from_files(
         &self,
         source_files: Vec<SourceFile>,
@@ -203,7 +203,7 @@ impl MigrationGenerator {
         if operations.is_empty() {
             Ok(None)
         } else {
-            let migration_name = migration_processor.next_migration_name()?;
+            let migration_name = migration_processor.next_auto_migration_name()?;
             let dependencies = migration_processor.base_dependencies();
 
             let migration =
@@ -214,13 +214,20 @@ impl MigrationGenerator {
 
     pub fn generate_custom_migration(&self, name: &str) -> anyhow::Result<MigrationAsSource> {
         let source_files = self.get_source_files()?;
+        self.generate_custom_migration_from_files(name, source_files)
+    }
+
+    pub fn generate_custom_migration_from_files(
+        &self,
+        name: &str,
+        source_files: Vec<SourceFile>,
+    ) -> anyhow::Result<MigrationAsSource> {
         let AppState { migrations, .. } = self.process_source_files(source_files)?;
         let migration_processor = MigrationProcessor::new(migrations)?;
 
         let migration_name = migration_processor.next_migration_name_with_suffix(name)?;
         let dependencies = migration_processor.base_dependencies();
 
-        // Convert dependencies to Repr
         let dependencies_repr: Vec<_> = dependencies.iter().map(Repr::repr).collect();
 
         let app_name = self.options.app_name.as_ref().unwrap_or(&self.crate_name);
@@ -241,12 +248,12 @@ impl MigrationGenerator {
             }
 
             #[::cot::db::migrations::migration_op]
-            async fn forwards(_ctx: &::cot::db::migrations::MigrationContext) -> ::cot::db::Result<()> {
+            async fn forwards(_ctx: ::cot::db::migrations::MigrationContext<'_>) -> ::cot::db::Result<()> {
                 Ok(())
             }
 
             #[::cot::db::migrations::migration_op]
-            async fn backwards(_ctx: &::cot::db::migrations::MigrationContext) -> ::cot::db::Result<()> {
+            async fn backwards(_ctx: ::cot::db::migrations::MigrationContext<'_>) -> ::cot::db::Result<()> {
                 Err(::cot::db::DatabaseError::MigrationError(
                     ::cot::db::migrations::MigrationEngineError::Custom("Backwards migration not implemented".into())
                 ))
@@ -922,14 +929,12 @@ impl MigrationProcessor {
         Ok(Self { migrations })
     }
 
-    /// Returns the latest (in the order of applying migrations) versions of the
-    /// models that are marked as migration models, that means the latest
-    /// version of each migration model.
+    /// Returns the most recent versions of all models found across all
+    /// migrations.
     ///
     /// This is useful for generating migrations - we can compare the latest
-    /// version of the model in the source code with the latest version of the
-    /// model in the migrations (returned by this method) and generate the
-    /// necessary operations.
+    /// version of the model in the source code with the most recent version in
+    /// the migrations and generate the necessary operations.
     #[must_use]
     fn latest_models(&self) -> Vec<ModelInSource> {
         let mut migration_models: HashMap<String, &ModelInSource> = HashMap::new();
@@ -942,7 +947,11 @@ impl MigrationProcessor {
         migration_models.into_values().cloned().collect()
     }
 
-    fn next_migration_name(&self) -> anyhow::Result<String> {
+    fn next_auto_migration_name(&self) -> anyhow::Result<String> {
+        if self.migrations.is_empty() {
+            return Ok(format!("{MIGRATIONS_MODULE_PREFIX}0001_initial"));
+        }
+
         let migration_number = self.get_next_migration_number()?;
         let now = chrono::Utc::now();
         let date_time = now.format("%Y%m%d_%H%M%S");
@@ -969,10 +978,18 @@ impl MigrationProcessor {
             .name
             .split('_')
             .nth(1)
-            .with_context(|| format!("migration number not found: {}", last_migration.name))?
+            .with_context(|| {
+                format!(
+                    "the migration number was not found: {}",
+                    last_migration.name
+                )
+            })?
             .parse::<u32>()
             .with_context(|| {
-                format!("unable to parse migration number: {}", last_migration.name)
+                format!(
+                    "unable to parse the migration number: {}",
+                    last_migration.name
+                )
             })?;
 
         Ok(last_migration_number + 1)
@@ -1539,7 +1556,7 @@ mod tests {
         let migrations = vec![];
         let processor = MigrationProcessor::new(migrations).unwrap();
 
-        let next_migration_name = processor.next_migration_name().unwrap();
+        let next_migration_name = processor.next_auto_migration_name().unwrap();
         assert_eq!(next_migration_name, "m_0001_initial");
     }
 
@@ -1582,6 +1599,29 @@ mod tests {
 
         let next_name = processor.next_migration_name_with_suffix("custom").unwrap();
         assert_eq!(next_name, "m_0002_custom");
+    }
+
+    #[test]
+    fn create_new_migration_check_files_exist() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let cargo_toml_path = tempdir.path().join("Cargo.toml");
+        std::fs::create_dir(tempdir.path().join("src")).unwrap();
+        std::fs::write(
+            &cargo_toml_path,
+            "[package]\nname = \"testapp\"\nversion = \"0.1.0\"\nedition = \"2021\"",
+        )
+        .unwrap();
+
+        let options = MigrationGeneratorOptions::default();
+        create_new_migration(tempdir.path(), "my_custom", options).unwrap();
+
+        let migration_file = tempdir.path().join("src/migrations/m_0001_my_custom.rs");
+        assert!(migration_file.exists());
+
+        let migrations_mod = tempdir.path().join("src/migrations.rs");
+        assert!(migrations_mod.exists());
+        let contents = std::fs::read_to_string(migrations_mod).unwrap();
+        assert!(contents.contains("pub mod m_0001_my_custom;"));
     }
 
     #[test]

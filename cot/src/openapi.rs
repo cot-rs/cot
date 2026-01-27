@@ -1,9 +1,8 @@
 //! OpenAPI integration for Cot.
 //!
 //! This module provides traits and utilities for generating OpenAPI
-//! documentation for Cot applications. The idea is to be able to use Cot's
-//! existing request handlers and extractors to generate OpenAPI documentation
-//! automatically.
+//! documentation for Cot applications. It allows using Cot's existing request
+//! handlers and extractors to generate OpenAPI documentation automatically.
 //!
 //! # Usage
 //!
@@ -119,7 +118,8 @@ use cot_core::handler::{BoxRequestHandler, RequestHandler, handle_all_parameters
 /// This macro can be applied to enums to automatically implement the
 /// [`ApiOperationResponse`] trait for OpenAPI documentation generation.
 /// The enum must consist of tuple variants with exactly one field each,
-/// where each field type implements [`ApiOperationResponse`].
+/// with each variant containing a single field that implements
+/// [`ApiOperationResponse`].
 ///
 /// **Note**: This macro only implements [`ApiOperationResponse`]. If you also
 /// need [`IntoResponse`], you must derive it separately or implement it
@@ -255,8 +255,10 @@ impl Default for RouteContext<'_> {
     }
 }
 
-/// Returns the OpenAPI path item for the route - a collection of different
-/// HTTP operations (GET, POST, etc.) at a given URL.
+/// Trait for types that can be converted into an OpenAPI path item.
+///
+/// An OpenAPI path item is a collection of different HTTP operations (GET,
+/// POST, etc.) at a given URL.
 ///
 /// You usually shouldn't need to implement this directly. Instead, it's easiest
 /// to use [`ApiMethodRouter`](crate::router::method::openapi::ApiMethodRouter).
@@ -370,6 +372,9 @@ pub trait AsApiRoute {
 /// ```
 pub trait AsApiOperation<T = ()> {
     /// Returns the OpenAPI operation for the route.
+    ///
+    /// Returns [`None`] if the operation should be hidden from the OpenAPI
+    /// specification.
     ///
     /// # Examples
     ///

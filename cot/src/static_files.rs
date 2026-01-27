@@ -1,7 +1,7 @@
 //! Static files middleware.
 //!
-//! This middleware serves static files from the `static` directory of the
-//! project.
+//! This module provides middleware for serving static files from the `static`
+//! directory of the project.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -25,9 +25,9 @@ use crate::config::{StaticFilesConfig, StaticFilesPathRewriteMode};
 use crate::project::MiddlewareContext;
 use crate::response::{Response, ResponseExt};
 
-/// Macro to define static files by specifying their paths.
+/// Macro to define static files by specifying paths.
 ///
-/// The files are included at compile time using the `include_bytes!` macro.
+/// The files are embedded at compile time using the `include_bytes!` macro.
 /// The paths are relative to the `static` directory of the project (under the
 /// project root, where the `Cargo.toml` file is).
 ///
@@ -268,7 +268,7 @@ impl StaticFile {
 /// the [`CotApp::static_files`](crate::App::static_files) trait
 /// method. The middleware serves files from the `/static/` path.
 ///
-/// If a request is made to a path starting with `/static/`, the middleware
+/// When a request is made to a path starting with `/static/`, the middleware
 /// checks if the file exists in the static files collection. If it does, the
 /// file is served. Otherwise, the request is passed to the inner service.
 #[derive(Debug, Clone)]

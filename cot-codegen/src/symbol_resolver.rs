@@ -163,7 +163,7 @@ impl SymbolResolver {
 /// a `use` statement for a given type, but also, for instance, the type is
 /// defined in the current module.
 ///
-/// For instance, for `use std::collections::HashMap;` the `VisibleSymbol `
+/// For instance, for `use std::collections::HashMap;` the `VisibleSymbol`
 /// would be:
 /// ```
 /// use cot_codegen::symbol_resolver::{VisibleSymbol, VisibleSymbolKind};

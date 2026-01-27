@@ -79,9 +79,9 @@ use crate::{Body, Error, cli, error_page};
 /// * session management
 /// * etc.
 ///
-/// Each app can have its own set of URLs that it can handle which can be
-/// mounted on the project's router, its own set of middleware, database
-/// migrations (which can depend on other apps), etc.
+/// Each app can have its own set of URLs that can be mounted on the project's
+/// router, its own set of middlewares, database migrations (which can depend on
+/// other apps), etc.
 #[async_trait]
 pub trait App: Send + Sync {
     /// The name of the app.
@@ -405,7 +405,7 @@ pub trait Project {
     ///
     /// # Panics
     ///
-    /// Note that this handler is exempt of the typical panic handling
+    /// Note that this handler is exempt from the typical panic handling
     /// machinery in Cot. This means that if this handler panics, no
     /// response will be sent to a user. Because of that, you should
     /// avoid panicking here and return [`Err`] instead.
@@ -435,7 +435,8 @@ pub trait Project {
 }
 
 /// An alias for `ProjectContext` in appropriate phase for use with the
-/// [`Project::register_apps`] method.
+/// [`Project::register_apps`] method. This represents the `ProjectContext`
+/// during the [`WithConfig`] phase.
 pub type RegisterAppsContext = ProjectContext<WithConfig>;
 
 /// An alias for `ProjectContext` in appropriate phase for use with the
@@ -1050,7 +1051,7 @@ struct LoadConfig {
 impl_into_cot_error!(LoadConfig);
 
 impl Bootstrapper<WithConfig> {
-    /// Builds the Cot project instance.
+    /// Builds the initialized Cot project instance.
     ///
     /// This is the final step in the bootstrapping process. It initializes the
     /// project with the given configuration and returns a [`Bootstrapper`]
@@ -1135,7 +1136,7 @@ impl Bootstrapper<WithConfig> {
 }
 
 impl Bootstrapper<WithApps> {
-    /// Builds the Cot project instance.
+    /// Builds the initialized Cot project instance.
     ///
     /// This is the final step in the bootstrapping process. It initializes the
     /// project with the given configuration and returns a [`Bootstrapper`]
@@ -1344,12 +1345,13 @@ impl Bootstrapper<WithDatabase> {
 }
 
 impl Bootstrapper<WithCache> {
-    /// Builds the Cot project instance.
+    /// Builds the initialized Cot project instance.
     ///
     /// This is the final step in the bootstrapping process. It initializes the
     /// project with the given configuration and returns a [`Bootstrapper`]
     /// instance that contains the project's context and handler.
-    /// /// You shouldn't have to use this method directly most of the time.
+    ///
+    /// You shouldn't have to use this method directly most of the time.
     /// It's mainly useful for controlling the bootstrapping process in
     /// custom [`CliTask`](cli::CliTask)s.
     ///

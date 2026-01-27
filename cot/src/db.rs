@@ -72,7 +72,7 @@ pub enum DatabaseError {
     /// Error when applying migrations.
     #[error("{ERROR_PREFIX} error when applying migrations: {0}")]
     MigrationError(#[from] migrations::MigrationEngineError),
-    /// An object could not be found in the database.
+    /// A record could not be found in the database.
     #[error("{ERROR_PREFIX} record with primary key `{primary_key}` not found in the database")]
     RecordNotFound {
         /// The primary key of the record that was not found.
@@ -174,7 +174,7 @@ pub trait Model: Sized + Send + 'static {
     /// The primary key type of the model.
     type PrimaryKey: PrimaryKey;
 
-    /// The name of the app this model is defined in.
+    /// The name of the app in which this model is defined.
     const APP_NAME: &'static str;
 
     /// The name of the table in the database.
@@ -868,7 +868,7 @@ impl Database {
     /// # Errors
     ///
     /// This method can return an error if the connection to the database could
-    /// not be closed gracefully, for instance because the connection has
+    /// not be closed gracefully, for example, because the connection has
     /// already been dropped.
     ///
     /// # Examples

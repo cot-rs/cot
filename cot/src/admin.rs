@@ -456,8 +456,8 @@ pub trait AdminModelManager: Send + Sync {
     ///
     /// Returns an error if the object with the given ID does not exist.
     ///
-    /// Returns an error if the object could not be removed, for instance
-    /// due to a database error.
+    /// Returns an error if the object could not be removed, for example,
+    /// a database error.
     async fn remove_by_id(&self, request: &mut Request, object_id: &str) -> cot::Result<()>;
 }
 
@@ -597,8 +597,8 @@ pub trait AdminModel: Any + Send + 'static {
     ///
     /// # Errors
     ///
-    /// Returns an error if the object could not be saved, for instance
-    /// due to a database error.
+    /// Returns an error if the object could not be saved, for example,
+    /// a database error.
     async fn save_from_request(
         request: &mut Request,
         object_id: Option<&str>,
@@ -612,8 +612,8 @@ pub trait AdminModel: Any + Send + 'static {
     ///
     /// Returns an error if the object with the given ID does not exist.
     ///
-    /// Returns an error if the object could not be removed, for instance
-    /// due to a database error.
+    /// Returns an error if the object could not be removed, for example,
+    /// a database error.
     async fn remove_by_id(request: &mut Request, object_id: &str) -> cot::Result<()>
     where
         Self: Sized;
@@ -625,12 +625,12 @@ pub trait AdminModel: Any + Send + 'static {
 ///
 /// ```
 /// use cot::admin::AdminApp;
-/// use cot::project::WithConfig;
-/// use cot::{AppBuilder, Project, ProjectContext};
+/// use cot::project::RegisterAppsContext;
+/// use cot::{AppBuilder, Project};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
 ///         apps.register_with_views(AdminApp::new(), "/admin");
 ///     }
 /// }

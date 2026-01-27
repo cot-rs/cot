@@ -27,7 +27,8 @@ pub enum MigrationEngineError {
     Custom(String),
 }
 
-/// A migration engine that can run migrations.
+/// A migration engine responsible for managing and applying database
+/// migrations.
 ///
 /// # Examples
 ///
@@ -138,7 +139,7 @@ impl MigrationEngine {
     ///
     /// # Errors
     ///
-    /// Throws an error if any of the migrations fail to apply, or if there is
+    /// Returns an error if any of the migrations fail to apply, or if there is
     /// an error while interacting with the database, or if there is an
     /// error while marking a migration as applied.
     ///
@@ -434,16 +435,13 @@ impl Operation {
     /// # Examples
     ///
     /// ```
-    /// use cot::db::migrations::{CustomOperationFn, Operation};
-    /// use cot::db::{Database, Result};
+    /// use cot::db::Result;
+    /// use cot::db::migrations::{MigrationContext, Operation, migration_op};
     ///
-    /// fn forwards(
-    ///     db: &Database,
-    /// ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> {
-    ///     Box::pin(async move {
-    ///         // do something
-    ///         Ok(())
-    ///     })
+    /// #[migration_op]
+    /// async fn forwards(ctx: MigrationContext) -> Result<()> {
+    ///     // do something
+    ///     Ok(())
     /// }
     ///
     /// const OPERATION: Operation = Operation::custom(forwards).build();
@@ -457,7 +455,7 @@ impl Operation {
     ///
     /// # Errors
     ///
-    /// Throws an error if the operation fails to apply.
+    /// Returns an error if the operation fails to apply.
     ///
     /// # Examples
     ///
@@ -534,8 +532,8 @@ impl Operation {
                 forwards,
                 backwards: _,
             } => {
-                let context = MigrationContext { db: database };
-                forwards(&context).await?;
+                let context = MigrationContext::new(database);
+                forwards(context).await?;
             }
         }
         Ok(())
@@ -546,7 +544,7 @@ impl Operation {
     ///
     /// # Errors
     ///
-    /// Throws an error if the operation fails to apply.
+    /// Returns an error if the operation fails to apply.
     ///
     /// # Examples
     ///
@@ -619,8 +617,8 @@ impl Operation {
                 backwards,
             } => {
                 if let Some(backwards) = backwards {
-                    let context = MigrationContext { db: database };
-                    backwards(&context).await?;
+                    let context = MigrationContext::new(database);
+                    backwards(context).await?;
                 } else {
                     return Err(crate::db::DatabaseError::MigrationError(
                         MigrationEngineError::Custom("Backwards migration not implemented".into()),
@@ -637,9 +635,16 @@ impl Operation {
 /// This structure provides access to the database and other information that
 /// might be needed during a migration.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct MigrationContext<'a> {
     /// The database connection to run the migration against.
     pub db: &'a Database,
+}
+
+impl<'a> MigrationContext<'a> {
+    fn new(db: &'a Database) -> Self {
+        Self { db }
+    }
 }
 
 /// A type alias for a custom migration operation function.
@@ -648,7 +653,7 @@ pub struct MigrationContext<'a> {
 /// functions of this type.
 pub type CustomOperationFn =
     for<'a> fn(
-        &'a MigrationContext<'a>,
+        MigrationContext<'a>,
     ) -> std::pin::Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>;
 
 #[derive(Debug, Copy, Clone)]
@@ -1613,25 +1618,19 @@ impl RemoveModelBuilder {
 /// # Examples
 ///
 /// ```
-/// use cot::db::migrations::{CustomOperationFn, Operation};
-/// use cot::db::{Database, Result};
+/// use cot::db::Result;
+/// use cot::db::migrations::{MigrationContext, Operation, migration_op};
 ///
-/// fn forwards(
-///     db: &Database,
-/// ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> {
-///     Box::pin(async move {
-///         // do something
-///         Ok(())
-///     })
+/// #[migration_op]
+/// async fn forwards(ctx: MigrationContext) -> Result<()> {
+///     // do something
+///     Ok(())
 /// }
 ///
-/// fn backwards(
-///     db: &Database,
-/// ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> {
-///     Box::pin(async move {
-///         // undo something
-///         Ok(())
-///     })
+/// #[migration_op]
+/// async fn backwards(ctx: MigrationContext) -> Result<()> {
+///     // undo something
+///     Ok(())
 /// }
 ///
 /// const OPERATION: Operation = Operation::custom(forwards).backwards(backwards).build();
@@ -2144,6 +2143,58 @@ mod tests {
         } else {
             panic!("Expected OperationInner::AddField");
         }
+    }
+
+    #[cot::test]
+    async fn test_operation_custom() {
+        // test only on SQLite because we are using raw SQL
+        let test_db = TestDatabase::new_sqlite().await.unwrap();
+
+        #[migration_op]
+        async fn forwards(ctx: MigrationContext<'_>) -> Result<()> {
+            ctx.db
+                .raw("CREATE TABLE custom_test (id INTEGER PRIMARY KEY)")
+                .await?;
+            Ok(())
+        }
+
+        let operation = Operation::custom(forwards).build();
+        operation.forwards(&test_db.database()).await.unwrap();
+
+        let result = test_db.database().raw("SELECT * FROM custom_test").await;
+        assert!(result.is_ok());
+    }
+
+    #[cot::test]
+    async fn test_operation_custom_backwards() {
+        // test only on SQLite because we are using raw SQL
+        let test_db = TestDatabase::new_sqlite().await.unwrap();
+
+        #[migration_op]
+        async fn forwards(_ctx: MigrationContext<'_>) -> Result<()> {
+            panic!("this should not be called");
+        }
+
+        #[migration_op]
+        async fn backwards(ctx: MigrationContext<'_>) -> Result<()> {
+            ctx.db.raw("DROP TABLE custom_test_back").await?;
+            Ok(())
+        }
+
+        test_db
+            .database()
+            .raw("CREATE TABLE custom_test_back (id INTEGER PRIMARY KEY)")
+            .await
+            .unwrap();
+
+        let operation = Operation::custom(forwards).backwards(backwards).build();
+        operation.backwards(&test_db.database()).await.unwrap();
+
+        let result = test_db
+            .database()
+            .raw("SELECT * FROM custom_test_back")
+            .await;
+        assert!(result.is_err());
     }
 
     #[test]

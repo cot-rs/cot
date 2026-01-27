@@ -1,12 +1,12 @@
 use crate::{Body, StatusCode};
-
 mod into_response;
 
 /// Derive macro for the [`IntoResponse`] trait.
 ///
 /// This macro can be applied to enums to automatically implement the
 /// [`IntoResponse`] trait. The enum must consist of tuple variants with
-/// exactly one field each, where each field type implements [`IntoResponse`].
+/// exactly one field each, with each variant containing a single field that
+/// implements [`IntoResponse`].
 ///
 /// # Requirements
 ///
@@ -68,7 +68,7 @@ mod private {
 }
 
 /// Extension trait for [`http::Response`] that provides helper methods for
-/// working with HTTP response.
+/// working with HTTP responses.
 ///
 /// # Sealed
 ///
@@ -95,7 +95,7 @@ pub trait ResponseExt: Sized + private::Sealed {
     ///
     /// This creates a new [`Response`] object with a status code of
     /// [`StatusCode::SEE_OTHER`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/303)
-    /// and a location header set to the provided location.
+    /// and a `Location` header set to the provided location.
     ///
     /// # Examples
     ///

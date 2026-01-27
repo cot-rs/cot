@@ -7,7 +7,7 @@
 ///
 /// Note that this is just a newtype wrapper around data and does not provide
 /// any content validation. It is primarily useful as a request extractor and
-/// response type for REST-ful endpoints.
+/// response type for RESTful endpoints.
 ///
 /// # Examples
 ///

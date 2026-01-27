@@ -110,7 +110,7 @@ pub struct SessionMiddleware {
 }
 
 impl SessionMiddleware {
-    /// Crates a new instance of [`SessionMiddleware`].
+    /// Creates a new instance of [`SessionMiddleware`].
     #[must_use]
     pub fn new<S: SessionStore + Send + Sync + 'static>(store: S) -> Self {
         let layer = SessionManagerLayer::new(SessionStoreWrapper::new(Arc::new(store)));

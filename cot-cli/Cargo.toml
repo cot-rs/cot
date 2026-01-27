@@ -44,7 +44,6 @@ tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [dev-dependencies]
-cot = { path = "../cot", features = ["test"] }
 cot-cli = { path = ".", features = ["test_utils"] }
 assert_cmd.workspace = true
 insta.workspace = true

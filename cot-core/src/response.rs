@@ -1,4 +1,4 @@
-use crate::{Body, StatusCode};
+use crate::Body;
 mod into_response;
 
 /// Derive macro for the [`IntoResponse`] trait.
@@ -90,30 +90,6 @@ pub trait ResponseExt: Sized + private::Sealed {
     /// ```
     #[must_use]
     fn builder() -> http::response::Builder;
-
-    /// Create a new redirect response.
-    ///
-    /// This creates a new [`Response`] object with a status code of
-    /// [`StatusCode::SEE_OTHER`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/303)
-    /// and a `Location` header set to the provided location.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::StatusCode;
-    /// use cot::response::{Response, ResponseExt};
-    ///
-    /// let response = Response::new_redirect("http://example.com");
-    /// ```
-    ///
-    /// # See also
-    ///
-    /// * [`cot::reverse_redirect!`](../../cot/macro.reverse_redirect!.html) – a
-    ///   more ergonomic way to create redirects to internal views (available in
-    ///   the `cot` crate)
-    #[must_use]
-    #[deprecated(since = "0.5.0", note = "Use Redirect::new() instead")]
-    fn new_redirect<T: Into<String>>(location: T) -> Self;
 }
 
 impl private::Sealed for Response {}
@@ -121,14 +97,6 @@ impl private::Sealed for Response {}
 impl ResponseExt for Response {
     fn builder() -> http::response::Builder {
         http::Response::builder()
-    }
-
-    fn new_redirect<T: Into<String>>(location: T) -> Self {
-        http::Response::builder()
-            .status(StatusCode::SEE_OTHER)
-            .header(http::header::LOCATION, location.into())
-            .body(Body::empty())
-            .expect(RESPONSE_BUILD_FAILURE)
     }
 }
 
@@ -182,9 +150,9 @@ impl Redirect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::StatusCode;
     use crate::body::BodyInner;
     use crate::headers::JSON_CONTENT_TYPE;
-    use crate::response::{Response, ResponseExt};
 
     #[test]
     #[cfg(feature = "json")]
@@ -211,18 +179,6 @@ mod tests {
                 panic!("Expected fixed body");
             }
         }
-    }
-
-    #[test]
-    #[expect(deprecated)]
-    fn response_new_redirect() {
-        let location = "http://example.com";
-        let response = Response::new_redirect(location);
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(
-            response.headers().get(http::header::LOCATION).unwrap(),
-            location
-        );
     }
 
     #[test]

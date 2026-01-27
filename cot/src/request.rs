@@ -185,28 +185,6 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn path_params_mut(&mut self) -> &mut PathParams;
 
-    /// Get the database.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
-    ///     let db = request.db();
-    ///     // ... do something with the database
-    ///     # unimplemented!()
-    /// }
-    /// ```
-    #[cfg(feature = "db")]
-    #[must_use]
-    #[deprecated(
-        since = "0.5.0",
-        note = "use request extractors (`FromRequestHead`) instead"
-    )]
-    fn db(&self) -> &crate::db::Database;
-
     /// Get the content type of the request.
     ///
     /// # Examples
@@ -315,11 +293,6 @@ impl RequestExt for Request {
         self.extensions_mut().get_or_insert_default::<PathParams>()
     }
 
-    #[cfg(feature = "db")]
-    fn db(&self) -> &crate::db::Database {
-        self.context().database()
-    }
-
     fn content_type(&self) -> Option<&http::HeaderValue> {
         self.headers().get(http::header::CONTENT_TYPE)
     }
@@ -373,11 +346,6 @@ impl RequestExt for RequestHead {
 
     fn path_params_mut(&mut self) -> &mut PathParams {
         self.extensions.get_or_insert_default::<PathParams>()
-    }
-
-    #[cfg(feature = "db")]
-    fn db(&self) -> &crate::db::Database {
-        self.context().database()
     }
 
     fn content_type(&self) -> Option<&http::HeaderValue> {

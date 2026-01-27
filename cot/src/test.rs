@@ -950,8 +950,25 @@ impl TestDatabase {
     /// # }
     /// ```
     pub async fn new_postgres(test_name: &str) -> Result<Self> {
-        let db_url = std::env::var("POSTGRES_URL")
-            .unwrap_or_else(|_| "postgresql://cot:cot@localhost".to_string());
+        let (db_url, container) = if let Ok(db_url) = std::env::var("POSTGRES_URL") {
+            (db_url, None)
+        } else {
+            use testcontainers::runners::AsyncRunner;
+            use testcontainers_modules::postgres::Postgres;
+
+            let container = Postgres::default().start().await.map_err(|e| {
+                cot_core::Error::internal(format!("failed to start PostgreSQL container: {e}"))
+            })?;
+            let host_port = container.get_host_port_ipv4(5432).await.map_err(|e| {
+                cot_core::Error::internal(format!("failed to get PostgreSQL container port: {e}"))
+            })?;
+            let host_port: u16 = host_port;
+            (
+                format!("postgresql://postgres:postgres@localhost:{host_port}"),
+                Some(container),
+            )
+        };
+
         let database = Database::new(format!("{db_url}/postgres")).await?;
 
         let test_database_name = format!("test_cot__{test_name}");
@@ -970,6 +987,7 @@ impl TestDatabase {
             TestDatabaseKind::Postgres {
                 db_url,
                 db_name: test_database_name,
+                _container: container,
             },
         ))
     }
@@ -1018,8 +1036,25 @@ impl TestDatabase {
     /// # }
     /// ```
     pub async fn new_mysql(test_name: &str) -> Result<Self> {
-        let db_url =
-            std::env::var("MYSQL_URL").unwrap_or_else(|_| "mysql://root:@localhost".to_string());
+        let (db_url, container) = if let Ok(db_url) = std::env::var("MYSQL_URL") {
+            (db_url, None)
+        } else {
+            use testcontainers::runners::AsyncRunner;
+            use testcontainers_modules::mariadb::Mariadb;
+
+            let container = Mariadb::default().start().await.map_err(|e| {
+                cot_core::Error::internal(format!("failed to start MariaDB container: {e}"))
+            })?;
+            let host_port = container.get_host_port_ipv4(3306).await.map_err(|e| {
+                cot_core::Error::internal(format!("failed to get MariaDB container port: {e}"))
+            })?;
+            let host_port: u16 = host_port;
+            (
+                format!("mysql://root:@localhost:{host_port}"),
+                Some(container),
+            )
+        };
+
         let database = Database::new(format!("{db_url}/mysql")).await?;
 
         let test_database_name = format!("test_cot__{test_name}");
@@ -1038,6 +1073,7 @@ impl TestDatabase {
             TestDatabaseKind::MySql {
                 db_url,
                 db_name: test_database_name,
+                _container: container,
             },
         ))
     }
@@ -1190,7 +1226,9 @@ impl TestDatabase {
         self.database.close().await?;
         match &self.kind {
             TestDatabaseKind::Sqlite => {}
-            TestDatabaseKind::Postgres { db_url, db_name } => {
+            TestDatabaseKind::Postgres {
+                db_url, db_name, ..
+            } => {
                 let database = Database::new(format!("{db_url}/postgres")).await?;
 
                 database
@@ -1198,7 +1236,9 @@ impl TestDatabase {
                     .await?;
                 database.close().await?;
             }
-            TestDatabaseKind::MySql { db_url, db_name } => {
+            TestDatabaseKind::MySql {
+                db_url, db_name, ..
+            } => {
                 let database = Database::new(format!("{db_url}/mysql")).await?;
 
                 database.raw(&format!("DROP DATABASE {db_name}")).await?;
@@ -1220,11 +1260,23 @@ impl std::ops::Deref for TestDatabase {
 }
 
 #[cfg(feature = "db")]
-#[derive(Debug, Clone)]
+#[derive(derive_more::Debug)]
 enum TestDatabaseKind {
     Sqlite,
-    Postgres { db_url: String, db_name: String },
-    MySql { db_url: String, db_name: String },
+    Postgres {
+        db_url: String,
+        db_name: String,
+        #[debug(skip)]
+        _container:
+            Option<testcontainers::ContainerAsync<testcontainers_modules::postgres::Postgres>>,
+    },
+    MySql {
+        db_url: String,
+        db_name: String,
+        #[debug(skip)]
+        _container:
+            Option<testcontainers::ContainerAsync<testcontainers_modules::mariadb::Mariadb>>,
+    },
 }
 
 /// A test migration.
@@ -1581,6 +1633,64 @@ impl<T: Project + 'static> TestServer<T> {
     }
 }
 
+/// A test Webdriver container.
+///
+/// This is used to start a Webdriver container for end-to-end tests using
+/// Testcontainers.
+#[derive(derive_more::Debug)]
+pub struct TestWebDriver {
+    #[debug(skip)]
+    container: testcontainers::ContainerAsync<testcontainers_modules::selenium::Selenium>,
+}
+
+impl TestWebDriver {
+    /// Create a new Webdriver container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container could not be started.
+    pub async fn new() -> Result<Self> {
+        Self::with_host_port_exposure(None).await
+    }
+
+    /// Create a new Webdriver container and expose a host port to it.
+    ///
+    /// This is useful if you want to reach a service running on the host from
+    /// the container (e.g. the Cot server). The host will be reachable at
+    /// `host.testcontainers.internal`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the container could not be started.
+    pub async fn with_host_port_exposure(port: Option<u16>) -> Result<Self> {
+        use testcontainers::ImageExt;
+        use testcontainers::runners::AsyncRunner;
+        use testcontainers_modules::selenium::Selenium;
+
+        let selenium = Selenium::default();
+
+        let container = if let Some(port) = port {
+            selenium.with_exposed_host_port(port).start().await
+        } else {
+            selenium.start().await
+        }
+        .map_err(|e| {
+            cot_core::Error::internal(format!("failed to start Selenium container: {e}"))
+        })?;
+
+        Ok(Self { container })
+    }
+
+    /// Get the Webdriver URL.
+    pub async fn url(&self) -> Result<String> {
+        let host_port = self.container.get_host_port_ipv4(4444).await.map_err(|e| {
+            cot_core::Error::internal(format!("failed to get Selenium container port: {e}"))
+        })?;
+        let host_port: u16 = host_port;
+        Ok(format!("http://localhost:{host_port}"))
+    }
+}
+
 /// A guard for running tests serially.
 ///
 /// This is mostly useful for tests that need to modify some global state (e.g.
@@ -1756,13 +1866,15 @@ impl RedisDbAllocator {
 }
 
 #[cfg(feature = "cache")]
-#[derive(Debug, Clone)]
+#[derive(derive_more::Debug)]
 enum CacheKind {
     Memory,
     #[cfg(feature = "redis")]
     Redis {
         #[expect(unused)]
         allocator: RedisDbAllocator,
+        #[debug(skip)]
+        _container: Option<testcontainers::ContainerAsync<testcontainers_modules::redis::Redis>>,
     },
 }
 
@@ -1786,7 +1898,7 @@ enum CacheKind {
 /// # }
 /// ```
 #[cfg(feature = "cache")]
-#[derive(Debug, Clone)]
+#[derive(derive_more::Debug)]
 pub struct TestCache {
     cache: Cache,
     kind: CacheKind,
@@ -1863,7 +1975,21 @@ impl TestCache {
     /// ```
     #[cfg(feature = "redis")]
     pub async fn new_redis() -> Result<Self> {
-        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost".to_string());
+        let (url, container) = if let Ok(url) = std::env::var("REDIS_URL") {
+            (url, None)
+        } else {
+            use testcontainers::runners::AsyncRunner;
+            use testcontainers_modules::redis::Redis;
+
+            let container = Redis::default().start().await.map_err(|e| {
+                cot_core::Error::internal(format!("failed to start Redis container: {e}"))
+            })?;
+            let host_port = container.get_host_port_ipv4(6379).await.map_err(|e| {
+                cot_core::Error::internal(format!("failed to get Redis container port: {e}"))
+            })?;
+            let host_port: u16 = host_port;
+            (format!("redis://localhost:{host_port}"), Some(container))
+        };
         let mut url = CacheUrl::from(url);
 
         let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
@@ -1893,7 +2019,13 @@ impl TestCache {
         let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
         let cache = Cache::new(redis, Some("test_harness".to_string()), Timeout::default());
 
-        let this = Self::new(cache, CacheKind::Redis { allocator });
+        let this = Self::new(
+            cache,
+            CacheKind::Redis {
+                allocator,
+                _container: container,
+            },
+        );
 
         Ok(this)
     }
@@ -1944,7 +2076,7 @@ impl TestCache {
     /// ```
     pub async fn cleanup(&self) -> Result<()> {
         #[cfg(feature = "redis")]
-        if let CacheKind::Redis { allocator: _ } = &self.kind {
+        if let CacheKind::Redis { allocator: _, .. } = &self.kind {
             self.cache.clear().await?;
         }
         Ok(())

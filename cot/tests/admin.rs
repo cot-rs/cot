@@ -70,11 +70,10 @@ impl Project for AdminProject {
     }
 }
 
-#[ignore = "This test requires a Webdriver to be running"]
 #[cot::e2e_test]
 async fn admin_e2e_login() -> Result<(), Box<dyn Error>> {
     let server = TestServerBuilder::new(AdminProject).start().await;
-    let driver = create_webdriver().await?;
+    let (driver, _webdriver_container) = create_webdriver(&server).await?;
 
     login(&server, &driver).await?;
 
@@ -90,13 +89,12 @@ async fn admin_e2e_login() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[ignore = "This test requires a Webdriver to be running"]
 #[cot::e2e_test]
 async fn admin_e2e_change_password() -> Result<(), Box<dyn Error>> {
     const NEW_PASSWORD: &str = "test";
 
     let server = TestServerBuilder::new(AdminProject).start().await;
-    let driver = create_webdriver().await?;
+    let (driver, _webdriver_container) = create_webdriver(&server).await?;
 
     login(&server, &driver).await?;
 
@@ -158,8 +156,21 @@ async fn login_with(
     Ok(())
 }
 
-async fn create_webdriver() -> Result<Client, Box<dyn Error>> {
-    Ok(ClientBuilder::native()
-        .connect("http://localhost:4444")
-        .await?)
+async fn create_webdriver<P: cot::Project + 'static>(
+    server: &TestServer<P>,
+) -> Result<(Client, Option<cot::test::TestWebDriver>), Box<dyn Error>> {
+    let (url, container) = if let Ok(url) = std::env::var("WEBDRIVER_URL") {
+        (url, None)
+    } else {
+        let port = server.address().port();
+        let container = cot::test::TestWebDriver::with_host_port_exposure(Some(port)).await?;
+        let url = container.url().await?;
+
+        std::env::set_var("COT_TEST_SERVER_HOST", "host.testcontainers.internal");
+
+        (url, Some(container))
+    };
+
+    let client = ClientBuilder::native().connect(&url).await?;
+    Ok((client, container))
 }

@@ -139,6 +139,8 @@ sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
 time = { version = "0.3.44", default-features = false }
+testcontainers = { version = "0.26", features = ["host-port-exposure"] }
+testcontainers-modules = { version = "0.14", features = ["postgres", "mariadb", "redis", "selenium"] }
 tokio = { version = "1.48", default-features = false }
 toml = { version = "0.9", default-features = false }
 tower = "0.5.2"

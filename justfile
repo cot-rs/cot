@@ -70,6 +70,4 @@ test:
 alias ti := test-ignored
 
 test-ignored:
-    docker compose up -d --wait
     cargo nextest run --all-features --run-ignored only
-    docker compose down

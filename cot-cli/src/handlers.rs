@@ -4,9 +4,12 @@ use anyhow::Context;
 use clap::CommandFactory;
 
 use crate::args::{
-    Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, ProjectNewArgs,
+    Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, MigrationNewArgs,
+    ProjectNewArgs,
 };
-use crate::migration_generator::{MigrationGeneratorOptions, list_migrations, make_migrations};
+use crate::migration_generator::{
+    MigrationGeneratorOptions, create_new_migration, list_migrations, make_migrations,
+};
 use crate::new_project::{CotSource, new_project};
 
 pub fn handle_new_project(
@@ -57,6 +60,21 @@ pub fn handle_migration_make(
         output_dir,
     };
     make_migrations(&path, options).with_context(|| "unable to create migrations")
+}
+
+pub fn handle_migration_new(
+    MigrationNewArgs {
+        name,
+        path,
+        app_name,
+    }: MigrationNewArgs,
+) -> anyhow::Result<()> {
+    let path = path.unwrap_or(PathBuf::from("."));
+    let options = MigrationGeneratorOptions {
+        app_name,
+        output_dir: None,
+    };
+    create_new_migration(&path, &name, options).with_context(|| "unable to create migration")
 }
 
 pub fn handle_cli_manpages(

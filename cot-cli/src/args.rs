@@ -48,6 +48,20 @@ pub enum MigrationCommands {
     List(MigrationListArgs),
     /// Generate migrations for a Cot project
     Make(MigrationMakeArgs),
+    /// Create a new empty migration
+    New(MigrationNewArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct MigrationNewArgs {
+    /// Name of the migration
+    pub name: String,
+    /// Path to the crate directory to create the migration in [default: current
+    /// directory]
+    pub path: Option<PathBuf>,
+    /// Name of the app to use in the migration (default: crate name)
+    #[arg(long)]
+    pub app_name: Option<String>,
 }
 
 #[derive(Debug, Args)]

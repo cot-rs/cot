@@ -4,7 +4,9 @@ mod sorter;
 
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use std::future::Future;
 
+pub use cot_macros::migration_op;
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::{Level, info};
@@ -20,6 +22,9 @@ pub enum MigrationEngineError {
     /// An error occurred while determining the correct order of migrations.
     #[error("error while determining the correct order of migrations")]
     MigrationSortError(#[from] MigrationSorterError),
+    /// A custom error occurred during a migration.
+    #[error("error running migration: {0}")]
+    Custom(String),
 }
 
 /// A migration engine that can run migrations.
@@ -424,6 +429,30 @@ impl Operation {
         RemoveModelBuilder::new()
     }
 
+    /// Returns a builder for a custom operation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::migrations::{CustomOperationFn, Operation};
+    /// use cot::db::{Database, Result};
+    ///
+    /// fn forwards(
+    ///     db: &Database,
+    /// ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> {
+    ///     Box::pin(async move {
+    ///         // do something
+    ///         Ok(())
+    ///     })
+    /// }
+    ///
+    /// const OPERATION: Operation = Operation::custom(forwards).build();
+    /// ```
+    #[must_use]
+    pub const fn custom(forwards: CustomOperationFn) -> CustomBuilder {
+        CustomBuilder::new(forwards)
+    }
+
     /// Runs the operation forwards.
     ///
     /// # Errors
@@ -500,6 +529,13 @@ impl Operation {
             } => {
                 let query = sea_query::Table::drop().table(*table_name).to_owned();
                 database.execute_schema(query).await?;
+            }
+            OperationInner::Custom {
+                forwards,
+                backwards: _,
+            } => {
+                let context = MigrationContext { db: database };
+                forwards(&context).await?;
             }
         }
         Ok(())
@@ -578,10 +614,42 @@ impl Operation {
                 }
                 database.execute_schema(query).await?;
             }
+            OperationInner::Custom {
+                forwards: _,
+                backwards,
+            } => {
+                if let Some(backwards) = backwards {
+                    let context = MigrationContext { db: database };
+                    backwards(&context).await?;
+                } else {
+                    return Err(crate::db::DatabaseError::MigrationError(
+                        MigrationEngineError::Custom("Backwards migration not implemented".into()),
+                    ));
+                }
+            }
         }
         Ok(())
     }
 }
+
+/// A context for a custom migration operation.
+///
+/// This structure provides access to the database and other information that
+/// might be needed during a migration.
+#[derive(Debug)]
+pub struct MigrationContext<'a> {
+    /// The database connection to run the migration against.
+    pub db: &'a Database,
+}
+
+/// A type alias for a custom migration operation function.
+///
+/// Typically, you should use the [`migration_op`] attribute macro to define
+/// functions of this type.
+pub type CustomOperationFn =
+    for<'a> fn(
+        &'a MigrationContext<'a>,
+    ) -> std::pin::Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>;
 
 #[derive(Debug, Copy, Clone)]
 enum OperationInner {
@@ -605,6 +673,10 @@ enum OperationInner {
     RemoveModel {
         table_name: Identifier,
         fields: &'static [Field],
+    },
+    Custom {
+        forwards: CustomOperationFn,
+        backwards: Option<CustomOperationFn>,
     },
 }
 
@@ -1532,6 +1604,66 @@ impl RemoveModelBuilder {
         Operation::new(OperationInner::RemoveModel {
             table_name: unwrap_builder_option!(self, table_name),
             fields: unwrap_builder_option!(self, fields),
+        })
+    }
+}
+
+/// A builder for a custom operation.
+///
+/// # Examples
+///
+/// ```
+/// use cot::db::migrations::{CustomOperationFn, Operation};
+/// use cot::db::{Database, Result};
+///
+/// fn forwards(
+///     db: &Database,
+/// ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> {
+///     Box::pin(async move {
+///         // do something
+///         Ok(())
+///     })
+/// }
+///
+/// fn backwards(
+///     db: &Database,
+/// ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> {
+///     Box::pin(async move {
+///         // undo something
+///         Ok(())
+///     })
+/// }
+///
+/// const OPERATION: Operation = Operation::custom(forwards).backwards(backwards).build();
+/// ```
+#[derive(Debug, Copy, Clone)]
+pub struct CustomBuilder {
+    forwards: CustomOperationFn,
+    backwards: Option<CustomOperationFn>,
+}
+
+impl CustomBuilder {
+    #[must_use]
+    const fn new(forwards: CustomOperationFn) -> Self {
+        Self {
+            forwards,
+            backwards: None,
+        }
+    }
+
+    /// Sets the backwards operation.
+    #[must_use]
+    pub const fn backwards(mut self, backwards: CustomOperationFn) -> Self {
+        self.backwards = Some(backwards);
+        self
+    }
+
+    /// Builds the operation.
+    #[must_use]
+    pub const fn build(self) -> Operation {
+        Operation::new(OperationInner::Custom {
+            forwards: self.forwards,
+            backwards: self.backwards,
         })
     }
 }

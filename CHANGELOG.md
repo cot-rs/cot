@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/cot-rs/cot/compare/cot-v0.5.0...cot-v0.6.0) - 2026-01-28
+
+[View diff on diff.rs](https://diff.rs/cot/0.5.0/cot/0.6.0/Cargo.toml)
+
+### Other
+
+- [**breaking**] Extract framework core to cot-core ([#444](https://github.com/cot-rs/cot/pull/444)) (by [@seqre](https://github.com/seqre))
+- [**breaking**] Remove deprecated items ([#457](https://github.com/cot-rs/cot/pull/457)) (by [@m4tx](https://github.com/m4tx))
+- Various tiny doc fixes ([#450](https://github.com/cot-rs/cot/pull/450)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.5.0](https://github.com/cot-rs/cot/compare/cot-v0.4.0...cot-v0.5.0) - 2026-01-21
 
 [View diff on diff.rs](https://diff.rs/cot/0.4.0/cot/0.5.0/Cargo.toml)

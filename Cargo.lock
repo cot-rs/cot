@@ -3681,8 +3681,6 @@ checksum = "0946d52b4b7e28823148aebbeceb901012c595ad737920d504fa8634bb099e6f"
 dependencies = [
  "form_urlencoded",
  "indexmap",
- "itoa",
- "ryu",
  "serde_core",
 ]
 

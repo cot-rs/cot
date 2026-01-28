@@ -2205,6 +2205,26 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    async fn operation_custom_backwards_not_implemented() {
+        // test only on SQLite because we are using raw SQL
+        let test_db = TestDatabase::new_sqlite().await.unwrap();
+
+        #[migration_op]
+        async fn forwards(_ctx: MigrationContext<'_>) -> Result<()> {
+            Ok(())
+        }
+
+        let operation = Operation::custom(forwards).build();
+        let result = operation.backwards(&test_db.database()).await;
+
+        assert!(result.is_err());
+    }
+
     #[test]
     fn field_new() {
         let field = Field::new(Identifier::new("id"), ColumnType::Integer)

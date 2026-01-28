@@ -146,6 +146,19 @@ mod tests {
     }
 
     #[test]
+    fn migration_new_wrong_directory() {
+        let args = MigrationNewArgs {
+            name: "test_migration".to_string(),
+            path: Some(PathBuf::from("nonexistent")),
+            app_name: None,
+        };
+
+        let result = handle_migration_new(args);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn generate_manpages() {
         let temp_dir = tempfile::tempdir().unwrap();
         let args = ManpagesArgs {

@@ -68,6 +68,7 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
             [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
+            [CompletionResult]::new('new', 'new', [CompletionResultType]::ParameterValue, 'Create a new empty migration')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -91,9 +92,20 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
+        'cot;migration;new' {
+            [CompletionResult]::new('--app-name', '--app-name', [CompletionResultType]::ParameterName, 'Name of the app to use in the migration (default: crate name)')
+            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
         'cot;migration;help' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
             [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
+            [CompletionResult]::new('new', 'new', [CompletionResultType]::ParameterValue, 'Create a new empty migration')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -101,6 +113,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;migration;help;make' {
+            break
+        }
+        'cot;migration;help;new' {
             break
         }
         'cot;migration;help;help' {
@@ -168,12 +183,16 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
         'cot;help;migration' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
             [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
+            [CompletionResult]::new('new', 'new', [CompletionResultType]::ParameterValue, 'Create a new empty migration')
             break
         }
         'cot;help;migration;list' {
             break
         }
         'cot;help;migration;make' {
+            break
+        }
+        'cot;help;migration;new' {
             break
         }
         'cot;help;cli' {

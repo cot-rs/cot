@@ -60,8 +60,8 @@ ahash = { version = "0.8.12", default-features = false }
 aide = { version = "0.15", default-features = false }
 anstyle = "1.0.13"
 anyhow = "1.0.100"
-askama = { version = "0.15.1", default-features = false }
-askama_derive = { version = "0.15.1", default-features = false, features = ["external-sources", "proc-macro"] }
+askama = { version = "0.15.3", default-features = false }
+askama_derive = { version = "0.15.3", default-features = false, features = ["external-sources", "proc-macro"] }
 assert_cmd = "2"
 async-stream = "0.3"
 async-trait = "0.1"
@@ -69,10 +69,10 @@ axum = { version = "0.8", default-features = false }
 backtrace = "0.3.76"
 bytes = "1.11"
 cargo_toml = "0.22"
-chrono = { version = "0.4.42", default-features = false }
+chrono = { version = "0.4.43", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
 chumsky = { version = "0.9.3", default-features = false }
-clap = { version = "4.5.53", features = ["deprecated"] }
+clap = { version = "4.5.55", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.2.31"
@@ -126,7 +126,7 @@ schemars = { version = "0.9", default-features = false }
 sea-query = { version = "0.32", default-features = false }
 sea-query-binder = { version = "0.7", default-features = false }
 serde = "1"
-serde_html_form = "0.3"
+serde_html_form = "0.4"
 serde_json = "1"
 serde_path_to_error = "0.1.20"
 serde_urlencoded = "0.7"
@@ -138,10 +138,10 @@ syn = { version = "2", default-features = false }
 sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
-time = { version = "0.3.44", default-features = false }
-tokio = { version = "1.48", default-features = false }
+time = { version = "0.3.46", default-features = false }
+tokio = { version = "1.49", default-features = false }
 toml = { version = "0.9", default-features = false }
-tower = "0.5.2"
+tower = "0.5.3"
 tower-livereload = "0.9.6"
 tower-sessions = { version = "0.14", default-features = false }
 tracing = { version = "0.1", default-features = false }

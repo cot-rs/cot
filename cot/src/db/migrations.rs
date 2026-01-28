@@ -2146,7 +2146,11 @@ mod tests {
     }
 
     #[cot::test]
-    async fn test_operation_custom() {
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    async fn operation_custom() {
         // test only on SQLite because we are using raw SQL
         let test_db = TestDatabase::new_sqlite().await.unwrap();
 
@@ -2166,7 +2170,11 @@ mod tests {
     }
 
     #[cot::test]
-    async fn test_operation_custom_backwards() {
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    async fn operation_custom_backwards() {
         // test only on SQLite because we are using raw SQL
         let test_db = TestDatabase::new_sqlite().await.unwrap();
 

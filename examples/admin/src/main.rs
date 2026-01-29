@@ -62,12 +62,14 @@ impl App for HelloApp {
     }
 
     async fn init(&self, context: &mut ProjectContext) -> cot::Result<()> {
-        // TODO use transaction
-        let user = DatabaseUser::get_by_username(context.database(), "admin").await?;
+        let mut transaction = context.database().begin().await?;
+
+        let user = DatabaseUser::get_by_username(&mut transaction, "admin").await?;
         if user.is_none() {
-            DatabaseUser::create_user(context.database(), "admin", "admin").await?;
+            DatabaseUser::create_user(&mut transaction, "admin", "admin").await?;
         }
 
+        transaction.commit().await?;
         Ok(())
     }
 

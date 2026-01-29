@@ -932,3 +932,45 @@ async fn bulk_insert_with_fixed_pk(test_db: &mut TestDatabase) {
         .unwrap();
     assert_eq!(model300.name, "test300");
 }
+
+#[cot_macros::dbtest]
+async fn transaction_commit(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+    let db = &**test_db;
+
+    let mut transaction = db.begin().await.unwrap();
+    let mut model = TestModel {
+        id: Auto::auto(),
+        name: "test".to_string(),
+    };
+    model.insert(&mut transaction).await.unwrap();
+    transaction.commit().await.unwrap();
+
+    let exists = TestModel::objects()
+        .filter(<TestModel as Model>::Fields::name.eq("test"))
+        .exists(db)
+        .await
+        .unwrap();
+    assert!(exists);
+}
+
+#[cot_macros::dbtest]
+async fn transaction_rollback(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+    let db = &**test_db;
+
+    let mut transaction = db.begin().await.unwrap();
+    let mut model = TestModel {
+        id: Auto::auto(),
+        name: "test_rollback".to_string(),
+    };
+    model.insert(&mut transaction).await.unwrap();
+    transaction.rollback().await.unwrap();
+
+    let exists = TestModel::objects()
+        .filter(<TestModel as Model>::Fields::name.eq("test_rollback"))
+        .exists(db)
+        .await
+        .unwrap();
+    assert!(!exists);
+}

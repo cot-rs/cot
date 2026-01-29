@@ -1,8 +1,9 @@
 //! Database interface implementation – PostgreSQL backend.
 
-use crate::db::sea_query_db::impl_sea_query_db_backend;
+use crate::db::sea_query_db::{impl_sea_query_db_backend, impl_sea_query_transaction_backend};
 
 impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::postgres::PgPool, PostgresRow, PostgresValueRef, sea_query::PostgresQueryBuilder);
+impl_sea_query_transaction_backend!(DatabasePostgres, TransactionPostgres: sqlx::postgres::Postgres, PostgresRow, sea_query::PostgresQueryBuilder);
 
 impl DatabasePostgres {
     #[expect(clippy::unused_async)]

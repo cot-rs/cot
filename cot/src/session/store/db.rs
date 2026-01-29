@@ -112,11 +112,12 @@ impl DbStore {
     pub fn new(connection: Database) -> DbStore {
         DbStore { connection }
     }
-}
 
-#[async_trait]
-impl SessionStore for DbStore {
-    async fn create(&self, record: &mut Record) -> session_store::Result<()> {
+    async fn create_in_executor<DB: crate::db::DatabaseBackend>(
+        &self,
+        mut db: DB,
+        record: &mut Record,
+    ) -> session_store::Result<()> {
         for _ in 0..=MAX_COLLISION_RETRIES {
             let key = record.id.to_string();
 
@@ -132,7 +133,7 @@ impl SessionStore for DbStore {
                 expiry,
             };
 
-            let res = self.connection.insert(&mut model).await;
+            let res = db.insert(&mut model).await;
             match res {
                 Ok(()) => {
                     return Ok(());
@@ -146,27 +147,45 @@ impl SessionStore for DbStore {
         }
         Err(DbStoreError::TooManyIdCollisions(MAX_COLLISION_RETRIES))?
     }
+}
+
+#[async_trait]
+impl SessionStore for DbStore {
+    async fn create(&self, record: &mut Record) -> session_store::Result<()> {
+        self.create_in_executor(&self.connection, record).await
+    }
 
     async fn save(&self, record: &Record) -> session_store::Result<()> {
-        // TODO: use transactions when implemented
+        let mut transaction = self
+            .connection
+            .begin()
+            .await
+            .map_err(DbStoreError::DatabaseError)?;
+
         let key = record.id.to_string();
         let data = serde_json::to_string(&record.data)
             .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
 
         let query = query!(Session, $key == key)
-            .get(&self.connection)
+            .get(&mut transaction)
             .await
             .map_err(DbStoreError::DatabaseError)?;
         if let Some(mut model) = query {
             model.data = data;
             model
-                .update(&self.connection)
+                .update(&mut transaction)
                 .await
                 .map_err(DbStoreError::DatabaseError)?;
         } else {
             let mut record = record.clone();
-            self.create(&mut record).await?;
+            self.create_in_executor(&mut transaction, &mut record)
+                .await?;
         }
+
+        transaction
+            .commit()
+            .await
+            .map_err(DbStoreError::DatabaseError)?;
         Ok(())
     }
 

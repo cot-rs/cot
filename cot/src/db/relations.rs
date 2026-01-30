@@ -197,6 +197,80 @@ impl From<ForeignKeyOnUpdatePolicy> for sea_query::ForeignKeyAction {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ManyToMany<T: Model> {
+    PrimaryKeys(Vec<T::PrimaryKey>),
+    Models(Vec<T>),
+}
+
+impl<T: Model> Default for ManyToMany<T> {
+    fn default() -> Self {
+        ManyToMany::PrimaryKeys(Vec::new())
+    }
+}
+impl<T: Model> ManyToMany<T> {
+    pub fn primary_keys(&self) -> Vec<&T::PrimaryKey> {
+        match self {
+            Self::PrimaryKeys(pks) => pks.iter().collect(),
+            Self::Models(models) => models.iter().map(|m| m.primary_key()).collect(),
+        }
+    }
+
+    pub fn models(&self) -> Option<&Vec<T>> {
+        match self {
+            Self::Models(models) => Some(models),
+            Self::PrimaryKeys(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ManyToManyField<T: Model, Owner: Model> {
+    pub join_table: &'static str,
+    pub owner_field: &'static str,
+    pub target_field: &'static str,
+    pub phantom: std::marker::PhantomData<(T, Owner)>,
+}
+
+impl<T: Model, Owner: Model> ManyToManyField<T, Owner> {
+    pub const fn new(
+        join_table: &'static str,
+        owner_field: &'static str,
+        target_field: &'static str,
+    ) -> Self {
+        Self {
+            join_table,
+            owner_field,
+            target_field,
+            phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub async fn get<'a, DB: DatabaseBackend>(
+        &self,
+        relation: &'a mut ManyToMany<T>,
+        db: &DB,
+    ) -> Result<&'a Vec<T>> {
+        match relation {
+            ManyToMany::Models(m) => Ok(m),
+            ManyToMany::PrimaryKeys(pks) => {
+                let mut models = Vec::with_capacity(pks.len());
+                for pk in pks {
+                    let model = T::get_by_primary_key(db, pk.clone())
+                        .await?
+                        .ok_or(DatabaseError::ForeignKeyNotFound)?;
+                    models.push(model);
+                }
+                *relation = ManyToMany::Models(models);
+                match relation {
+                    ManyToMany::Models(m) => Ok(m),
+                    ManyToMany::PrimaryKeys(_) => unreachable!("models were just set"),
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

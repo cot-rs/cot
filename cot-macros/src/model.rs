@@ -1,9 +1,9 @@
-use proc_macro2::Literal;
 use cot_codegen::model::{Field, ManyToManySpec, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::{SymbolResolver, VisibleSymbol, VisibleSymbolKind};
 use darling::FromMeta;
 use darling::ast::NestedMeta;
 use heck::ToSnakeCase;
+use proc_macro2::Literal;
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, TokenStreamExt, format_ident, quote};
 use syn::Token;
@@ -83,7 +83,7 @@ struct ModelBuilder {
     fields_as_update_from_db: Vec<TokenStream>,
     fields_as_get_values: Vec<TokenStream>,
     fields_as_field_refs: Vec<TokenStream>,
-    fields_as_m2m_consts: Vec<TokenStream>
+    fields_as_m2m_consts: Vec<TokenStream>,
 }
 
 impl ToTokens for ModelBuilder {
@@ -118,7 +118,7 @@ impl ModelBuilder {
             fields_as_update_from_db: Vec::with_capacity(field_count),
             fields_as_get_values: Vec::with_capacity(field_count),
             fields_as_field_refs: Vec::with_capacity(field_count),
-            fields_as_m2m_consts: Vec::with_capacity(field_count)
+            fields_as_m2m_consts: Vec::with_capacity(field_count),
         };
         for field in &model.fields {
             model_builder.push_field(field);
@@ -194,12 +194,9 @@ impl ModelBuilder {
         ));
     }
 
-    fn infer_m2m_names(
-        &self,
-        field: &Field,
-        m2m: &ManyToManySpec,
-    ) -> (String, String, String) {
-        let owner_table = self.table_name.clone();
+    fn infer_m2m_names(&self, field: &Field, m2m: &ManyToManySpec) -> (String, String, String) {
+        // owner table as available in ModelBuilder
+        let owner_table = self.table_name.clone(); // already snake-cased + app namespace if needed
         let owner_pk_col = self.pk_field.column_name.clone();
 
         let target_table = m2m.target_table_name.clone();

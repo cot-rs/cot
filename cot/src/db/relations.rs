@@ -208,7 +208,7 @@ impl<T: Model> Default for ManyToMany<T> {
         ManyToMany::PrimaryKeys(Vec::new())
     }
 }
-impl <T: Model> ManyToMany<T> {
+impl<T: Model> ManyToMany<T> {
     pub fn primary_keys(&self) -> Vec<&T::PrimaryKey> {
         match self {
             Self::PrimaryKeys(pks) => pks.iter().collect(),
@@ -232,7 +232,7 @@ pub struct ManyToManyField<T: Model, Owner: Model> {
     pub phantom: std::marker::PhantomData<(T, Owner)>,
 }
 
-impl <T: Model, Owner: Model> ManyToManyField<T, Owner> {
+impl<T: Model, Owner: Model> ManyToManyField<T, Owner> {
     pub const fn new(
         join_table: &'static str,
         owner_field: &'static str,

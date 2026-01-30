@@ -6,7 +6,10 @@ use crate::db::impl_mysql::MySqlValueRef;
 use crate::db::impl_postgres::PostgresValueRef;
 #[cfg(feature = "sqlite")]
 use crate::db::impl_sqlite::SqliteValueRef;
-use crate::db::{Auto, ColumnType, DatabaseError, DatabaseField, DbFieldValue, DbValue, ForeignKey, FromDbValue, LimitedString, ManyToMany, Model, PrimaryKey, Result, SqlxValueRef, ToDbFieldValue, ToDbValue};
+use crate::db::{
+    Auto, ColumnType, DatabaseError, DatabaseField, DbFieldValue, DbValue, ForeignKey, FromDbValue,
+    LimitedString, ManyToMany, Model, PrimaryKey, Result, SqlxValueRef, ToDbFieldValue, ToDbValue,
+};
 
 mod chrono_wrapper;
 

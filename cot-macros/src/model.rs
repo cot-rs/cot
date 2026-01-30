@@ -199,33 +199,27 @@ impl ModelBuilder {
         field: &Field,
         m2m: &ManyToManySpec,
     ) -> (String, String, String) {
-        // owner table as available in ModelBuilder
-        let owner_table = self.table_name.clone(); // already snake-cased + app namespace if needed
+        let owner_table = self.table_name.clone();
         let owner_pk_col = self.pk_field.column_name.clone();
 
-        // target table guessed from ManyToManySpec (snake-case of type ident)
         let target_table = m2m.target_table_name.clone();
         let target_pk_col = "id".to_string();
 
-        // join table: prefer attr.table else owner_field (avoid collisions by including field name)
         let join_table = if let Some(t) = &m2m.attr.table {
             t.clone()
         } else {
             format!("{}_{}", owner_table, field.name.to_string().to_snake_case())
         };
 
-        // left column (owner)
         let left_col = if let Some(l) = &m2m.attr.owner_field {
             l.clone()
         } else {
             format!("{}_{}", owner_table, owner_pk_col)
         };
 
-        // right column (target) — special-case self-referential relations:
         let right_col = if let Some(r) = &m2m.attr.target_field {
             r.clone()
         } else if owner_table == target_table {
-            // self-referential: use field name to avoid duplicate identical column names
             format!("{}_id", field.name.to_string().to_snake_case())
         } else {
             format!("{}_{}", target_table, target_pk_col)

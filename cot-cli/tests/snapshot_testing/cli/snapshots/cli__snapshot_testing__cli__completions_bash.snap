@@ -82,6 +82,9 @@ _cot() {
             cot__help__migration,make)
                 cmd="cot__help__migration__make"
                 ;;
+            cot__help__migration,new)
+                cmd="cot__help__migration__new"
+                ;;
             cot__migration,help)
                 cmd="cot__migration__help"
                 ;;
@@ -91,6 +94,9 @@ _cot() {
             cot__migration,make)
                 cmd="cot__migration__make"
                 ;;
+            cot__migration,new)
+                cmd="cot__migration__new"
+                ;;
             cot__migration__help,help)
                 cmd="cot__migration__help__help"
                 ;;
@@ -99,6 +105,9 @@ _cot() {
                 ;;
             cot__migration__help,make)
                 cmd="cot__migration__help__make"
+                ;;
+            cot__migration__help,new)
+                cmd="cot__migration__help__new"
                 ;;
             *)
                 ;;
@@ -297,7 +306,7 @@ _cot() {
             return 0
             ;;
         cot__help__migration)
-            opts="list make"
+            opts="list make new"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -338,6 +347,20 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        cot__help__migration__new)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         cot__help__new)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
@@ -353,7 +376,7 @@ _cot() {
             return 0
             ;;
         cot__migration)
-            opts="-v -q -h --verbose --quiet --help list make help"
+            opts="-v -q -h --verbose --quiet --help list make new help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -367,7 +390,7 @@ _cot() {
             return 0
             ;;
         cot__migration__help)
-            opts="list make help"
+            opts="list make new help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -422,6 +445,20 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        cot__migration__help__new)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         cot__migration__list)
             opts="-v -q -h --verbose --quiet --help [PATH]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
@@ -448,6 +485,24 @@ _cot() {
                     return 0
                     ;;
                 --output-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        cot__migration__new)
+            opts="-v -q -h --app-name --verbose --quiet --help <NAME> [PATH]"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --app-name)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

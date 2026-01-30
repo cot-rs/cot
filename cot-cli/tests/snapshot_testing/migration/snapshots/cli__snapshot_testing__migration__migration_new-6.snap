@@ -1,0 +1,22 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+description: "Verbosity level: trace"
+info:
+  program: cot
+  args:
+    - migration
+    - new
+    - custom
+    - "-vvvvv"
+---
+success: true
+exit_code: 0
+----- stdout -----
+TIMESTAMP [34mDEBUG[0m [2mcot_cli::migration_generator[0m[2m:[0m Parsing file: "/tmp/TEMP_PATH/src/main.rs"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::migration_generator[0m[2m:[0m Processing file: "main.rs"
+
+----- stderr -----
+[1m[92m    Creating[0m Migration 'm_0001_custom'
+[1m[92m    Creating[0m Migration file '/tmp/TEMP_PATH/src/migrations/m_0001_custom.rs'
+[1m[32m     Created[0m Migration file '/tmp/TEMP_PATH/src/migrations/m_0001_custom.rs'
+[1m[32m     Created[0m Migration 'm_0001_custom'

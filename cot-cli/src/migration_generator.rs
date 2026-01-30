@@ -143,8 +143,8 @@ impl MigrationGenerator {
         Ok(migrations)
     }
 
-    /// Generate migrations and return internal structures that can be used to
-    /// generate source code.
+    /// Generates migrations and returns an intermediate structure that can be
+    /// converted into Rust source code.
     pub fn generate_migrations_as_generated_from_files(
         &self,
         source_files: Vec<SourceFile>,
@@ -829,14 +829,12 @@ impl MigrationProcessor {
         Ok(Self { migrations })
     }
 
-    /// Returns the latest (in the order of applying migrations) versions of the
-    /// models that are marked as migration models, that means the latest
-    /// version of each migration model.
+    /// Returns the most recent versions of all models found across all
+    /// migrations.
     ///
     /// This is useful for generating migrations - we can compare the latest
-    /// version of the model in the source code with the latest version of the
-    /// model in the migrations (returned by this method) and generate the
-    /// necessary operations.
+    /// version of the model in the source code with the most recent version in
+    /// the migrations and generate the necessary operations.
     #[must_use]
     fn latest_models(&self) -> Vec<ModelInSource> {
         let mut migration_models: HashMap<String, &ModelInSource> = HashMap::new();
@@ -859,10 +857,18 @@ impl MigrationProcessor {
             .name
             .split('_')
             .nth(1)
-            .with_context(|| format!("migration number not found: {}", last_migration.name))?
+            .with_context(|| {
+                format!(
+                    "the migration number was not found: {}",
+                    last_migration.name
+                )
+            })?
             .parse::<u32>()
             .with_context(|| {
-                format!("unable to parse migration number: {}", last_migration.name)
+                format!(
+                    "unable to parse the migration number: {}",
+                    last_migration.name
+                )
             })?;
 
         let migration_number = last_migration_number + 1;

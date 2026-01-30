@@ -49,8 +49,7 @@ pub trait RequestHandler<T = ()> {
     ///
     /// # Errors
     ///
-    /// This method can return an error if the request handler fails to handle
-    /// the request.
+    /// This method can return an error if it fails to handle the request.
     fn handle(&self, request: Request) -> impl Future<Output = Result<Response>> + Send;
 }
 

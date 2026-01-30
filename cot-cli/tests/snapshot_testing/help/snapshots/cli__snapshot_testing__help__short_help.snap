@@ -8,7 +8,7 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-The Rust web framework for lazy developers - CLI tool.
+Command-line interface for the Cot web framework
 
 Usage: cot [OPTIONS] <COMMAND>
 

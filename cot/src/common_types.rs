@@ -210,7 +210,7 @@ impl Url {
         self.0.as_str()
     }
 
-    /// Converts the `Url` into a owned `String` representation.
+    /// Converts the `Url` into an owned `String` representation.
     ///
     /// # Examples
     /// ```
@@ -240,8 +240,11 @@ impl Url {
 
     /// Returns the host part of the URL, if present.
     ///
-    /// This typically includes the domain name or IP address.
+    /// This typically includes the domain name or IP address. It returns
+    /// [`None`] if the URL has no host.
+    ///
     /// # Example
+    ///
     /// ```
     /// use cot::common_types::Url;
     ///
@@ -418,8 +421,8 @@ impl DatabaseField for Url {
 pub struct Email(EmailAddress);
 
 impl Email {
-    /// Creates a new `Email` from a string, validating that it's a proper email
-    /// address.
+    /// Creates a new `Email` from a string, validating that it is a proper
+    /// email address.
     ///
     /// # Errors
     ///

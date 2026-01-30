@@ -16,27 +16,27 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
-http.workspace = true
-derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
-thiserror.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+askama = { workspace = true, features = ["alloc"] }
+axum.workspace = true
 backtrace.workspace = true
 bytes.workspace = true
-futures-core.workspace = true
-http-body.workspace = true
-http-body-util.workspace = true
-sync_wrapper.workspace = true
-axum.workspace = true
 cot_macros.workspace = true
-askama = { workspace = true, features = ["alloc"] }
-tower-sessions.workspace = true
-serde_path_to_error.workspace = true
-indexmap.workspace = true
-serde_html_form.workspace = true
+derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
 form_urlencoded.workspace = true
-tower.workspace = true
+futures-core.workspace = true
 futures-util.workspace = true
+http-body-util.workspace = true
+http-body.workspace = true
+http.workspace = true
+indexmap.workspace = true
+serde.workspace = true
+serde_html_form = { workspace = true, features = ["de", "std"] }
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+sync_wrapper.workspace = true
+thiserror.workspace = true
+tower-sessions.workspace = true
+tower.workspace = true
 
 [dev-dependencies]
 async-stream.workspace = true

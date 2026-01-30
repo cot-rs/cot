@@ -35,7 +35,7 @@ pub enum Commands {
 pub struct ProjectNewArgs {
     /// Path to the directory to create the new project in
     pub path: PathBuf,
-    /// Set the resulting crate name (defaults to the directory name)
+    /// Set the resulting crate name [default: the directory name]
     #[arg(long)]
     pub name: Option<String>,
     #[command(flatten)]
@@ -52,7 +52,7 @@ pub enum MigrationCommands {
 
 #[derive(Debug, Args)]
 pub struct MigrationListArgs {
-    /// Path to the crate directory to list migrations for  [default: current
+    /// Path to the crate directory to list migrations for [default: current
     /// directory]
     pub path: Option<PathBuf>,
 }
@@ -62,11 +62,11 @@ pub struct MigrationMakeArgs {
     /// Path to the crate directory to generate migrations for [default: current
     /// directory]
     pub path: Option<PathBuf>,
-    /// Name of the app to use in the migration (default: crate name)
+    /// Name of the app to use in the migration [default: crate name]
     #[arg(long)]
     pub app_name: Option<String>,
-    /// Directory to write the migrations to (default: migrations/ directory
-    /// in the crate's src/ directory)
+    /// Directory to write the migrations to [default: the migrations/ directory
+    /// in the crate's src/ directory]
     #[arg(long)]
     pub output_dir: Option<PathBuf>,
 }

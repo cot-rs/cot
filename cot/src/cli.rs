@@ -121,7 +121,7 @@ impl Cli {
     ///
     /// # Panics
     ///
-    /// Panics if a CLI task with given name has been registered already.
+    /// Panics if a task with the same name has already been registered.
     ///
     /// # Examples
     ///

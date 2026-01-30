@@ -53,7 +53,7 @@ use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
 
 /// A test client for making requests to a Cot project.
 ///
-/// Useful for End-to-End testing Cot projects.
+/// This client is useful for end-to-end testing of Cot projects.
 #[derive(Debug)]
 pub struct Client {
     context: Arc<ProjectContext>,
@@ -66,7 +66,7 @@ impl Client {
     ///
     /// # Panics
     ///
-    /// Panics if the test config could not be loaded.
+    /// Panics if the test configuration could not be loaded.
     /// Panics if the project could not be initialized.
     ///
     /// # Examples
@@ -112,7 +112,7 @@ impl Client {
         }
     }
 
-    /// Send a GET request to the given path.
+    /// Sends a GET request to the specified path.
     ///
     /// # Errors
     ///
@@ -150,7 +150,7 @@ impl Client {
         .await
     }
 
-    /// Send a request to the given path.
+    /// Sends a request to the specified path.
     ///
     /// # Errors
     ///
@@ -490,7 +490,8 @@ impl TestRequestBuilder {
         self
     }
 
-    /// Add a session support to the request builder.
+    /// Add session support to the request builder. This uses an in-memory
+    /// session store.
     ///
     /// # Examples
     ///
@@ -608,7 +609,7 @@ impl TestRequestBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if the auth object fails to be created.
+    /// Panics if the authentication object fails to be created.
     ///
     /// # Examples
     ///
@@ -1411,8 +1412,9 @@ impl<T: Project + 'static> TestServerBuilder<T> {
 
 /// A running test server.
 ///
-/// This is returned by [`TestServerBuilder::start`] and can be used to access
-/// the server's URL and close the server.
+/// This represents a running Cot server in a background task. It is returned
+/// by [`TestServerBuilder::start`] and can be used to access the server's URL
+/// and close the server.
 ///
 /// # Examples
 ///

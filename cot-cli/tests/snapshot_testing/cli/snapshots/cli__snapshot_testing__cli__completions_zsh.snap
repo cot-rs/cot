@@ -46,7 +46,7 @@ _cot() {
         case $line[1] in
             (new)
 _arguments "${_arguments_options[@]}" : \
-'--name=[Set the resulting crate name (defaults to the directory name)]:NAME:_default' \
+'--name=[Set the resulting crate name \[default\: the directory name\]]:NAME:_default' \
 '--cot-path=[Use \`cot\` from the specified path instead of a published crate]:COT_PATH:_files' \
 '--use-git[Use the latest \`cot\` version from git instead of a published crate]' \
 '*-v[Increase logging verbosity]' \
@@ -84,13 +84,13 @@ _arguments "${_arguments_options[@]}" : \
 '(-v --verbose)*--quiet[Decrease logging verbosity]' \
 '-h[Print help]' \
 '--help[Print help]' \
-'::path -- Path to the crate directory to list migrations for  \[default\: current directory\]:_files' \
+'::path -- Path to the crate directory to list migrations for \[default\: current directory\]:_files' \
 && ret=0
 ;;
 (make)
 _arguments "${_arguments_options[@]}" : \
-'--app-name=[Name of the app to use in the migration (default\: crate name)]:APP_NAME:_default' \
-'--output-dir=[Directory to write the migrations to (default\: migrations/ directory in the crate'\''s src/ directory)]:OUTPUT_DIR:_files' \
+'--app-name=[Name of the app to use in the migration \[default\: crate name\]]:APP_NAME:_default' \
+'--output-dir=[Directory to write the migrations to \[default\: the migrations/ directory in the crate'\''s src/ directory\]]:OUTPUT_DIR:_files' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \

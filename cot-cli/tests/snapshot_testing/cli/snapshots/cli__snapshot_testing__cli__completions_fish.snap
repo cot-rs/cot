@@ -44,7 +44,7 @@ complete -c cot -n "__fish_cot_needs_command" -f -a "new" -d 'Create a new Cot p
 complete -c cot -n "__fish_cot_needs_command" -f -a "migration" -d 'Manage migrations for a Cot project'
 complete -c cot -n "__fish_cot_needs_command" -f -a "cli" -d 'Manage Cot CLI'
 complete -c cot -n "__fish_cot_needs_command" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
-complete -c cot -n "__fish_cot_using_subcommand new" -l name -d 'Set the resulting crate name (defaults to the directory name)' -r
+complete -c cot -n "__fish_cot_using_subcommand new" -l name -d 'Set the resulting crate name [default: the directory name]' -r
 complete -c cot -n "__fish_cot_using_subcommand new" -l cot-path -d 'Use `cot` from the specified path instead of a published crate' -r -F
 complete -c cot -n "__fish_cot_using_subcommand new" -l use-git -d 'Use the latest `cot` version from git instead of a published crate'
 complete -c cot -n "__fish_cot_using_subcommand new" -s v -l verbose -d 'Increase logging verbosity'
@@ -59,8 +59,8 @@ complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_s
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help'
-complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l app-name -d 'Name of the app to use in the migration (default: crate name)' -r
-complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l output-dir -d 'Directory to write the migrations to (default: migrations/ directory in the crate\'s src/ directory)' -r -F
+complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l app-name -d 'Name of the app to use in the migration [default: crate name]' -r
+complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l output-dir -d 'Directory to write the migrations to [default: the migrations/ directory in the crate\'s src/ directory]' -r -F
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s h -l help -d 'Print help'

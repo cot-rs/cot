@@ -143,9 +143,8 @@ impl Body {
     ///
     /// # Errors
     ///
-    /// This method returns an error if reading the body fails.
-    ///
-    /// If the body is larger than the limit, an error is returned.
+    /// This method returns an error if reading the body fails, or if the body
+    /// is larger than the specified limit.
     ///
     /// # Examples
     ///

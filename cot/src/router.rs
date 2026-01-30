@@ -44,9 +44,9 @@ pub mod path;
 
 /// A router that can be used to route requests to their respective views.
 ///
-/// This struct is used to route requests to their respective views. It can be
-/// created directly by calling the [`Router::with_urls`] method, and that's
-/// what is typically done in [`cot::App::router`] implementations.
+/// This struct is responsible for routing requests to their respective views.
+/// It can be created directly by calling the [`Router::with_urls`] method, and
+/// that's what is typically done in [`cot::App::router`] implementations.
 ///
 /// # Examples
 ///
@@ -214,14 +214,15 @@ impl Router {
         self.route(request, &path).await
     }
 
-    /// Get a URL for a view by name.
+    /// Generates a URL for a view using its name.
     ///
     /// Instead of using this method directly, consider using the
     /// [`reverse!`](crate::reverse) macro which provides much more ergonomic
     /// way to call this.
     ///
-    /// `app_name` is the name of the app that the view should be found in. If
-    /// `app_name` is `None`, the view will be searched for in any app.
+    /// The `app_name` parameter specifies the name of the app that the view
+    /// should be found in. If it is `None`, the view is searched for across all
+    /// registered apps.
     ///
     /// # Errors
     ///
@@ -243,12 +244,13 @@ impl Router {
             })?)
     }
 
-    /// Get a URL for a view by name.
+    /// Generates a URL for a view using its name.
     ///
-    /// `app_name` is the name of the app that the view should be found in. If
-    /// `app_name` is `None`, the view will be searched for in any app.
+    /// The `app_name` parameter specifies the name of the app that the view
+    /// should be found in. If it is `None`, the view is searched for across all
+    /// registered apps.
     ///
-    /// Returns `None` if the view name is not found.
+    /// It returns [`None`] if the view name is not found.
     ///
     /// # Errors
     ///
@@ -576,10 +578,10 @@ impl Route {
     }
 
     /// Create a new route with the given handler for inclusion in the OpenAPI
-    /// specs.
+    /// specifications.
     ///
     /// See [`crate::openapi`] module documentation for more details on how to
-    /// generate OpenAPI specs automatically.
+    /// generate OpenAPI specifications automatically.
     ///
     /// # Examples
     ///

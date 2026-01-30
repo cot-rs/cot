@@ -48,7 +48,7 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;new' {
-            [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Set the resulting crate name (defaults to the directory name)')
+            [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Set the resulting crate name [default: the directory name]')
             [CompletionResult]::new('--cot-path', '--cot-path', [CompletionResultType]::ParameterName, 'Use `cot` from the specified path instead of a published crate')
             [CompletionResult]::new('--use-git', '--use-git', [CompletionResultType]::ParameterName, 'Use the latest `cot` version from git instead of a published crate')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
@@ -81,8 +81,8 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;migration;make' {
-            [CompletionResult]::new('--app-name', '--app-name', [CompletionResultType]::ParameterName, 'Name of the app to use in the migration (default: crate name)')
-            [CompletionResult]::new('--output-dir', '--output-dir', [CompletionResultType]::ParameterName, 'Directory to write the migrations to (default: migrations/ directory in the crate''s src/ directory)')
+            [CompletionResult]::new('--app-name', '--app-name', [CompletionResultType]::ParameterName, 'Name of the app to use in the migration [default: crate name]')
+            [CompletionResult]::new('--output-dir', '--output-dir', [CompletionResultType]::ParameterName, 'Directory to write the migrations to [default: the migrations/ directory in the crate''s src/ directory]')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')

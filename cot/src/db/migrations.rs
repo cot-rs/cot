@@ -22,7 +22,8 @@ pub enum MigrationEngineError {
     MigrationSortError(#[from] MigrationSorterError),
 }
 
-/// A migration engine that can run migrations.
+/// A migration engine responsible for managing and applying database
+/// migrations.
 ///
 /// # Examples
 ///
@@ -133,7 +134,7 @@ impl MigrationEngine {
     ///
     /// # Errors
     ///
-    /// Throws an error if any of the migrations fail to apply, or if there is
+    /// Returns an error if any of the migrations fail to apply, or if there is
     /// an error while interacting with the database, or if there is an
     /// error while marking a migration as applied.
     ///
@@ -428,7 +429,7 @@ impl Operation {
     ///
     /// # Errors
     ///
-    /// Throws an error if the operation fails to apply.
+    /// Returns an error if the operation fails to apply.
     ///
     /// # Examples
     ///
@@ -510,7 +511,7 @@ impl Operation {
     ///
     /// # Errors
     ///
-    /// Throws an error if the operation fails to apply.
+    /// Returns an error if the operation fails to apply.
     ///
     /// # Examples
     ///

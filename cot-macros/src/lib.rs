@@ -72,15 +72,19 @@ pub fn derive_admin_model(input: TokenStream) -> TokenStream {
 ///   use this type; the migration engine will generate the migration model
 ///   types for you.
 ///
-///   Migration models have two major uses. The first is so that the migration
-///   engine uses knows what was the state of model at the time the last
+///   Migration models have two major uses. First, they ensure that the
+///   migration engine knows what state the model was in at the time the last
 ///   migration was generated. This allows the engine to automatically detect
-///   the changes and generate the necessary migration code. The second use is
-///   to allow custom code in the migrations: you might want the migration to
-///   fill in some data, for instance. You can't use the actual model for this
-///   because the model might have changed since the migration was generated.
-///   You can, however, use the migration model, which will always represent
-///   the state of the model at the time the migration runs.
+///   the changes and generate the necessary migration code. Second, they allow
+///   custom code in migrations: you might want the migration to fill in some
+///   data, for example. After the migration has been created, though, the model
+///   might have changed. If you tried to use the application model in the
+///   migration code (which always represents the latest state of the model), it
+///   might not match the actual database schema at the time the migration is
+///   applied. You can use the migration model to ensure that your custom code
+///   operates exactly on the schema that is present at the time the migration
+///   is applied.
+///
 /// ```
 /// // In a migration file
 /// use cot::db::model;
@@ -168,7 +172,7 @@ pub fn cachetest(_args: TokenStream, input: TokenStream) -> TokenStream {
 /// An attribute macro that defines an `async` test function for a Cot-powered
 /// app.
 ///
-/// This is pretty much an equivalent to `#[tokio::test]` provided so that you
+/// This is equivalent to `#[tokio::test]`, but is provided so that you
 /// don't have to declare `tokio` as a dependency in your tests.
 ///
 /// # Examples

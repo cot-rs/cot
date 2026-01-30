@@ -2,7 +2,7 @@
 //!
 //! Cot uses the [`Request`](http::Request) type from the [`http`] crate
 //! to represent incoming HTTP requests. However, it also provides a
-//! [`RequestExt`] trait that contain various helper methods for working with
+//! [`RequestExt`] trait that contains various helper methods for working with
 //! HTTP requests. These methods are used to access the application context,
 //! project configuration, path parameters, and more. You probably want to have
 //! a `use` statement for [`RequestExt`] in your code most of the time to be
@@ -107,8 +107,8 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn router(&self) -> &Arc<Router>;
 
-    /// Get the app name the current route belongs to, or [`None`] if the
-    /// request is not routed.
+    /// Returns the name of the app that the current route belongs to, or
+    /// [`None`] if the request is not routed.
     ///
     /// This is mainly useful for providing context to reverse redirects, where
     /// you want to redirect to a route in the same app.
@@ -127,8 +127,11 @@ pub trait RequestExt: private::Sealed {
     /// ```
     fn app_name(&self) -> Option<&str>;
 
-    /// Get the route name, or [`None`] if the request is not routed or doesn't
-    /// have a route name.
+    /// Returns the name of the current route.
+    ///
+    /// This returns [`None`] if:
+    /// - the request is not routed, or
+    /// - the route has no name.
     ///
     /// This is mainly useful for use in templates, where you want to know which
     /// route is being rendered, for instance to mark the active tab.
@@ -182,28 +185,6 @@ pub trait RequestExt: private::Sealed {
     #[must_use]
     fn path_params_mut(&mut self) -> &mut PathParams;
 
-    /// Get the database.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::request::{Request, RequestExt};
-    /// use cot::response::Response;
-    ///
-    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
-    ///     let db = request.db();
-    ///     // ... do something with the database
-    ///     # unimplemented!()
-    /// }
-    /// ```
-    #[cfg(feature = "db")]
-    #[must_use]
-    #[deprecated(
-        since = "0.5.0",
-        note = "use request extractors (`FromRequestHead`) instead"
-    )]
-    fn db(&self) -> &crate::db::Database;
-
     /// Get the content type of the request.
     ///
     /// # Examples
@@ -225,7 +206,7 @@ pub trait RequestExt: private::Sealed {
     ///
     /// # Errors
     ///
-    /// Throws an error if the content type is not the expected value.
+    /// Returns an error if the content type is not the expected value.
     ///
     /// # Examples
     ///
@@ -312,11 +293,6 @@ impl RequestExt for Request {
         self.extensions_mut().get_or_insert_default::<PathParams>()
     }
 
-    #[cfg(feature = "db")]
-    fn db(&self) -> &crate::db::Database {
-        self.context().database()
-    }
-
     fn content_type(&self) -> Option<&http::HeaderValue> {
         self.headers().get(http::header::CONTENT_TYPE)
     }
@@ -370,11 +346,6 @@ impl RequestExt for RequestHead {
 
     fn path_params_mut(&mut self) -> &mut PathParams {
         self.extensions.get_or_insert_default::<PathParams>()
-    }
-
-    #[cfg(feature = "db")]
-    fn db(&self) -> &crate::db::Database {
-        self.context().database()
     }
 
     fn content_type(&self) -> Option<&http::HeaderValue> {

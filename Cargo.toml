@@ -60,7 +60,7 @@ ahash = { version = "0.8.12", default-features = false }
 aide = { version = "0.15", default-features = false }
 anstyle = "1.0.13"
 anyhow = "1.0.100"
-askama = { version = "0.15.3", default-features = false }
+askama = { version = "0.15.4", default-features = false }
 askama_derive = { version = "0.15.3", default-features = false, features = ["external-sources", "proc-macro"] }
 assert_cmd = "2"
 async-stream = "0.3"
@@ -72,7 +72,7 @@ cargo_toml = "0.22"
 chrono = { version = "0.4.43", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
 chumsky = { version = "0.9.3", default-features = false }
-clap = { version = "4.5.55", features = ["deprecated"] }
+clap = { version = "4.5.56", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.2.31"

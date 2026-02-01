@@ -160,6 +160,7 @@ fn attr_migration_op() {
     let t = trybuild::TestCases::new();
     t.pass("tests/ui/attr_migration_op.rs");
     t.compile_fail("tests/ui/attr_migration_op_not_async.rs");
+    t.compile_fail("tests/ui/attr_migration_op_return_type_invalid.rs");
 }
 
 #[rustversion::attr(

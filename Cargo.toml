@@ -119,7 +119,7 @@ proc-macro-crate = "3"
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 rand = { version = "0.9", default-features = false }
-redis = { version = "0.32", default-features = false }
+redis = { version = "1.0", default-features = false }
 reqwest = { version = "0.13", default-features = false }
 rustversion = "1"
 schemars = { version = "0.9", default-features = false }

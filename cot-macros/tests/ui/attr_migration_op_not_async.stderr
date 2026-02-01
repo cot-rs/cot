@@ -1,0 +1,5 @@
+error: migration operation must be an `async` function
+ --> tests/ui/attr_migration_op_not_async.rs:7:1
+  |
+7 | fn my_migration(_ctx: MigrationContext<'_>) -> Result<()> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

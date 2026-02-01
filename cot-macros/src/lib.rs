@@ -5,6 +5,7 @@ mod dbtest;
 mod form;
 mod from_request;
 mod main_fn;
+mod migration_op;
 mod model;
 mod query;
 mod select_as_form_field;
@@ -23,6 +24,7 @@ use crate::dbtest::fn_to_dbtest;
 use crate::form::impl_form_for_struct;
 use crate::from_request::impl_from_request_head_for_struct;
 use crate::main_fn::{fn_to_cot_e2e_test, fn_to_cot_main, fn_to_cot_test};
+use crate::migration_op::fn_to_migration_op;
 use crate::model::impl_model_for_struct;
 use crate::query::{Query, query_to_tokens};
 use crate::select_as_form_field::impl_select_as_form_field_for_enum;
@@ -151,6 +153,33 @@ pub fn query(input: TokenStream) -> TokenStream {
 pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);
     fn_to_dbtest(fn_input)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+/// An attribute macro that defines a custom migration operation.
+///
+/// This macro simplifies writing custom migration operations by allowing you to
+/// write them as regular `async` functions. It handles the necessary pinning
+/// and boxing of the return type to make it compatible with the migration
+/// engine.
+///
+/// # Examples
+///
+/// ```
+/// use cot::db::Result;
+/// use cot::db::migrations::{MigrationContext, migration_op};
+///
+/// #[migration_op]
+/// async fn my_migration(ctx: MigrationContext<'_>) -> Result<()> {
+///     // Your migration logic here
+///     Ok(())
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn migration_op(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let fn_input = parse_macro_input!(input as ItemFn);
+    fn_to_migration_op(fn_input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

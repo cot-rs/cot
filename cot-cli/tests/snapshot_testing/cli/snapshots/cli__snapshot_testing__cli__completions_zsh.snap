@@ -100,6 +100,19 @@ _arguments "${_arguments_options[@]}" : \
 '::path -- Path to the crate directory to generate migrations for \[default\: current directory\]:_files' \
 && ret=0
 ;;
+(new)
+_arguments "${_arguments_options[@]}" : \
+'--app-name=[Name of the app to use in the migration (default\: crate name)]:APP_NAME:_default' \
+'*-v[Increase logging verbosity]' \
+'*--verbose[Increase logging verbosity]' \
+'(-v --verbose)*-q[Decrease logging verbosity]' \
+'(-v --verbose)*--quiet[Decrease logging verbosity]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':name -- Name of the migration:_default' \
+'::path -- Path to the crate directory to create the migration in \[default\: current directory\]:_files' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_cot__migration__help_commands" \
@@ -117,6 +130,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (make)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(new)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -240,6 +257,10 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (make)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(new)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -375,6 +396,7 @@ _cot__help__migration_commands() {
     local commands; commands=(
 'list:List all migrations for a Cot project' \
 'make:Generate migrations for a Cot project' \
+'new:Create a new empty migration' \
     )
     _describe -t commands 'cot help migration commands' commands "$@"
 }
@@ -388,6 +410,11 @@ _cot__help__migration__make_commands() {
     local commands; commands=()
     _describe -t commands 'cot help migration make commands' commands "$@"
 }
+(( $+functions[_cot__help__migration__new_commands] )) ||
+_cot__help__migration__new_commands() {
+    local commands; commands=()
+    _describe -t commands 'cot help migration new commands' commands "$@"
+}
 (( $+functions[_cot__help__new_commands] )) ||
 _cot__help__new_commands() {
     local commands; commands=()
@@ -398,6 +425,7 @@ _cot__migration_commands() {
     local commands; commands=(
 'list:List all migrations for a Cot project' \
 'make:Generate migrations for a Cot project' \
+'new:Create a new empty migration' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'cot migration commands' commands "$@"
@@ -407,6 +435,7 @@ _cot__migration__help_commands() {
     local commands; commands=(
 'list:List all migrations for a Cot project' \
 'make:Generate migrations for a Cot project' \
+'new:Create a new empty migration' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'cot migration help commands' commands "$@"
@@ -426,6 +455,11 @@ _cot__migration__help__make_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration help make commands' commands "$@"
 }
+(( $+functions[_cot__migration__help__new_commands] )) ||
+_cot__migration__help__new_commands() {
+    local commands; commands=()
+    _describe -t commands 'cot migration help new commands' commands "$@"
+}
 (( $+functions[_cot__migration__list_commands] )) ||
 _cot__migration__list_commands() {
     local commands; commands=()
@@ -435,6 +469,11 @@ _cot__migration__list_commands() {
 _cot__migration__make_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration make commands' commands "$@"
+}
+(( $+functions[_cot__migration__new_commands] )) ||
+_cot__migration__new_commands() {
+    local commands; commands=()
+    _describe -t commands 'cot migration new commands' commands "$@"
 }
 (( $+functions[_cot__new_commands] )) ||
 _cot__new_commands() {

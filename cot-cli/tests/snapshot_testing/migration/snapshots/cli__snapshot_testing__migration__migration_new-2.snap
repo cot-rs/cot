@@ -1,0 +1,20 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+description: "Verbosity level: error"
+info:
+  program: cot
+  args:
+    - migration
+    - new
+    - custom
+    - "-v"
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+[1m[92m    Creating[0m Migration 'm_0001_custom'
+[1m[92m    Creating[0m Migration file '/tmp/TEMP_PATH/src/migrations/m_0001_custom.rs'
+[1m[32m     Created[0m Migration file '/tmp/TEMP_PATH/src/migrations/m_0001_custom.rs'
+[1m[32m     Created[0m Migration 'm_0001_custom'

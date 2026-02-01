@@ -63,6 +63,7 @@ set edit:completion:arg-completer[cot] = {|@words|
             cand --help 'Print help'
             cand list 'List all migrations for a Cot project'
             cand make 'Generate migrations for a Cot project'
+            cand new 'Create a new empty migration'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'cot;migration;list'= {
@@ -83,14 +84,26 @@ set edit:completion:arg-completer[cot] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'cot;migration;new'= {
+            cand --app-name 'Name of the app to use in the migration (default: crate name)'
+            cand -v 'Increase logging verbosity'
+            cand --verbose 'Increase logging verbosity'
+            cand -q 'Decrease logging verbosity'
+            cand --quiet 'Decrease logging verbosity'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'cot;migration;help'= {
             cand list 'List all migrations for a Cot project'
             cand make 'Generate migrations for a Cot project'
+            cand new 'Create a new empty migration'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'cot;migration;help;list'= {
         }
         &'cot;migration;help;make'= {
+        }
+        &'cot;migration;help;new'= {
         }
         &'cot;migration;help;help'= {
         }
@@ -147,10 +160,13 @@ set edit:completion:arg-completer[cot] = {|@words|
         &'cot;help;migration'= {
             cand list 'List all migrations for a Cot project'
             cand make 'Generate migrations for a Cot project'
+            cand new 'Create a new empty migration'
         }
         &'cot;help;migration;list'= {
         }
         &'cot;help;migration;make'= {
+        }
+        &'cot;help;migration;new'= {
         }
         &'cot;help;cli'= {
             cand manpages 'Generate manpages for the Cot CLI'

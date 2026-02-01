@@ -143,7 +143,7 @@ tokio = { version = "1.49", default-features = false }
 toml = { version = "0.9", default-features = false }
 tower = "0.5.3"
 tower-livereload = "0.9.6"
-tower-sessions = { version = "0.14", default-features = false }
+tower-sessions = { version = "0.15", default-features = false }
 tracing = { version = "0.1", default-features = false }
 tracing-subscriber = "0.3"
 tracing-test = "0.2"

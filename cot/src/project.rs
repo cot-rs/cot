@@ -189,7 +189,7 @@ pub trait App: Send + Sync {
 ///     MyProject
 /// }
 /// ```
-pub trait Project {
+pub trait Project: Send {
     /// Returns the metadata for the CLI.
     ///
     /// This method is used to set the name, version, authors, and description
@@ -1085,8 +1085,6 @@ impl Bootstrapper<WithConfig> {
     /// # Ok(())
     /// # }
     /// ```
-    // Send not needed; Bootstrapper is run async in a single thread
-    #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_apps().boot().await
     }
@@ -1171,8 +1169,6 @@ impl Bootstrapper<WithApps> {
     /// # Ok(())
     /// # }
     /// ```
-    // Send not needed; Bootstrapper is run async in a single thread
-    #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_database().await?.boot().await
     }
@@ -1209,8 +1205,6 @@ impl Bootstrapper<WithApps> {
     /// # Ok(())
     /// # }
     /// ```
-    // Send not needed; Bootstrapper is run async in a single thread
-    #[expect(clippy::future_not_send)]
     pub async fn with_database(self) -> cot::Result<Bootstrapper<WithDatabase>> {
         #[cfg(feature = "db")]
         let database = Self::init_database(&self.context.config.database).await?;
@@ -1275,8 +1269,6 @@ impl Bootstrapper<WithDatabase> {
     /// # }
     /// ```
     // Function marked `async` to be consistent with the other `boot` methods
-    // Send not needed; Bootstrapper is run async in a single thread
-    #[expect(clippy::future_not_send)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         self.with_cache().await?.boot().await
     }
@@ -1314,7 +1306,6 @@ impl Bootstrapper<WithDatabase> {
     /// # Ok(())
     /// # }
     /// ```
-    #[expect(clippy::future_not_send)]
     #[allow(
         clippy::unused_async,
         clippy::allow_attributes,
@@ -1379,7 +1370,10 @@ impl Bootstrapper<WithCache> {
     /// # Ok(())
     /// # }
     /// ```
-    #[expect(clippy::unused_async, clippy::future_not_send)]
+    #[expect(
+        clippy::unused_async,
+        reason = "for consistency with other Bootstrapper::boot methods"
+    )]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler_builder = RootHandlerBuilder {
@@ -2057,10 +2051,6 @@ impl<S: BootstrapPhase<Database = Option<Database>>> ProjectContext<S> {
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-#[expect(
-    clippy::future_not_send,
-    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
-)]
 pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> cot::Result<()> {
     let listener = tokio::net::TcpListener::bind(address_str)
         .await
@@ -2082,10 +2072,6 @@ pub async fn run(bootstrapper: Bootstrapper<Initialized>, address_str: &str) -> 
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-#[expect(
-    clippy::future_not_send,
-    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
-)]
 pub async fn run_at(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,
@@ -2106,10 +2092,6 @@ pub async fn run_at(
 /// # Errors
 ///
 /// This function returns an error if the server fails to start.
-#[expect(
-    clippy::future_not_send,
-    reason = "Send not needed; Bootstrapper/CLI is run async in a single thread"
-)]
 pub async fn run_at_with_shutdown(
     bootstrapper: Bootstrapper<Initialized>,
     listener: tokio::net::TcpListener,

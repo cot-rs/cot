@@ -1,6 +1,7 @@
 use crate::db::fields::{
     impl_from_postgres_default, impl_from_sqlite_default, impl_to_db_value_default,
 };
+#[cfg(feature = "mysql")]
 use crate::db::impl_mysql::MySqlValueRef;
 use crate::db::{ColumnType, DatabaseField, FromDbValue, Result, SqlxValueRef};
 

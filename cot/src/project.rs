@@ -189,7 +189,7 @@ pub trait App: Send + Sync {
 ///     MyProject
 /// }
 /// ```
-pub trait Project: Send {
+pub trait Project {
     /// Returns the metadata for the CLI.
     ///
     /// This method is used to set the name, version, authors, and description
@@ -849,7 +849,7 @@ async fn default_error_handler(error: RequestOuterError) -> crate::Result<impl I
 #[derive(Debug)]
 pub struct Bootstrapper<S: BootstrapPhase = Initialized> {
     #[debug("..")]
-    project: Box<dyn Project>,
+    project: Box<dyn Project + Send>,
     context: ProjectContext<S>,
     handler: S::RequestHandler,
     error_handler: S::ErrorHandler,
@@ -874,7 +874,7 @@ impl Bootstrapper<Uninitialized> {
     /// # }
     /// ```
     #[must_use]
-    pub fn new<P: Project + 'static>(project: P) -> Self {
+    pub fn new<P: Project + Send + 'static>(project: P) -> Self {
         Self {
             project: Box::new(project),
             context: ProjectContext::new(),
@@ -2308,7 +2308,7 @@ pub(crate) fn prepare_request_for_error_handler(request_head: &mut RequestHead, 
 /// # }
 /// ```
 #[expect(clippy::future_not_send)] // Send not needed; CLI is run async in a single thread
-pub async fn run_cli(project: impl Project + 'static) -> cot::Result<()> {
+pub async fn run_cli(project: impl Project + Send + 'static) -> cot::Result<()> {
     Bootstrapper::new(project).run_cli().await
 }
 

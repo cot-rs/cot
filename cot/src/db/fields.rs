@@ -20,6 +20,7 @@ macro_rules! impl_from_sqlite_default {
         fn from_sqlite(
             value: crate::db::impl_sqlite::SqliteValueRef<'_>,
         ) -> crate::db::Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
         }
     };
@@ -48,6 +49,7 @@ macro_rules! impl_from_postgres_default {
         fn from_postgres(
             value: crate::db::impl_postgres::PostgresValueRef<'_>,
         ) -> crate::db::Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
         }
     };
@@ -74,6 +76,7 @@ macro_rules! impl_from_mysql_default {
     () => {
         #[cfg(feature = "mysql")]
         fn from_mysql(value: crate::db::impl_mysql::MySqlValueRef<'_>) -> Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
         }
     };

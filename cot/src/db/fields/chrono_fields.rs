@@ -73,7 +73,9 @@ mod tests {
             <DateTime<FixedOffset> as DatabaseField>::TYPE,
             ColumnType::DateTimeWithTimeZone
         );
-        assert!(!<DateTime<FixedOffset> as DatabaseField>::NULLABLE);
+        const {
+            assert!(!<DateTime<FixedOffset> as DatabaseField>::NULLABLE);
+        }
     }
 
     #[test]
@@ -82,7 +84,9 @@ mod tests {
             <DateTime<Utc> as DatabaseField>::TYPE,
             ColumnType::DateTimeWithTimeZone
         );
-        assert!(!<DateTime<Utc> as DatabaseField>::NULLABLE);
+        const {
+            assert!(!<DateTime<Utc> as DatabaseField>::NULLABLE);
+        }
     }
 
     #[test]
@@ -91,13 +95,17 @@ mod tests {
             <Option<DateTime<FixedOffset>> as DatabaseField>::TYPE,
             ColumnType::DateTimeWithTimeZone
         );
-        assert!(<Option<DateTime<FixedOffset>> as DatabaseField>::NULLABLE);
+        const {
+            assert!(<Option<DateTime<FixedOffset>> as DatabaseField>::NULLABLE);
+        }
 
         assert_eq!(
             <Option<DateTime<Utc>> as DatabaseField>::TYPE,
             ColumnType::DateTimeWithTimeZone
         );
-        assert!(<Option<DateTime<Utc>> as DatabaseField>::NULLABLE);
+        const {
+            assert!(<Option<DateTime<Utc>> as DatabaseField>::NULLABLE);
+        }
     }
 
     #[test]
@@ -107,10 +115,7 @@ mod tests {
 
         match db_value {
             DbValue::ChronoDateTimeWithTimeZone(Some(v)) => assert_eq!(*v, dt),
-            _ => panic!(
-                "Expected DbValue::ChronoDateTimeWithTimeZone, got {:?}",
-                db_value
-            ),
+            _ => panic!("Expected DbValue::ChronoDateTimeWithTimeZone, got {db_value:?}"),
         }
     }
 
@@ -121,7 +126,7 @@ mod tests {
 
         match db_value {
             DbValue::ChronoDateTimeUtc(Some(v)) => assert_eq!(*v, dt),
-            _ => panic!("Expected DbValue::ChronoDateTimeUtc, got {:?}", db_value),
+            _ => panic!("Expected DbValue::ChronoDateTimeUtc, got {db_value:?}"),
         }
     }
 

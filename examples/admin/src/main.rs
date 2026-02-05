@@ -3,7 +3,6 @@ mod migrations;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
-use askama::Template;
 use async_trait::async_trait;
 use cot::admin::{AdminApp, AdminModel, AdminModelManager, DefaultAdminModelManager};
 use cot::auth::db::{DatabaseUser, DatabaseUserApp};
@@ -13,15 +12,14 @@ use cot::config::{
     StaticFilesConfig, StaticFilesPathRewriteMode,
 };
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{Auto, Model, model};
+use cot::db::{Auto, Database, Model, model};
 use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
-use cot::project::{MiddlewareContext, RegisterAppsContext};
-use cot::request::extractors::RequestDb;
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project, ProjectContext};
+use cot::{App, AppBuilder, Project, ProjectContext, Template};
 
 #[derive(Debug, Clone, Form, AdminModel)]
 #[model]
@@ -44,7 +42,7 @@ struct IndexTemplate<'a> {
     todo_items: Vec<TodoItem>,
 }
 
-async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Html> {
+async fn index(urls: Urls, db: Database) -> cot::Result<Html> {
     let todo_items = TodoItem::objects().all(&db).await?;
     let index_template = IndexTemplate {
         urls: &urls,
@@ -126,7 +124,7 @@ impl Project for AdminProject {
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .middleware(AuthMiddleware::new())

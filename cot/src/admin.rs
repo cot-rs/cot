@@ -6,10 +6,8 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
-use askama::Template;
 use async_trait::async_trait;
 use bytes::Bytes;
-use cot::request::extractors::StaticFiles;
 /// Implements the [`AdminModel`] trait for a struct.
 ///
 /// This is a simple method for adding a database model to the admin panel.
@@ -23,16 +21,17 @@ use serde::Deserialize;
 
 use crate::auth::Auth;
 use crate::common_types::Password;
+use crate::error::NotFound;
 use crate::form::{
     Form, FormContext, FormErrorTarget, FormField, FormFieldValidationError, FormResult,
 };
 use crate::html::Html;
-use crate::request::extractors::{FromRequestHead, Path, UrlQuery};
+use crate::request::extractors::{FromRequestHead, Path, StaticFiles, UrlQuery};
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Router, Urls};
 use crate::static_files::StaticFile;
-use crate::{App, Error, Method, RequestHandler, reverse_redirect};
+use crate::{App, Error, Method, RequestHandler, Template, reverse_redirect};
 
 struct AdminAuthenticated<T, H: Send + Sync>(H, PhantomData<fn() -> T>);
 
@@ -127,7 +126,7 @@ async fn login(
     Html::new(template.render()?).into_response()
 }
 
-async fn authenticate(auth: &Auth, login_form: LoginForm) -> cot::Result<bool> {
+async fn authenticate(auth: &Auth, login_form: LoginForm) -> crate::Result<bool> {
     #[cfg(feature = "db")]
     let user = auth
         .authenticate(&crate::auth::db::DatabaseUserCredentials::new(
@@ -189,7 +188,7 @@ async fn view_model(
     Path(model_name): Path<String>,
     UrlQuery(pagination_params): UrlQuery<PaginationParams>,
     request: Request,
-) -> cot::Result<Response> {
+) -> crate::Result<Response> {
     #[derive(Debug, Template)]
     #[template(path = "admin/model.html")]
     struct ModelTemplate<'a> {
@@ -215,7 +214,9 @@ async fn view_model(
     let total_pages = total_object_counts.div_ceil(page_size);
 
     if (page == 0 || page > total_pages) && total_pages > 0 {
-        return Err(Error::not_found_message(format!("page {page} not found")));
+        return Err(Error::from(NotFound::with_message(format!(
+            "page {page} not found"
+        ))));
     }
 
     let pagination = Pagination::new(page_size, page);
@@ -356,11 +357,11 @@ async fn get_object(
         .get_object_by_id(request, object_id)
         .await?
         .ok_or_else(|| {
-            Error::not_found_message(format!(
+            Error::from(NotFound::with_message(format!(
                 "Object with ID `{}` not found in model `{}`",
                 object_id,
                 manager.name()
-            ))
+            )))
         })
 }
 
@@ -371,7 +372,11 @@ fn get_manager(
     model_managers
         .into_iter()
         .find(|manager| manager.url_name() == model_name)
-        .ok_or_else(|| Error::not_found_message(format!("Model `{model_name}` not found")))
+        .ok_or_else(|| {
+            Error::from(NotFound::with_message(format!(
+                "Model `{model_name}` not found"
+            )))
+        })
 }
 
 #[repr(transparent)]
@@ -451,8 +456,8 @@ pub trait AdminModelManager: Send + Sync {
     ///
     /// Returns an error if the object with the given ID does not exist.
     ///
-    /// Returns an error if the object could not be removed, for instance
-    /// due to a database error.
+    /// Returns an error if the object could not be removed, for example,
+    /// a database error.
     async fn remove_by_id(&self, request: &mut Request, object_id: &str) -> cot::Result<()>;
 }
 
@@ -522,10 +527,8 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
     }
 
     async fn form_context_from_object(&self, object: Box<dyn AdminModel>) -> Box<dyn FormContext> {
-        let object_casted = object
-            .as_any()
-            .downcast_ref::<T>()
-            .expect("Invalid object type");
+        let object_any: &dyn Any = &*object;
+        let object_casted = object_any.downcast_ref::<T>().expect("Invalid object type");
 
         T::form_context_from_self(object_casted).await
     }
@@ -551,11 +554,6 @@ impl<T: AdminModel + Send + Sync + 'static> AdminModelManager for DefaultAdminMo
     note = "add #[derive(cot::admin::AdminModel)] to the struct to automatically derive the trait"
 )]
 pub trait AdminModel: Any + Send + 'static {
-    /// Returns the object as an `Any` trait object.
-    // TODO: consider removing this when Rust trait_upcasting is stabilized and we
-    // bump the MSRV (lands in Rust 1.86)
-    fn as_any(&self) -> &dyn Any;
-
     /// Get the objects of this model.
     async fn get_objects(request: &Request, pagination: Pagination) -> cot::Result<Vec<Self>>
     where
@@ -599,8 +597,8 @@ pub trait AdminModel: Any + Send + 'static {
     ///
     /// # Errors
     ///
-    /// Returns an error if the object could not be saved, for instance
-    /// due to a database error.
+    /// Returns an error if the object could not be saved, for example,
+    /// a database error.
     async fn save_from_request(
         request: &mut Request,
         object_id: Option<&str>,
@@ -614,8 +612,8 @@ pub trait AdminModel: Any + Send + 'static {
     ///
     /// Returns an error if the object with the given ID does not exist.
     ///
-    /// Returns an error if the object could not be removed, for instance
-    /// due to a database error.
+    /// Returns an error if the object could not be removed, for example,
+    /// a database error.
     async fn remove_by_id(request: &mut Request, object_id: &str) -> cot::Result<()>
     where
         Self: Sized;
@@ -627,12 +625,12 @@ pub trait AdminModel: Any + Send + 'static {
 ///
 /// ```
 /// use cot::admin::AdminApp;
-/// use cot::project::WithConfig;
-/// use cot::{AppBuilder, Project, ProjectContext};
+/// use cot::project::RegisterAppsContext;
+/// use cot::{AppBuilder, Project};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
-///     fn register_apps(&self, apps: &mut AppBuilder, _context: &ProjectContext<WithConfig>) {
+///     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
 ///         apps.register_with_views(AdminApp::new(), "/admin");
 ///     }
 /// }

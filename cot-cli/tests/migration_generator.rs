@@ -181,6 +181,31 @@ fn create_model_compile_test() {
         content: migration_content,
     } = migration_opt;
 
+    compile_test(src, &migration_name, &migration_content);
+}
+
+#[test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
+fn custom_migration_compile_test() {
+    let generator = test_generator();
+    let src = "fn main() {}";
+    let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
+
+    let migration_opt = generator
+        .generate_custom_migration_from_files("custom", source_files)
+        .unwrap();
+    let MigrationAsSource {
+        name: migration_name,
+        content: migration_content,
+    } = migration_opt;
+
+    compile_test(src, &migration_name, &migration_content);
+}
+
+fn compile_test(src: &str, migration_name: &str, migration_content: &str) {
     let source_with_migrations = format!(
         r"
 {src}

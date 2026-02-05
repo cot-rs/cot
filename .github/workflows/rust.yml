@@ -15,6 +15,10 @@ env:
   SCCACHE_GHA_ENABLED: true
   RUSTC_WRAPPER: sccache
 
+  _RUST_STABLE: &rust_stable stable
+  # Pinning the nightly version to a "stable" version to avoid CI breakages.
+  _RUST_NIGHTLY: &rust_nightly nightly-2025-11-11
+
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
 concurrency:
@@ -31,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -54,20 +58,28 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       matrix:
-        rust: [stable, nightly, "1.85"] # 1.85 is the MSRV
+        rust: [stable, nightly, MSRV]
         os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - rust: stable
+            version: *rust_stable
+          - rust: nightly
+            version: *rust_nightly
+          - rust: MSRV
+            version: "1.88" # MSRV
 
     name: Build & test
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.rust == 'nightly' }}
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: ${{ matrix.version }}
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -84,19 +96,19 @@ jobs:
           tool: nextest
 
       - name: Fetch dependencies
-        run: cargo +${{ matrix.rust }} fetch --locked
+        run: cargo +${{ matrix.version }} fetch --locked
 
       - name: Build
-        run: cargo +${{ matrix.rust }} build --all-features --tests
+        run: cargo +${{ matrix.version }} build --all-features --tests
 
       - name: Test
-        run: cargo +${{ matrix.rust }} nextest run --all-features
+        run: cargo +${{ matrix.version }} nextest run --all-features
 
       # Nextest does not support doc tests as in stable Rust
       # they are not exposed in the same way as normal tests.
       # https://github.com/nextest-rs/nextest/issues/16
       - name: Test docs
-        run: cargo +${{ matrix.rust }} test --all-features --doc
+        run: cargo +${{ matrix.version }} test --all-features --doc
 
   clippy:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
@@ -106,7 +118,7 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -135,13 +147,13 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           # cot_macros ui tests require nightly
-          toolchain: nightly
+          toolchain: *rust_nightly
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -178,7 +190,7 @@ jobs:
     needs: ["build"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install LLVM
         run: sudo apt-get install -y llvm
@@ -187,7 +199,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           # branch coverage is currently optional and requires nightly
-          toolchain: nightly
+          toolchain: *rust_nightly
           components: llvm-tools-preview
 
       - name: Reclaim disk space
@@ -216,11 +228,17 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Generate code coverage
-        run: cargo llvm-cov --all-features --workspace --branch --doctests --codecov --output-path codecov.json -- --include-ignored
+        run: cargo llvm-cov --all-features --workspace --branch --no-report -- --include-ignored
+
+      - name: Generate code coverage - doctests
+        run: cargo llvm-cov --all-features --workspace --branch --doc --no-report
+
+      - name: Merge code coverage reports
+        run: cargo llvm-cov report --codecov --output-path codecov.json
 
       - uses: codecov/codecov-action@v5
         with:
-          files: coverage.json
+          files: codecov.json
           flags: rust
           fail_ci_if_error: true
         env:
@@ -234,13 +252,13 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           # nightly-only rustfmt settings
-          toolchain: nightly
+          toolchain: *rust_nightly
           components: rustfmt
 
       - name: Cache Cargo registry
@@ -267,7 +285,7 @@ jobs:
       SCCACHE_GHA_ENABLED: ""
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -275,7 +293,7 @@ jobs:
           toolchain: stable
 
       - name: Run cargo-machete
-        uses: bnjbvr/cargo-machete@v0.8.0
+        uses: bnjbvr/cargo-machete@v0.9.1
 
   minimal-versions:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
@@ -285,13 +303,13 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           # the `-Z` flag is only accepted on the nightly channel of Cargo
-          toolchain: nightly
+          toolchain: *rust_nightly
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -323,7 +341,7 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -354,13 +372,13 @@ jobs:
     needs: ["build"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           # miri requires nightly
-          toolchain: nightly
+          toolchain: *rust_nightly
           components: miri
 
       - name: Cache Cargo registry
@@ -393,7 +411,7 @@ jobs:
       RUSTC_WRAPPER: ""
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check licenses
         uses: EmbarkStudios/cargo-deny-action@v2
@@ -411,7 +429,7 @@ jobs:
       SCCACHE_GHA_ENABLED: ""
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

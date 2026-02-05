@@ -114,3 +114,23 @@ fn migration_make_existing_model() {
         );
     }
 }
+
+#[test]
+#[expect(clippy::cast_possible_truncation)]
+fn migration_new() {
+    let cmd = cot_cli!("migration", "new", "custom");
+    for (idx, mut cli) in cot_clis_with_verbosity(&cmd).into_iter().enumerate() {
+        let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
+
+        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
+        test_utils::make_package(temp_dir.path()).unwrap();
+
+        insta::with_settings!(
+            {
+                description => format!("Verbosity level: {filter}"),
+                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
+            },
+            { assert_cmd_snapshot!(cli.current_dir(temp_dir.path())) }
+        );
+    }
+}

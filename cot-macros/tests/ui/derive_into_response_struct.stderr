@@ -1,0 +1,7 @@
+error: only enums can derive `IntoResponse`
+ --> tests/ui/derive_into_response_struct.rs:3:10
+  |
+3 | #[derive(IntoResponse)]
+  |          ^^^^^^^^^^^^
+  |
+  = note: this error originates in the derive macro `IntoResponse` (in Nightly builds, run with -Z macro-backtrace for more info)

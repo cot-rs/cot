@@ -11,66 +11,84 @@ use crate::db::{
     LimitedString, Model, PrimaryKey, Result, SqlxValueRef, ToDbFieldValue, ToDbValue,
 };
 
+mod chrono_fields;
 mod chrono_wrapper;
 
 macro_rules! impl_from_sqlite_default {
     () => {
         #[cfg(feature = "sqlite")]
-        fn from_sqlite(value: SqliteValueRef<'_>) -> Result<Self> {
+        fn from_sqlite(
+            value: crate::db::impl_sqlite::SqliteValueRef<'_>,
+        ) -> crate::db::Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
         }
     };
     ($wrapper_ty:ty) => {
         #[cfg(feature = "sqlite")]
-        fn from_sqlite(value: SqliteValueRef<'_>) -> Result<Self> {
+        fn from_sqlite(
+            value: crate::db::impl_sqlite::SqliteValueRef<'_>,
+        ) -> crate::db::Result<Self> {
             <$wrapper_ty as FromDbValue>::from_sqlite(value).map(|val| val.into())
         }
     };
     ($wrapper_ty:ty, option) => {
         #[cfg(feature = "sqlite")]
-        fn from_sqlite(value: SqliteValueRef<'_>) -> Result<Self> {
+        fn from_sqlite(
+            value: crate::db::impl_sqlite::SqliteValueRef<'_>,
+        ) -> crate::db::Result<Self> {
             <$wrapper_ty as FromDbValue>::from_sqlite(value).map(|val| val.map(|val| val.into()))
         }
     };
 }
+use impl_from_sqlite_default;
 
 macro_rules! impl_from_postgres_default {
     () => {
         #[cfg(feature = "postgres")]
-        fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
+        fn from_postgres(
+            value: crate::db::impl_postgres::PostgresValueRef<'_>,
+        ) -> crate::db::Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
         }
     };
     ($wrapper_ty:ty) => {
         #[cfg(feature = "postgres")]
-        fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
+        fn from_postgres(
+            value: crate::db::impl_postgres::PostgresValueRef<'_>,
+        ) -> crate::db::Result<Self> {
             <$wrapper_ty as FromDbValue>::from_postgres(value).map(|val| val.into())
         }
     };
     ($wrapper_ty:ty, option) => {
         #[cfg(feature = "postgres")]
-        fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
+        fn from_postgres(
+            value: crate::db::impl_postgres::PostgresValueRef<'_>,
+        ) -> crate::db::Result<Self> {
             <$wrapper_ty as FromDbValue>::from_postgres(value).map(|val| val.map(|val| val.into()))
         }
     };
 }
+use impl_from_postgres_default;
 
 macro_rules! impl_from_mysql_default {
     () => {
         #[cfg(feature = "mysql")]
-        fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
+        fn from_mysql(value: crate::db::impl_mysql::MySqlValueRef<'_>) -> Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
         }
     };
     ($wrapper_ty:ty) => {
         #[cfg(feature = "mysql")]
-        fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
+        fn from_mysql(value: crate::db::impl_mysql::MySqlValueRef<'_>) -> Result<Self> {
             <$wrapper_ty as FromDbValue>::from_mysql(value).map(|val| val.into())
         }
     };
     ($wrapper_ty:ty, option) => {
         #[cfg(feature = "mysql")]
-        fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
+        fn from_mysql(value: crate::db::impl_mysql::MySqlValueRef<'_>) -> Result<Self> {
             <$wrapper_ty as FromDbValue>::from_mysql(value).map(|val| val.map(|val| val.into()))
         }
     };
@@ -78,28 +96,28 @@ macro_rules! impl_from_mysql_default {
 
 macro_rules! impl_to_db_value_default {
     ($ty:ty) => {
-        impl ToDbValue for $ty {
-            fn to_db_value(&self) -> DbValue {
+        impl crate::db::ToDbValue for $ty {
+            fn to_db_value(&self) -> crate::db::DbValue {
                 self.clone().into()
             }
         }
 
-        impl ToDbValue for Option<$ty> {
-            fn to_db_value(&self) -> DbValue {
+        impl crate::db::ToDbValue for Option<$ty> {
+            fn to_db_value(&self) -> crate::db::DbValue {
                 self.clone().into()
             }
         }
     };
 
     ($ty:ty, $wrapper_ty:ty) => {
-        impl ToDbValue for $ty {
-            fn to_db_value(&self) -> DbValue {
+        impl crate::db::ToDbValue for $ty {
+            fn to_db_value(&self) -> crate::db::DbValue {
                 Into::<$wrapper_ty>::into(self.clone()).to_db_value()
             }
         }
 
-        impl ToDbValue for Option<$ty> {
-            fn to_db_value(&self) -> DbValue {
+        impl crate::db::ToDbValue for Option<$ty> {
+            fn to_db_value(&self) -> crate::db::DbValue {
                 self.clone()
                     .map(|val| Into::<$wrapper_ty>::into(val))
                     .to_db_value()
@@ -107,6 +125,7 @@ macro_rules! impl_to_db_value_default {
         }
     };
 }
+use impl_to_db_value_default;
 
 macro_rules! impl_db_field {
     ($ty:ty, $column_type:ident) => {
@@ -230,35 +249,6 @@ impl ToDbValue for &str {
         (*self).to_string().into()
     }
 }
-
-impl DatabaseField for chrono::DateTime<chrono::FixedOffset> {
-    const TYPE: ColumnType = ColumnType::DateTimeWithTimeZone;
-}
-
-impl FromDbValue for chrono::DateTime<chrono::FixedOffset> {
-    impl_from_sqlite_default!();
-
-    impl_from_postgres_default!();
-
-    #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
-        Ok(value.get::<chrono::DateTime<chrono::Utc>>()?.fixed_offset())
-    }
-}
-impl FromDbValue for Option<chrono::DateTime<chrono::FixedOffset>> {
-    impl_from_sqlite_default!();
-
-    impl_from_postgres_default!();
-
-    #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
-        Ok(value
-            .get::<Option<chrono::DateTime<chrono::Utc>>>()?
-            .map(|dt| dt.fixed_offset()))
-    }
-}
-
-impl_to_db_value_default!(chrono::DateTime<chrono::FixedOffset>);
 
 impl ToDbValue for Option<&str> {
     fn to_db_value(&self) -> DbValue {

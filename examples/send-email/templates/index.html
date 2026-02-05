@@ -1,0 +1,71 @@
+{% let urls = urls %}
+{% let status = status %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Send Email Example</title>
+        <link rel="stylesheet" href="{{ static_files.url_for("css/main.css")? }}">
+    </head>
+    <body>
+        <div class="root-container">
+            {% if status == "Success" %}
+                <div id="status-message"
+                     class="status status--success"
+                     role="status"
+                     aria-live="polite"
+                     aria-atomic="true">
+                    <p class="status__text">Email sent successfully</p>
+                </div>
+            {% elif status == "Failure" %}
+                <div id="status-message"
+                     class="status status--error"
+                     role="status"
+                     aria-live="polite"
+                     aria-atomic="true">
+                    <p class="status__text">Failed to send email</p>
+                </div>
+            {% endif %}
+            <form id="email-form"
+                  action="{{ cot::reverse!(urls, "send_email")? }}"
+                  method="post">
+                <div class="form-field">
+                    <label for="from">From</label>
+                    <input type="email"
+                           id="from"
+                           name="from"
+                           placeholder="sender@example.com"
+                           required
+                           autocomplete="email">
+                </div>
+                <div class="form-field">
+                    <label for="to">To</label>
+                    <input type="email"
+                           id="to"
+                           name="to"
+                           placeholder="recipient@example.com"
+                           required
+                           autocomplete="email">
+                </div>
+                <div class="form-field">
+                    <label for="subject">Subject</label>
+                    <input type="text"
+                           id="subject"
+                           name="subject"
+                           placeholder="Email subject"
+                           required>
+                </div>
+                <div class="form-field">
+                    <label for="message">Message</label>
+                    <textarea id="message"
+                              name="message"
+                              placeholder="Write your message here..."
+                              rows="5"
+                              required></textarea>
+                </div>
+                <button type="submit" class="submit-button">Send Email</button>
+            </form>
+        </div>
+    </body>
+</html>

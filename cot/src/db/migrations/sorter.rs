@@ -11,16 +11,16 @@ use crate::utils::graph::{Graph, apply_permutation};
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum MigrationSorterError {
-    #[error("Cycle detected in migrations")]
+    #[error("cycle detected in migrations")]
     CycleDetected(#[from] crate::utils::graph::CycleDetected),
-    #[error("Dependency not found: {}", format_migration_dependency(.0))]
+    #[error("dependency not found: {}", format_migration_dependency(.0))]
     InvalidDependency(MigrationDependency),
-    #[error("Migration defined twice: {app_name}::{migration_name}")]
+    #[error("migration defined twice: {app_name}::{migration_name}")]
     DuplicateMigration {
         app_name: String,
         migration_name: String,
     },
-    #[error("Migration creating model defined twice: {app_name}::{table_name}")]
+    #[error("migration creating model defined twice: {app_name}::{table_name}")]
     DuplicateModel {
         app_name: String,
         table_name: String,

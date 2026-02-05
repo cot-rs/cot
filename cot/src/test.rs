@@ -7,8 +7,15 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use cot::project::run_at_with_shutdown;
-use derive_more::Debug;
+#[cfg(feature = "cache")]
+use cot::config::CacheUrl;
+#[cfg(feature = "redis")]
+use cot_core::error::impl_into_cot_error;
+use cot_core::handler::BoxedHandler;
+#[cfg(feature = "redis")]
+use deadpool_redis::Connection;
+#[cfg(feature = "redis")]
+use redis::AsyncCommands;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tower::Service;
@@ -17,15 +24,26 @@ use tower_sessions::MemoryStore;
 #[cfg(feature = "db")]
 use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
+#[cfg(feature = "cache")]
+use crate::cache::Cache;
+#[cfg(feature = "cache")]
+use crate::cache::store::memory::Memory;
+#[cfg(feature = "redis")]
+use crate::cache::store::redis::Redis;
 use crate::config::ProjectConfig;
+#[cfg(feature = "cache")]
+use crate::config::Timeout;
 #[cfg(feature = "db")]
 use crate::db::Database;
 #[cfg(feature = "db")]
 use crate::db::migrations::{
     DynMigration, MigrationDependency, MigrationEngine, MigrationWrapper, Operation,
 };
-use crate::handler::BoxedHandler;
-use crate::project::prepare_request;
+#[cfg(feature = "email")]
+use crate::email::Email;
+#[cfg(feature = "email")]
+use crate::email::transport::console::Console;
+use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
 use crate::request::Request;
 use crate::response::Response;
 use crate::router::Router;
@@ -35,11 +53,12 @@ use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
 
 /// A test client for making requests to a Cot project.
 ///
-/// Useful for End-to-End testing Cot projects.
+/// This client is useful for end-to-end testing of Cot projects.
 #[derive(Debug)]
 pub struct Client {
     context: Arc<ProjectContext>,
     handler: BoxedHandler,
+    error_handler: BoxedHandler,
 }
 
 impl Client {
@@ -47,7 +66,7 @@ impl Client {
     ///
     /// # Panics
     ///
-    /// Panics if the test config could not be loaded.
+    /// Panics if the test configuration could not be loaded.
     /// Panics if the project could not be initialized.
     ///
     /// # Examples
@@ -85,14 +104,15 @@ impl Client {
             .await
             .expect("Could not boot project");
 
-        let (context, handler) = bootstrapper.into_context_and_handler();
+        let bootstrapped_project = bootstrapper.finish();
         Self {
-            context: Arc::new(context),
-            handler,
+            context: Arc::new(bootstrapped_project.context),
+            handler: bootstrapped_project.handler,
+            error_handler: bootstrapped_project.error_handler,
         }
     }
 
-    /// Send a GET request to the given path.
+    /// Sends a GET request to the specified path.
     ///
     /// # Errors
     ///
@@ -130,7 +150,7 @@ impl Client {
         .await
     }
 
-    /// Send a request to the given path.
+    /// Sends a request to the specified path.
     ///
     /// # Errors
     ///
@@ -160,9 +180,21 @@ impl Client {
     /// ```
     pub async fn request(&mut self, mut request: Request) -> Result<Response> {
         prepare_request(&mut request, self.context.clone());
+        let (head, body) = request.into_parts();
+        let mut error_head = head.clone();
+        let request = Request::from_parts(head, body);
 
         poll_fn(|cx| self.handler.poll_ready(cx)).await?;
-        self.handler.call(request).await
+        match self.handler.call(request).await {
+            Ok(result) => Ok(result),
+            Err(error) => {
+                prepare_request_for_error_handler(&mut error_head, error);
+                let request = Request::from_parts(error_head, Body::empty());
+
+                poll_fn(|cx| self.error_handler.poll_ready(cx)).await?;
+                self.error_handler.call(request).await
+            }
+        }
     }
 }
 
@@ -198,15 +230,19 @@ pub struct TestRequestBuilder {
     auth_backend: Option<AuthBackendWrapper>,
     auth: Option<Auth>,
     #[cfg(feature = "db")]
-    database: Option<Arc<Database>>,
+    database: Option<Database>,
     form_data: Option<Vec<(String, String)>>,
     #[cfg(feature = "json")]
     json_data: Option<String>,
     static_files: Vec<StaticFile>,
+    #[cfg(feature = "cache")]
+    cache: Option<Cache>,
+    #[cfg(feature = "email")]
+    email: Option<Email>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
-#[derive(Debug, Clone)]
+#[derive(derive_more::Debug, Clone)]
 struct AuthBackendWrapper {
     #[debug("..")]
     inner: Arc<dyn AuthBackend>,
@@ -256,6 +292,10 @@ impl Default for TestRequestBuilder {
             #[cfg(feature = "json")]
             json_data: None,
             static_files: Vec::new(),
+            #[cfg(feature = "cache")]
+            cache: None,
+            #[cfg(feature = "email")]
+            email: None,
         }
     }
 }
@@ -450,7 +490,8 @@ impl TestRequestBuilder {
         self
     }
 
-    /// Add a session support to the request builder.
+    /// Add session support to the request builder. This uses an in-memory
+    /// session store.
     ///
     /// # Examples
     ///
@@ -530,9 +571,8 @@ impl TestRequestBuilder {
     /// use cot::db::Database;
     /// use cot::html::Html;
     /// use cot::test::TestRequestBuilder;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn index(RequestDb(db): RequestDb) -> Html {
+    /// async fn index(db: Database) -> Html {
     ///     // ... do something with db
     ///
     ///     Html::new("Hello world!")
@@ -557,7 +597,7 @@ impl TestRequestBuilder {
     /// }
     /// ```
     #[cfg(feature = "db")]
-    pub fn database<DB: Into<Arc<Database>>>(&mut self, database: DB) -> &mut Self {
+    pub fn database<DB: Into<Database>>(&mut self, database: DB) -> &mut Self {
         self.database = Some(database.into());
         self
     }
@@ -569,7 +609,7 @@ impl TestRequestBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if the auth object fails to be created.
+    /// Panics if the authentication object fails to be created.
     ///
     /// # Examples
     ///
@@ -589,8 +629,8 @@ impl TestRequestBuilder {
     /// # }
     /// ```
     #[cfg(feature = "db")]
-    pub async fn with_db_auth(&mut self, db: Arc<Database>) -> &mut Self {
-        self.auth_backend(DatabaseUserBackend::new(Arc::clone(&db)));
+    pub async fn with_db_auth(&mut self, db: Database) -> &mut Self {
+        self.auth_backend(DatabaseUserBackend::new(db.clone()));
         self.with_session();
         self.database(db);
         self.auth = Some(
@@ -738,6 +778,14 @@ impl TestRequestBuilder {
             auth_backend,
             #[cfg(feature = "db")]
             self.database.clone(),
+            #[cfg(feature = "cache")]
+            self.cache
+                .clone()
+                .unwrap_or_else(|| Cache::new(Memory::new(), None, Timeout::default())),
+            #[cfg(feature = "email")]
+            self.email
+                .clone()
+                .unwrap_or_else(|| Email::new(Console::new())),
         );
         prepare_request(&mut request, Arc::new(context));
 
@@ -814,7 +862,7 @@ impl TestRequestBuilder {
 #[cfg(feature = "db")]
 #[derive(Debug)]
 pub struct TestDatabase {
-    database: Arc<Database>,
+    database: Database,
     kind: TestDatabaseKind,
     migrations: Vec<MigrationWrapper>,
 }
@@ -823,7 +871,7 @@ pub struct TestDatabase {
 impl TestDatabase {
     fn new(database: Database, kind: TestDatabaseKind) -> TestDatabase {
         Self {
-            database: Arc::new(database),
+            database,
             kind,
             migrations: Vec::new(),
         }
@@ -1111,7 +1159,7 @@ impl TestDatabase {
     /// # }
     /// ```
     #[must_use]
-    pub fn database(&self) -> Arc<Database> {
+    pub fn database(&self) -> Database {
         self.database.clone()
     }
 
@@ -1364,8 +1412,9 @@ impl<T: Project + 'static> TestServerBuilder<T> {
 
 /// A running test server.
 ///
-/// This is returned by [`TestServerBuilder::start`] and can be used to access
-/// the server's URL and close the server.
+/// This represents a running Cot server in a background task. It is returned
+/// by [`TestServerBuilder::start`] and can be used to access the server's URL
+/// and close the server.
 ///
 /// # Examples
 ///
@@ -1547,5 +1596,357 @@ pub fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
             // We can ignore poisoned mutexes because we don't store any data inside
             poison_error.into_inner()
         }
+    }
+}
+
+#[cfg(feature = "redis")]
+const POOL_KEY: &str = "cot:test:db_pool";
+
+#[cfg(feature = "redis")]
+async fn get_db_num(conn: &mut Connection) -> usize {
+    let cfg = redis::cmd("CONFIG")
+        .arg("GET")
+        .arg("databases")
+        .query_async::<Vec<String>>(conn)
+        .await
+        .expect("Failed to get Redis config");
+    cfg.get(1)
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(16)
+}
+
+#[cfg(feature = "redis")]
+async fn set_current_db(conn: &mut Connection, db_num: usize) {
+    redis::cmd("SELECT")
+        .arg(db_num)
+        .query_async::<()>(conn)
+        .await
+        .expect("Failed to select Redis database");
+}
+
+#[cfg(feature = "redis")]
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+enum RedisDbAllocatorError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("Redis error: {0}")]
+    Redis(String),
+}
+
+#[cfg(feature = "redis")]
+impl_into_cot_error!(RedisDbAllocatorError);
+
+#[cfg(feature = "redis")]
+#[derive(Debug, Clone)]
+struct RedisDbAllocator {
+    alloc_db: usize,
+    redis: Redis,
+}
+
+#[cfg(feature = "redis")]
+type RedisAllocatorResult<T> = std::result::Result<T, RedisDbAllocatorError>;
+#[cfg(feature = "redis")]
+impl RedisDbAllocator {
+    fn new(alloc_db: usize, redis: Redis) -> Self {
+        Self { alloc_db, redis }
+    }
+
+    async fn get_conn(&self) -> RedisAllocatorResult<Connection> {
+        let conn = self
+            .redis
+            .get_connection()
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+        Ok(conn)
+    }
+
+    /// Initialize the Redis database allocator.
+    ///
+    /// The goal here is to ensure that DB IDs are initialized once.
+    /// Since we run tests using `nextest`, the tests are run per process.
+    /// Thus, we run this in a transaction to guarantee a deterministic
+    /// behavior.
+    ///
+    /// On initializing the IDs, we check for the existence of an "init" key in
+    /// the DB. If the key does not exist, or if the length of the pool list
+    /// does not match the expected count, we  reinitialize the pool by
+    /// populating it with database indices from 1 to `alloc_db - 1`.
+    async fn init(&self) -> RedisAllocatorResult<Option<String>> {
+        const KEY_TIMEOUT_SECS: u64 = 300;
+        const INIT_KEY: &str = "cot:test:db_pool:initialized";
+
+        let mut con = self.get_conn().await?;
+        let last_eligible_db = self.alloc_db - 1;
+
+        redis::cmd("WATCH")
+            .arg(INIT_KEY)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        let prev = redis::cmd("GET")
+            .arg(INIT_KEY)
+            .query_async::<Option<String>>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        if prev.is_some() {
+            redis::cmd("UNWATCH")
+                .query_async::<redis::Value>(&mut con)
+                .await
+                .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+            return Ok(prev);
+        }
+
+        // start a transaction so this is atomic across processes
+        redis::cmd("MULTI")
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        let mut set_cmd = redis::cmd("SET");
+        set_cmd.arg(INIT_KEY).arg("1");
+        set_cmd.arg("EX").arg(KEY_TIMEOUT_SECS);
+        set_cmd
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        // delete and reinit IDs
+        redis::cmd("DEL")
+            .arg(POOL_KEY)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        let vals: Vec<String> = (1..=last_eligible_db).map(|i| i.to_string()).collect();
+        redis::cmd("RPUSH")
+            .arg(POOL_KEY)
+            .arg(vals)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        // keys should expire after a short while, a double defense against reuse by
+        // subsequent runs
+        redis::cmd("EXPIRE")
+            .arg(POOL_KEY)
+            .arg(KEY_TIMEOUT_SECS)
+            .query_async::<redis::Value>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+
+        redis::cmd("EXEC")
+            .query_async::<Option<Vec<redis::Value>>>(&mut con)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+        Ok(None)
+    }
+
+    async fn allocate(&self) -> RedisAllocatorResult<Option<usize>> {
+        let mut connection = self.get_conn().await?;
+
+        let db_index: Option<String> = connection
+            .lpop(POOL_KEY, None)
+            .await
+            .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
+        Ok(db_index.and_then(|i| i.parse::<usize>().ok()))
+    }
+}
+
+#[cfg(feature = "cache")]
+#[derive(Debug, Clone)]
+enum CacheKind {
+    Memory,
+    #[cfg(feature = "redis")]
+    Redis {
+        #[expect(unused)]
+        allocator: RedisDbAllocator,
+    },
+}
+
+/// A test cache.
+///
+/// This is used to create a separate cache for testing.
+///
+/// # Examples
+///
+/// ```
+/// use cot::test::TestCache;
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// let test_cache = TestCache::new_memory();
+/// let cache = test_cache.cache();
+///
+/// // do something with the cache
+///
+/// # Ok(())
+/// # }
+/// ```
+#[cfg(feature = "cache")]
+#[derive(Debug, Clone)]
+pub struct TestCache {
+    cache: Cache,
+    kind: CacheKind,
+}
+
+#[cfg(feature = "cache")]
+impl TestCache {
+    fn new(cache: Cache, kind: CacheKind) -> Self {
+        Self { cache, kind }
+    }
+
+    /// Create a new in-memory test cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache could not be created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_memory();
+    /// let cache = test_cache.cache();
+    ///
+    /// // do something with the cache
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn new_memory() -> Self {
+        let cache = Cache::new(Memory::new(), None, Timeout::default());
+        Self::new(cache, CacheKind::Memory)
+    }
+
+    /// Create a new Redis test cache.
+    ///
+    /// The Redis URL is read from the `REDIS_URL` environment variable. If not
+    /// provided, it defaults to `redis://localhost`.
+    ///
+    /// Running with redis makes use of an internal allocator that selects what
+    /// DB a test will run. Every test requires its own database to avoid
+    /// conflicts. The allocator, by design, will reserve the last database
+    /// number for allocation purposes, so make sure your Redis instance is
+    /// configured with at least 2 databases. For example if your redis
+    /// instance has 16 logical databases, database 15 will be used for
+    /// allocations, and databases 0-14 will be used for tests.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Redis cache could not be created.
+    ///
+    /// # Panics
+    ///
+    /// Panics if Redis is not configured with at least 2 databases.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_redis().await?;
+    /// let cache = test_cache.cache();
+    ///
+    /// // do something with the cache
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "redis")]
+    pub async fn new_redis() -> Result<Self> {
+        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost".to_string());
+        let mut url = CacheUrl::from(url);
+
+        let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
+        let mut conn = redis.get_connection().await?;
+        // get the total number of DBs
+        let db_num = get_db_num(&mut conn).await;
+        assert!(
+            db_num > 1,
+            "Redis must be configured with at least 2 databases for testing"
+        );
+
+        let alloc_db = db_num - 1;
+
+        // switch to the allocation DB to perform initialization
+        set_current_db(&mut conn, db_num - 1).await;
+
+        let allocator = RedisDbAllocator::new(alloc_db, redis);
+        allocator.init().await?;
+        // get the db number for the current test
+        let current_db = allocator
+            .allocate()
+            .await?
+            .expect("Failed to allocate a Redis database for testing");
+
+        // create a new connection to the correct DB
+        url.inner_mut().set_path(current_db.to_string().as_str());
+        let redis = Redis::new(&url, crate::config::DEFAULT_REDIS_POOL_SIZE)?;
+        let cache = Cache::new(redis, Some("test_harness".to_string()), Timeout::default());
+
+        let this = Self::new(cache, CacheKind::Redis { allocator });
+
+        Ok(this)
+    }
+
+    /// Get the cache.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_memory();
+    /// let cache = test_cache.cache();
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn cache(&self) -> Cache {
+        self.cache.clone()
+    }
+
+    /// Cleanup the test cache.
+    ///
+    /// This will clear the cache and deallocate any resources used by the test
+    /// cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache could not be cleared.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_redis().await?;
+    ///
+    /// // do something with the cache
+    ///
+    /// test_cache.cleanup().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn cleanup(&self) -> Result<()> {
+        #[cfg(feature = "redis")]
+        if let CacheKind::Redis { allocator: _ } = &self.kind {
+            self.cache.clear().await?;
+        }
+        Ok(())
     }
 }

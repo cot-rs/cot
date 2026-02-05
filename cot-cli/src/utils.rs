@@ -151,12 +151,12 @@ impl CargoTomlManager {
                         .unwrap_or_default(), // dir containing the workspace Cargo.toml
                 };
 
-                if let Some(workspace_path) = workspace_path {
-                    if let Ok(manifest) = Manifest::from_path(&workspace_path) {
-                        let mut manager = Self::parse_workspace(&workspace_path, manifest);
-                        manager.current_package = Some(package.name.clone());
-                        return Ok(CargoTomlManager::Workspace(manager));
-                    }
+                if let Some(workspace_path) = workspace_path
+                    && let Ok(manifest) = Manifest::from_path(&workspace_path)
+                {
+                    let mut manager = Self::parse_workspace(&workspace_path, manifest);
+                    manager.current_package = Some(package.name.clone());
+                    return Ok(CargoTomlManager::Workspace(manager));
                 }
 
                 let manager = PackageManager {

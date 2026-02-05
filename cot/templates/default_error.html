@@ -1,0 +1,28 @@
+{%- let status_code = error.status_code() -%}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>{{ status_code.canonical_reason().unwrap_or("Server Error") }}</title>
+        <style>{%- include "default_error.css" -%}</style>
+    </head>
+    <body>
+        <h1>{{ status_code.canonical_reason().unwrap_or("Error") }}</h1>
+        {%- if status_code == cot::StatusCode::NOT_FOUND -%}
+            <p>Sorry, the page you are looking for has not been found.</p>
+            <p>Try checking if the address you provided is correct and do not contain any typos.</p>
+        {%- elif status_code == cot::StatusCode::METHOD_NOT_ALLOWED -%}
+            <p>Sorry, this endpoint does not support the requested HTTP method.</p>
+        {%- elif status_code.is_client_error() -%}
+            <p>An error occurred while trying to process your request.</p>
+        {%- else -%}
+            <p>
+                Sorry, the page you are looking for is currently unavailable.
+                <br />
+                Please try again later.
+            </p>
+            <p>
+                If you are a user, please report this to the website administrator. If you are the website administrator, please look in the server logs for details.
+            </p>
+        {%- endif -%}
+    </body>
+</html>

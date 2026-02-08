@@ -20,7 +20,7 @@ use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use async_trait::async_trait;
+pub use async_trait::async_trait;
 use cot_core::error::impl_into_cot_error;
 pub use cot_macros::{model, query};
 use derive_more::{Debug, Deref, Display};
@@ -32,16 +32,18 @@ use sea_query::{
     ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
 };
 use sea_query_binder::{SqlxBinder, SqlxValues};
-use sqlx::{Type, TypeInfo};
+use sqlx::{Acquire, Type, TypeInfo};
 use thiserror::Error;
 use tracing::{Instrument, Level, span, trace};
 
 #[cfg(feature = "mysql")]
-use crate::db::impl_mysql::{DatabaseMySql, MySqlRow, MySqlValueRef};
+use crate::db::impl_mysql::{DatabaseMySql, MySqlRow, MySqlValueRef, TransactionMySql};
 #[cfg(feature = "postgres")]
-use crate::db::impl_postgres::{DatabasePostgres, PostgresRow, PostgresValueRef};
+use crate::db::impl_postgres::{
+    DatabasePostgres, PostgresRow, PostgresValueRef, TransactionPostgres,
+};
 #[cfg(feature = "sqlite")]
-use crate::db::impl_sqlite::{DatabaseSqlite, SqliteRow, SqliteValueRef};
+use crate::db::impl_sqlite::{DatabaseSqlite, SqliteRow, SqliteValueRef, TransactionSqlite};
 use crate::db::migrations::ColumnTypeMapper;
 
 const ERROR_PREFIX: &str = "database error:";
@@ -115,6 +117,9 @@ pub enum DatabaseError {
         /// The actual number of rows returned.
         actual: usize,
     },
+    /// Nested transactions are not supported yet.
+    #[error("{ERROR_PREFIX} nested transactions are not supported yet")]
+    NestedTransactionsNotSupported,
 }
 impl_into_cot_error!(DatabaseError, INTERNAL_SERVER_ERROR);
 
@@ -151,12 +156,12 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
 ///     name: String,
 /// }
 /// ```
-#[async_trait]
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not marked as a database model",
     label = "`{Self}` is not annotated with `#[cot::db::model]`",
     note = "annotate `{Self}` with the `#[cot::db::model]` attribute"
 )]
+#[async_trait]
 pub trait Model: Sized + Send + 'static {
     #[allow(
         clippy::allow_attributes,
@@ -229,7 +234,7 @@ pub trait Model: Sized + Send + 'static {
     /// found in the database, or there was a problem with the database
     /// connection.
     async fn get_by_primary_key<DB: DatabaseBackend>(
-        db: &DB,
+        db: DB,
         pk: Self::PrimaryKey,
     ) -> Result<Option<Self>>;
 
@@ -245,7 +250,7 @@ pub trait Model: Sized + Send + 'static {
     /// inserted into the database, for instance because the migrations
     /// haven't been applied, or there was a problem with the database
     /// connection.
-    async fn save<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
+    async fn save<DB: DatabaseBackend>(&mut self, mut db: DB) -> Result<()> {
         db.insert_or_update(self).await?;
         Ok(())
     }
@@ -258,7 +263,7 @@ pub trait Model: Sized + Send + 'static {
     /// inserted into the database, for instance because the migrations
     /// haven't been applied, or there was a problem with the database
     /// connection.
-    async fn insert<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
+    async fn insert<DB: DatabaseBackend>(&mut self, mut db: DB) -> Result<()> {
         db.insert(self).await?;
         Ok(())
     }
@@ -274,7 +279,7 @@ pub trait Model: Sized + Send + 'static {
     ///
     /// This method can return an error if the model with the given primary key
     /// could not be found in the database.
-    async fn update<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
+    async fn update<DB: DatabaseBackend>(&mut self, mut db: DB) -> Result<()> {
         db.update(self).await?;
         Ok(())
     }
@@ -318,7 +323,7 @@ pub trait Model: Sized + Send + 'static {
     /// // After insertion, all todos have populated IDs
     /// assert!(todos[0].id.is_fixed());
     /// ```
-    async fn bulk_insert<DB: DatabaseBackend>(db: &DB, instances: &mut [Self]) -> Result<()> {
+    async fn bulk_insert<DB: DatabaseBackend>(mut db: DB, instances: &mut [Self]) -> Result<()> {
         db.bulk_insert(instances).await?;
         Ok(())
     }
@@ -358,7 +363,7 @@ pub trait Model: Sized + Send + 'static {
     /// assert!(todos[0].id.is_fixed());
     /// ```
     async fn bulk_insert_or_update<DB: DatabaseBackend>(
-        db: &DB,
+        mut db: DB,
         instances: &mut [Self],
     ) -> Result<()> {
         db.bulk_insert_or_update(instances).await?;
@@ -785,6 +790,386 @@ pub trait SqlxValueRef<'r>: Sized {
     }
 }
 
+/// A database transaction structure that holds a transaction to the database.
+#[derive(Debug)]
+pub struct Transaction<'a> {
+    inner: TransactionImpl<'a>,
+}
+
+#[derive(Debug)]
+enum TransactionImpl<'a> {
+    #[cfg(feature = "sqlite")]
+    Sqlite(TransactionSqlite<'a>),
+    #[cfg(feature = "postgres")]
+    Postgres(TransactionPostgres<'a>),
+    #[cfg(feature = "mysql")]
+    MySql(TransactionMySql<'a>),
+}
+
+impl Transaction<'_> {
+    /// Commits the transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction could not be committed.
+    pub async fn commit(self) -> Result<()> {
+        match self.inner {
+            #[cfg(feature = "sqlite")]
+            TransactionImpl::Sqlite(inner) => inner.commit().await,
+            #[cfg(feature = "postgres")]
+            TransactionImpl::Postgres(inner) => inner.commit().await,
+            #[cfg(feature = "mysql")]
+            TransactionImpl::MySql(inner) => inner.commit().await,
+        }
+    }
+
+    /// Rolls back the transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction could not be rolled back.
+    pub async fn rollback(self) -> Result<()> {
+        match self.inner {
+            #[cfg(feature = "sqlite")]
+            TransactionImpl::Sqlite(inner) => inner.rollback().await,
+            #[cfg(feature = "postgres")]
+            TransactionImpl::Postgres(inner) => inner.rollback().await,
+            #[cfg(feature = "mysql")]
+            TransactionImpl::MySql(inner) => inner.rollback().await,
+        }
+    }
+
+    /// Starts a new database transaction (savepoint).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction could not be started.
+    pub async fn begin(&mut self) -> Result<Transaction<'_>> {
+        let inner = match &mut self.inner {
+            #[cfg(feature = "sqlite")]
+            TransactionImpl::Sqlite(inner) => {
+                TransactionImpl::Sqlite(TransactionSqlite::new(inner.inner.begin().await?))
+            }
+            #[cfg(feature = "postgres")]
+            TransactionImpl::Postgres(inner) => {
+                TransactionImpl::Postgres(TransactionPostgres::new(inner.inner.begin().await?))
+            }
+            #[cfg(feature = "mysql")]
+            TransactionImpl::MySql(inner) => {
+                TransactionImpl::MySql(TransactionMySql::new(inner.inner.begin().await?))
+            }
+        };
+
+        Ok(Transaction { inner })
+    }
+
+    async fn fetch_option<T>(&mut self, statement: &T) -> Result<Option<Row>>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        let result = match &mut self.inner {
+            #[cfg(feature = "sqlite")]
+            TransactionImpl::Sqlite(inner) => {
+                inner.fetch_option::<T>(statement).await?.map(Row::Sqlite)
+            }
+            #[cfg(feature = "postgres")]
+            TransactionImpl::Postgres(inner) => {
+                inner.fetch_option::<T>(statement).await?.map(Row::Postgres)
+            }
+            #[cfg(feature = "mysql")]
+            TransactionImpl::MySql(inner) => {
+                inner.fetch_option::<T>(statement).await?.map(Row::MySql)
+            }
+        };
+
+        Ok(result)
+    }
+
+    async fn fetch_all<T>(&mut self, statement: &T) -> Result<Vec<Row>>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        let result = match &mut self.inner {
+            #[cfg(feature = "sqlite")]
+            TransactionImpl::Sqlite(inner) => inner
+                .fetch_all::<T>(statement)
+                .await?
+                .into_iter()
+                .map(Row::Sqlite)
+                .collect(),
+            #[cfg(feature = "postgres")]
+            TransactionImpl::Postgres(inner) => inner
+                .fetch_all::<T>(statement)
+                .await?
+                .into_iter()
+                .map(Row::Postgres)
+                .collect(),
+            #[cfg(feature = "mysql")]
+            TransactionImpl::MySql(inner) => inner
+                .fetch_all::<T>(statement)
+                .await?
+                .into_iter()
+                .map(Row::MySql)
+                .collect(),
+        };
+
+        Ok(result)
+    }
+
+    async fn execute_statement<T>(&mut self, statement: &T) -> Result<StatementResult>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        let result = match &mut self.inner {
+            #[cfg(feature = "sqlite")]
+            TransactionImpl::Sqlite(inner) => inner.execute_statement::<T>(statement).await?,
+            #[cfg(feature = "postgres")]
+            TransactionImpl::Postgres(inner) => inner.execute_statement::<T>(statement).await?,
+            #[cfg(feature = "mysql")]
+            TransactionImpl::MySql(inner) => inner.execute_statement::<T>(statement).await?,
+        };
+
+        Ok(result)
+    }
+}
+
+#[async_trait]
+impl DatabaseBackend for Transaction<'_> {
+    async fn insert_or_update<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        Database::insert_or_update_generic(self, data, true).await
+    }
+
+    async fn insert<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        Database::insert_or_update_generic(self, data, false).await
+    }
+
+    async fn update<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        Database::update_generic(self, data).await
+    }
+
+    async fn bulk_insert<T: Model>(&mut self, data: &mut [T]) -> Result<()> {
+        Database::bulk_insert_generic(self, data, false).await
+    }
+
+    async fn bulk_insert_or_update<T: Model>(&mut self, data: &mut [T]) -> Result<()> {
+        Database::bulk_insert_generic(self, data, true).await
+    }
+
+    async fn query<T: Model>(&mut self, query: &Query<T>) -> Result<Vec<T>> {
+        Database::query_generic(self, query).await
+    }
+
+    async fn get<T: Model>(&mut self, query: &Query<T>) -> Result<Option<T>> {
+        Database::get_generic(self, query).await
+    }
+
+    async fn exists<T: Model>(&mut self, query: &Query<T>) -> Result<bool> {
+        Database::exists_generic(self, query).await
+    }
+
+    async fn delete<T: Model>(&mut self, query: &Query<T>) -> Result<StatementResult> {
+        let mut delete = sea_query::Query::delete();
+        delete.from_table(T::TABLE_NAME);
+        query.add_filter_to_statement(&mut delete);
+
+        self.execute_statement(&delete).await
+    }
+}
+
+#[async_trait]
+trait RawExecutor {
+    async fn fetch_option<T>(&mut self, statement: &T) -> Result<Option<Row>>
+    where
+        T: SqlxBinder + Send + Sync;
+
+    async fn fetch_all<T>(&mut self, statement: &T) -> Result<Vec<Row>>
+    where
+        T: SqlxBinder + Send + Sync;
+
+    async fn execute_statement<T>(&mut self, statement: &T) -> Result<StatementResult>
+    where
+        T: SqlxBinder + Send + Sync;
+
+    fn supports_returning(&self) -> bool;
+
+    fn max_params(&self) -> usize;
+
+    async fn begin_transaction<'a>(&'a mut self) -> Result<Transaction<'a>>;
+}
+
+#[async_trait]
+impl RawExecutor for &Database {
+    async fn fetch_option<T>(&mut self, statement: &T) -> Result<Option<Row>>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        let result = match &*self.inner {
+            #[cfg(feature = "sqlite")]
+            DatabaseImpl::Sqlite(inner) => inner.fetch_option(statement).await?.map(Row::Sqlite),
+            #[cfg(feature = "postgres")]
+            DatabaseImpl::Postgres(inner) => {
+                inner.fetch_option(statement).await?.map(Row::Postgres)
+            }
+            #[cfg(feature = "mysql")]
+            DatabaseImpl::MySql(inner) => inner.fetch_option(statement).await?.map(Row::MySql),
+        };
+
+        Ok(result)
+    }
+
+    async fn fetch_all<T>(&mut self, statement: &T) -> Result<Vec<Row>>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        let result = match &*self.inner {
+            #[cfg(feature = "sqlite")]
+            DatabaseImpl::Sqlite(inner) => inner
+                .fetch_all(statement)
+                .await?
+                .into_iter()
+                .map(Row::Sqlite)
+                .collect(),
+            #[cfg(feature = "postgres")]
+            DatabaseImpl::Postgres(inner) => inner
+                .fetch_all(statement)
+                .await?
+                .into_iter()
+                .map(Row::Postgres)
+                .collect(),
+            #[cfg(feature = "mysql")]
+            DatabaseImpl::MySql(inner) => inner
+                .fetch_all(statement)
+                .await?
+                .into_iter()
+                .map(Row::MySql)
+                .collect(),
+        };
+
+        Ok(result)
+    }
+
+    async fn execute_statement<T>(&mut self, statement: &T) -> Result<StatementResult>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        let result = match &*self.inner {
+            #[cfg(feature = "sqlite")]
+            DatabaseImpl::Sqlite(inner) => inner.execute_statement(statement).await?,
+            #[cfg(feature = "postgres")]
+            DatabaseImpl::Postgres(inner) => inner.execute_statement(statement).await?,
+            #[cfg(feature = "mysql")]
+            DatabaseImpl::MySql(inner) => inner.execute_statement(statement).await?,
+        };
+
+        Ok(result)
+    }
+
+    fn supports_returning(&self) -> bool {
+        (*self).supports_returning()
+    }
+
+    fn max_params(&self) -> usize {
+        match &*self.inner {
+            #[cfg(feature = "sqlite")]
+            DatabaseImpl::Sqlite(_) => 32766,
+            #[cfg(feature = "postgres")]
+            DatabaseImpl::Postgres(_) => 65535,
+            #[cfg(feature = "mysql")]
+            DatabaseImpl::MySql(_) => 65535,
+        }
+    }
+
+    async fn begin_transaction<'a>(&'a mut self) -> Result<Transaction<'a>> {
+        self.begin().await
+    }
+}
+
+#[async_trait]
+impl RawExecutor for Transaction<'_> {
+    async fn fetch_option<T>(&mut self, statement: &T) -> Result<Option<Row>>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        self.fetch_option::<T>(statement).await
+    }
+
+    async fn fetch_all<T>(&mut self, statement: &T) -> Result<Vec<Row>>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        self.fetch_all::<T>(statement).await
+    }
+
+    async fn execute_statement<T>(&mut self, statement: &T) -> Result<StatementResult>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        self.execute_statement::<T>(statement).await
+    }
+
+    fn supports_returning(&self) -> bool {
+        match &self.inner {
+            #[cfg(feature = "sqlite")]
+            TransactionImpl::Sqlite(_) => true,
+            #[cfg(feature = "postgres")]
+            TransactionImpl::Postgres(_) => true,
+            #[cfg(feature = "mysql")]
+            TransactionImpl::MySql(_) => false,
+        }
+    }
+
+    fn max_params(&self) -> usize {
+        match &self.inner {
+            #[cfg(feature = "sqlite")]
+            TransactionImpl::Sqlite(_) => 32766,
+            #[cfg(feature = "postgres")]
+            TransactionImpl::Postgres(_) => 65535,
+            #[cfg(feature = "mysql")]
+            TransactionImpl::MySql(_) => 65535,
+        }
+    }
+
+    async fn begin_transaction<'b>(&'b mut self) -> Result<Transaction<'b>> {
+        self.begin().await
+    }
+}
+
+#[async_trait]
+impl<E: RawExecutor + Send> RawExecutor for &mut E {
+    async fn fetch_option<T>(&mut self, statement: &T) -> Result<Option<Row>>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        (**self).fetch_option::<T>(statement).await
+    }
+
+    async fn fetch_all<T>(&mut self, statement: &T) -> Result<Vec<Row>>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        (**self).fetch_all::<T>(statement).await
+    }
+
+    async fn execute_statement<T>(&mut self, statement: &T) -> Result<StatementResult>
+    where
+        T: SqlxBinder + Send + Sync,
+    {
+        (**self).execute_statement::<T>(statement).await
+    }
+
+    fn supports_returning(&self) -> bool {
+        (**self).supports_returning()
+    }
+
+    fn max_params(&self) -> usize {
+        (**self).max_params()
+    }
+
+    async fn begin_transaction<'a>(&'a mut self) -> Result<Transaction<'a>> {
+        (**self).begin_transaction().await
+    }
+}
+
 /// A database connection structure that holds the connection to the database.
 ///
 /// It is used to execute queries and interact with the database. The connection
@@ -893,6 +1278,30 @@ impl Database {
         }
     }
 
+    /// Starts a new database transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction could not be started.
+    pub async fn begin(&self) -> Result<Transaction<'_>> {
+        let inner = match &*self.inner {
+            #[cfg(feature = "sqlite")]
+            DatabaseImpl::Sqlite(inner) => {
+                TransactionImpl::Sqlite(TransactionSqlite::new(inner.begin().await?))
+            }
+            #[cfg(feature = "postgres")]
+            DatabaseImpl::Postgres(inner) => {
+                TransactionImpl::Postgres(TransactionPostgres::new(inner.begin().await?))
+            }
+            #[cfg(feature = "mysql")]
+            DatabaseImpl::MySql(inner) => {
+                TransactionImpl::MySql(TransactionMySql::new(inner.begin().await?))
+            }
+        };
+
+        Ok(Transaction { inner })
+    }
+
     /// Inserts a new row into the database.
     ///
     /// # Errors
@@ -903,7 +1312,7 @@ impl Database {
     pub async fn insert<T: Model>(&self, data: &mut T) -> Result<()> {
         let span = span!(Level::TRACE, "insert", table = %T::TABLE_NAME);
 
-        Self::insert_or_update_impl(self, data, false)
+        Self::insert_or_update_generic(self, data, false)
             .instrument(span)
             .await
     }
@@ -923,12 +1332,16 @@ impl Database {
             table = %T::TABLE_NAME
         );
 
-        Self::insert_or_update_impl(self, data, true)
+        Self::insert_or_update_generic(self, data, true)
             .instrument(span)
             .await
     }
 
-    async fn insert_or_update_impl<T: Model>(&self, data: &mut T, update: bool) -> Result<()> {
+    async fn insert_or_update_generic<T: Model, E: RawExecutor>(
+        mut executor: E,
+        data: &mut T,
+        update: bool,
+    ) -> Result<()> {
         let column_identifiers = T::COLUMNS
             .iter()
             .map(|column| Identifier::from(column.name.as_str()));
@@ -979,16 +1392,17 @@ impl Database {
         }
 
         if auto_col_ids.is_empty() {
-            self.execute_statement(&insert_statement).await?;
+            executor.execute_statement(&insert_statement).await?;
         } else {
-            let row = if self.supports_returning() {
+            let row = if executor.supports_returning() {
                 insert_statement.returning(ReturningClause::Columns(auto_col_identifiers));
 
-                self.fetch_option(&insert_statement)
+                executor
+                    .fetch_option(&insert_statement)
                     .await?
                     .expect("query should return the primary key")
             } else {
-                let result = self.execute_statement(&insert_statement).await?;
+                let result = executor.execute_statement(&insert_statement).await?;
                 let row_id = result
                     .last_inserted_row_id
                     .expect("expected last inserted row ID if RETURNING clause is not supported");
@@ -997,7 +1411,7 @@ impl Database {
                     .columns(auto_col_identifiers)
                     .and_where(sea_query::Expr::col(T::PRIMARY_KEY_NAME).eq(row_id))
                     .to_owned();
-                self.fetch_option(&query).await?.expect(
+                executor.fetch_option(&query).await?.expect(
                     "expected a row returned from a SELECT if RETURNING clause is not supported",
                 )
             };
@@ -1031,10 +1445,10 @@ impl Database {
             primary_key = ?data.primary_key().to_db_field_value(),
         );
 
-        Self::update_impl(self, data).instrument(span).await
+        Self::update_generic(self, data).instrument(span).await
     }
 
-    async fn update_impl<T: Model>(&self, data: &mut T) -> Result<()> {
+    async fn update_generic<T: Model, E: RawExecutor>(mut executor: E, data: &mut T) -> Result<()> {
         let column_identifiers = T::COLUMNS
             .iter()
             .map(|column| Identifier::from(column.name.as_str()));
@@ -1068,7 +1482,7 @@ impl Database {
             .and_where(sea_query::Expr::col(T::PRIMARY_KEY_NAME).eq(primary_key.clone()))
             .to_owned();
 
-        let result = self.execute_statement(&update_statement).await?;
+        let result = executor.execute_statement(&update_statement).await?;
         if result.rows_affected == RowsNum(0) {
             return Err(DatabaseError::RecordNotFound { primary_key });
         }
@@ -1088,7 +1502,7 @@ impl Database {
     pub async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()> {
         let span = span!(Level::TRACE, "bulk_insert", table = %T::TABLE_NAME, count = data.len());
 
-        Self::bulk_insert_impl(self, data, false)
+        Self::bulk_insert_generic(self, data, false)
             .instrument(span)
             .await
     }
@@ -1104,37 +1518,26 @@ impl Database {
     pub async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()> {
         let span = span!(
             Level::TRACE,
-            "bulk_insert_or_update",
+            "insert_or_update",
             table = %T::TABLE_NAME,
             count = data.len()
         );
 
-        Self::bulk_insert_impl(self, data, true)
+        Self::bulk_insert_generic(self, data, true)
             .instrument(span)
             .await
     }
 
-    async fn bulk_insert_impl<T: Model>(&self, data: &mut [T], update: bool) -> Result<()> {
-        // TODO: add transactions when implemented
-
+    async fn bulk_insert_generic<T: Model, E: RawExecutor + Send>(
+        mut executor: E,
+        data: &mut [T],
+        update: bool,
+    ) -> Result<()> {
         if data.is_empty() {
             return Ok(());
         }
 
-        let max_params = match &*self.inner {
-            // https://sqlite.org/limits.html#max_variable_number
-            // Assuming SQLite > 3.32.0 (2020-05-22)
-            #[cfg(feature = "sqlite")]
-            DatabaseImpl::Sqlite(_) => 32766,
-            // https://www.postgresql.org/docs/18/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-BIND
-            // The number of parameter format codes is Int16
-            #[cfg(feature = "postgres")]
-            DatabaseImpl::Postgres(_) => 65535,
-            // https://dev.mysql.com/doc/dev/mysql-server/9.5.0/page_protocol_com_stmt_prepare.html#sect_protocol_com_stmt_prepare_response
-            // The number of parameter returned in the COM_STMT_PREPARE_OK packet is int<2>
-            #[cfg(feature = "mysql")]
-            DatabaseImpl::MySql(_) => 65535,
-        };
+        let max_params = executor.max_params();
 
         let column_identifiers: Vec<_> = T::COLUMNS
             .iter()
@@ -1186,9 +1589,10 @@ impl Database {
             return Err(DatabaseError::BulkInsertNoValueColumns);
         };
 
-        for chunk in data.chunks_mut(batch_size) {
-            self.bulk_insert_chunk(
-                chunk,
+        if data.len() <= batch_size {
+            Self::bulk_insert_chunk_generic(
+                executor,
+                data,
                 update,
                 &value_identifiers,
                 &value_column_indices,
@@ -1196,13 +1600,28 @@ impl Database {
                 &auto_col_identifiers,
             )
             .await?;
+        } else {
+            let mut transaction = executor.begin_transaction().await?;
+            for chunk in data.chunks_mut(batch_size) {
+                Self::bulk_insert_chunk_generic(
+                    &mut transaction,
+                    chunk,
+                    update,
+                    &value_identifiers,
+                    &value_column_indices,
+                    &auto_col_ids,
+                    &auto_col_identifiers,
+                )
+                .await?;
+            }
+            transaction.commit().await?;
         }
 
         Ok(())
     }
 
-    async fn bulk_insert_chunk<T: Model>(
-        &self,
+    async fn bulk_insert_chunk_generic<T: Model, E: RawExecutor + Send>(
+        mut executor: E,
         chunk: &mut [T],
         update: bool,
         value_identifiers: &[Identifier],
@@ -1250,12 +1669,12 @@ impl Database {
         }
 
         if auto_col_ids.is_empty() {
-            self.execute_statement(&insert_statement).await?;
-        } else if self.supports_returning() {
+            executor.execute_statement(&insert_statement).await?;
+        } else if executor.supports_returning() {
             // PostgreSQL/SQLite: Use RETURNING clause
             insert_statement.returning(ReturningClause::Columns(auto_col_identifiers.to_vec()));
 
-            let rows = self.fetch_all(&insert_statement).await?;
+            let rows = executor.fetch_all(&insert_statement).await?;
             if rows.len() != chunk.len() {
                 return Err(DatabaseError::BulkInsertReturnDataInvalid {
                     expected: chunk.len(),
@@ -1268,7 +1687,7 @@ impl Database {
             }
         } else {
             // MySQL: Use LAST_INSERT_ID() and fetch rows
-            let result = self.execute_statement(&insert_statement).await?;
+            let result = executor.execute_statement(&insert_statement).await?;
             let first_id = result.last_inserted_row_id.ok_or_else(|| {
                 DatabaseError::BulkInsertReturnDataInvalid {
                     expected: chunk.len(),
@@ -1292,7 +1711,7 @@ impl Database {
                 .order_by(T::PRIMARY_KEY_NAME, sea_query::Order::Asc)
                 .to_owned();
 
-            let rows = self.fetch_all(&query).await?;
+            let rows = executor.fetch_all(&query).await?;
             if rows.len() != chunk.len() {
                 return Err(DatabaseError::BulkInsertReturnDataInvalid {
                     expected: chunk.len(),
@@ -1327,6 +1746,13 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
+        Self::query_generic(self, query).await
+    }
+
+    async fn query_generic<T: Model, E: RawExecutor>(
+        mut executor: E,
+        query: &Query<T>,
+    ) -> Result<Vec<T>> {
         let columns_to_get: Vec<_> = T::COLUMNS.iter().map(|column| column.name).collect();
         let mut select = sea_query::Query::select();
         select.columns(columns_to_get).from(T::TABLE_NAME);
@@ -1334,7 +1760,7 @@ impl Database {
         query.add_limit_to_statement(&mut select);
         query.add_offset_to_statement(&mut select);
 
-        let rows = self.fetch_all(&select).await?;
+        let rows = executor.fetch_all(&select).await?;
         let result = rows.into_iter().map(T::from_db).collect::<Result<_>>()?;
 
         Ok(result)
@@ -1353,13 +1779,20 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>> {
+        Self::get_generic(self, query).await
+    }
+
+    async fn get_generic<T: Model, E: RawExecutor>(
+        mut executor: E,
+        query: &Query<T>,
+    ) -> Result<Option<T>> {
         let columns_to_get: Vec<_> = T::COLUMNS.iter().map(|column| column.name).collect();
         let mut select = sea_query::Query::select();
         select.columns(columns_to_get).from(T::TABLE_NAME);
         query.add_filter_to_statement(&mut select);
         select.limit(1);
 
-        let row = self.fetch_option(&select).await?;
+        let row = executor.fetch_option(&select).await?;
 
         let result = match row {
             Some(row) => Some(T::from_db(row)?),
@@ -1380,12 +1813,19 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool> {
+        Self::exists_generic(self, query).await
+    }
+
+    async fn exists_generic<T: Model, E: RawExecutor>(
+        mut executor: E,
+        query: &Query<T>,
+    ) -> Result<bool> {
         let mut select = sea_query::Query::select();
         select.expr(sea_query::Expr::value(1)).from(T::TABLE_NAME);
         query.add_filter_to_statement(&mut select);
         select.limit(1);
 
-        let rows = self.fetch_option(&select).await?;
+        let rows = executor.fetch_option(&select).await?;
 
         Ok(rows.is_some())
     }
@@ -1402,11 +1842,18 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult> {
+        Self::delete_generic(self, query).await
+    }
+
+    async fn delete_generic<T: Model, E: RawExecutor>(
+        mut executor: E,
+        query: &Query<T>,
+    ) -> Result<StatementResult> {
         let mut delete = sea_query::Query::delete();
         delete.from_table(T::TABLE_NAME);
         query.add_filter_to_statement(&mut delete);
 
-        self.execute_statement(&delete).await
+        executor.execute_statement(&delete).await
     }
 
     /// Executes a raw SQL query.
@@ -1480,24 +1927,6 @@ impl Database {
         Ok(result)
     }
 
-    async fn fetch_option<T>(&self, statement: &T) -> Result<Option<Row>>
-    where
-        T: SqlxBinder + Send + Sync,
-    {
-        let result = match &*self.inner {
-            #[cfg(feature = "sqlite")]
-            DatabaseImpl::Sqlite(inner) => inner.fetch_option(statement).await?.map(Row::Sqlite),
-            #[cfg(feature = "postgres")]
-            DatabaseImpl::Postgres(inner) => {
-                inner.fetch_option(statement).await?.map(Row::Postgres)
-            }
-            #[cfg(feature = "mysql")]
-            DatabaseImpl::MySql(inner) => inner.fetch_option(statement).await?.map(Row::MySql),
-        };
-
-        Ok(result)
-    }
-
     fn supports_returning(&self) -> bool {
         match &*self.inner {
             #[cfg(feature = "sqlite")]
@@ -1507,53 +1936,6 @@ impl Database {
             #[cfg(feature = "mysql")]
             DatabaseImpl::MySql(_) => false,
         }
-    }
-
-    async fn fetch_all<T>(&self, statement: &T) -> Result<Vec<Row>>
-    where
-        T: SqlxBinder + Send + Sync,
-    {
-        let result = match &*self.inner {
-            #[cfg(feature = "sqlite")]
-            DatabaseImpl::Sqlite(inner) => inner
-                .fetch_all(statement)
-                .await?
-                .into_iter()
-                .map(Row::Sqlite)
-                .collect(),
-            #[cfg(feature = "postgres")]
-            DatabaseImpl::Postgres(inner) => inner
-                .fetch_all(statement)
-                .await?
-                .into_iter()
-                .map(Row::Postgres)
-                .collect(),
-            #[cfg(feature = "mysql")]
-            DatabaseImpl::MySql(inner) => inner
-                .fetch_all(statement)
-                .await?
-                .into_iter()
-                .map(Row::MySql)
-                .collect(),
-        };
-
-        Ok(result)
-    }
-
-    async fn execute_statement<T>(&self, statement: &T) -> Result<StatementResult>
-    where
-        T: SqlxBinder + Send + Sync,
-    {
-        let result = match &*self.inner {
-            #[cfg(feature = "sqlite")]
-            DatabaseImpl::Sqlite(inner) => inner.execute_statement(statement).await?,
-            #[cfg(feature = "postgres")]
-            DatabaseImpl::Postgres(inner) => inner.execute_statement(statement).await?,
-            #[cfg(feature = "mysql")]
-            DatabaseImpl::MySql(inner) => inner.execute_statement(statement).await?,
-        };
-
-        Ok(result)
     }
 
     async fn execute_schema<T: SchemaStatementBuilder>(
@@ -1591,7 +1973,7 @@ impl ColumnTypeMapper for Database {
 /// This trait is used to provide a backend for the database.
 #[cfg_attr(test, automock)]
 #[async_trait]
-pub trait DatabaseBackend: Send + Sync {
+pub trait DatabaseBackend: Send {
     /// Inserts a new row into the database, or updates an existing row if it
     /// already exists.
     ///
@@ -1600,7 +1982,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()>;
+    async fn insert_or_update<T: Model>(&mut self, data: &mut T) -> Result<()>;
 
     /// Inserts a new row into the database.
     ///
@@ -1609,7 +1991,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn insert<T: Model>(&self, data: &mut T) -> Result<()>;
+    async fn insert<T: Model>(&mut self, data: &mut T) -> Result<()>;
 
     /// Updates an existing row in the database.
     ///
@@ -1618,7 +2000,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be updated in the
     /// database, for instance because the migrations haven't been applied, or
     /// there was a problem with the database connection.
-    async fn update<T: Model>(&self, data: &mut T) -> Result<()>;
+    async fn update<T: Model>(&mut self, data: &mut T) -> Result<()>;
 
     /// Bulk inserts multiple rows into the database.
     ///
@@ -1627,7 +2009,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the rows could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()>;
+    async fn bulk_insert<T: Model>(&mut self, data: &mut [T]) -> Result<()>;
 
     /// Bulk inserts multiple rows into the database, or updates existing rows
     /// if they already exist.
@@ -1637,7 +2019,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the rows could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()>;
+    async fn bulk_insert_or_update<T: Model>(&mut self, data: &mut [T]) -> Result<()>;
 
     /// Executes a query and returns the results converted to the model type.
     ///
@@ -1650,7 +2032,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// generated or applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>>;
+    async fn query<T: Model>(&mut self, query: &Query<T>) -> Result<Vec<T>>;
 
     /// Returns the first row that matches the given query. If no rows match the
     /// query, returns `None`.
@@ -1664,7 +2046,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>>;
+    async fn get<T: Model>(&mut self, query: &Query<T>) -> Result<Option<T>>;
 
     /// Returns whether a row exists that matches the given query.
     ///
@@ -1677,7 +2059,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool>;
+    async fn exists<T: Model>(&mut self, query: &Query<T>) -> Result<bool>;
 
     /// Deletes all rows that match the given query.
     ///
@@ -1690,45 +2072,84 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult>;
+    async fn delete<T: Model>(&mut self, query: &Query<T>) -> Result<StatementResult>;
 }
 
 #[async_trait]
-impl DatabaseBackend for Database {
-    async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::insert_or_update(self, data).await
+impl<DB: DatabaseBackend + ?Sized + Send> DatabaseBackend for &mut DB {
+    async fn insert_or_update<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        (**self).insert_or_update(data).await
     }
 
-    async fn insert<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::insert(self, data).await
+    async fn insert<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        (**self).insert(data).await
     }
 
-    async fn update<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::update(self, data).await
+    async fn update<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        (**self).update(data).await
     }
 
-    async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()> {
-        Database::bulk_insert(self, data).await
+    async fn bulk_insert<T: Model>(&mut self, data: &mut [T]) -> Result<()> {
+        (**self).bulk_insert(data).await
     }
 
-    async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()> {
-        Database::bulk_insert_or_update(self, data).await
+    async fn bulk_insert_or_update<T: Model>(&mut self, data: &mut [T]) -> Result<()> {
+        (**self).bulk_insert_or_update(data).await
     }
 
-    async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
-        Database::query(self, query).await
+    async fn query<T: Model>(&mut self, query: &Query<T>) -> Result<Vec<T>> {
+        (**self).query(query).await
     }
 
-    async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>> {
-        Database::get(self, query).await
+    async fn get<T: Model>(&mut self, query: &Query<T>) -> Result<Option<T>> {
+        (**self).get(query).await
     }
 
-    async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool> {
-        Database::exists(self, query).await
+    async fn exists<T: Model>(&mut self, query: &Query<T>) -> Result<bool> {
+        (**self).exists(query).await
     }
 
-    async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult> {
-        Database::delete(self, query).await
+    async fn delete<T: Model>(&mut self, query: &Query<T>) -> Result<StatementResult> {
+        (**self).delete(query).await
+    }
+}
+
+#[async_trait]
+impl DatabaseBackend for &Database {
+    async fn insert_or_update<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        Database::insert_or_update_generic(*self, data, true).await
+    }
+
+    async fn insert<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        Database::insert_or_update_generic(*self, data, false).await
+    }
+
+    async fn update<T: Model>(&mut self, data: &mut T) -> Result<()> {
+        Database::update_generic(*self, data).await
+    }
+
+    async fn bulk_insert<T: Model>(&mut self, data: &mut [T]) -> Result<()> {
+        Database::bulk_insert_generic(*self, data, false).await
+    }
+
+    async fn bulk_insert_or_update<T: Model>(&mut self, data: &mut [T]) -> Result<()> {
+        Database::bulk_insert_generic(*self, data, true).await
+    }
+
+    async fn query<T: Model>(&mut self, query: &Query<T>) -> Result<Vec<T>> {
+        Database::query_generic(*self, query).await
+    }
+
+    async fn get<T: Model>(&mut self, query: &Query<T>) -> Result<Option<T>> {
+        Database::get_generic(*self, query).await
+    }
+
+    async fn exists<T: Model>(&mut self, query: &Query<T>) -> Result<bool> {
+        Database::exists_generic(*self, query).await
+    }
+
+    async fn delete<T: Model>(&mut self, query: &Query<T>) -> Result<StatementResult> {
+        Database::delete_generic(*self, query).await
     }
 }
 

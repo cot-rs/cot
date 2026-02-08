@@ -99,7 +99,7 @@ impl DatabaseUser {
     /// # }
     /// ```
     pub async fn create_user<DB: DatabaseBackend, T: Into<String>, U: Into<Password>>(
-        db: &DB,
+        mut db: DB,
         username: T,
         password: U,
     ) -> Result<Self> {
@@ -110,7 +110,9 @@ impl DatabaseUser {
         })?;
 
         let mut user = Self::new(Auto::auto(), username, &password.into());
-        user.insert(db).await.map_err(AuthError::backend_error)?;
+        user.insert(&mut db)
+            .await
+            .map_err(AuthError::backend_error)?;
 
         Ok(user)
     }
@@ -155,9 +157,9 @@ impl DatabaseUser {
     /// #     Ok(())
     /// # }
     /// ```
-    pub async fn get_by_id<DB: DatabaseBackend>(db: &DB, id: i64) -> Result<Option<Self>> {
+    pub async fn get_by_id<DB: DatabaseBackend>(mut db: DB, id: i64) -> Result<Option<Self>> {
         let db_user = query!(DatabaseUser, $id == id)
-            .get(db)
+            .get(&mut db)
             .await
             .map_err(AuthError::backend_error)?;
 
@@ -201,14 +203,14 @@ impl DatabaseUser {
     /// # }
     /// ```
     pub async fn get_by_username<DB: DatabaseBackend>(
-        db: &DB,
+        mut db: DB,
         username: &str,
     ) -> Result<Option<Self>> {
         let username = LimitedString::<MAX_USERNAME_LENGTH>::new(username).map_err(|_| {
             AuthError::backend_error(CreateUserError::UsernameTooLong(username.len()))
         })?;
         let db_user = query!(DatabaseUser, $username == username)
-            .get(db)
+            .get(&mut db)
             .await
             .map_err(AuthError::backend_error)?;
 
@@ -221,7 +223,7 @@ impl DatabaseUser {
     ///
     /// Returns an error if there was an error querying the database.
     pub async fn authenticate<DB: DatabaseBackend>(
-        db: &DB,
+        mut db: DB,
         credentials: &DatabaseUserCredentials,
     ) -> Result<Option<Self>> {
         let username = credentials.username();
@@ -230,7 +232,7 @@ impl DatabaseUser {
                 AuthError::backend_error(CreateUserError::UsernameTooLong(username.len()))
             })?;
         let user = query!(DatabaseUser, $username == username_limited)
-            .get(db)
+            .get(&mut db)
             .await
             .map_err(AuthError::backend_error)?;
 
@@ -240,7 +242,7 @@ impl DatabaseUser {
                 PasswordVerificationResult::Ok => Ok(Some(user)),
                 PasswordVerificationResult::OkObsolete(new_hash) => {
                     user.password = new_hash;
-                    user.save(db).await.map_err(AuthError::backend_error)?;
+                    user.save(&mut db).await.map_err(AuthError::backend_error)?;
                     Ok(Some(user))
                 }
                 PasswordVerificationResult::Invalid => Ok(None),
@@ -624,7 +626,7 @@ mod tests {
         let username = "testuser".to_string();
         let password = Password::new("password123");
 
-        let user = DatabaseUser::create_user(&mock_db, username.clone(), &password)
+        let user = DatabaseUser::create_user(&mut mock_db, username.clone(), &password)
             .await
             .unwrap();
         assert_eq!(user.username(), username);
@@ -644,7 +646,7 @@ mod tests {
             .expect_get::<DatabaseUser>()
             .returning(move |_| Ok(Some(user.clone())));
 
-        let result = DatabaseUser::get_by_id(&mock_db, 1).await.unwrap();
+        let result = DatabaseUser::get_by_id(&mut mock_db, 1).await.unwrap();
         assert!(result.is_some());
         assert_eq!(result.unwrap().username(), "testuser");
     }
@@ -665,7 +667,7 @@ mod tests {
 
         let credentials =
             DatabaseUserCredentials::new("testuser".to_string(), Password::new("password123"));
-        let result = DatabaseUser::authenticate(&mock_db, &credentials)
+        let result = DatabaseUser::authenticate(&mut mock_db, &credentials)
             .await
             .unwrap();
         assert!(result.is_some());
@@ -683,7 +685,7 @@ mod tests {
 
         let credentials =
             DatabaseUserCredentials::new("testuser".to_string(), Password::new("password123"));
-        let result = DatabaseUser::authenticate(&mock_db, &credentials)
+        let result = DatabaseUser::authenticate(&mut mock_db, &credentials)
             .await
             .unwrap();
         assert!(result.is_none());
@@ -705,7 +707,7 @@ mod tests {
 
         let credentials =
             DatabaseUserCredentials::new("testuser".to_string(), Password::new("invalid"));
-        let result = DatabaseUser::authenticate(&mock_db, &credentials)
+        let result = DatabaseUser::authenticate(&mut mock_db, &credentials)
             .await
             .unwrap();
         assert!(result.is_none());

@@ -189,6 +189,33 @@ impl HtmlTag {
         input
     }
 
+    /// Creates a new `HtmlTag` instance for a datalist element.
+    ///
+    /// # Examples
+    /// ```
+    /// use cot::html::HtmlTag;
+    /// let data_list = HtmlTag::data_list(vec!["Option 1", "Option 2"], "my-datalist");
+    /// let rendered = data_list.render();
+    /// assert_eq!(rendered.as_str(), "<datalist id=\"my-datalist\"><option value=\"Option 1\">Option 1</option><option value=\"Option 2\">Option 2</option></datalist>");
+    /// ```
+    #[must_use]
+    pub fn data_list<L: Into<Vec<String>>>(list: L, id: &str) -> Self {
+        let mut data_list = Self::new("datalist");
+        data_list.attr("id", id);
+
+        let mut options: Vec<HtmlNode> = Vec::new();
+
+        for l in list.into() {
+            let mut option = HtmlTag::new("option");
+            option.attr("value", &l);
+            option.push_str(&l);
+            options.push(HtmlNode::Tag(option));
+        }
+
+        data_list.children = options;
+        data_list
+    }
+
     /// Adds an attribute to the HTML tag.
     ///
     /// # Safety

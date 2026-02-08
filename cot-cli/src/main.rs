@@ -25,6 +25,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Migration(cmd) => match cmd {
             MigrationCommands::List(args) => handlers::handle_migration_list(args),
             MigrationCommands::Make(args) => handlers::handle_migration_make(args),
+            MigrationCommands::New(args) => handlers::handle_migration_new(args),
         },
     }
 }

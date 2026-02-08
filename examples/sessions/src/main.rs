@@ -1,15 +1,18 @@
-use askama::Template;
 use cot::cli::CliMetadata;
-use cot::config::ProjectConfig;
+use cot::config::{
+    DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig, SessionStoreConfig,
+    SessionStoreTypeConfig,
+};
 use cot::form::Form;
 use cot::html::Html;
 use cot::middleware::SessionMiddleware;
-use cot::project::{MiddlewareContext, RegisterAppsContext};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::Request;
 use cot::response::{IntoResponse, Response};
 use cot::router::{Route, Router, Urls};
 use cot::session::Session;
-use cot::{App, AppBuilder, BoxedHandler, Project, reverse_redirect};
+use cot::session::db::SessionApp;
+use cot::{App, AppBuilder, Project, Template, reverse_redirect};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
@@ -25,7 +28,7 @@ struct NameTemplate<'a> {
 
 #[derive(Debug, Form)]
 struct NameForm {
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     name: String,
 }
 
@@ -80,18 +83,39 @@ impl Project for SessionsProject {
     }
 
     fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
-        Ok(ProjectConfig::dev_default())
+        Ok(ProjectConfig::builder()
+            .database(
+                DatabaseConfig::builder()
+                    .url("sqlite://example-session.sqlite3?mode=rwc")
+                    .build(),
+            )
+            .middlewares(
+                MiddlewareConfig::builder()
+                    .session(
+                        SessionMiddlewareConfig::builder()
+                            .secure(false)
+                            .store(
+                                SessionStoreConfig::builder()
+                                    .store_type(SessionStoreTypeConfig::Database)
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build())
     }
 
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views(HelloApp, "");
+        apps.register(SessionApp::new());
     }
 
     fn middlewares(
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(SessionMiddleware::from_context(context))
             .build()

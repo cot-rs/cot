@@ -18,8 +18,10 @@ mod sea_query_db;
 use std::fmt::{Display, Formatter, Write};
 use std::hash::Hash;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use cot_core::error::impl_into_cot_error;
 pub use cot_macros::{model, query};
 use derive_more::{Debug, Deref, Display};
 #[cfg(test)]
@@ -27,7 +29,7 @@ use mockall::automock;
 use query::Query;
 pub use relations::{ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use sea_query::{
-    Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
+    ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
 };
 use sea_query_binder::{SqlxBinder, SqlxValues};
 use sqlx::{Type, TypeInfo};
@@ -42,19 +44,21 @@ use crate::db::impl_postgres::{DatabasePostgres, PostgresRow, PostgresValueRef};
 use crate::db::impl_sqlite::{DatabaseSqlite, SqliteRow, SqliteValueRef};
 use crate::db::migrations::ColumnTypeMapper;
 
+const ERROR_PREFIX: &str = "database error:";
 /// An error that can occur when interacting with the database.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum DatabaseError {
     /// Database engine error.
-    #[error("Database engine error: {0}")]
+    #[error("{ERROR_PREFIX} database engine error: {0}")]
     DatabaseEngineError(#[from] sqlx::Error),
     /// Error when building query.
-    #[error("Error when building query: {0}")]
+    #[error("{ERROR_PREFIX} error when building query: {0}")]
     QueryBuildingError(#[from] sea_query::error::Error),
     /// Type mismatch in database value.
     #[error(
-        "Type mismatch in database value: expected `{expected}`, found `{found}`. Perhaps migration is needed."
+        "{ERROR_PREFIX} type mismatch in database value: expected `{expected}`, found `{found}`. \
+        Perhaps a migration is needed"
     )]
     TypeMismatch {
         /// The expected type.
@@ -63,22 +67,56 @@ pub enum DatabaseError {
         found: String,
     },
     /// Error when decoding database value.
-    #[error("Error when decoding database value: {0}")]
+    #[error("{ERROR_PREFIX} error when decoding database value: {0}")]
     ValueDecode(Box<dyn std::error::Error + 'static + Send + Sync>),
     /// Error when applying migrations.
-    #[error("Error when applying migrations: {0}")]
+    #[error("{ERROR_PREFIX} error when applying migrations: {0}")]
     MigrationError(#[from] migrations::MigrationEngineError),
-    /// An object could not be found in the database.
-    #[error("Record with primary key `{primary_key}` not found in the database")]
+    /// A record could not be found in the database.
+    #[error("{ERROR_PREFIX} record with primary key `{primary_key}` not found in the database")]
     RecordNotFound {
         /// The primary key of the record that was not found.
         primary_key: DbValue,
     },
     /// Foreign Key could not be retrieved from the database because the record
     /// was not found.
-    #[error("Error retrieving a Foreign Key from the database: record not found")]
+    #[error("{ERROR_PREFIX} error retrieving a Foreign Key from the database: record not found")]
     ForeignKeyNotFound,
+    /// Error when a unique constraint is violated in the database.
+    #[error("{ERROR_PREFIX} unique constraint violation")]
+    UniqueViolation,
+    /// Single model has more fields than database parameter limit.
+    #[error(
+        "{ERROR_PREFIX} model has {field_count} fields which exceeds the database parameter limit \
+        of {limit}"
+    )]
+    BulkInsertModelTooLarge {
+        /// The number of fields in the model.
+        field_count: usize,
+        /// The database parameter limit.
+        limit: usize,
+    },
+    /// Attempted bulk create with a model that only contains Auto fields.
+    #[error(
+        "{ERROR_PREFIX} bulk_insert requires at least one non-auto field. Models with only \
+        auto-generated fields should be created individually using insert()"
+    )]
+    BulkInsertNoValueColumns,
+    /// Data returned by the bulk insert does not match the expected number of
+    /// rows.
+    #[error(
+        "{ERROR_PREFIX} bulk insert: expected {expected} rows, but got {actual}. This may be \
+        due to concurrent inserts or gaps in auto-increment IDs if using MySQL backend, or \
+        might be a general database misbehavior otherwise."
+    )]
+    BulkInsertReturnDataInvalid {
+        /// The expected number of rows.
+        expected: usize,
+        /// The actual number of rows returned.
+        actual: usize,
+    },
 }
+impl_into_cot_error!(DatabaseError, INTERNAL_SERVER_ERROR);
 
 impl DatabaseError {
     /// Creates a new database error from a value decode error.
@@ -136,7 +174,7 @@ pub trait Model: Sized + Send + 'static {
     /// The primary key type of the model.
     type PrimaryKey: PrimaryKey;
 
-    /// The name of the app this model is defined in.
+    /// The name of the app in which this model is defined.
     const APP_NAME: &'static str;
 
     /// The name of the table in the database.
@@ -238,6 +276,92 @@ pub trait Model: Sized + Send + 'static {
     /// could not be found in the database.
     async fn update<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
         db.update(self).await?;
+        Ok(())
+    }
+
+    /// Bulk insert multiple model instances to the database in a single query.
+    ///
+    /// This method is significantly faster than calling [`Self::insert`]
+    /// multiple times, as it combines all instances into a single SQL
+    /// `INSERT` statement with multiple value sets.
+    ///
+    /// # Backend-specific behavior
+    ///
+    /// ## MySQL
+    ///
+    /// MySQL does not support returning auto-generated fields in bulk
+    /// insert or update operations. Because of this, any fields marked as
+    /// [`Auto`] will be populated by running a separate `SELECT` query which
+    /// assumes that the auto-generated fields are sequentially assigned.
+    /// This might lead to errors if there are concurrent inserts happening,
+    /// or if the auto-generated fields are not sequential for other reasons.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Database connection fails
+    /// - Unique constraint is violated
+    /// - Single model has more fields than the database parameter limit
+    /// - Model only contains auto-generated fields
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let mut todos = vec![
+    ///     TodoItem { id: Auto::auto(), title: "Task 1".into() },
+    ///     TodoItem { id: Auto::auto(), title: "Task 2".into() },
+    ///     TodoItem { id: Auto::auto(), title: "Task 3".into() },
+    /// ];
+    ///
+    /// TodoItem::bulk_insert(&db, &mut todos).await?;
+    ///
+    /// // After insertion, all todos have populated IDs
+    /// assert!(todos[0].id.is_fixed());
+    /// ```
+    async fn bulk_insert<DB: DatabaseBackend>(db: &DB, instances: &mut [Self]) -> Result<()> {
+        db.bulk_insert(instances).await?;
+        Ok(())
+    }
+
+    /// Bulk insert multiple model instances to the database in a single query,
+    /// or updates existing instances with the same primary keys.
+    ///
+    /// This method is significantly faster than calling
+    /// [`Self::insert`]/[`Self::update`] multiple times, as it combines all
+    /// instances into a single SQL `INSERT` statement with multiple value
+    /// sets.
+    ///
+    /// # Backend-specific behavior
+    ///
+    /// See the docs for [`Self::bulk_insert`] for backend-specific behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Database connection fails
+    /// - Unique constraint is violated
+    /// - Single model has more fields than the database parameter limit
+    /// - Model only contains auto-generated fields
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let mut todos = vec![
+    ///     TodoItem { id: Auto::auto(), title: "Task 1".into() },
+    ///     TodoItem { id: Auto::auto(), title: "Task 2".into() },
+    ///     TodoItem { id: Auto::auto(), title: "Task 3".into() },
+    /// ];
+    ///
+    /// TodoItem::bulk_insert_or_update(&db, &mut todos).await?;
+    ///
+    /// // After insertion, all todos have populated IDs
+    /// assert!(todos[0].id.is_fixed());
+    /// ```
+    async fn bulk_insert_or_update<DB: DatabaseBackend>(
+        db: &DB,
+        instances: &mut [Self],
+    ) -> Result<()> {
+        db.bulk_insert_or_update(instances).await?;
         Ok(())
     }
 }
@@ -666,10 +790,9 @@ pub trait SqlxValueRef<'r>: Sized {
 /// It is used to execute queries and interact with the database. The connection
 /// is established when the structure is created and closed when
 /// [`Self::close()`] is called.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Database {
-    _url: String,
-    inner: DatabaseImpl,
+    inner: Arc<DatabaseImpl>,
 }
 
 #[derive(Debug)]
@@ -714,8 +837,7 @@ impl Database {
         if url.starts_with("sqlite:") {
             let inner = DatabaseSqlite::new(&url).await?;
             return Ok(Self {
-                _url: url,
-                inner: DatabaseImpl::Sqlite(inner),
+                inner: Arc::new(DatabaseImpl::Sqlite(inner)),
             });
         }
 
@@ -723,8 +845,7 @@ impl Database {
         if url.starts_with("postgresql:") {
             let inner = DatabasePostgres::new(&url).await?;
             return Ok(Self {
-                _url: url,
-                inner: DatabaseImpl::Postgres(inner),
+                inner: Arc::new(DatabaseImpl::Postgres(inner)),
             });
         }
 
@@ -732,8 +853,7 @@ impl Database {
         if url.starts_with("mysql:") {
             let inner = DatabaseMySql::new(&url).await?;
             return Ok(Self {
-                _url: url,
-                inner: DatabaseImpl::MySql(inner),
+                inner: Arc::new(DatabaseImpl::MySql(inner)),
             });
         }
 
@@ -748,7 +868,7 @@ impl Database {
     /// # Errors
     ///
     /// This method can return an error if the connection to the database could
-    /// not be closed gracefully, for instance because the connection has
+    /// not be closed gracefully, for example, because the connection has
     /// already been dropped.
     ///
     /// # Examples
@@ -763,7 +883,7 @@ impl Database {
     /// }
     /// ```
     pub async fn close(&self) -> Result<()> {
-        match &self.inner {
+        match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.close().await,
             #[cfg(feature = "postgres")]
@@ -958,6 +1078,242 @@ impl Database {
         Ok(())
     }
 
+    /// Bulk inserts multiple rows into the database.
+    ///
+    /// # Errors
+    ///
+    /// This method can return an error if the rows could not be inserted into
+    /// the database, for instance because the migrations haven't been
+    /// applied, or there was a problem with the database connection.
+    pub async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()> {
+        let span = span!(Level::TRACE, "bulk_insert", table = %T::TABLE_NAME, count = data.len());
+
+        Self::bulk_insert_impl(self, data, false)
+            .instrument(span)
+            .await
+    }
+
+    /// Bulk inserts multiple rows into the database, or updates them if they
+    /// already exist.
+    ///
+    /// # Errors
+    ///
+    /// This method can return an error if the rows could not be inserted into
+    /// the database, for instance because the migrations haven't been
+    /// applied, or there was a problem with the database connection.
+    pub async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()> {
+        let span = span!(
+            Level::TRACE,
+            "bulk_insert_or_update",
+            table = %T::TABLE_NAME,
+            count = data.len()
+        );
+
+        Self::bulk_insert_impl(self, data, true)
+            .instrument(span)
+            .await
+    }
+
+    async fn bulk_insert_impl<T: Model>(&self, data: &mut [T], update: bool) -> Result<()> {
+        // TODO: add transactions when implemented
+
+        if data.is_empty() {
+            return Ok(());
+        }
+
+        let max_params = match &*self.inner {
+            // https://sqlite.org/limits.html#max_variable_number
+            // Assuming SQLite > 3.32.0 (2020-05-22)
+            #[cfg(feature = "sqlite")]
+            DatabaseImpl::Sqlite(_) => 32766,
+            // https://www.postgresql.org/docs/18/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-BIND
+            // The number of parameter format codes is Int16
+            #[cfg(feature = "postgres")]
+            DatabaseImpl::Postgres(_) => 65535,
+            // https://dev.mysql.com/doc/dev/mysql-server/9.5.0/page_protocol_com_stmt_prepare.html#sect_protocol_com_stmt_prepare_response
+            // The number of parameter returned in the COM_STMT_PREPARE_OK packet is int<2>
+            #[cfg(feature = "mysql")]
+            DatabaseImpl::MySql(_) => 65535,
+        };
+
+        let column_identifiers: Vec<_> = T::COLUMNS
+            .iter()
+            .map(|column| Identifier::from(column.name.as_str()))
+            .collect();
+        let value_indices: Vec<_> = (0..T::COLUMNS.len()).collect();
+
+        // Determine which columns are Auto vs Value by examining the first instance
+        // (all instances should have the same structure, as we are inserting a single
+        // Model)
+        let first_values = data[0]
+            .get_values(&value_indices)
+            .into_iter()
+            .map(ToDbFieldValue::to_db_field_value)
+            .collect::<Vec<_>>();
+
+        let mut auto_col_ids = Vec::new();
+        let mut auto_col_identifiers = Vec::new();
+        let mut value_column_indices = Vec::new();
+        let mut value_identifiers = Vec::new();
+
+        for (index, (identifier, value)) in
+            std::iter::zip(column_identifiers.iter(), first_values.iter()).enumerate()
+        {
+            match value {
+                DbFieldValue::Auto => {
+                    auto_col_ids.push(index);
+                    auto_col_identifiers.push((*identifier).into_column_ref());
+                }
+                DbFieldValue::Value(_) => {
+                    value_column_indices.push(index);
+                    value_identifiers.push(*identifier);
+                }
+            }
+        }
+
+        let num_value_fields = value_identifiers.len();
+
+        if num_value_fields > max_params {
+            return Err(DatabaseError::BulkInsertModelTooLarge {
+                field_count: num_value_fields,
+                limit: max_params,
+            });
+        }
+
+        let batch_size = if num_value_fields > 0 {
+            max_params / num_value_fields
+        } else {
+            return Err(DatabaseError::BulkInsertNoValueColumns);
+        };
+
+        for chunk in data.chunks_mut(batch_size) {
+            self.bulk_insert_chunk(
+                chunk,
+                update,
+                &value_identifiers,
+                &value_column_indices,
+                &auto_col_ids,
+                &auto_col_identifiers,
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn bulk_insert_chunk<T: Model>(
+        &self,
+        chunk: &mut [T],
+        update: bool,
+        value_identifiers: &[Identifier],
+        value_column_indices: &[usize],
+        auto_col_ids: &[usize],
+        auto_col_identifiers: &[ColumnRef],
+    ) -> Result<()> {
+        let mut insert_statement = sea_query::Query::insert()
+            .into_table(T::TABLE_NAME)
+            .columns(value_identifiers.iter().copied())
+            .to_owned();
+
+        // Add values for each instance in the chunk
+        for instance in chunk.iter() {
+            let values = instance.get_values(value_column_indices);
+            let db_values: Vec<_> = values
+                .into_iter()
+                .map(|v| match v.to_db_field_value() {
+                    DbFieldValue::Value(val) => val,
+                    DbFieldValue::Auto => {
+                        unreachable!(
+                            "Expected `Value` for a value column, but found `Auto` when running \
+                            a bulk insert"
+                        )
+                    }
+                })
+                .map(SimpleExpr::Value)
+                .collect();
+
+            debug_assert!(!db_values.is_empty(), "expected at least 1 value field");
+            insert_statement.values(db_values)?;
+        }
+
+        if update {
+            let update_cols: Vec<_> = value_identifiers
+                .iter()
+                .filter(|id| **id != T::PRIMARY_KEY_NAME)
+                .copied()
+                .collect();
+            insert_statement.on_conflict(
+                OnConflict::column(T::PRIMARY_KEY_NAME)
+                    .update_columns(update_cols)
+                    .to_owned(),
+            );
+        }
+
+        if auto_col_ids.is_empty() {
+            self.execute_statement(&insert_statement).await?;
+        } else if self.supports_returning() {
+            // PostgreSQL/SQLite: Use RETURNING clause
+            insert_statement.returning(ReturningClause::Columns(auto_col_identifiers.to_vec()));
+
+            let rows = self.fetch_all(&insert_statement).await?;
+            if rows.len() != chunk.len() {
+                return Err(DatabaseError::BulkInsertReturnDataInvalid {
+                    expected: chunk.len(),
+                    actual: rows.len(),
+                });
+            }
+
+            for (instance, row) in chunk.iter_mut().zip(rows) {
+                instance.update_from_db(row, auto_col_ids)?;
+            }
+        } else {
+            // MySQL: Use LAST_INSERT_ID() and fetch rows
+            let result = self.execute_statement(&insert_statement).await?;
+            let first_id = result.last_inserted_row_id.ok_or_else(|| {
+                DatabaseError::BulkInsertReturnDataInvalid {
+                    expected: chunk.len(),
+                    actual: 0,
+                }
+            })?;
+
+            // Fetch the inserted rows using a SELECT query
+            // Note: This assumes IDs are consecutive, which is generally safe for
+            // auto_increment but could fail with concurrent inserts
+            let query = sea_query::Query::select()
+                .from(T::TABLE_NAME)
+                .columns(auto_col_identifiers.iter().cloned())
+                .and_where(
+                    sea_query::Expr::col(T::PRIMARY_KEY_NAME).gte(first_id).and(
+                        sea_query::Expr::col(T::PRIMARY_KEY_NAME).lt(first_id
+                            + <u64 as TryFrom<usize>>::try_from(chunk.len())
+                                .expect("chunk length fits in u64")),
+                    ),
+                )
+                .order_by(T::PRIMARY_KEY_NAME, sea_query::Order::Asc)
+                .to_owned();
+
+            let rows = self.fetch_all(&query).await?;
+            if rows.len() != chunk.len() {
+                return Err(DatabaseError::BulkInsertReturnDataInvalid {
+                    expected: chunk.len(),
+                    actual: rows.len(),
+                });
+            }
+
+            for (instance, row) in chunk.iter_mut().zip(rows) {
+                instance.update_from_db(row, auto_col_ids)?;
+            }
+        }
+
+        if update {
+            trace!(count = chunk.len(), "Inserted or updated rows");
+        } else {
+            trace!(count = chunk.len(), "Inserted rows");
+        }
+
+        Ok(())
+    }
+
     /// Executes the given query and returns the results converted to the model
     /// type.
     ///
@@ -1112,7 +1468,7 @@ impl Database {
             .collect::<Vec<_>>();
         let values = SqlxValues(sea_query::Values(values));
 
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.raw_with(query, values).await?,
             #[cfg(feature = "postgres")]
@@ -1128,7 +1484,7 @@ impl Database {
     where
         T: SqlxBinder + Send + Sync,
     {
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.fetch_option(statement).await?.map(Row::Sqlite),
             #[cfg(feature = "postgres")]
@@ -1143,7 +1499,7 @@ impl Database {
     }
 
     fn supports_returning(&self) -> bool {
-        match self.inner {
+        match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(_) => true,
             #[cfg(feature = "postgres")]
@@ -1157,7 +1513,7 @@ impl Database {
     where
         T: SqlxBinder + Send + Sync,
     {
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner
                 .fetch_all(statement)
@@ -1188,7 +1544,7 @@ impl Database {
     where
         T: SqlxBinder + Send + Sync,
     {
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.execute_statement(statement).await?,
             #[cfg(feature = "postgres")]
@@ -1204,7 +1560,7 @@ impl Database {
         &self,
         statement: T,
     ) -> Result<StatementResult> {
-        let result = match &self.inner {
+        let result = match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.execute_schema(statement).await?,
             #[cfg(feature = "postgres")]
@@ -1219,7 +1575,7 @@ impl Database {
 
 impl ColumnTypeMapper for Database {
     fn sea_query_column_type_for(&self, column_type: ColumnType) -> sea_query::ColumnType {
-        match &self.inner {
+        match &*self.inner {
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(inner) => inner.sea_query_column_type_for(column_type),
             #[cfg(feature = "postgres")]
@@ -1263,6 +1619,25 @@ pub trait DatabaseBackend: Send + Sync {
     /// database, for instance because the migrations haven't been applied, or
     /// there was a problem with the database connection.
     async fn update<T: Model>(&self, data: &mut T) -> Result<()>;
+
+    /// Bulk inserts multiple rows into the database.
+    ///
+    /// # Errors
+    ///
+    /// This method can return an error if the rows could not be inserted into
+    /// the database, for instance because the migrations haven't been
+    /// applied, or there was a problem with the database connection.
+    async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()>;
+
+    /// Bulk inserts multiple rows into the database, or updates existing rows
+    /// if they already exist.
+    ///
+    /// # Errors
+    ///
+    /// This method can return an error if the rows could not be inserted into
+    /// the database, for instance because the migrations haven't been
+    /// applied, or there was a problem with the database connection.
+    async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()>;
 
     /// Executes a query and returns the results converted to the model type.
     ///
@@ -1332,35 +1707,12 @@ impl DatabaseBackend for Database {
         Database::update(self, data).await
     }
 
-    async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
-        Database::query(self, query).await
+    async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()> {
+        Database::bulk_insert(self, data).await
     }
 
-    async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>> {
-        Database::get(self, query).await
-    }
-
-    async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool> {
-        Database::exists(self, query).await
-    }
-
-    async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult> {
-        Database::delete(self, query).await
-    }
-}
-
-#[async_trait]
-impl DatabaseBackend for std::sync::Arc<Database> {
-    async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::insert_or_update(self, data).await
-    }
-
-    async fn insert<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::insert(self, data).await
-    }
-
-    async fn update<T: Model>(&self, data: &mut T) -> Result<()> {
-        Database::update(self, data).await
+    async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()> {
+        Database::bulk_insert_or_update(self, data).await
     }
 
     async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
@@ -1456,11 +1808,12 @@ pub struct RowsNum(pub u64);
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Auto<T> {
     /// A fixed value.
     Fixed(T),
     /// A value that will be automatically generated by the database.
+    #[default]
     Auto,
 }
 
@@ -1544,12 +1897,6 @@ impl<T> Auto<T> {
             Self::Fixed(value) => value,
             Self::Auto => panic!("{}", message),
         }
-    }
-}
-
-impl<T> Default for Auto<T> {
-    fn default() -> Self {
-        Self::Auto
     }
 }
 

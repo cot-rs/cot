@@ -1,0 +1,5 @@
+error: migration operation must return `cot::Result<()>`
+ --> tests/ui/attr_migration_op_return_type_invalid.rs:5:1
+  |
+5 | async fn my_migration(_ctx: MigrationContext<'_>) {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

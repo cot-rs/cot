@@ -32,6 +32,7 @@ services:
   redis:
     image: redis:8-alpine
     container_name: cot-redis
+    command: ["redis-server", "--databases", "100"]
     ports:
       - "6379:6379"
     healthcheck:

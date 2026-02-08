@@ -94,6 +94,25 @@ changes intentionally modify the output. You can do this by running:
 cargo insta test --review
 ```
 
+### Benchmarking
+
+Cot uses [Criterion](https://github.com/bheisler/criterion.rs) for performance benchmarking, with continuous benchmarking powered by [Bencher](https://bencher.dev) in CI.
+
+To run benchmarks locally:
+
+```sh
+cargo bench --package cot --features test
+```
+
+Benchmarks are located in `cot/benches/` and test core framework performance including routing, JSON handling, and nested router scenarios. The benchmarking utilities in `bench_utils.rs` provide scaffolding for creating HTTP request benchmarks against Cot applications.
+
+#### Continuous Benchmarking
+
+- **Base branch benchmarks** run automatically on pushes to `master`, establishing performance baselines
+- **PR benchmarks** run on pull requests, comparing performance against the base branch with statistical analysis
+- Results are tracked over time and regressions are automatically detected using t-tests
+- Performance results are posted as comments on pull requests
+
 ### Dependencies
 
 When adding a new dependency to the project, please consider if it's actually

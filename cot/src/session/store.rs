@@ -7,6 +7,9 @@
 //! Session stores are responsible for persisting session data between requests.
 //! Different implementations store data in different places, such as memory,
 //! files, databases, or external caching services like Redis.
+
+#[cfg(all(feature = "db", feature = "json"))]
+pub mod db;
 #[cfg(feature = "json")]
 pub mod file;
 pub mod memory;
@@ -19,13 +22,17 @@ use async_trait::async_trait;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
+pub(crate) const MAX_COLLISION_RETRIES: u32 = 32;
+pub(crate) const ERROR_PREFIX: &str = "session store:";
+
 /// A wrapper that provides a concrete type for
-/// [`tower_session::SessionManagerLayer`] while delegating to a boxed
-/// [`SessionStore`] trait object.
+/// [`SessionManagerLayer`](tower_sessions::SessionManagerLayer) while
+/// delegating to a boxed [`SessionStore`] trait
+/// object.
 ///
 /// This enables runtime selection of session store implementations, as
-/// [`tower_sessions::SessionManagerLayer`] requires a concrete type rather than
-/// a boxed trait object.
+/// [`SessionManagerLayer`](tower_sessions::SessionManagerLayer) requires a
+/// concrete type rather than a boxed trait object.
 ///
 /// # Examples
 ///

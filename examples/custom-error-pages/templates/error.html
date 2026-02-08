@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ error.status_code().as_u16() }} {{ error.status_code().canonical_reason().unwrap_or("Error") }}</title>
+        <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+        }
+
+        h1 {
+            font-size: 50px;
+        }
+
+        p {
+            font-size: 20px;
+        }
+
+        a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+        </style>
+    </head>
+    <body>
+        <h1>{{ error.status_code().as_u16() }}</h1>
+        {% if error.status_code().as_u16() == 404 %}
+            <p>The page you're looking for can't be found.</p>
+            <p>This is how you can define your custom error pages in Cot.</p>
+        {% elif error.status_code().is_client_error() %}
+            <p>An error occurred trying to process your request.</p>
+        {% else %}
+            <p>A server error occurred. Note that there is a panic displayed in the logs.</p>
+            <p>
+                {# djlint:off J018 #}Do you want to see <a href="/example-404-page">the 404 page</a>?{# djlint:on #}
+            </p>
+        {% endif %}
+    </body>
+</html>

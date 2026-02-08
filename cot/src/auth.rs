@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// backwards compatible shim for form Password type.
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
+use cot_core::error::impl_into_cot_error;
 use derive_more::with_trait::Debug;
 #[cfg(test)]
 use mockall::automock;
@@ -30,28 +31,31 @@ use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, T
 use crate::request::{Request, RequestExt};
 use crate::session::Session;
 
+const ERROR_PREFIX: &str = "failed to authenticate user:";
+
 /// An error that occurs during authentication.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum AuthError {
-    /// The password hash that is passed to [`PasswordHash::new`] is invalid.
-    #[error("Password hash is invalid")]
+    /// The password hash that was provided to [`PasswordHash::new`] is invalid.
+    #[error("{ERROR_PREFIX} password hash is invalid")]
     PasswordHashInvalid,
     /// An error occurred while accessing the session object.
-    #[error("Error while accessing the session object")]
+    #[error("{ERROR_PREFIX} error while accessing the session object")]
     SessionAccess(#[from] tower_sessions::session::Error),
     /// An error occurred while accessing the user object.
-    #[error("Error while accessing the user object")]
+    #[error("{ERROR_PREFIX} error while accessing the user object")]
     UserBackend(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
     /// The credentials type provided to [`AuthBackend::authenticate`] is not
     /// supported.
-    #[error("Tried to authenticate with an unsupported credentials type")]
+    #[error("{ERROR_PREFIX} tried to authenticate with an unsupported credentials type")]
     CredentialsTypeNotSupported,
     /// The [`UserId`] type provided to [`AuthBackend::get_by_id`] is not
     /// supported.
-    #[error("Tried to get a user by an unsupported user ID type")]
+    #[error("{ERROR_PREFIX} tried to get a user by an unsupported user ID type")]
     UserIdTypeNotSupported,
 }
+impl_into_cot_error!(AuthError, UNAUTHORIZED);
 
 impl AuthError {
     /// Creates a new [`AuthError::UserBackend`] error from a backend error.
@@ -150,7 +154,7 @@ pub trait User {
 
     /// Returns the user's session authentication hash.
     ///
-    /// This used to verify that the session hash stored in the session
+    /// This is used to verify that the session hash stored in the session
     /// object is valid. If the session hash is not valid, the user is
     /// logged out. For instance,
     /// [`DatabaseUser`](db::DatabaseUser) implements this method
@@ -160,9 +164,9 @@ pub trait User {
     ///
     /// The session auth hash should always be the same for the same secret key,
     /// unless something has changed in the user's data that should invalidate
-    /// the session (e.g. password change). Moreover, if a user implementation
-    /// returns [`Some`] session hash for some secret key A, it should also
-    /// return [`Some`] session hash for any other secret key B.
+    /// the session (for example, a password change). Moreover, if a user
+    /// implementation returns [`Some`] session hash for some secret key A, it
+    /// should also return [`Some`] session hash for any other secret key B.
     ///
     /// If this method returns `None`, the session hash is not checked.
     ///
@@ -243,7 +247,7 @@ pub enum UserId {
     /// ```
     /// use cot::auth::UserId;
     ///
-    /// let user_id = UserId::String("forty_two@exmaple.com".to_string());
+    /// let user_id = UserId::String("forty_two@example.com".to_string());
     /// ```
     String(String),
 }
@@ -310,7 +314,8 @@ impl Debug for UserWrapper {
 /// An anonymous, unauthenticated user.
 ///
 /// This is used to represent a user that is not authenticated. It is returned
-/// by the [`Auth::user()`] method when there is no active user session.
+/// by the [`Auth::user()`] method when there is no active user session or when
+/// the user has been logged out.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct AnonymousUser;
 
@@ -478,8 +483,9 @@ pub struct PasswordHash(String);
 impl PasswordHash {
     /// Creates a new password hash object from a string.
     ///
-    /// Note that this method takes the hash directly. If you need to hash a
-    /// password, use [`PasswordHash::from_password`] instead.
+    /// Note that this method takes the hash directly and does not perform any
+    /// hashing. If you need to hash a password, use the
+    /// [`from_password`](Self::from_password) method instead.
     ///
     /// # Examples
     ///
@@ -530,13 +536,13 @@ impl PasswordHash {
 
     /// Verifies a password against the hash.
     ///
-    /// * If the password is valid, returns [`PasswordVerificationResult::Ok`].
-    /// * If the password is valid but the hash is obsolete, returns
-    ///   [`PasswordVerificationResult::OkObsolete`] with the new hash
-    ///   calculated with the currently preferred algorithm. The new hash should
-    ///   be saved to the database.
-    /// * If the password is invalid, returns
-    ///   [`PasswordVerificationResult::Invalid`].
+    /// This method returns one of the following values:
+    ///
+    /// * [`PasswordVerificationResult::Ok`]: The password is valid.
+    /// * [`PasswordVerificationResult::OkObsolete`]: The password is valid, but
+    ///   the hash is obsolete. The new hash, calculated with the currently
+    ///   preferred algorithm, is provided and should be saved to the database.
+    /// * [`PasswordVerificationResult::Invalid`]: The password is invalid.
     ///
     /// # Examples
     ///
@@ -634,9 +640,9 @@ impl TryFrom<String> for PasswordHash {
 pub enum PasswordVerificationResult {
     /// The password is valid.
     Ok,
-    /// The password is valid, but the hash is obsolete. The new hash calculated
-    /// with the currently preferred algorithm is provided, and it should be
-    /// saved to the database.
+    /// The password is valid, but the hash is obsolete. The new hash, which was
+    /// calculated with the currently preferred algorithm, is provided and
+    /// should be saved to the database.
     OkObsolete(PasswordHash),
     /// The password is invalid.
     Invalid,

@@ -1,23 +1,22 @@
 mod migrations;
 
-use askama::Template;
 use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
 use chrono_tz::Tz;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{Auto, Model, model};
+use cot::db::{Auto, Database, Model, model};
 use cot::form::Form;
 use cot::form::fields::Step;
 use cot::html::Html;
 use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
-use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::request::Request;
-use cot::request::extractors::{RequestDb, RequestForm, StaticFiles};
+use cot::request::extractors::{RequestForm, StaticFiles};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::{StaticFile, StaticFilesMiddleware};
-use cot::{App, AppBuilder, BoxedHandler, Project, reverse_redirect, static_files};
+use cot::{App, AppBuilder, Project, Template, reverse_redirect, static_files};
 
 #[derive(Debug, Clone)]
 #[model]
@@ -33,11 +32,11 @@ struct ExampleFormItem {
 
 #[derive(Debug, Form)]
 struct ExampleForm {
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     title: String,
     datetime: NaiveDateTime,
     #[form(
-        opt(
+        opts(
             timezone=Tz::America__New_York,
             step=Step::Value(Duration::seconds(70)),
             prefer_latest = true
@@ -45,7 +44,7 @@ struct ExampleForm {
     )]
     datetime_tz: DateTime<FixedOffset>,
     #[form(
-        opt(
+        opts(
             min = NaiveTime::parse_from_str("11:00:00", "%H:%M:%S").unwrap(),
             max = NaiveTime::parse_from_str("11:30:40", "%H:%M:%S").unwrap(),
             step = Step::Value(Duration::seconds(70))
@@ -53,7 +52,7 @@ struct ExampleForm {
     )]
     time: NaiveTime,
     #[form(
-        opt(
+        opts(
             min = NaiveDate::parse_from_str("2025-01-01", "%Y-%m-%d").unwrap(),
             max = NaiveDate::parse_from_str("2025-12-31", "%Y-%m-%d").unwrap(),
             step = Step::Value(Duration::days(7))
@@ -75,7 +74,7 @@ async fn index(
     urls: Urls,
     static_files: StaticFiles,
     mut request: Request,
-    RequestDb(db): RequestDb,
+    db: Database,
 ) -> cot::Result<Html> {
     let example_form_items = ExampleFormItem::objects().all(&db).await?;
     let index_template = IndexTemplate {
@@ -91,7 +90,7 @@ async fn index(
 
 async fn add_example_form(
     urls: Urls,
-    RequestDb(db): RequestDb,
+    db: Database,
     RequestForm(example_form): RequestForm<ExampleForm>,
 ) -> cot::Result<Response> {
     let example_form = example_form.unwrap();
@@ -147,11 +146,7 @@ impl Project for FormsProject {
         apps.register_with_views(FormsApp, "");
     }
 
-    fn middlewares(
-        &self,
-        handler: RootHandlerBuilder,
-        context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    fn middlewares(&self, handler: RootHandlerBuilder, context: &MiddlewareContext) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .middleware(AuthMiddleware::new())

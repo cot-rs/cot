@@ -27,13 +27,15 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+use cot_core::error::impl_into_cot_error;
+use cot_core::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
+use cot_core::request::{AppName, RouteName};
 use derive_more::with_trait::Debug;
 use tracing::debug;
 
-use crate::error::ErrorRepr;
-use crate::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
-use crate::request::{AppName, PathParams, Request, RequestExt, RequestHead, RouteName};
-use crate::response::{Response, not_found_response};
+use crate::error::NotFound;
+use crate::request::{PathParams, Request, RequestExt, RequestHead};
+use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
 use crate::{Error, Result};
 
@@ -42,9 +44,9 @@ pub mod path;
 
 /// A router that can be used to route requests to their respective views.
 ///
-/// This struct is used to route requests to their respective views. It can be
-/// created directly by calling the [`Router::with_urls`] method, and that's
-/// what is typically done in [`cot::App::router`] implementations.
+/// This struct is responsible for routing requests to their respective views.
+/// It can be created directly by calling the [`Router::with_urls`] method, and
+/// that's what is typically done in [`cot::App::router`] implementations.
 ///
 /// # Examples
 ///
@@ -138,7 +140,7 @@ impl Router {
             result.handler.handle(request).await
         } else {
             debug!("Not found: {}", request_path);
-            not_found_response(None)
+            Err(Error::from(NotFound::router()))
         }
     }
 
@@ -171,10 +173,9 @@ impl Router {
                     #[cfg(feature = "openapi")]
                     RouteInner::ApiHandler(handler) => {
                         if matches_fully {
+                            let handler: &(dyn BoxRequestHandler + Send + Sync) = &**handler;
                             return Some(HandlerFound {
-                                // TODO: consider removing this when Rust trait_upcasting is
-                                // stabilized and we bump the MSRV (lands in Rust 1.86)
-                                handler: handler.as_box_request_handler(),
+                                handler,
                                 app_name: self.app_name.clone(),
                                 name: route.name.clone(),
                                 params: Self::matches_to_path_params(&matches, Vec::new()),
@@ -213,14 +214,15 @@ impl Router {
         self.route(request, &path).await
     }
 
-    /// Get a URL for a view by name.
+    /// Generates a URL for a view using its name.
     ///
     /// Instead of using this method directly, consider using the
     /// [`reverse!`](crate::reverse) macro which provides much more ergonomic
     /// way to call this.
     ///
-    /// `app_name` is the name of the app that the view should be found in. If
-    /// `app_name` is `None`, the view will be searched for in any app.
+    /// The `app_name` parameter specifies the name of the app that the view
+    /// should be found in. If it is `None`, the view is searched for across all
+    /// registered apps.
     ///
     /// # Errors
     ///
@@ -236,18 +238,19 @@ impl Router {
     ) -> Result<String> {
         Ok(self
             .reverse_option(app_name, name, params)?
-            .ok_or_else(|| ErrorRepr::NoViewToReverse {
+            .ok_or_else(|| NoViewToReverse {
                 app_name: app_name.map(ToOwned::to_owned),
                 view_name: name.to_owned(),
             })?)
     }
 
-    /// Get a URL for a view by name.
+    /// Generates a URL for a view using its name.
     ///
-    /// `app_name` is the name of the app that the view should be found in. If
-    /// `app_name` is `None`, the view will be searched for in any app.
+    /// The `app_name` parameter specifies the name of the app that the view
+    /// should be found in. If it is `None`, the view is searched for across all
+    /// registered apps.
     ///
-    /// Returns `None` if the view name is not found.
+    /// It returns [`None`] if the view name is not found.
     ///
     /// # Errors
     ///
@@ -280,16 +283,14 @@ impl Router {
             .get(&RouteName(String::from(name)))
             .map(|matcher| matcher.reverse(params));
         if let Some(url) = url {
-            return Ok(Some(url.map_err(ErrorRepr::from)?));
+            return Ok(Some(url?));
         }
 
         for route in &self.urls {
-            if let RouteInner::Router(router) = &route.view {
-                if let Some(url) = router.reverse_option(app_name, name, params)? {
-                    return Ok(Some(
-                        route.url.reverse(params).map_err(ErrorRepr::from)? + &url,
-                    ));
-                }
+            if let RouteInner::Router(router) = &route.view
+                && let Some(url) = router.reverse_option(app_name, name, params)?
+            {
+                return Ok(Some(route.url.reverse(params)? + &url));
             }
         }
         Ok(None)
@@ -443,6 +444,14 @@ impl Default for Router {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("failed to reverse route `{view_name}` due to view not existing")]
+struct NoViewToReverse {
+    app_name: Option<String>,
+    view_name: String,
+}
+impl_into_cot_error!(NoViewToReverse);
+
 #[derive(Debug)]
 struct HandlerFound<'a> {
     #[debug("handler(...)")]
@@ -563,18 +572,16 @@ impl Route {
     {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Handler(Arc::new(into_box_request_handler(ErrorHandlerWrapper(
-                handler,
-            )))),
+            view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: None,
         }
     }
 
     /// Create a new route with the given handler for inclusion in the OpenAPI
-    /// specs.
+    /// specifications.
     ///
     /// See [`crate::openapi`] module documentation for more details on how to
-    /// generate OpenAPI specs automatically.
+    /// generate OpenAPI specifications automatically.
     ///
     /// # Examples
     ///
@@ -601,7 +608,7 @@ impl Route {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+                crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: None,
         }
@@ -670,7 +677,7 @@ impl Route {
         Self {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::ApiHandler(Arc::new(
-                crate::openapi::into_box_api_endpoint_request_handler(ErrorHandlerWrapper(handler)),
+                crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: Some(RouteName(name.into())),
         }
@@ -777,39 +784,6 @@ enum RouteInner {
     Router(Router),
     #[cfg(feature = "openapi")]
     ApiHandler(Arc<dyn crate::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
-}
-
-struct ErrorHandlerWrapper<H>(H);
-
-impl<HandlerParams, H> RequestHandler<HandlerParams> for ErrorHandlerWrapper<H>
-where
-    H: RequestHandler<HandlerParams> + Send + Sync,
-{
-    async fn handle(&self, request: Request) -> Result<Response> {
-        let response = self.0.handle(request).await;
-
-        match response {
-            Ok(response) => Ok(response),
-            Err(error) => match error.inner {
-                ErrorRepr::NotFound { message } => not_found_response(message),
-                _ => Err(error),
-            },
-        }
-    }
-}
-
-#[cfg(feature = "openapi")]
-impl<H> crate::openapi::AsApiRoute for ErrorHandlerWrapper<H>
-where
-    H: crate::openapi::AsApiRoute,
-{
-    fn as_api_route(
-        &self,
-        route_context: &crate::openapi::RouteContext<'_>,
-        schema_generator: &mut schemars::SchemaGenerator,
-    ) -> aide::openapi::PathItem {
-        self.0.as_api_route(route_context, schema_generator)
-    }
 }
 
 /// Get a URL for a view by its registered name and given params.
@@ -1051,7 +1025,10 @@ macro_rules! reverse_redirect {
             $request,
             $view_name,
             $( $($key = $value),* )?
-        ).map(|url| <$crate::response::Response as $crate::response::ResponseExt>::new_redirect(url))
+        ).map(|url|
+            $crate::response::IntoResponse::into_response($crate::response::Redirect::new(url))
+                .expect("Failed to build response")
+        )
     };
 }
 

@@ -1,12 +1,11 @@
 //! Database-backed user authentication backend.
 //!
 //! This module provides a user type and an authentication backend that stores
-//! the user data in a database using the Cot ORM.
+//! user data in a database using the Cot ORM.
 
 use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 
 use async_trait::async_trait;
 // Importing `Auto` from `cot` instead of `crate` so that the migration generator
@@ -67,27 +66,24 @@ impl DatabaseUser {
         }
     }
 
-    /// Create a new user and save it to the database.
+    /// Creates a new user and saves it to the database.
     ///
     /// # Errors
     ///
-    /// Returns an error if the user could not be saved to the database.
+    /// Returns an error if the user could not be saved.
     ///
     /// # Example
     ///
     /// ```
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::{Request, RequestExt};
     ///
-    /// async fn view(request: &Request) -> cot::Result<Html> {
-    ///     let user = DatabaseUser::create_user(
-    ///         request.db(),
-    ///         "testuser".to_string(),
-    ///         &Password::new("password123"),
-    ///     )
-    ///     .await?;
+    /// async fn view(db: Database) -> cot::Result<Html> {
+    ///     let user =
+    ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
+    ///             .await?;
     ///
     ///     Ok(Html::new("User created!"))
     /// }
@@ -97,11 +93,7 @@ impl DatabaseUser {
     /// #     use cot::test::{TestDatabase, TestRequestBuilder};
     /// #     let mut test_database = TestDatabase::new_sqlite().await?;
     /// #     test_database.with_auth().run_migrations().await;
-    /// #     let request = TestRequestBuilder::get("/")
-    /// #         .with_db_auth(test_database.database())
-    /// #         .await
-    /// #         .build();
-    /// #     view(&request).await?;
+    /// #     view(test_database.database()).await?;
     /// #     test_database.cleanup().await?;
     /// #     Ok(())
     /// # }
@@ -123,8 +115,8 @@ impl DatabaseUser {
         Ok(user)
     }
 
-    /// Get a user by their integer ID. Returns [`None`] if the user does not
-    /// exist.
+    /// Retrieves a user by their integer ID. It returns [`None`] if the user
+    /// does not exist.
     ///
     /// # Errors
     ///
@@ -140,18 +132,15 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::{Request, RequestExt};
     ///
-    /// async fn view(request: &Request) -> cot::Result<Html> {
-    ///     let user = DatabaseUser::create_user(
-    ///         request.db(),
-    ///         "testuser".to_string(),
-    ///         &Password::new("password123"),
-    ///     )
-    ///     .await?;
+    /// async fn view(db: Database) -> cot::Result<Html> {
+    ///     let user =
+    ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
+    ///             .await?;
     ///
-    ///     let user_from_db = DatabaseUser::get_by_id(request.db(), user.id()).await?;
+    ///     let user_from_db = DatabaseUser::get_by_id(&db, user.id()).await?;
     ///
     ///     Ok(Html::new("User created!"))
     /// }
@@ -161,11 +150,7 @@ impl DatabaseUser {
     /// #     use cot::test::{TestDatabase, TestRequestBuilder};
     /// #     let mut test_database = TestDatabase::new_sqlite().await?;
     /// #     test_database.with_auth().run_migrations().await;
-    /// #     let request = TestRequestBuilder::get("/")
-    /// #         .with_db_auth(test_database.database())
-    /// #         .await
-    /// #         .build();
-    /// #     view(&request).await?;
+    /// #     view(test_database.database()).await?;
     /// #     test_database.cleanup().await?;
     /// #     Ok(())
     /// # }
@@ -179,8 +164,8 @@ impl DatabaseUser {
         Ok(db_user)
     }
 
-    /// Get a user by their username. Returns [`None`] if the user does not
-    /// exist.
+    /// Retrieves a user by their username. It returns [`None`] if the user does
+    /// not exist.
     ///
     /// # Errors
     ///
@@ -192,10 +177,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
@@ -210,7 +195,7 @@ impl DatabaseUser {
     /// #     use cot::test::{TestDatabase, TestRequestBuilder};
     /// #     let mut test_database = TestDatabase::new_sqlite().await?;
     /// #     test_database.with_auth().run_migrations().await;
-    /// #     view(RequestDb(test_database.database())).await?;
+    /// #     view(test_database.database()).await?;
     /// #     test_database.cleanup().await?;
     /// #     Ok(())
     /// # }
@@ -230,7 +215,7 @@ impl DatabaseUser {
         Ok(db_user)
     }
 
-    /// Authenticate a user.
+    /// Authenticates a user using the provided credentials.
     ///
     /// # Errors
     ///
@@ -276,7 +261,7 @@ impl DatabaseUser {
         }
     }
 
-    /// Get the ID of the user.
+    /// Returns the ID of the user.
     ///
     /// # Example
     ///
@@ -284,10 +269,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
@@ -319,7 +304,7 @@ impl DatabaseUser {
         }
     }
 
-    /// Get the username of the user.
+    /// Returns the username of the user.
     ///
     /// # Example
     ///
@@ -327,10 +312,10 @@ impl DatabaseUser {
     /// use cot::auth::UserId;
     /// use cot::auth::db::DatabaseUser;
     /// use cot::common_types::Password;
+    /// use cot::db::Database;
     /// use cot::html::Html;
-    /// use cot::request::extractors::RequestDb;
     ///
-    /// async fn view(RequestDb(db): RequestDb) -> cot::Result<Html> {
+    /// async fn view(db: Database) -> cot::Result<Html> {
     ///     let user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
@@ -425,7 +410,7 @@ impl DatabaseUserCredentials {
         Self { username, password }
     }
 
-    /// Get the username of the user.
+    /// Returns the username of the user.
     ///
     /// # Example
     ///
@@ -442,7 +427,7 @@ impl DatabaseUserCredentials {
         &self.username
     }
 
-    /// Get the password of the user.
+    /// Returns the password of the user.
     ///
     /// # Example
     ///
@@ -469,7 +454,7 @@ impl DatabaseUserCredentials {
 /// [`DatabaseUserCredentials`] struct and ignores all other credential types.
 #[derive(Debug, Clone)]
 pub struct DatabaseUserBackend {
-    database: Arc<Database>,
+    database: Database,
 }
 
 impl DatabaseUserBackend {
@@ -495,7 +480,7 @@ impl DatabaseUserBackend {
     /// }
     /// ```
     #[must_use]
-    pub fn new(database: Arc<Database>) -> Self {
+    pub fn new(database: Database) -> Self {
         Self { database }
     }
 }

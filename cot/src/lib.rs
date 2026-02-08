@@ -41,10 +41,7 @@
 //! [examples in the repository](https://github.com/cot-rs/cot/tree/master/examples).
 
 #![warn(missing_docs, rustdoc::missing_crate_level_docs)]
-#![cfg_attr(
-    docsrs,
-    feature(doc_cfg, doc_auto_cfg, rustdoc_missing_doc_code_examples)
-)]
+#![cfg_attr(docsrs, feature(doc_cfg, rustdoc_missing_doc_code_examples))]
 #![cfg_attr(docsrs, warn(rustdoc::missing_doc_code_examples))]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/cot-rs/media/6585c518/logo/logo.svg",
@@ -53,33 +50,30 @@
 
 extern crate self as cot;
 
+#[cfg(feature = "cache")]
+pub mod cache;
+
 #[cfg(feature = "db")]
 pub mod db;
-mod error;
+pub mod error;
 pub mod form;
-mod headers;
 // Not public API. Referenced by macro-generated code.
 #[doc(hidden)]
 #[path = "private.rs"]
 pub mod __private;
 pub mod admin;
 pub mod auth;
-mod body;
 pub mod cli;
 pub mod common_types;
 pub mod config;
+#[cfg(feature = "email")]
+pub mod email;
 mod error_page;
-#[macro_use]
-pub(crate) mod handler;
-pub mod html;
-#[cfg(feature = "json")]
-pub mod json;
 pub mod middleware;
 #[cfg(feature = "openapi")]
 pub mod openapi;
 pub mod project;
 pub mod request;
-pub mod response;
 pub mod router;
 mod serializers;
 pub mod session;
@@ -90,7 +84,40 @@ pub(crate) mod utils;
 
 #[cfg(feature = "openapi")]
 pub use aide;
-pub use body::Body;
+/// A wrapper around a handler that's used in [`Bootstrapper`].
+///
+/// It is returned by [`Bootstrapper::finish`]. Typically, you don't need to
+/// interact with this type directly, except for creating it in
+/// [`Project::middlewares`] through the
+/// [`RootHandlerBuilder::build`](crate::project::RootHandlerBuilder::build)
+/// method.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::ProjectConfig;
+/// use cot::{Bootstrapper, BoxedHandler, Project};
+///
+/// struct MyProject;
+/// impl Project for MyProject {}
+///
+/// # #[tokio::main]
+/// # async fn main() -> cot::Result<()> {
+/// let bootstrapper = Bootstrapper::new(MyProject)
+///     .with_config(ProjectConfig::default())
+///     .boot()
+///     .await?;
+/// let handler: BoxedHandler = bootstrapper.finish().handler;
+/// # Ok(())
+/// # }
+/// ```
+pub use cot_core::handler::BoxedHandler;
+pub use cot_core::handler::RequestHandler;
+#[cfg(feature = "json")]
+#[doc(inline)]
+pub use cot_core::json;
+#[doc(inline)]
+pub use cot_core::{Body, Method, Result, StatusCode, error::Error, html, response};
 /// An attribute macro that defines an end-to-end test function for a
 /// Cot-powered app.
 ///
@@ -154,21 +181,11 @@ pub use cot_macros::e2e_test;
 /// ```
 pub use cot_macros::main;
 pub use cot_macros::test;
-pub use error::Error;
 #[cfg(feature = "openapi")]
 pub use schemars;
 pub use {bytes, http};
 
-pub use crate::handler::{BoxedHandler, RequestHandler};
+pub use crate::__private::askama::{Template, filter_fn};
 pub use crate::project::{
     App, AppBuilder, Bootstrapper, Project, ProjectContext, run, run_at, run_cli,
 };
-
-/// A type alias for a result that can return a [`cot::Error`].
-pub type Result<T> = std::result::Result<T, Error>;
-
-/// A type alias for an HTTP status code.
-pub type StatusCode = http::StatusCode;
-
-/// A type alias for an HTTP method.
-pub type Method = http::Method;

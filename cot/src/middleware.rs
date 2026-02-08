@@ -9,51 +9,44 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use bytes::Bytes;
 use futures_core::future::BoxFuture;
-use futures_util::TryFutureExt;
-use http_body_util::BodyExt;
-use http_body_util::combinators::BoxBody;
 use tower::Service;
 use tower_sessions::service::PlaintextCookie;
 use tower_sessions::{SessionManagerLayer, SessionStore};
 
+use crate::Error;
 #[cfg(feature = "cache")]
 use crate::config::CacheType;
 use crate::config::{Expiry, SameSite, SessionStoreTypeConfig};
-use crate::error::ErrorRepr;
 use crate::project::MiddlewareContext;
 use crate::request::Request;
 use crate::response::Response;
 use crate::session::store::SessionStoreWrapper;
+#[cfg(all(feature = "db", feature = "json"))]
+use crate::session::store::db::DbStore;
 #[cfg(feature = "json")]
 use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
 #[cfg(feature = "redis")]
 use crate::session::store::redis::RedisStore;
-use crate::{Body, Error};
 
 #[cfg(feature = "live-reload")]
 mod live_reload;
 
-#[cfg(feature = "live-reload")]
-pub use live_reload::LiveReloadMiddleware;
-
-/// Middleware that converts a any [`http::Response`] generic type to a
-/// [`cot::response::Response`].
+/// Middleware that converts any error type to [`Error`].
 ///
 /// This is useful for converting a response from a middleware that is
 /// compatible with the `tower` crate to a response that is compatible with
 /// Cot. It's applied automatically by
-/// [`RootHandlerBuilder::middleware()`](cot::project::RootHandlerBuilder::middleware())
-/// and is not needed to be added manually.
+/// [`RootHandlerBuilder::middleware`](crate::project::RootHandlerBuilder::middleware) and is not needed to be added
+/// manually.
 ///
 /// # Examples
 ///
 /// ```
+/// use cot::Project;
 /// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -61,120 +54,7 @@ pub use live_reload::LiveReloadMiddleware;
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
-///         handler
-///             // IntoCotResponseLayer used internally in middleware()
-///             .middleware(LiveReloadMiddleware::from_context(context))
-///             .build()
-///     }
-/// }
-/// ```
-#[derive(Debug, Copy, Clone)]
-pub struct IntoCotResponseLayer;
-
-impl IntoCotResponseLayer {
-    /// Create a new [`IntoCotResponseLayer`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::middleware::IntoCotResponseLayer;
-    ///
-    /// let middleware = IntoCotResponseLayer::new();
-    /// ```
-    #[must_use]
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Default for IntoCotResponseLayer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<S> tower::Layer<S> for IntoCotResponseLayer {
-    type Service = IntoCotResponse<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        IntoCotResponse { inner }
-    }
-}
-
-/// Service struct that converts any [`http::Response`] generic type to
-/// [`cot::response::Response`].
-///
-/// Used by [`IntoCotResponseLayer`].
-///
-/// # Examples
-///
-/// ```
-/// use std::any::TypeId;
-///
-/// use cot::middleware::{IntoCotResponse, IntoCotResponseLayer};
-///
-/// assert_eq!(
-///     TypeId::of::<<IntoCotResponseLayer as tower::Layer<()>>::Service>(),
-///     TypeId::of::<IntoCotResponse::<()>>()
-/// );
-/// ```
-#[derive(Debug, Clone)]
-pub struct IntoCotResponse<S> {
-    inner: S,
-}
-
-impl<S, ResBody, E> Service<Request> for IntoCotResponse<S>
-where
-    S: Service<Request, Response = http::Response<ResBody>>,
-    ResBody: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
-    E: std::error::Error + Send + Sync + 'static,
-{
-    type Response = Response;
-    type Error = S::Error;
-    type Future = futures_util::future::MapOk<S::Future, fn(http::Response<ResBody>) -> Response>;
-
-    #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    #[inline]
-    fn call(&mut self, request: Request) -> Self::Future {
-        self.inner.call(request).map_ok(map_response)
-    }
-}
-
-fn map_response<ResBody, E>(response: http::response::Response<ResBody>) -> Response
-where
-    ResBody: http_body::Body<Data = Bytes, Error = E> + Send + Sync + 'static,
-    E: std::error::Error + Send + Sync + 'static,
-{
-    response.map(|body| Body::wrapper(BoxBody::new(body.map_err(map_err))))
-}
-
-/// Middleware that converts any error type to [`cot::Error`].
-///
-/// This is useful for converting a response from a middleware that is
-/// compatible with the `tower` crate to a response that is compatible with
-/// Cot. It's applied automatically by
-/// [`RootHandlerBuilder::middleware()`](cot::project::RootHandlerBuilder::middleware())
-/// and is not needed to be added manually.
-///
-/// # Examples
-///
-/// ```
-/// use cot::middleware::LiveReloadMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
-///
-/// struct MyProject;
-/// impl Project for MyProject {
-///     fn middlewares(
-///         &self,
-///         handler: RootHandlerBuilder,
-///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler
 ///             // IntoCotErrorLayer used internally in middleware()
 ///             .middleware(LiveReloadMiddleware::from_context(context))
@@ -182,88 +62,42 @@ where
 ///     }
 /// }
 /// ```
-#[derive(Debug, Copy, Clone)]
-pub struct IntoCotErrorLayer;
-
-impl IntoCotErrorLayer {
-    /// Create a new [`IntoCotErrorLayer`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use cot::middleware::IntoCotErrorLayer;
-    ///
-    /// let middleware = IntoCotErrorLayer::new();
-    /// ```
-    #[must_use]
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Default for IntoCotErrorLayer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<S> tower::Layer<S> for IntoCotErrorLayer {
-    type Service = IntoCotError<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        IntoCotError { inner }
-    }
-}
-
-/// Service struct that converts a any error type to a [`cot::Error`].
+pub use cot_core::middleware::IntoCotErrorLayer;
+/// Middleware that converts any `http::Response` generic type
+/// to a [`Response`].
 ///
-/// Used by [`IntoCotErrorLayer`].
+/// This is useful for converting a response from a middleware that is
+/// compatible with the `tower` crate to a response that is compatible with
+/// Cot. It's applied automatically by
+/// [`RootHandlerBuilder::middleware`](crate::project::RootHandlerBuilder::middleware)
+/// and is not needed to be added manually.
 ///
 /// # Examples
 ///
 /// ```
-/// use std::any::TypeId;
+/// use cot::Project;
+/// use cot::middleware::LiveReloadMiddleware;
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
 ///
-/// use cot::middleware::{IntoCotError, IntoCotErrorLayer};
-///
-/// assert_eq!(
-///     TypeId::of::<<IntoCotErrorLayer as tower::Layer<()>>::Service>(),
-///     TypeId::of::<IntoCotError::<()>>()
-/// );
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn middlewares(
+///         &self,
+///         handler: RootHandlerBuilder,
+///         context: &MiddlewareContext,
+///     ) -> RootHandler {
+///         handler
+///             // IntoCotResponseLayer used internally in middleware()
+///             .middleware(LiveReloadMiddleware::from_context(context))
+///             .build()
+///     }
+/// }
 /// ```
-#[derive(Debug, Clone)]
-pub struct IntoCotError<S> {
-    inner: S,
-}
-
-impl<S> Service<Request> for IntoCotError<S>
-where
-    S: Service<Request>,
-    <S as Service<Request>>::Error: std::error::Error + Send + Sync + 'static,
-{
-    type Response = S::Response;
-    type Error = Error;
-    type Future = futures_util::future::MapErr<S::Future, fn(S::Error) -> Error>;
-
-    #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(map_err)
-    }
-
-    #[inline]
-    fn call(&mut self, request: Request) -> Self::Future {
-        self.inner.call(request).map_err(map_err)
-    }
-}
-
-fn map_err<E>(error: E) -> Error
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    Error::new(ErrorRepr::MiddlewareWrapped {
-        source: Box::new(error),
-    })
-}
+pub use cot_core::middleware::IntoCotResponseLayer;
+#[doc(inline)]
+pub use cot_core::middleware::{IntoCotError, IntoCotResponse};
+#[cfg(feature = "live-reload")]
+pub use live_reload::LiveReloadMiddleware;
 
 type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;
 
@@ -276,7 +110,7 @@ pub struct SessionMiddleware {
 }
 
 impl SessionMiddleware {
-    /// Crates a new instance of [`SessionMiddleware`].
+    /// Creates a new instance of [`SessionMiddleware`].
     #[must_use]
     pub fn new<S: SessionStore + Send + Sync + 'static>(store: S) -> Self {
         let layer = SessionManagerLayer::new(SessionStoreWrapper::new(Arc::new(store)));
@@ -289,9 +123,9 @@ impl SessionMiddleware {
     /// # Examples
     ///
     /// ```
+    /// use cot::Project;
     /// use cot::middleware::SessionMiddleware;
-    /// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-    /// use cot::{BoxedHandler, Project, ProjectContext};
+    /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
     ///
     /// struct MyProject;
     /// impl Project for MyProject {
@@ -299,7 +133,7 @@ impl SessionMiddleware {
     ///         &self,
     ///         handler: RootHandlerBuilder,
     ///         context: &MiddlewareContext,
-    ///     ) -> BoxedHandler {
+    ///     ) -> RootHandler {
     ///         handler
     ///             .middleware(SessionMiddleware::from_context(context))
     ///             .build()
@@ -314,7 +148,7 @@ impl SessionMiddleware {
     pub fn from_context(context: &MiddlewareContext) -> Self {
         let session_cfg = &context.config().middlewares.session;
         let store_type = session_cfg.store.store_type.clone();
-        let boxed_store = Self::config_to_session_store(store_type);
+        let boxed_store = Self::config_to_session_store(store_type, context);
         let arc_store = Arc::from(boxed_store);
         let layer = SessionManagerLayer::new(SessionStoreWrapper::new(arc_store));
         let mut middleware = SessionMiddleware { inner: layer }
@@ -488,6 +322,7 @@ impl SessionMiddleware {
     /// [`SessionStore`]
     fn config_to_session_store(
         config: SessionStoreTypeConfig,
+        context: &MiddlewareContext,
     ) -> Box<dyn SessionStore + Send + Sync> {
         match config {
             SessionStoreTypeConfig::Memory => Box::new(MemoryStore::new()),
@@ -509,10 +344,8 @@ impl SessionMiddleware {
                     }
                 }
             }
-            #[cfg(feature = "db")]
-            SessionStoreTypeConfig::Database => {
-                unimplemented!();
-            }
+            #[cfg(all(feature = "db", feature = "json"))]
+            SessionStoreTypeConfig::Database => Box::new(DbStore::new(context.database().clone())),
         }
     }
 }
@@ -622,8 +455,8 @@ where
 ///
 /// ```
 /// use cot::middleware::AuthMiddleware;
-/// use cot::project::{MiddlewareContext, RootHandlerBuilder};
-/// use cot::{BoxedHandler, Project, ProjectContext};
+/// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
+/// use cot::{Project, ProjectContext};
 ///
 /// struct MyProject;
 /// impl Project for MyProject {
@@ -631,7 +464,7 @@ where
 ///         &self,
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
-///     ) -> BoxedHandler {
+///     ) -> RootHandler {
 ///         handler.middleware(AuthMiddleware::new()).build()
 ///     }
 /// }
@@ -718,15 +551,25 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use http::Request;
-    use tower::{Layer, ServiceExt};
+    use tower::{Layer, Service, ServiceExt};
 
     use super::*;
     use crate::auth::Auth;
+    use crate::config::{
+        CacheUrl, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
+        SessionStoreConfig, SessionStoreTypeConfig,
+    };
+    use crate::middleware::SessionMiddleware;
+    use crate::project::{RegisterAppsContext, WithCache};
+    use crate::response::Response;
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
+    use crate::{AppBuilder, Body, Bootstrapper, Error, Project, ProjectContext};
 
     #[cot::test]
     async fn session_middleware_adds_session() {
@@ -736,9 +579,7 @@ mod tests {
         });
         let store = MemoryStore::default();
         let mut svc = SessionMiddleware::new(store).layer(svc);
-
         let request = TestRequestBuilder::get("/").build();
-
         svc.ready().await.unwrap().call(request).await.unwrap();
     }
 
@@ -866,5 +707,128 @@ mod tests {
 
         // Counter should have been incremented twice
         assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    async fn create_svc_and_call_with_req(context: &ProjectContext<WithCache>) {
+        let store = SessionMiddleware::from_context(context);
+        let svc = tower::service_fn(|req: Request<Body>| async move {
+            assert!(req.extensions().get::<Session>().is_some());
+            Ok::<_, Error>(Response::new(Body::empty()))
+        });
+        let mut svc = store.layer(svc);
+        let request = TestRequestBuilder::get("/").build();
+        svc.ready().await.unwrap().call(request).await.unwrap();
+    }
+
+    fn create_project_config(store: SessionStoreTypeConfig) -> ProjectConfig {
+        let mut project = ProjectConfig::builder();
+        let project = match store {
+            SessionStoreTypeConfig::Database => project.database(
+                DatabaseConfig::builder()
+                    .url("sqlite::memory:".to_string())
+                    .build(),
+            ),
+            _ => &mut project,
+        };
+
+        project
+            .middlewares(
+                MiddlewareConfig::builder()
+                    .session(
+                        SessionMiddlewareConfig::builder()
+                            .store(SessionStoreConfig::builder().store_type(store).build())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build()
+    }
+
+    struct TestProject;
+
+    impl Project for TestProject {
+        fn register_apps(&self, _apps: &mut AppBuilder, _context: &RegisterAppsContext) {}
+    }
+
+    #[cot::test]
+    async fn memory_store_factory_produces_working_store() {
+        let config = create_project_config(SessionStoreTypeConfig::Memory);
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(feature = "json")]
+    #[cot::test]
+    async fn session_middleware_file_config_to_session_store() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path: PathBuf = dir.path().to_path_buf();
+        let config = create_project_config(SessionStoreTypeConfig::File { path });
+
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(all(feature = "cache", feature = "redis"))]
+    #[cot::test]
+    #[ignore = "requires external Redis service"]
+    async fn session_middleware_redis_config_to_session_store() {
+        let redis_url =
+            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let uri = CacheUrl::from(redis_url);
+        let config = create_project_config(SessionStoreTypeConfig::Cache { uri });
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
+    }
+
+    #[cfg(all(feature = "db", feature = "json"))]
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    async fn session_middleware_database_config_to_session_store() {
+        let config = create_project_config(SessionStoreTypeConfig::Database);
+        let bootstrapper = Bootstrapper::new(TestProject)
+            .with_config(config)
+            .with_apps()
+            .with_database()
+            .await
+            .expect("bootstrap failed")
+            .with_cache()
+            .await
+            .expect("bootstrap failed");
+        let context = bootstrapper.context();
+
+        create_svc_and_call_with_req(context).await;
     }
 }

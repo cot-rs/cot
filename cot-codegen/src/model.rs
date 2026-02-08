@@ -92,7 +92,7 @@ impl ModelOpts {
         let table_name = if let Some(table_name) = &args.table_name {
             table_name.clone()
         } else {
-            original_name.to_string().to_snake_case()
+            original_name.clone().to_snake_case()
         };
 
         let primary_key_field = self.get_primary_key_field(&fields)?;
@@ -169,10 +169,10 @@ impl FieldOpts {
             }
 
             for arg in &type_path.path.segments {
-                if let syn::PathArguments::AngleBracketed(arg) = &arg.arguments {
-                    if let Some(ty) = Self::find_type_in_generics(arg, type_to_find) {
-                        return Some(ty);
-                    }
+                if let syn::PathArguments::AngleBracketed(arg) = &arg.arguments
+                    && let Some(ty) = Self::find_type_in_generics(arg, type_to_find)
+                {
+                    return Some(ty);
                 }
             }
         }

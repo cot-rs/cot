@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.4.0...cot-cli-v0.5.0) - 2026-01-21
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.4.0/cot-cli/0.5.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Email support using lettre ([#419](https://github.com/cot-rs/cot/pull/419)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+
+### Other
+
+- [**breaking**] Bump deps, bump MSRV to 1.88 ([#431](https://github.com/cot-rs/cot/pull/431)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Fix includes for `#[derive(Template)]` ([#446](https://github.com/cot-rs/cot/pull/446)) (by [@Kijewski](https://github.com/Kijewski))
+- *(deps)* Bump the dependencies group with 22 updates ([#401](https://github.com/cot-rs/cot/pull/401)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- *(deps)* Bump the dependencies group with 11 updates ([#407](https://github.com/cot-rs/cot/pull/407)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- Remove askama from the project template ([#452](https://github.com/cot-rs/cot/pull/452)) (by [@m4tx](https://github.com/m4tx))
+
+## [0.4.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.3.1...cot-cli-v0.4.0) - 2025-09-11
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.3.1/cot-cli/0.4.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Add `SelectField`; support more chrono form fields ([#345](https://github.com/cot-rs/cot/pull/345)) (by [@m4tx](https://github.com/m4tx))
+- [**breaking**] Error handling overhaul, more powerful custom error handlers ([#373](https://github.com/cot-rs/cot/pull/373)) (by [@m4tx](https://github.com/m4tx))
+- Support multiple session stores ([#277](https://github.com/cot-rs/cot/pull/277)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- DB session store implementation ([#360](https://github.com/cot-rs/cot/pull/360)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+
+### Other
+
+- [**breaking**] *(deps)* Bump all dependencies ([#361](https://github.com/cot-rs/cot/pull/361)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- Fix clippy warnings on Rust 1.88 ([#355](https://github.com/cot-rs/cot/pull/355)) (by [@m4tx](https://github.com/m4tx))
+- Warn on `clippy::allow_attributes`; fix clippy warnings ([#363](https://github.com/cot-rs/cot/pull/363)) (by [@m4tx](https://github.com/m4tx))
+- *(pre-commit)* Add HTML/Jinja2 linter & formatter ([#365](https://github.com/cot-rs/cot/pull/365)) (by [@melroy12](https://github.com/melroy12))
+
 ## [0.3.1](https://github.com/cot-rs/cot/compare/cot-cli-v0.3.0...cot-cli-v0.3.1) - 2025-05-16
 
 ### <!-- 1 -->New features

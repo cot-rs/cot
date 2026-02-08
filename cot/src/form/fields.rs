@@ -126,10 +126,10 @@ impl Display for StringField {
         if let Some(placeholder) = &self.custom_options.placeholder {
             tag.attr("placeholder", placeholder);
         }
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
         if let Some(autocomplete) = &self.custom_options.autocomplete {
             tag.attr("autocomplete", autocomplete.to_string());
@@ -247,10 +247,10 @@ impl Display for PasswordField {
         if let Some(placeholder) = &self.custom_options.placeholder {
             tag.attr("placeholder", placeholder);
         }
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
         if let Some(autocomplete) = &self.custom_options.autocomplete {
             tag.attr("autocomplete", autocomplete.to_string());
@@ -371,10 +371,10 @@ impl Display for EmailField {
         if let Some(placeholder) = &self.custom_options.placeholder {
             tag.attr("placeholder", placeholder);
         }
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
         if let Some(autocomplete) = &self.custom_options.autocomplete {
             tag.attr("autocomplete", autocomplete.to_string());
@@ -506,10 +506,10 @@ impl<T: Integer + Display> Display for IntegerField<T> {
         if let Some(placeholder) = &self.custom_options.placeholder {
             tag.attr("placeholder", placeholder);
         }
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
         if let Some(step) = &self.custom_options.step {
             tag.attr("step", step.to_string());
@@ -887,10 +887,10 @@ impl<T: Float + Display> Display for FloatField<T> {
         if let Some(placeholder) = &self.custom_options.placeholder {
             tag.attr("placeholder", placeholder);
         }
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
         if let Some(step) = &self.custom_options.step {
             tag.attr("step", step.to_string());
@@ -1040,10 +1040,10 @@ impl Display for UrlField {
         if let Some(placeholder) = &self.custom_options.placeholder {
             tag.attr("placeholder", placeholder);
         }
-        if let Some(readonly) = self.custom_options.readonly {
-            if readonly {
-                tag.bool_attr("readonly");
-            }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
         if let Some(autocomplete) = &self.custom_options.autocomplete {
             tag.attr("autocomplete", autocomplete.to_string());
@@ -1065,7 +1065,7 @@ impl Display for UrlField {
             let list_id = format!("__{}_datalist", self.id());
             tag.attr("list", &list_id);
 
-            let data_list = HtmlTag::data_list(list.clone(), &list_id);
+            let data_list = HtmlTag::data_list(list, &list_id);
             tag.push_tag(data_list);
         }
         if let Some(value) = &self.value {

@@ -59,17 +59,17 @@ docs-open:
 
 alias t := test
 
-test-all: test test-ignored
-
-alias ta := test-all
-
 test:
+    cargo nextest run --all-features --run-ignored all
+    cargo test --all-features --doc
+
+alias tni := test-no-ignored
+
+test-no-ignored:
     cargo nextest run --all-features
     cargo test --all-features --doc
 
 alias ti := test-ignored
 
 test-ignored:
-    docker compose up -d --wait
     cargo nextest run --all-features --run-ignored only
-    docker compose down

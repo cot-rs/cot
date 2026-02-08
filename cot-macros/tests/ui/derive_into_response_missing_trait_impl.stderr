@@ -2,7 +2,7 @@ error[E0599]: no method named `into_response` found for struct `Dummy` in the cu
  --> tests/ui/derive_into_response_missing_trait_impl.rs:3:10
   |
 3 | #[derive(IntoResponse)]
-  |          ^^^^^^^^^^^^ method not found in `Dummy`
+  |          ^^^^^^^^^^^^
 ...
 8 | struct Dummy;
   | ------------ method `into_response` not found for this struct

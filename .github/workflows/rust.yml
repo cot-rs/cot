@@ -173,9 +173,6 @@ jobs:
       - name: Build
         run: cargo build --all-features --tests
 
-      - name: Run the external dependencies
-        run: docker compose up -d --wait
-
       - name: Test
         run: cargo nextest run --all-features --run-ignored only
 
@@ -220,9 +217,6 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Run the external dependencies
-        run: docker compose up -d
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

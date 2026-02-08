@@ -145,6 +145,8 @@ pub struct FieldOpts {
     pub ty: syn::Type,
     pub primary_key: darling::util::Flag,
     pub unique: darling::util::Flag,
+    #[darling(default)]
+    pub many_to_many: Option<ManyToManyOpts>,
 }
 
 impl FieldOpts {
@@ -213,6 +215,17 @@ impl FieldOpts {
                 .map(ForeignKeySpec::try_from)
                 .transpose()?,
         );
+
+        let many_to_many_spec = match ManyToManySpec::try_from(self.ty.clone()) {
+            Ok(mut spec) => {
+                if let Some(attr) = &self.many_to_many {
+                    spec.attr = attr.clone();
+                }
+                Some(spec)
+            }
+            Err(_) => None,
+        };
+
         let is_primary_key = self.primary_key.is_present();
         let mut resolved_ty = self.ty.clone();
         symbol_resolver.resolve(&mut resolved_ty, self_reference);
@@ -224,6 +237,7 @@ impl FieldOpts {
             primary_key: is_primary_key,
             foreign_key,
             unique: self.unique.is_present(),
+            many_to_many: many_to_many_spec,
         })
     }
 }
@@ -261,6 +275,7 @@ pub struct Field {
     /// determined not to be a foreign key.
     pub foreign_key: Option<ForeignKeySpec>,
     pub unique: bool,
+    pub many_to_many: Option<ManyToManySpec>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -307,6 +322,97 @@ impl TryFrom<syn::Type> for ForeignKeySpec {
                 "expected ForeignKey to have a type generic argument",
             ))
         }
+    }
+}
+
+use syn::{Type, TypeGroup, TypeParen, TypePath, TypeReference};
+
+#[derive(Debug, Clone, FromMeta, Default, PartialEq, Eq, Hash)]
+pub struct ManyToManyOpts {
+    #[darling(default)]
+    pub table: Option<String>,
+    #[darling(default)]
+    pub owner_field: Option<String>,
+    #[darling(default)]
+    pub target_field: Option<String>,
+    #[darling(default)]
+    pub through: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ManyToManySpec {
+    pub to_model: syn::Type,
+    pub target_table_name: String,
+    pub attr: ManyToManyOpts,
+}
+
+impl TryFrom<syn::Type> for ManyToManySpec {
+    type Error = syn::Error;
+
+    fn try_from(ty: syn::Type) -> Result<Self, Self::Error> {
+        let syn::Type::Path(type_path) = &ty else {
+            return Err(syn::Error::new(
+                ty.span(),
+                "expected a path type for ManyToMany",
+            ));
+        };
+
+        let seg = type_path
+            .path
+            .segments
+            .last()
+            .expect("type path must have at least one segment");
+
+        let ident_str = seg.ident.to_string();
+        if ident_str != "ManyToMany" && !ident_str.ends_with("::ManyToMany") {
+            return Err(syn::Error::new(ty.span(), "expected ManyToMany<T>"));
+        }
+
+        let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
+            return Err(syn::Error::new(
+                ty.span(),
+                "expected ManyToMany to have angle-bracketed generic arguments",
+            ));
+        };
+
+        if args.args.len() != 1 {
+            return Err(syn::Error::new(
+                ty.span(),
+                "expected ManyToMany to have only one generic parameter",
+            ));
+        }
+
+        let inner = &args.args[0];
+        let inner_ty = if let syn::GenericArgument::Type(inner_ty) = inner {
+            inner_ty
+        } else {
+            return Err(syn::Error::new(
+                ty.span(),
+                "expected a type generic argument",
+            ));
+        };
+
+        fn type_to_snake_name(ty: &Type) -> Option<String> {
+            match ty {
+                Type::Path(TypePath { path, .. }) => path
+                    .segments
+                    .last()
+                    .map(|seg| seg.ident.to_string().to_snake_case()),
+                Type::Reference(TypeReference { elem, .. }) => type_to_snake_name(&*elem),
+                Type::Paren(TypeParen { elem, .. }) => type_to_snake_name(&*elem),
+                Type::Group(TypeGroup { elem, .. }) => type_to_snake_name(&*elem),
+                _ => None,
+            }
+        }
+
+        let target_table_name = type_to_snake_name(inner_ty)
+            .expect("Could not determine target table name from ManyToMany inner type");
+
+        Ok(ManyToManySpec {
+            to_model: inner_ty.clone(),
+            target_table_name,
+            attr: ManyToManyOpts::default(),
+        })
     }
 }
 

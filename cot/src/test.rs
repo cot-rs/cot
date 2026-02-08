@@ -92,10 +92,9 @@ impl Client {
     /// }
     /// ```
     #[must_use]
-    #[expect(clippy::future_not_send)] // used in the test code
     pub async fn new<P>(project: P) -> Self
     where
-        P: Project + 'static,
+        P: Project + Send + 'static,
     {
         let config = project.config("test").expect("Could not get test config");
         let bootstrapper = Bootstrapper::new(project)
@@ -1351,7 +1350,7 @@ pub struct TestServerBuilder<T> {
     project: T,
 }
 
-impl<T: Project + 'static> TestServerBuilder<T> {
+impl<T: Project + Send + 'static> TestServerBuilder<T> {
     /// Create a new test server.
     ///
     /// # Examples
@@ -1444,7 +1443,7 @@ pub struct TestServer<T> {
     project: PhantomData<fn() -> T>,
 }
 
-impl<T: Project + 'static> TestServer<T> {
+impl<T: Project + Send + 'static> TestServer<T> {
     async fn start(project: T) -> Self {
         let tcp_listener = TcpListener::bind("0.0.0.0:0")
             .await

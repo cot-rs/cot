@@ -38,6 +38,12 @@ pub struct List(Vec<String>);
 
 impl List {
     /// Creates a new `List` from any iterator of string-like items.
+    ///
+    /// # Examples
+    /// ```
+    /// use cot::form::fields::List;
+    /// let list = List::new(vec!["Option 1", "Option 2", "Option 3"]);
+    /// ```
     pub fn new<I, S>(iter: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -46,11 +52,37 @@ impl List {
         let v = iter.into_iter().map(|s| s.as_ref().to_string()).collect();
         Self(v)
     }
+
+    /// Returns an iterator over the items in the list.
+    ///
+    /// # Examples
+    /// ```
+    /// use cot::form::fields::List;
+    /// let list = List::new(vec!["Option 1", "Option 2", "Option 3"]);
+    /// for item in list.iter() {
+    ///     println!("{item:?}");
+    /// }
+    /// ```
+    pub fn iter(&self) -> std::slice::Iter<'_, String> {
+        self.0.iter()
+    }
 }
 
-impl From<List> for Vec<String> {
-    fn from(value: List) -> Self {
-        value.0
+impl IntoIterator for List {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<String>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a List {
+    type Item = &'a String;
+    type IntoIter = std::slice::Iter<'a, String>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 

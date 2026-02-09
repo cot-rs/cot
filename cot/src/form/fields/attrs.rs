@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn list_iter() {
         let list = List::new(["Option 1", "Option 2", "Option 3"]);
-        let collected: Vec<&str> = list.iter().map(|s| s.as_str()).collect();
+        let collected: Vec<&str> = list.iter().map(String::as_str).collect();
         assert_eq!(collected, vec!["Option 1", "Option 2", "Option 3"]);
     }
 }

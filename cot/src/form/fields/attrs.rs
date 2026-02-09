@@ -208,3 +208,53 @@ impl Display for Capture {
         f.write_str(self.as_str())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn autocapitalize_as_str() {
+        assert_eq!(AutoCapitalize::Off.as_str(), "off");
+        assert_eq!(AutoCapitalize::On.as_str(), "on");
+        assert_eq!(AutoCapitalize::Words.as_str(), "words");
+        assert_eq!(AutoCapitalize::Characters.as_str(), "characters");
+    }
+
+    #[test]
+    fn autocapitalize_to_string() {
+        assert_eq!(AutoCapitalize::Off.to_string(), "off");
+        assert_eq!(AutoCapitalize::On.to_string(), "on");
+        assert_eq!(AutoCapitalize::Words.to_string(), "words");
+        assert_eq!(AutoCapitalize::Characters.to_string(), "characters");
+    }
+
+    #[test]
+    fn autocomplete_as_str() {
+        assert_eq!(AutoComplete::Off.as_str(), "off");
+        assert_eq!(AutoComplete::On.as_str(), "on");
+        let custom = AutoComplete::Value("email".to_string());
+        assert_eq!(custom.as_str(), "email");
+    }
+
+    #[test]
+    fn dir_as_str() {
+        assert_eq!(Dir::Rtl.as_str(), "rtl");
+        assert_eq!(Dir::Ltr.as_str(), "ltr");
+        assert_eq!(Dir::Auto.as_str(), "auto");
+    }
+
+    #[test]
+    fn dir_to_string() {
+        assert_eq!(Dir::Rtl.to_string(), "rtl");
+        assert_eq!(Dir::Ltr.to_string(), "ltr");
+        assert_eq!(Dir::Auto.to_string(), "auto");
+    }
+
+    #[test]
+    fn list_iter() {
+        let list = List::new(["Option 1", "Option 2", "Option 3"]);
+        let collected: Vec<&str> = list.iter().map(|s| s.as_str()).collect();
+        assert_eq!(collected, vec!["Option 1", "Option 2", "Option 3"]);
+    }
+}

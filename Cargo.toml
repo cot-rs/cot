@@ -67,6 +67,7 @@ async-stream = "0.3"
 async-trait = "0.1"
 axum = { version = "0.8", default-features = false }
 backtrace = "0.3.76"
+blake3 = "1.8.3"
 bytes = "1.11"
 cargo_toml = "0.22"
 chrono = { version = "0.4.43", default-features = false }
@@ -90,6 +91,7 @@ email_address = "0.2.9"
 fake = "4"
 fantoccini = "0.22"
 form_urlencoded = "1"
+fs4 = { version = "0.13.1", features = ["tokio", "sync"] }
 futures = { version = "0.3", default-features = false }
 futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false }

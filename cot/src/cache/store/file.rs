@@ -53,10 +53,11 @@ use serde_json::Value;
 use thiserror::Error;
 use tokio::fs::OpenOptions;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::task::spawn_blocking;
 
 use crate::cache::store::{CacheStore, CacheStoreError, CacheStoreResult};
-use crate::config::Timeout;
-use crate::error::error_impl::impl_into_cot_error;
+use crate::config::{CacheStoreTypeConfig, Timeout};
+use cot_core::error::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "file-based cache store error:";
 const TEMPFILE_SUFFIX: &str = "tmp";
@@ -203,27 +204,15 @@ impl FileStore {
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
+        tokio::fs::rename(&file_path, self.dir_path.join(&key_hash))
+            .await
+            .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+
         file.unlock_async()
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
-        match tokio::fs::rename(&file_path, self.dir_path.join(&key_hash)).await {
-            Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                // if the source temp file is gone, it means another thread
-                // likely renamed it already or the directory was cleared.
-                // In a thundering herd, this is actually a "success" state
-                // because the data is already there.
-                Ok(())
-            }
-            // this branch checks for access denied that might
-            // happen during race conditions on Windows
-            // when we try to rename the file. We are passing this
-            // because another thread/process is probably writing
-            // a newer cache file
-            Err(e) if e.raw_os_error() == Some(ERROR_ACCESS_DENIED) => Ok(()),
-            Err(e) => Err(FileCacheStoreError::Io(Box::new(e)))?,
-        }
+        Ok(())
     }
 
     async fn read(&self, key: &str) -> CacheStoreResult<Option<Value>> {
@@ -349,39 +338,85 @@ impl FileStore {
         Ok(Some(value))
     }
 
+    #[allow(clippy::incompatible_msrv)]
+    fn claim_and_lock_on_handoff(new_temp_path: &Path) -> Result<tokio::fs::File, std::io::Error> {
+        let current_temp_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(new_temp_path)
+            .inspect(|handle| {
+                let _ = handle.lock();
+            })?;
+
+        let temp_file_std = std::fs::OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create_new(true)
+            .open(new_temp_path)?;
+
+        let _ = temp_file_std.lock();
+        let _ = current_temp_file.unlock();
+
+        Ok(tokio::fs::File::from_std(temp_file_std))
+    }
+
+    #[allow(clippy::incompatible_msrv)]
     async fn create_file_temp(
         &self,
         key_hash: &str,
     ) -> CacheStoreResult<(tokio::fs::File, std::path::PathBuf)> {
         let temp_path = self.dir_path.join(format!("{key_hash}.{TEMPFILE_SUFFIX}"));
 
+        // We must let the loop to propagate upwards to catch sudden missing cache directory
+        // Then it would be easier for us to wait for file creation where we offload one lock check into the OS by using `create_new()`. So, the flow looks like this,
+        // 1. create_new() -> fail, we check if the error is OS_EXIST
+        // 2. we move this into a loop then park into a blocking thread waiting for the lock to move. On lock acquired, the current thread must recreate the file again, drop the old lock and the subsequent thread moves forward into the step in which the current thread was doing.
+
         let temp_file = loop {
             match OpenOptions::new()
                 .write(true)
                 .read(true)
-                .create(true)
-                .truncate(false)
+                .create_new(true)
+                .truncate(true)
                 .open(&temp_path)
                 .await
             {
                 Ok(handle) => {
-                    if let Ok(lock_aquired) = handle.try_lock_exclusive()
-                        && lock_aquired
+                    if let Ok(lock_acquired) = handle.try_lock_exclusive()
+                        && lock_acquired
                     {
-                        handle
-                            .set_len(0)
-                            .await
-                            .map_err(|e| FileCacheStoreError::TempFileCreation(Box::new(e)))?;
-
                         break handle;
                     }
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    // if this fails then we should bail regardless
-                    self.create_dir_root()
+                // trigger to enter the offloading loop
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    let new_temp_path = temp_path.clone();
+                    let new_temp_file: Result<tokio::fs::File, FileCacheStoreError> =
+                        spawn_blocking(move || {
+                            loop {
+                                match Self::claim_and_lock_on_handoff(&new_temp_path) {
+                                    Ok(handle) => break Ok(handle),
+                                    Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                                        continue;
+                                    }
+                                    Err(e) => {
+                                        break Err(FileCacheStoreError::TempFileCreation(
+                                            Box::new(e),
+                                        ))?;
+                                    }
+                                }
+                            }
+                        })
                         .await
-                        .map_err(|e| FileCacheStoreError::DirCreation(Box::new(e)))?;
+                        .map_err(|e| FileCacheStoreError::TempFileCreation(Box::new(e)))?;
+                    break new_temp_file?;
                 }
+                // trigger to create the new directory
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => self
+                    .create_dir_root()
+                    .await
+                    .map_err(|e| FileCacheStoreError::DirCreation(Box::new(e)))?,
                 Err(e) => {
                     return Err(FileCacheStoreError::TempFileCreation(Box::new(e)))?;
                 }

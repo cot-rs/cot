@@ -914,7 +914,6 @@ dependencies = [
  "fantoccini",
  "form_urlencoded",
  "fs4",
- "futures",
  "futures-core",
  "futures-util",
  "grass",

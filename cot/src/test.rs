@@ -4,6 +4,8 @@ use std::any::Any;
 use std::future::poll_fn;
 use std::marker::PhantomData;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+#[cfg(feature = "cache")]
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -26,6 +28,10 @@ use crate::auth::db::DatabaseUserBackend;
 use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 #[cfg(feature = "cache")]
 use crate::cache::Cache;
+#[cfg(feature = "cache")]
+use crate::cache::store::file::FileCacheStoreError;
+#[cfg(feature = "cache")]
+use crate::cache::store::file::FileStore;
 #[cfg(feature = "cache")]
 use crate::cache::store::memory::Memory;
 #[cfg(feature = "redis")]
@@ -1763,6 +1769,9 @@ enum CacheKind {
         #[expect(unused)]
         allocator: RedisDbAllocator,
     },
+    File {
+        path: PathBuf,
+    },
 }
 
 /// A test cache.
@@ -1897,6 +1906,59 @@ impl TestCache {
         Ok(this)
     }
 
+    /// Create a new file store test cache
+    ///
+    /// This will create a new directory for the test cache instance
+    /// in  `{tmp_dir}/cot_test_cache_run_{i}` where `tmp_dir` is
+    /// the path returned by `std::env::temp_dir()` and `i` is the
+    /// instance number of the directory. The constructor will iterate
+    /// over the base path before committing the directory where the
+    /// cache directory will be created.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use cot::test::TestCache;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let test_cache = TestCache::new_file();
+    /// let cache = test_cache.cache();
+    ///
+    /// // do something with the cache
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the cache directory could not be created
+    pub fn new_file() -> Result<Self> {
+        let base_path = std::env::temp_dir().join(format!("cot_test_cache_{}", std::process::id()));
+
+        let _ = std::fs::create_dir_all(&base_path);
+
+        let mut i = 0;
+        let path = loop {
+            let candidate = base_path.join(format!("run_{i}"));
+
+            match std::fs::create_dir(&candidate) {
+                Ok(()) => break candidate,
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    i += 1;
+                }
+                Err(e) => return Err(FileCacheStoreError::DirCreation(Box::new(e)))?,
+            }
+        };
+
+        let file_store = FileStore::new(path.clone())?;
+
+        let cache = Cache::new(file_store, Some("dev_test".to_string()), Timeout::default());
+
+        Ok(Self::new(cache, CacheKind::File { path }))
+    }
+
     /// Get the cache.
     ///
     /// # Examples
@@ -1945,6 +2007,9 @@ impl TestCache {
         #[cfg(feature = "redis")]
         if let CacheKind::Redis { allocator: _ } = &self.kind {
             self.cache.clear().await?;
+        }
+        if let CacheKind::File { path } = &self.kind {
+            let _ = tokio::fs::remove_dir_all(path).await;
         }
         Ok(())
     }

@@ -35,7 +35,7 @@ digest.workspace = true
 email_address.workspace = true
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 form_urlencoded.workspace = true
-fs4.workspace = true
+fs4 = { workspace = true, optional = true }
 futures-core.workspace = true
 futures-util.workspace = true
 hex.workspace = true

@@ -27,7 +27,9 @@ use derive_more::{Debug, Deref, Display};
 #[cfg(test)]
 use mockall::automock;
 use query::Query;
-pub use relations::{ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
+pub use relations::{
+    ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy, ManyToMany, ManyToManyField,
+};
 use sea_query::{
     ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
 };

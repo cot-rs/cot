@@ -1841,6 +1841,7 @@ mod tests {
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(crate::Table4),
                     }),
+                    many_to_many: None,
                 }],
             },
         ];

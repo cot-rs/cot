@@ -1125,22 +1125,9 @@ impl GeneratedMigration {
             } => {
                 let to_type = match to {
                     DynOperation::CreateModel { model_ty, .. } => model_ty,
-                    DynOperation::AddField { .. } => unreachable!(
-                        "AddField operation shouldn't be a dependency of CreateModel \
-                    because it doesn't create a new model"
-                    ),
-                    DynOperation::RemoveField { .. } => unreachable!(
-                        "RemoveField operation shouldn't be a dependency of CreateModel \
-                    because it doesn't create a new model"
-                    ),
-                    DynOperation::RemoveModel { .. } => unreachable!(
-                        "RemoveModel operation shouldn't be a dependency of CreateModel \
-                    because it doesn't create a new model"
-                    ),
-                    DynOperation::AlterField { .. } => unreachable!(
-                        "AlterField operation shouldn't be a dependency of CreateModel \
-                    because it doesn't create a new model"
-                    ),
+                    _ => {
+                        unreachable!("Only CreateModel can be a dependency target for CreateModel")
+                    }
                 };
                 trace!(
                     "Removing foreign keys from {} to {}",
@@ -1164,23 +1151,10 @@ impl GeneratedMigration {
 
                 result
             }
-            DynOperation::AddField { .. } => {
-                // AddField only links two already existing models together, so
-                // removing it shouldn't ever affect whether a graph is cyclic
-                unreachable!("AddField operation should never create cycles")
-            }
-            DynOperation::RemoveField { .. } => {
-                // RemoveField doesn't create dependencies, it only removes a field
-                unreachable!("RemoveField operation should never create cycles")
-            }
-            DynOperation::RemoveModel { .. } => {
-                // RemoveModel doesn't create dependencies, it only removes a model
-                unreachable!("RemoveModel operation should never create cycles")
-            }
-            DynOperation::AlterField { .. } => {
-                // AlterField only changes metadata of an existing field,
-                // so it does not create dependency cycles.
-                unreachable!("AlterField operation should never create cycles")
+            _ => {
+                // Only CreateModel can create dependency cycles; all other ops
+                // change existing schema without introducing new FK dependencies.
+                unreachable!("Only CreateModel operation can create cycles")
             }
         }
     }
@@ -1424,6 +1398,7 @@ impl Repr for DynDependency {
 /// runtime and is using codegen types.
 ///
 /// This is used to generate migration files.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DynOperation {
     CreateModel {

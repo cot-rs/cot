@@ -1,6 +1,6 @@
 [package]
 name = "cot-cli"
-version = "0.5.0"
+version = "0.6.0"
 description = "Command-line interface for the Cot web framework"
 categories = ["command-line-utilities", "web-programming"]
 edition.workspace = true

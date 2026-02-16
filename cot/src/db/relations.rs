@@ -92,11 +92,11 @@ impl<T: Model> ForeignKey<T> {
     /// could not be found in the database.
     ///
     /// Returns an error if there was a problem communicating with the database.
-    pub async fn get<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<&T> {
+    pub async fn get<DB: DatabaseBackend>(&mut self, mut db: DB) -> Result<&T> {
         match self {
             Self::Model(model) => Ok(model),
             Self::PrimaryKey(pk) => {
-                let model = T::get_by_primary_key(db, pk.clone())
+                let model = T::get_by_primary_key(&mut db, pk.clone())
                     .await?
                     .ok_or(DatabaseError::ForeignKeyNotFound)?;
                 *self = Self::Model(Box::new(model));

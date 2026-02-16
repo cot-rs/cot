@@ -60,7 +60,11 @@ use cot_core::error::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "file-based cache store error:";
 const TEMPFILE_SUFFIX: &str = "tmp";
-const MAX_RETRIES: i32 = 32;
+
+// This is a retry limit for edge-cases where a file has been
+// created but failed to be locked immediately, where such case
+// happens multiple times.
+const INTERNAL_MAX_RETRIES: i32 = 5;
 
 // This header offset skips exactly one i64 integer,
 // which is the basis of our current expiry timestamp
@@ -392,7 +396,7 @@ impl FileStore {
                     // We try again when we can't lock maybe due to external processes.
                     // However, if failure keeps happening here, we must abort.
                     retry_count += 1;
-                    if retry_count > MAX_RETRIES {
+                    if retry_count > INTERNAL_MAX_RETRIES {
                         return Err(FileCacheStoreError::TempFileCreation(Box::new(
                             std::io::Error::new(
                                 std::io::ErrorKind::TimedOut,

@@ -172,7 +172,7 @@ impl HtmlTag {
         }
     }
 
-    /// Creates a new `HtmlTag` instance for an input element.
+    /// Creates a new `HtmlTag` instance for an [input] element.
     ///
     /// # Examples
     ///
@@ -182,6 +182,8 @@ impl HtmlTag {
     /// let input = HtmlTag::input("text");
     /// assert_eq!(input.render().as_str(), "<input type=\"text\"/>");
     /// ```
+    ///
+    /// [input]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input
     #[must_use]
     pub fn input(input_type: &str) -> Self {
         let mut input = Self::new("input");
@@ -189,7 +191,7 @@ impl HtmlTag {
         input
     }
 
-    /// Creates a new `HtmlTag` instance for a datalist element.
+    /// Creates a new `HtmlTag` instance for a [datalist] element.
     ///
     /// # Examples
     /// ```
@@ -197,6 +199,8 @@ impl HtmlTag {
     /// let data_list = HtmlTag::data_list(vec!["Option 1", "Option 2"], "my-datalist");
     /// let rendered = data_list.render();
     /// ```
+    ///
+    /// [datalist]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/datalist
     #[must_use]
     pub fn data_list<I, S>(list: I, id: &str) -> Self
     where
@@ -212,7 +216,7 @@ impl HtmlTag {
             let l = item.as_ref();
             let mut option = HtmlTag::new("option");
             option.attr("value", l);
-            option.push_str(l);
+            // option.push_str(l);
             options.push(HtmlNode::Tag(option));
         }
 

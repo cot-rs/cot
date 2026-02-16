@@ -123,20 +123,16 @@ impl Display for StringField {
             tag.attr("minlength", min_length.to_string());
         }
 
-        if let Some(placeholder) = &self.custom_options.placeholder {
-            tag.attr("placeholder", placeholder);
-        }
-        if let Some(readonly) = self.custom_options.readonly
-            && readonly
-        {
-            tag.bool_attr("readonly");
-        }
-        if let Some(autocomplete) = &self.custom_options.autocomplete {
-            tag.attr("autocomplete", autocomplete.to_string());
-        }
-
         if let Some(size) = self.custom_options.size {
             tag.attr("size", size.to_string());
+        }
+
+        if let Some(autocapitalize) = &self.custom_options.autocapitalize {
+            tag.attr("autocapitalize", autocapitalize.to_string());
+        }
+
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
         }
 
         if let Some(dir) = &self.custom_options.dir {
@@ -153,6 +149,16 @@ impl Display for StringField {
 
             let data_list = HtmlTag::data_list(list.clone(), &list_id);
             tag.push_tag(data_list);
+        }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
 
         if let Some(value) = &self.value {
@@ -244,6 +250,15 @@ impl Display for PasswordField {
         if let Some(min_length) = self.custom_options.min_length {
             tag.attr("minlength", min_length.to_string());
         }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
         if let Some(placeholder) = &self.custom_options.placeholder {
             tag.attr("placeholder", placeholder);
         }
@@ -251,13 +266,6 @@ impl Display for PasswordField {
             && readonly
         {
             tag.bool_attr("readonly");
-        }
-        if let Some(autocomplete) = &self.custom_options.autocomplete {
-            tag.attr("autocomplete", autocomplete.to_string());
-        }
-
-        if let Some(size) = self.custom_options.size {
-            tag.attr("size", size.to_string());
         }
 
         // we don't set the value attribute for password fields
@@ -368,20 +376,13 @@ impl Display for EmailField {
         if let Some(min_length) = self.custom_options.min_length {
             tag.attr("minlength", min_length.to_string());
         }
-        if let Some(placeholder) = &self.custom_options.placeholder {
-            tag.attr("placeholder", placeholder);
-        }
-        if let Some(readonly) = self.custom_options.readonly
-            && readonly
-        {
-            tag.bool_attr("readonly");
-        }
-        if let Some(autocomplete) = &self.custom_options.autocomplete {
-            tag.attr("autocomplete", autocomplete.to_string());
-        }
 
         if let Some(size) = self.custom_options.size {
             tag.attr("size", size.to_string());
+        }
+
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
         }
 
         if let Some(dir) = &self.custom_options.dir {
@@ -397,6 +398,15 @@ impl Display for EmailField {
             tag.attr("list", &list_id);
 
             data_list = Some(HtmlTag::data_list(list.clone(), &list_id));
+        }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
         }
 
         if let Some(value) = &self.value {
@@ -1001,9 +1011,9 @@ pub struct UrlFieldOptions {
     ///
     /// [`size`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#size
     pub size: Option<u32>,
-    /// The [`List`] of options for the `datalist` element, which can be used to
-    /// provide predefined options for the input.
-    pub list: Option<List>,
+    /// The [`AutoComplete`] attribute in the HTML input element, which is used
+    /// to specify how the browser should handle autocomplete for the input.
+    pub autocomplete: Option<AutoComplete>,
     /// The direction of the text input, which can be set to `ltr`
     /// (left-to-right) or `rtl` (right-to-left). This corresponds to the
     /// [`Dir`] attribute in the HTML input element.
@@ -1013,9 +1023,9 @@ pub struct UrlFieldOptions {
     ///
     /// [`dirname`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#dirname
     pub dirname: Option<String>,
-    /// The [`AutoComplete`] attribute in the HTML input element, which is used
-    /// to specify how the browser should handle autocomplete for the input.
-    pub autocomplete: Option<AutoComplete>,
+    /// The [`List`] of options for the `datalist` element, which can be used to
+    /// provide predefined options for the input.
+    pub list: Option<List>,
     /// The placeholder text for the input field, which is displayed when the
     /// field is empty.
     pub placeholder: Option<String>,
@@ -1037,20 +1047,13 @@ impl Display for UrlField {
         if let Some(min_length) = self.custom_options.min_length {
             tag.attr("minlength", min_length.to_string());
         }
-        if let Some(placeholder) = &self.custom_options.placeholder {
-            tag.attr("placeholder", placeholder);
-        }
-        if let Some(readonly) = self.custom_options.readonly
-            && readonly
-        {
-            tag.bool_attr("readonly");
-        }
-        if let Some(autocomplete) = &self.custom_options.autocomplete {
-            tag.attr("autocomplete", autocomplete.to_string());
-        }
 
         if let Some(size) = self.custom_options.size {
             tag.attr("size", size.to_string());
+        }
+
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
         }
 
         if let Some(dir) = &self.custom_options.dir {
@@ -1068,6 +1071,16 @@ impl Display for UrlField {
             let data_list = HtmlTag::data_list(list, &list_id);
             tag.push_tag(data_list);
         }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -1134,6 +1147,7 @@ mod tests {
         assert!(html.contains("dirname=\"dir\""));
         assert!(html.contains("placeholder=\"Enter text\""));
         assert!(html.contains("readonly"));
+        assert!(html.contains("<datalist id=\"__test_datalist\"><option value=\"bar\"/><option value=\"baz\"/></datalist>"));
     }
 
     #[cot::test]
@@ -1257,7 +1271,7 @@ mod tests {
         assert!(html.contains("dir=\"ltr\""));
         assert!(html.contains("dirname=\"dir\""));
         assert!(html.contains("list=\"__test_id_datalist\""));
-        assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com">foo@example.com</option><option value="baz@example.com">baz@example.com</option></datalist>"#));
+        assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com"/><option value="baz@example.com"/></datalist>"#));
     }
 
     #[cot::test]

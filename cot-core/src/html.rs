@@ -172,7 +172,7 @@ impl HtmlTag {
         }
     }
 
-    /// Creates a new `HtmlTag` instance for an input element.
+    /// Creates a new `HtmlTag` instance for an [input] element.
     ///
     /// # Examples
     ///
@@ -182,11 +182,46 @@ impl HtmlTag {
     /// let input = HtmlTag::input("text");
     /// assert_eq!(input.render().as_str(), "<input type=\"text\"/>");
     /// ```
+    ///
+    /// [input]: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input
     #[must_use]
     pub fn input(input_type: &str) -> Self {
         let mut input = Self::new("input");
         input.attr("type", input_type);
         input
+    }
+
+    /// Creates a new `HtmlTag` instance for a [datalist] element.
+    ///
+    /// # Examples
+    /// ```
+    /// use cot::html::HtmlTag;
+    /// let data_list = HtmlTag::data_list(vec!["Option 1", "Option 2"], "my-datalist");
+    /// let rendered = data_list.render();
+    /// ```
+    ///
+    /// [datalist]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/datalist
+    #[must_use]
+    pub fn data_list<I, S>(list: I, id: &str) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut data_list = Self::new("datalist");
+        data_list.attr("id", id);
+
+        let mut options: Vec<HtmlNode> = Vec::new();
+
+        for item in list {
+            let l = item.as_ref();
+            let mut option = HtmlTag::new("option");
+            option.attr("value", l);
+            // option.push_str(l);
+            options.push(HtmlNode::Tag(option));
+        }
+
+        data_list.children = options;
+        data_list
     }
 
     /// Adds an attribute to the HTML tag.

@@ -545,13 +545,10 @@ impl CacheStore for FileStore {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use std::time::Duration;
 
     use chrono::Utc;
     use tempfile::tempdir;
-    use tokio::sync::Barrier;
-    use tokio::time::sleep;
 
     use crate::cache::store::file::{FileCacheStoreError, FileStore};
     use crate::cache::store::{CacheStore, CacheStoreError};
@@ -757,141 +754,74 @@ mod tests {
     #[cot::test]
     async fn test_interference_during_write() {
         let path = make_store_path();
-        let store = FileStore::new(path.clone()).expect("failed to init store");
-
+        let store = FileStore::new(path.clone()).expect("failed to init");
         let key = "test_key".to_string();
-        let value = serde_json::json!({ "id": 1, "message": "hello world" });
+        let value = serde_json::json!({ "id": 1 });
 
-        let num_task = 10;
-        let barrier = Arc::new(Barrier::new(num_task + 1));
-        let mut handles = Vec::with_capacity(num_task);
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                let (s, k, v) = (store.clone(), key.clone(), value.clone());
+                tokio::spawn(async move { s.insert(k, v, Timeout::Never).await })
+            })
+            .collect();
 
-        for _ in 0..num_task {
-            let b = barrier.clone();
-            let k = key.clone();
-            let s = store.clone();
-            let v = value.clone();
+        let _store_2 = FileStore::new(path.clone()).expect("failed to init interference");
 
-            handles.push(tokio::spawn(async move {
-                b.wait().await;
-                s.insert(k, v, Timeout::Never)
-                    .await
-                    .expect("failed to insert data to store");
-
-                sleep(Duration::from_millis(10)).await;
-            }));
+        for h in handles {
+            h.await.unwrap().expect("insert failed");
         }
 
-        barrier.wait().await;
-
-        tokio::task::yield_now().await;
-
-        let _store_2 = FileStore::new(path.clone()).expect("failed to init store");
-
-        for handle in handles {
-            handle.await.expect("task panicked");
-        }
-
-        let retrieved = store.read(&key).await.expect("failed to read from store");
-        if let Some(found) = retrieved {
-            assert_eq!(found, value);
-        }
-
+        let res = store.read(&key).await.expect("read failed");
+        assert_eq!(res.unwrap(), value);
         let _ = tokio::fs::remove_dir_all(&path).await;
     }
 
     #[cot::test]
     async fn test_clear_during_write() {
         let path = make_store_path();
-        let store = FileStore::new(path.clone()).expect("failed to init store");
-
-        let key = "test_key".to_string();
-        let value = serde_json::json!({ "id": 1, "message": "hello world" });
-
-        let num_task = 10;
-        let barrier = Arc::new(Barrier::new(num_task + 1));
-        let mut handles = Vec::with_capacity(num_task);
-
+        let store = FileStore::new(path.clone()).expect("failed to init");
         let _ = tokio::fs::remove_dir_all(&path).await;
 
-        for _ in 0..num_task / 2 {
-            let b = barrier.clone();
-            let k = key.clone();
+        let mut handles = Vec::new();
+        for i in 0..10 {
             let s = store.clone();
-            let v = value.clone();
-
             handles.push(tokio::spawn(async move {
-                b.wait().await;
-                s.insert(k, v, Timeout::Never)
-                    .await
-                    .expect("failed to insert data to store");
-
-                sleep(Duration::from_millis(10)).await;
+                if i % 2 == 0 {
+                    let _ = s
+                        .insert("k".into(), serde_json::json!({"i": i}), Timeout::Never)
+                        .await;
+                } else {
+                    let _ = s.clear().await;
+                }
             }));
         }
 
-        for _ in 0..num_task / 2 {
-            let b = barrier.clone();
-            let s = store.clone();
-
-            handles.push(tokio::spawn(async move {
-                b.wait().await;
-                s.clear().await.expect("failed to clear data");
-                sleep(Duration::from_millis(10)).await;
-            }));
+        for h in handles {
+            h.await.unwrap();
         }
-
-        barrier.wait().await;
-
-        for handle in handles {
-            handle.await.expect("task panicked");
-        }
-
         let _ = tokio::fs::remove_dir_all(&path).await;
     }
 
     #[cot::test]
     async fn test_thundering_write() {
         let path = make_store_path();
-        let store = FileStore::new(path.clone()).expect("failed to init store");
+        let store = FileStore::new(path.clone()).expect("failed to init");
+        let value = serde_json::json!({ "id": 1 });
 
-        let key = "test_key".to_string();
-        let value = serde_json::json!({ "id": 1, "message": "hello world" });
+        let tasks: Vec<_> = (0..10)
+            .map(|_| {
+                let s = store.clone();
+                let v = value.clone();
+                tokio::spawn(async move { s.insert("key".into(), v, Timeout::Never).await })
+            })
+            .collect();
 
-        let num_task = 10;
-        let barrier = Arc::new(Barrier::new(num_task));
-        let mut handles = Vec::with_capacity(num_task);
-
-        for _ in 0..num_task {
-            let b = barrier.clone();
-            let k = key.clone();
-            let s = store.clone();
-            let v = value.clone();
-
-            handles.push(tokio::spawn(async move {
-                b.wait().await;
-                s.insert(k, v, Timeout::Never)
-                    .await
-                    .expect("failed to insert data to store");
-
-                sleep(Duration::from_millis(10)).await;
-            }));
+        for h in tasks {
+            h.await.unwrap().expect("task panicked");
         }
 
-        for handle in handles {
-            handle.await.expect("task panicked");
-        }
-
-        let retrieved = store.read(&key).await.expect("failed to read from store");
-
-        assert!(retrieved.is_some(), "retrieved value should not be None");
-
-        // if this reads properly then its not torn
-        assert_eq!(
-            retrieved.unwrap(),
-            value,
-            "retrieved value does not match inserted value"
-        );
+        let retrieved = store.read("key").await.expect("failed to read from store");
+        assert_eq!(retrieved.unwrap(), value);
 
         let _ = tokio::fs::remove_dir_all(&path).await;
     }

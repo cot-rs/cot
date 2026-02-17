@@ -986,8 +986,9 @@ mod tests {
 
     #[cot::test]
     async fn test_cache_from_config_file() {
-        use crate::config::{CacheConfig, CacheStoreConfig};
         use std::env;
+
+        use crate::config::{CacheConfig, CacheStoreConfig};
 
         let temp_path =
             env::temp_dir().join(format!("test_cot_cache_file_store_{}", std::process::id()));

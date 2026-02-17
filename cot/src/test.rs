@@ -1922,7 +1922,7 @@ impl TestCache {
     ///
     /// # #[tokio::main]
     /// # async fn main() -> cot::Result<()> {
-    /// let test_cache = TestCache::new_file();
+    /// let test_cache = TestCache::new_file()?;
     /// let cache = test_cache.cache();
     ///
     /// // do something with the cache

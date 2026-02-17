@@ -791,6 +791,8 @@ impl Cache {
                     let file_store = FileStore::new(path.clone())?;
                     Self::new(file_store, config.prefix.clone(), config.timeout)
                 }
+                #[expect(unused)]
+                _ => unimplemented!(),
             }
         };
 

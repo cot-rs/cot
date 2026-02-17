@@ -23,4 +23,5 @@ allow = [
     "0BSD",
     "BSD-3-Clause",
     "Zlib",
+    "BSD-2-Clause",
 ]

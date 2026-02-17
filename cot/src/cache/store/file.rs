@@ -47,6 +47,7 @@ use std::path::Path;
 
 use blake3::hash;
 use chrono::{DateTime, Utc};
+use cot_core::error::impl_into_cot_error;
 use fs4::tokio::AsyncFileExt;
 use serde_json::Value;
 use thiserror::Error;
@@ -56,7 +57,6 @@ use tokio::task::spawn_blocking;
 
 use crate::cache::store::{CacheStore, CacheStoreError, CacheStoreResult};
 use crate::config::Timeout;
-use cot_core::error::impl_into_cot_error;
 
 const ERROR_PREFIX: &str = "file-based cache store error:";
 const TEMPFILE_SUFFIX: &str = "tmp";
@@ -203,11 +203,18 @@ impl FileStore {
             .await?;
 
         // Here's the flow:
-        // We sync the data after writing to it. This ensures that we get the correctly written data even if the later ops fail.
-        // We unlock first to let progress move. This is free when there are no concurrent accessor. If we rename then unlock, the final file gets locked instead when subsequent readers progress, defeating the purpose of this method.
-        // We create a new file handle to see whether the file still exists or not. If it doesn't exist, we move on. It's most likely has been deleted by `create_dir_root_sync` or `clear`.
-        // Finally, we rename only if the thread reasonably hold the "last" lock to the .tmp.
-        // This doesn't guarantee that no .tmp file will be renamed by another thread, but it pushes the guarantees towards "writers write and hold in .tmp file, not contesting the final file"
+        // We sync the data after writing to it. This ensures that we get the correctly
+        // written data even if the later ops fail. We unlock first to let
+        // progress move. This is free when there are no concurrent accessor. If we
+        // rename then unlock, the final file gets locked instead when subsequent
+        // readers progress, defeating the purpose of this method. We create a
+        // new file handle to see whether the file still exists or not. If it doesn't
+        // exist, we move on. It's most likely has been deleted by
+        // `create_dir_root_sync` or `clear`. Finally, we rename only if the
+        // thread reasonably hold the "last" lock to the .tmp. This doesn't
+        // guarantee that no .tmp file will be renamed by another thread, but it pushes
+        // the guarantees towards "writers write and hold in .tmp file, not contesting
+        // the final file"
         file.sync_data()
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
@@ -368,13 +375,19 @@ impl FileStore {
     ) -> CacheStoreResult<(tokio::fs::File, std::path::PathBuf)> {
         let temp_path = self.dir_path.join(format!("{key_hash}.{TEMPFILE_SUFFIX}"));
 
-        // We must let the loop to propagate upwards to catch sudden missing cache directory
-        // Then it would be easier for us to wait for file creation where we offload one lock check into the OS by using `create_new()`. So, the flow looks like this,
+        // We must let the loop to propagate upwards to catch sudden missing cache
+        // directory Then it would be easier for us to wait for file creation
+        // where we offload one lock check into the OS by using `create_new()`. So, the
+        // flow looks like this,
         // 1. `create_new()` -> fail, we check if the error is AlreadyExists.
-        // 2. In a condition where (1) is triggered, we park task into a blocking thread waiting for the lock to move.
+        // 2. In a condition where (1) is triggered, we park task into a blocking thread
+        //    waiting for the lock to move.
         // 3. The blocking thread will only wait for the existing file in the temp_path
         //
-        // This approach was chosen because we can't possibly (at least for now) to create a file AND lock that file atomically. A window where the existing file may get renamed or deleted is expected. Therefore, the blocking task is a pessimistic write.
+        // This approach was chosen because we can't possibly (at least for now) to
+        // create a file AND lock that file atomically. A window where the existing file
+        // may get renamed or deleted is expected. Therefore, the blocking task is a
+        // pessimistic write.
 
         let mut retry_count = 0;
         let temp_file = loop {
@@ -755,6 +768,9 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&path).await;
     }
 
+    // Ignored in miri since it currently doesn't support
+    // blocking lock operation
+    #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_interference_during_write() {
         let path = make_store_path();
@@ -780,6 +796,7 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&path).await;
     }
 
+    #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_clear_during_write() {
         let path = make_store_path();
@@ -806,6 +823,7 @@ mod tests {
         let _ = tokio::fs::remove_dir_all(&path).await;
     }
 
+    #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_thundering_write() {
         let path = make_store_path();

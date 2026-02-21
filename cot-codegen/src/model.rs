@@ -89,10 +89,15 @@ impl ModelOpts {
                 })?
                 .to_string();
         }
+        let unraw_original_name = if original_name.starts_with("r#") {
+            original_name[2..].to_string()
+        } else {
+            original_name.clone()
+        };
         let table_name = if let Some(table_name) = &args.table_name {
             table_name.clone()
         } else {
-            original_name.clone().to_snake_case()
+            unraw_original_name.to_snake_case()
         };
 
         let primary_key_field = self.get_primary_key_field(&fields)?;
@@ -205,7 +210,11 @@ impl FieldOpts {
         self_reference: Option<&String>,
     ) -> Result<Field, syn::Error> {
         let name = self.ident.as_ref().unwrap();
-        let column_name = name.to_string();
+        let column_name = if name.to_string().starts_with("r#") {
+            name.to_string()[2..].to_string()
+        } else {
+            name.to_string()
+        };
 
         let (auto_value, foreign_key) = (
             self.find_type("cot::db::Auto", symbol_resolver).is_some(),

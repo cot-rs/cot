@@ -9,16 +9,23 @@ use crate::cot_ident;
 #[derive(Debug)]
 pub(crate) struct Query {
     model_name: syn::Type,
-    _comma: Token![,],
-    expr: Expr,
+    _comma: Option<Token![,]>,
+    expr: Option<Expr>,
 }
 
 impl Parse for Query {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let model_name = input.parse()?;
+        let _comma: Option<Token![,]> = input.parse()?;
+        let expr = if _comma.is_some() {
+            Some(input.parse()?)
+        } else {
+            None
+        };
         Ok(Self {
-            model_name: input.parse()?,
-            _comma: input.parse()?,
-            expr: input.parse()?,
+            model_name,
+            _comma,
+            expr,
         })
     }
 }
@@ -26,10 +33,18 @@ impl Parse for Query {
 pub(super) fn query_to_tokens(query: Query) -> TokenStream {
     let crate_name = cot_ident();
     let model_name = query.model_name;
-    let expr = expr_to_tokens(&model_name, query.expr);
 
-    quote! {
-        <#model_name as #crate_name::db::Model>::objects().filter(#expr)
+    let base = quote! {
+        <#model_name as #crate_name::db::Model>::objects()
+    };
+
+    if let Some(expr) = query.expr {
+        let expr_tokens = expr_to_tokens(&model_name, expr);
+        quote! {
+            #base.filter(#expr_tokens)
+        }
+    } else {
+        base
     }
 }
 

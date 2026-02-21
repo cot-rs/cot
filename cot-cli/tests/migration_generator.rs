@@ -160,6 +160,74 @@ fn create_models_foreign_key_two_migrations() {
     assert_eq!(table_name, "cot__child");
 }
 
+#[test]
+fn create_model_keywords() {
+    let generator = test_generator();
+    let src = include_str!("migration_generator/keywords.rs");
+    let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
+
+    let migration = generator
+        .generate_migrations_as_generated_from_files(source_files)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(migration.migration_name, "m_0001_initial");
+    assert!(migration.dependencies.is_empty());
+
+    let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
+    assert_eq!(table_name, "cot__keywords");
+    assert_eq!(fields.len(), 3);
+
+    let field = &fields[0];
+    assert_eq!(field.column_name, "id");
+
+    let field = &fields[1];
+    assert_eq!(field.column_name, "abstract");
+    assert_eq!(field.name.to_string(), "r#abstract");
+
+    let field = &fields[2];
+    assert_eq!(field.column_name, "type");
+    assert_eq!(field.name.to_string(), "r#type");
+}
+
+#[test]
+fn create_model_keywords_source() {
+    let generator = test_generator();
+    let src = include_str!("migration_generator/keywords.rs");
+    let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
+
+    let migration = generator
+        .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
+        .unwrap();
+
+    assert!(
+        migration
+            .content
+            .contains(r#"::cot::db::Identifier::new("abstract")"#)
+    );
+    assert!(
+        migration
+            .content
+            .contains(r#"::cot::db::Identifier::new("type")"#)
+    );
+}
+
+#[test]
+fn create_model_keywords_model() {
+    let generator = test_generator();
+    let src = include_str!("migration_generator/keywords_model.rs");
+    let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
+
+    let migration = generator
+        .generate_migrations_as_generated_from_files(source_files)
+        .unwrap()
+        .unwrap();
+
+    let (table_name, _fields) = unwrap_create_model(&migration.operations[0]);
+    assert_eq!(table_name, "cot__type");
+}
+
 /// Test that the migration generator can generate a "create model" migration
 /// for a given model which compiles successfully.
 #[test]

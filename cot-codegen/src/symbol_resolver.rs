@@ -5,6 +5,7 @@ use std::iter::FromIterator;
 #[cfg(feature = "symbol-resolver")]
 use std::path::Path;
 
+use quote::format_ident;
 #[cfg(feature = "symbol-resolver")]
 use syn::UseTree;
 #[cfg(feature = "symbol-resolver")]
@@ -88,7 +89,7 @@ impl SymbolResolver {
                 let mut new_segments: Vec<_> = symbol
                     .full_path_parts()
                     .map(|s| syn::PathSegment {
-                        ident: syn::Ident::new(s, first_segment.ident.span()),
+                        ident: format_ident!("{}", s, span = first_segment.ident.span()),
                         arguments: syn::PathArguments::None,
                     })
                     .collect();

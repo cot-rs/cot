@@ -497,7 +497,7 @@ mod tests {
             ty: parse_quote! { MyContainer<std::string::String> },
             primary_key: darling::util::Flag::default(),
             unique: darling::util::Flag::default(),
-            table_name: None
+            table_name: None,
         };
 
         assert!(opts.find_type("my_crate::MyContainer", &resolver).is_some());

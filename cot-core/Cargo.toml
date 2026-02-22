@@ -29,7 +29,7 @@ http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
 indexmap.workspace = true
-schemars = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_html_form = { workspace = true, features = ["de", "std"] }
 serde_json.workspace = true

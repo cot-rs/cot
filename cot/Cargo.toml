@@ -50,7 +50,7 @@ multer.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
 pin-project-lite.workspace = true
 redis = { workspace = true, features = ["aio", "tokio-comp"], optional = true }
-schemars = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true, features = ["derive"] }
 sea-query = { workspace = true, optional = true }
 sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"], optional = true }
 serde = { workspace = true, features = ["derive"] }

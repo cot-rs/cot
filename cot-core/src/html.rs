@@ -54,6 +54,7 @@ use std::fmt::Write;
 
 use askama::filters::Escaper;
 use derive_more::{Deref, Display, From};
+#[cfg(feature = "schemars")]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

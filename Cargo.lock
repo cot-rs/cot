@@ -990,6 +990,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "indexmap",
+ "schemars",
  "serde",
  "serde_html_form",
  "serde_json",

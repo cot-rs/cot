@@ -148,7 +148,7 @@ Rendered output:
 
 Linking to other pages in your application is a frequent requirement, and hardcoding URLs in templates can become a maintenance hassle. To address this, Cot provides the `cot::reverse!()` macro. This macro generates URLs based on your route definitions, validating that you’ve passed any required parameters and that the route actually exists. If you ever change your URL structure, you'll only need to update the route definitions.
 
-`cot::reverse!()` expects a reference to the `Urls` object (which you can obtain by extracting it from the request), the route name, and any parameters needed by that route.
+`cot::reverse!()` expects a reference to the `Urls` object (which you can obtain by extracting it from the request), the route name, and any parameters needed by that route. It returns a `Result<String, Error>`, so should be suffixed by "?" when used in the html template.
 
 ### Example
 
@@ -156,8 +156,8 @@ Linking to other pages in your application is a frequent requirement, and hardco
 
 ```html.j2
 {% let urls = urls %}
-<a href="{{ cot::reverse!(urls, "index") }}">Home</a>
-<a href="{{ cot::reverse!(urls, "user", id=42) }}">User 42</a>
+<a href="{{ cot::reverse!(urls, "index")? }}">Home</a>
+<a href="{{ cot::reverse!(urls, "user", id=42)? }}">User 42</a>
 ```
 
 `main.rs`:

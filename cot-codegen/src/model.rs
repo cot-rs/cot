@@ -150,6 +150,7 @@ pub struct FieldOpts {
     pub ty: syn::Type,
     pub primary_key: darling::util::Flag,
     pub unique: darling::util::Flag,
+    pub table_name: Option<String>, // custom name of field inside db
 }
 
 impl FieldOpts {
@@ -210,11 +211,16 @@ impl FieldOpts {
         self_reference: Option<&String>,
     ) -> Result<Field, syn::Error> {
         let name = self.ident.as_ref().unwrap();
-        let column_name = if name.to_string().starts_with("r#") {
-            name.to_string()[2..].to_string()
-        } else {
-            name.to_string()
-        };
+
+        // check if a custom table name has been set
+        let column_name = self.table_name.clone().unwrap_or_else(|| {
+            // else default to the parameter name
+            if name.to_string().starts_with("r#") {
+                name.to_string()[2..].to_string()
+            } else {
+                name.to_string()
+            }
+        });
 
         let (auto_value, foreign_key) = (
             self.find_type("cot::db::Auto", symbol_resolver).is_some(),
@@ -491,6 +497,7 @@ mod tests {
             ty: parse_quote! { MyContainer<std::string::String> },
             primary_key: darling::util::Flag::default(),
             unique: darling::util::Flag::default(),
+            table_name: None
         };
 
         assert!(opts.find_type("my_crate::MyContainer", &resolver).is_some());

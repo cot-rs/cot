@@ -150,7 +150,8 @@ pub struct FieldOpts {
     pub ty: syn::Type,
     pub primary_key: darling::util::Flag,
     pub unique: darling::util::Flag,
-    pub table_name: Option<String>, // custom name of field inside db
+    // Custom name of the field inside db
+    pub field_name: Option<String>,
 }
 
 impl FieldOpts {

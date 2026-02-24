@@ -214,7 +214,7 @@ impl FieldOpts {
         let name = self.ident.as_ref().unwrap();
 
         // check if a custom table name has been set
-        let column_name = self.table_name.clone().unwrap_or_else(|| {
+        let column_name = self.field_name.clone().unwrap_or_else(|| {
             // else default to the parameter name
             if name.to_string().starts_with("r#") {
                 name.to_string()[2..].to_string()
@@ -475,6 +475,23 @@ mod tests {
     }
 
     #[test]
+    fn custom_field_name() {
+        let input: syn::Field = parse_quote! {
+            #[model(field_name = "test")]
+            name: String
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let field = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"TestModel".to_string()))
+            .unwrap();
+
+        assert_eq!(field.name.to_string(), "name");
+        assert_eq!(field.column_name, "test");
+        assert_eq!(field.ty, parse_quote!(String));
+        assert!(field.unique);
+    }
+
+    #[test]
     fn find_type_resolved() {
         let input: syn::Type =
             parse_quote! { ::my_crate::MyContainer<'a, Vec<std::string::String>> };
@@ -498,7 +515,7 @@ mod tests {
             ty: parse_quote! { MyContainer<std::string::String> },
             primary_key: darling::util::Flag::default(),
             unique: darling::util::Flag::default(),
-            table_name: None,
+            field_name: None,
         };
 
         assert!(opts.find_type("my_crate::MyContainer", &resolver).is_some());

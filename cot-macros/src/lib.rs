@@ -50,22 +50,27 @@ pub fn derive_admin_model(input: TokenStream) -> TokenStream {
 /// given named struct. Note that all the fields of the struct **must**
 /// implement the [`DatabaseField`] trait.
 ///
-/// # Model types
+/// # Model Attributes
+/// Cot provides a number of attributes that can be used on a struct to specify
+/// how it should be treated by the migration engine and other parts of Cot.
+/// These attributes are specified using the `#[model(...)]` attribute on the
+/// struct.
 ///
+/// ## `model_type`
 /// The model type can be specified using the `model_type` parameter. The model
 /// type can be one of the following:
 ///
 /// * `application` (default): The model represents an actual table in a
 ///   normally running instance of the application.
 /// ```
-/// use cot::db::model;
+/// use cot::db::{Auto, model};
 ///
 /// #[model(model_type = "application")]
 /// // This is equivalent to:
 /// // #[model]
 /// struct User {
 ///     #[model(primary_key)]
-///     id: i32,
+///     id: Auto<i32>,
 ///     username: String,
 /// }
 /// ```
@@ -89,12 +94,12 @@ pub fn derive_admin_model(input: TokenStream) -> TokenStream {
 ///
 /// ```
 /// // In a migration file
-/// use cot::db::model;
+/// use cot::db::{Auto, model};
 ///
 /// #[model(model_type = "migration")]
 /// struct _User {
 ///     #[model(primary_key)]
-///     id: i32,
+///     id: Auto<i32>,
 ///     username: String,
 /// }
 /// ```
@@ -103,14 +108,68 @@ pub fn derive_admin_model(input: TokenStream) -> TokenStream {
 ///   applied). They are ignored by the migration generator and should never be
 ///   used outside Cot code.
 /// ```
-/// use cot::db::model;
+/// use cot::db::{Auto, model};
 ///
 /// #[model(model_type = "internal")]
 /// struct CotMigrations {
 ///     #[model(primary_key)]
-///     id: i32,
+///     id: Auto<i32>,
 ///     app: String,
 ///     name: String,
+/// }
+/// ```
+///
+/// ## `table_name`
+/// By default, the table name is the same as the struct name, converted to
+/// snake case. You can specify a custom table name using the `table_name`
+/// parameter:
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model(table_name = "users")]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+///
+/// # Field Attributes
+/// In addition to the struct-level attributes, you can also specify field-level
+/// attributes using the `#[model(...)]` attribute, which is used to specify
+/// field-level constraints and properties.
+///
+/// ## `primary_key`
+/// The `primary_key` attribute is used to specify that a field is the primary
+/// key of the model. This attribute is required and must be used on exactly one
+/// field of the struct.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+///
+/// ## `unique`
+/// The `unique` attribute is used to specify that a field must be unique across
+/// all rows in the database. This will create a unique constraint on the
+/// corresponding column in the database.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(unique)]
+///     username: String,
 /// }
 /// ```
 ///

@@ -50,7 +50,7 @@ multer.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
 pin-project-lite.workspace = true
 redis = { workspace = true, features = ["aio", "tokio-comp"], optional = true }
-schemars = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true, features = ["derive"] }
 sea-query = { workspace = true, optional = true }
 sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"], optional = true }
 serde = { workspace = true, features = ["derive"] }
@@ -113,7 +113,7 @@ postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres"
 mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
 redis = ["cache", "dep:deadpool-redis", "dep:redis", "json"]
 json = ["dep:serde_json", "cot_core/json"]
-openapi = ["json", "dep:aide", "dep:schemars"]
+openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
 cache = ["json"]

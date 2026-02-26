@@ -1,7 +1,7 @@
-use cot::db::{model, Auto, ForeignKey};
+use cot::db::{Auto, ForeignKey, model};
 
 #[model]
-struct Keywords {
+struct r#const {
     #[model(primary_key)]
     id: Auto<i32>,
     r#abstract: String,

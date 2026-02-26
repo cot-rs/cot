@@ -175,7 +175,7 @@ fn create_model_keywords() {
     assert!(migration.dependencies.is_empty());
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "cot__keywords");
+    assert_eq!(table_name, "cot__const");
     assert_eq!(fields.len(), 3);
 
     let field = &fields[0];
@@ -204,6 +204,11 @@ fn create_model_keywords_source() {
     assert!(
         migration
             .content
+            .contains(r#"::cot::db::Identifier::new("cot__const")"#)
+    );
+    assert!(
+        migration
+            .content
             .contains(r#"::cot::db::Identifier::new("abstract")"#)
     );
     assert!(
@@ -211,21 +216,6 @@ fn create_model_keywords_source() {
             .content
             .contains(r#"::cot::db::Identifier::new("type")"#)
     );
-}
-
-#[test]
-fn create_model_keywords_model() {
-    let generator = test_generator();
-    let src = include_str!("migration_generator/keywords_model.rs");
-    let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
-
-    let migration = generator
-        .generate_migrations_as_generated_from_files(source_files)
-        .unwrap()
-        .unwrap();
-
-    let (table_name, _fields) = unwrap_create_model(&migration.operations[0]);
-    assert_eq!(table_name, "cot__type");
 }
 
 /// Test that the migration generator can generate a "create model" migration

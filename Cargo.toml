@@ -82,7 +82,7 @@ cot_codegen = { version = "0.5.0", path = "cot-codegen" }
 cot_macros = { version = "0.5.0", path = "cot-macros" }
 criterion = "0.8"
 darling = "0.23"
-deadpool-redis = { version = "0.22", default-features = false }
+deadpool-redis = { version = "0.23", default-features = false }
 derive_builder = "0.20"
 derive_more = "2"
 digest = "0.10"

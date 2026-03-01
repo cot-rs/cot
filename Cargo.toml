@@ -59,7 +59,7 @@ needless_continue = "allow"
 ahash = { version = "0.8.12", default-features = false }
 aide = { version = "0.15", default-features = false }
 anstyle = "1.0.13"
-anyhow = "1.0.100"
+anyhow = "1.0.102"
 askama = { version = "0.15.4", default-features = false }
 askama_derive = { version = "0.15.3", default-features = false, features = ["external-sources", "proc-macro"] }
 assert_cmd = "2"
@@ -69,10 +69,10 @@ axum = { version = "0.8", default-features = false }
 backtrace = "0.3.76"
 bytes = "1.11"
 cargo_toml = "0.22"
-chrono = { version = "0.4.43", default-features = false }
+chrono = { version = "0.4.44", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
 chumsky = { version = "0.9.3", default-features = false }
-clap = { version = "4.5.56", features = ["deprecated"] }
+clap = { version = "4.5.60", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.2.31"

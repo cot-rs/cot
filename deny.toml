@@ -14,13 +14,14 @@ all-features = true
 # See https://spdx.org/licenses/ for list of possible licenses
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
 allow = [
-    "MIT",
-    "Apache-2.0",
+    "0BSD",
     "Apache-2.0 WITH LLVM-exception",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "BSL-1.0",
     "CDLA-Permissive-2.0",
     "ISC",
+    "MIT",
     "Unicode-3.0",
-    "0BSD",
-    "BSD-3-Clause",
     "Zlib",
 ]

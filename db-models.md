@@ -6,7 +6,7 @@ Cot comes with its own ORM (Object-Relational Mapping) system, which is a layer 
 
 ## Defining models
 
-To define a model in Cot, you need to create a new Rust structure that implements the `Model` trait. This trait requires you to define the name of the table that the model corresponds to, as well as the fields that the table should have. Here's an example of a simple model that represents a link in a link shortener service:
+To define a model in Cot, you need to create a new Rust structure that implements the [`Model`](trait@cot::db::Model) trait. This trait requires you to define the name of the table that the model corresponds to, as well as the fields that the table should have. Here's an example of a simple model that represents a link in a link shortener service:
 
 ```rust
 use cot::db::{model, Auto, LimitedString};

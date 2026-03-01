@@ -180,15 +180,11 @@ pub trait User {
     /// use cot::auth::{SessionAuthHash, User, UserId};
     /// use cot::common_types::Password;
     /// use cot::config::SecretKey;
-    /// use hmac::{Hmac, Mac};
-    /// use sha2::Sha512;
     ///
     /// struct MyUser {
     ///     id: i64,
     ///     password: Password,
     /// }
-    ///
-    /// type SessionAuthHmac = Hmac<Sha512>;
     ///
     /// impl User for MyUser {
     ///     fn id(&self) -> Option<UserId> {
@@ -211,12 +207,12 @@ pub trait User {
     ///         // thanks to this, the session hash is invalidated when the user changes their password
     ///         // and the user is automatically logged out
     ///
-    ///         let mut mac = SessionAuthHmac::new_from_slice(secret_key.as_bytes())
-    ///             .expect("HMAC can take key of any size");
-    ///         mac.update(self.password.as_str().as_bytes());
-    ///         let hmac_data = mac.finalize().into_bytes();
+    ///         const SESSION_AUTH_HASH_CONTEXT: &'static str = "cot.rs session auth hash v1";
     ///
-    ///         Some(SessionAuthHash::new(&hmac_data))
+    ///         let key = blake3::derive_key(SESSION_AUTH_HASH_CONTEXT, secret_key.as_bytes());
+    ///         let hash = blake3::keyed_hash(&key, self.password.as_str().as_bytes());
+    ///
+    ///         Some(SessionAuthHash::new(hash.as_slice()))
     ///     }
     /// }
     /// ```
@@ -350,15 +346,11 @@ impl User for AnonymousUser {}
 /// use cot::auth::{SessionAuthHash, User, UserId};
 /// use cot::common_types::Password;
 /// use cot::config::SecretKey;
-/// use hmac::{Hmac, Mac};
-/// use sha2::Sha512;
 ///
 /// struct MyUser {
 ///     id: i64,
 ///     password: Password,
 /// }
-///
-/// type SessionAuthHmac = Hmac<Sha512>;
 ///
 /// impl User for MyUser {
 ///     fn id(&self) -> Option<UserId> {
@@ -381,12 +373,12 @@ impl User for AnonymousUser {}
 ///         // thanks to this, the session hash is invalidated when the user changes their password
 ///         // and the user is automatically logged out
 ///
-///         let mut mac = SessionAuthHmac::new_from_slice(secret_key.as_bytes())
-///             .expect("HMAC can take key of any size");
-///         mac.update(self.password.as_str().as_bytes());
-///         let hmac_data = mac.finalize().into_bytes();
+///         const SESSION_AUTH_HASH_CONTEXT: &'static str = "cot.rs session auth hash v1";
 ///
-///         Some(SessionAuthHash::new(&hmac_data))
+///         let key = blake3::derive_key(SESSION_AUTH_HASH_CONTEXT, secret_key.as_bytes());
+///         let hash = blake3::keyed_hash(&key, self.password.as_str().as_bytes());
+///
+///         Some(SessionAuthHash::new(hash.as_slice()))
 ///     }
 /// }
 /// ```

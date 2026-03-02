@@ -5,6 +5,7 @@
 //! provide a simple asynchronous interface for storing, retrieving, and
 //! managing cached values, optionally with expiration policies.
 
+pub mod file;
 pub mod memory;
 #[cfg(feature = "redis")]
 pub mod redis;

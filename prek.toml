@@ -1,0 +1,57 @@
+fail_fast = false
+[ci]
+autofix_commit_msg =  "chore(pre-commit.ci): auto fixes from pre-commit hooks"
+autoupdate_commit_msg = "chore(pre-commit.ci): pre-commit autoupdate"
+autoupdate_schedule = "monthly"
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "v6.0.0"
+hooks = [
+    { id = "check-added-large-files" },
+    { id = "check-case-conflict"},
+    { id = "check-executables-have-shebangs"},
+    { id = "check-toml", exclude = "^cot-cli/src/project_template/"},
+    { id =  "detect-private-key"},
+    { id =  "end-of-file-fixer"},
+    { id =  "mixed-line-ending", args= ["--fix=lf"]},
+    { id =  "trailing-whitespace"},
+]
+[[repos]]
+repo = "https://github.com/google/yamlfmt"
+rev = "v0.21.0"
+hooks = [
+    {id = "yamlfmt", types_or = ["json","yaml"]}
+]
+[[repos]]
+repo = "local"
+hooks = [
+    {
+        id = "fmt",
+        name = "cargo fmt",
+        files = '^.*\.(rs|toml)$',
+        exclude = "^cot-cli/src/project_template/",
+        language = "rust",
+        entry = "cargo fmt",
+        pass_filenames = false
+    }
+]
+[[repos]]
+repo = "https://github.com/instrumentl/pre-commit-just"
+rev = "v0.1"
+hooks = [
+    {id = "format-justfile", name = "format justfiles"}
+]
+[[repos]]
+repo = "https://github.com/djlint/djLint"
+rev = "v1.36.4"
+hooks = [
+    {
+        id = "djlint",
+        name = "djlint",
+        files = '\.(html|jinja|j2)$',
+        args = [
+            "--reformat",
+            "--lint"
+        ]
+    }
+]

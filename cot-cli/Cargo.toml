@@ -37,7 +37,7 @@ hex.workspace = true
 petgraph.workspace = true
 prettyplease.workspace = true
 proc-macro2 = { workspace = true, features = ["span-locations"] }
-rand = { workspace = true, features = ["std", "std_rng", "os_rng"] }
+rand = { workspace = true, features = ["std", "std_rng", "sys_rng"] }
 quote.workspace = true
 syn.workspace = true
 tracing.workspace = true

@@ -3,8 +3,8 @@ members = [
     "cot",
     "cot-cli",
     "cot-codegen",
-    "cot-macros",
     "cot-core",
+    "cot-macros",
     # Examples
     "examples/admin",
     "examples/custom-error-pages",
@@ -15,7 +15,12 @@ members = [
     "examples/json",
     "examples/sessions",
     "examples/todo-list",
-    "examples/forms"
+    "examples/forms",
+]
+exclude = [
+    # Not part of the workspace as it's not a part of the framework directly. To keep the main Cargo.lock cleaner,
+    # and to avoid unnecessary problems with cot-site dependencies, it's kept separate.
+    "docs-site",
 ]
 resolver = "2"
 

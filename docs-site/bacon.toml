@@ -1,0 +1,5 @@
+[jobs.serve]
+command = ["cargo", "+nightly", "run"]
+background = false
+on_change_strategy = "kill_then_restart"
+watch = ["templates", "scss", "../docs"]

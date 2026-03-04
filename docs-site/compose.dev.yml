@@ -1,0 +1,5 @@
+services:
+  web:
+    build: .
+    container_name: cot_site
+    restart: unless-stopped

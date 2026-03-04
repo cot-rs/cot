@@ -89,6 +89,10 @@ You can them execute the following command to stop the database:
 docker compose down
 ```
 
+### Guide
+
+The guide served at the [official website](https://cot.rs/guide/latest/) is built from the Markdown files located in the `docs` directory. See the [docs/README.md](docs/README.md) file for more information about the guide and how to build the website locally.
+
 ## Star History
 
 <a href="https://star-history.com/#cot-rs/cot&Date">

@@ -1,0 +1,25 @@
+[package]
+name = "docs-site"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+readme.workspace = true
+authors.workspace = true
+
+[dependencies]
+#cot-site = { git = "https://github.com/cot-rs/cot-site.git", rev = "b700d2bff16faaa6e1b0c6fc54d0e81976a4376e" }
+cot-site = { path = "../../cot-site" }
+cot = { version = "0.5", default-features = false }
+
+[patch.crates-io]
+cot = { path = "../../cot" }
+
+[lints]
+workspace = true
+
+[features]
+nightly = ["cot-site/nightly"]

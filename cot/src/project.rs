@@ -112,7 +112,7 @@ pub trait App: Send + Sync {
     ///
     /// This method returns an error if the app fails to initialize.
     #[expect(unused_variables)]
-    async fn init(&self, context: &mut ProjectContext) -> crate::Result<()> {
+    async fn init(&mut self, context: &mut ProjectContext) -> crate::Result<()> {
         Ok(())
     }
 

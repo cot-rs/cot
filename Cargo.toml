@@ -3,8 +3,9 @@ members = [
     "cot",
     "cot-cli",
     "cot-codegen",
-    "cot-macros",
     "cot-core",
+    "cot-macros",
+    "docs-site",
     # Examples
     "examples/admin",
     "examples/custom-error-pages",
@@ -15,7 +16,7 @@ members = [
     "examples/json",
     "examples/sessions",
     "examples/todo-list",
-    "examples/forms"
+    "examples/forms",
 ]
 resolver = "2"
 

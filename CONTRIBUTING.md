@@ -39,12 +39,9 @@ pull request with your changes. If anything does not pass, typically it will be
 easier to iterate and fix it locally than waiting for the CI servers to run
 tests for you.
 
-We highly recommend using [prek](https://prek.j178.dev/) over pre-commit to run some checks before committing code. To install it, run
-```shell
-cargo install prek
-```
+We are using [prek](https://prek.j178.dev/) (`pre-commit` Rust alternative) hooks to handle formatting and linting. See the `prek` website for installation instructions.
 
-Pre-commit still works for this project because **prek** and **pre-commit** share the same configuration file. However, the project may switch to a **prek**-specific configuration in the future.
+Pre-commit still works for this project because `prek` and `pre-commit` share the same configuration file. However, the project may switch to a `prek`-specific configuration in the future.
 
 ### Tests that use database, cache, or other external resources
 

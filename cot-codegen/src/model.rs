@@ -1,5 +1,6 @@
 use darling::{FromDeriveInput, FromField, FromMeta};
 use heck::ToSnakeCase;
+use syn::ext::IdentExt;
 use syn::spanned::Spanned;
 
 use crate::symbol_resolver::SymbolResolver;
@@ -77,7 +78,7 @@ impl ModelOpts {
             .map(as_field)
             .collect::<Result<Vec<_>, _>>()?;
 
-        let mut original_name = self.ident.to_string();
+        let mut original_name = self.ident.unraw().to_string();
         if args.model_type == ModelType::Migration {
             original_name = original_name
                 .strip_prefix("_")
@@ -92,7 +93,7 @@ impl ModelOpts {
         let table_name = if let Some(table_name) = &args.table_name {
             table_name.clone()
         } else {
-            original_name.clone().to_snake_case()
+            original_name.to_snake_case()
         };
 
         let primary_key_field = self.get_primary_key_field(&fields)?;
@@ -204,8 +205,8 @@ impl FieldOpts {
         symbol_resolver: &SymbolResolver,
         self_reference: Option<&String>,
     ) -> Result<Field, syn::Error> {
-        let name = self.ident.as_ref().unwrap();
-        let column_name = name.to_string();
+        let name = self.ident.clone().expect("Only structs are supported");
+        let column_name = name.unraw().to_string();
 
         let (auto_value, foreign_key) = (
             self.find_type("cot::db::Auto", symbol_resolver).is_some(),
@@ -364,6 +365,23 @@ mod tests {
     }
 
     #[test]
+    fn model_opts_raw_name() {
+        let input: syn::DeriveInput = parse_quote! {
+            struct r#abstract {
+                #[model(primary_key)]
+                id: i32,
+                name: String,
+            }
+        };
+        let opts = ModelOpts::new_from_derive_input(&input).unwrap();
+        let model = opts
+            .as_model(&ModelArgs::default(), &SymbolResolver::new(vec![]))
+            .unwrap();
+        assert_eq!(model.name.to_string(), "r#abstract");
+        assert_eq!(model.table_name, "abstract");
+    }
+
+    #[test]
     fn model_opts_as_model_migration() {
         let input: syn::DeriveInput = parse_quote! {
             #[model(model_type = "migration")]
@@ -456,6 +474,19 @@ mod tests {
         assert_eq!(field.column_name, "name");
         assert_eq!(field.ty, parse_quote!(String));
         assert!(field.unique);
+    }
+
+    #[test]
+    fn field_opts_raw_name() {
+        let input: syn::Field = parse_quote! {
+            r#abstract: String
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let field = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"TestModel".to_string()))
+            .unwrap();
+        assert_eq!(field.name.to_string(), "r#abstract");
+        assert_eq!(field.column_name, "abstract");
     }
 
     #[test]

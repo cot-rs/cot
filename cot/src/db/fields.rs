@@ -8,7 +8,7 @@ use crate::db::impl_postgres::PostgresValueRef;
 use crate::db::impl_sqlite::SqliteValueRef;
 use crate::db::{
     Auto, ColumnType, DatabaseError, DatabaseField, DbFieldValue, DbValue, ForeignKey, FromDbValue,
-    LimitedString, Model, PrimaryKey, Result, SqlxValueRef, ToDbFieldValue, ToDbValue,
+    LimitedString, ManyToMany, Model, PrimaryKey, Result, SqlxValueRef, ToDbFieldValue, ToDbValue,
 };
 
 mod chrono_fields;

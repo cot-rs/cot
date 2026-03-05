@@ -176,8 +176,8 @@ impl ModelBuilder {
         let fields_as_get_values = &self.fields_as_get_values;
 
         quote! {
-            #[#crate_ident::__private::async_trait]
             #[automatically_derived]
+            #[#orm_ident::async_trait]
             impl #orm_ident::Model for #name {
                 type Fields = #fields_struct_name;
                 type PrimaryKey = #pk_type;
@@ -225,11 +225,11 @@ impl ModelBuilder {
                 }
 
                 async fn get_by_primary_key<DB: #orm_ident::DatabaseBackend>(
-                    db: &DB,
+                    mut db: DB,
                     pk: Self::PrimaryKey,
                 ) -> #orm_ident::Result<Option<Self>> {
                     #orm_ident::query!(Self, $#pk_field_name == pk)
-                        .get(db)
+                        .get(&mut db)
                         .await
                 }
             }

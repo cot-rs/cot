@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 use derive_more::with_trait::Debug;
-use sea_query::{ExprTrait, IntoColumnRef};
+use sea_query::{ExprTrait, IntoColumnRef, Order};
 
 use crate::db;
 use crate::db::{
@@ -33,6 +33,7 @@ use crate::db::{
 pub struct Query<T> {
     filter: Option<Expr>,
     limit: Option<u64>,
+    order_by: Option<(String, Order)>,
     offset: Option<u64>,
     phantom_data: PhantomData<fn() -> T>,
 }
@@ -55,6 +56,7 @@ impl<T> Clone for Query<T> {
         Self {
             filter: self.filter.clone(),
             limit: self.limit,
+            order_by: self.order_by.clone(),
             offset: self.offset,
             phantom_data: PhantomData,
         }
@@ -98,6 +100,7 @@ impl<T: Model> Query<T> {
         Self {
             filter: None,
             limit: None,
+            order_by: None,
             offset: None,
             phantom_data: PhantomData,
         }
@@ -146,6 +149,28 @@ impl<T: Model> Query<T> {
     /// ```
     pub fn limit(&mut self, limit: u64) -> &mut Self {
         self.limit = Some(limit);
+        self
+    }
+
+    /// Set an order for records from the query.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::db::model;
+    /// use cot::db::query::{Expr, Query};
+    ///
+    /// #[model]
+    /// struct User {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    ///     age: i32,
+    /// }
+    ///
+    /// let query = Query::<User>::new().order_by("age", Order::Asc); // or Order::Desc
+    /// ```
+    pub fn order_by(&mut self, order_by: (String, Order)) -> &mut Self {
+        self.order_by = Some(self.order_by);
         self
     }
 
@@ -241,6 +266,12 @@ impl<T: Model> Query<T> {
     pub(super) fn add_limit_to_statement(&self, statement: &mut sea_query::SelectStatement) {
         if let Some(limit) = self.limit {
             statement.limit(limit);
+        }
+    }
+
+    pub(super) fn add_order_by_to_statement(&self, statement: &mut sea_query::SelectStatement) {
+        if let Some(order_by) = self.order_by {
+            statement.order_by(order_by.0, order_by.1);
         }
     }
 

@@ -89,14 +89,6 @@ You can them execute the following command to stop the database:
 docker compose down
 ```
 
-### Git hook manager
-We highly recommend using [prek](https://prek.j178.dev/) to run some checks before committing code. To install it, run
-```shell
-cargo install prek
-```
-
-Pre-commit still works for this project because **prek** and **pre-commit** share the same configuration file. However, the project may switch to a **prek**-specific configuration in the future.
-
 ## Star History
 
 <a href="https://star-history.com/#cot-rs/cot&Date">

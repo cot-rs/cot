@@ -176,7 +176,7 @@ impl ModelBuilder {
         let fields_as_get_values = &self.fields_as_get_values;
 
         quote! {
-            #[#crate_ident::__private::async_trait]
+            // #[#crate_ident::__private::async_trait]
             #[automatically_derived]
             impl #orm_ident::Model for #name {
                 type Fields = #fields_struct_name;

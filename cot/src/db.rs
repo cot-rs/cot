@@ -17,6 +17,7 @@ mod sea_query_db;
 
 use std::fmt::{Display, Formatter, Write};
 use std::hash::Hash;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -151,7 +152,7 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
 ///     name: String,
 /// }
 /// ```
-#[async_trait]
+// #[async_trait]
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not marked as a database model",
     label = "`{Self}` is not annotated with `#[cot::db::model]`",
@@ -228,10 +229,10 @@ pub trait Model: Sized + Send + 'static {
     /// This method can return an error if the model instance could not be
     /// found in the database, or there was a problem with the database
     /// connection.
-    async fn get_by_primary_key<DB: DatabaseBackend>(
+    fn get_by_primary_key<DB: DatabaseBackend>(
         db: &DB,
         pk: Self::PrimaryKey,
-    ) -> Result<Option<Self>>;
+    ) -> impl Future<Output=Result<Option<Self>>>;
 
     /// Inserts the model instance to the database, or updates an instance
     /// with the same primary key if it already exists.
@@ -245,9 +246,9 @@ pub trait Model: Sized + Send + 'static {
     /// inserted into the database, for instance because the migrations
     /// haven't been applied, or there was a problem with the database
     /// connection.
-    async fn save<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
-        db.insert_or_update(self).await?;
-        Ok(())
+    fn save<DB: DatabaseBackend>(&mut self, db: &DB) -> impl Future<Output=Result<()>> {
+        async move { db.insert_or_update(self).await }
+        // Ok(())
     }
 
     /// Insert the model instance to the database.
@@ -258,9 +259,9 @@ pub trait Model: Sized + Send + 'static {
     /// inserted into the database, for instance because the migrations
     /// haven't been applied, or there was a problem with the database
     /// connection.
-    async fn insert<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
-        db.insert(self).await?;
-        Ok(())
+    fn insert<DB: DatabaseBackend>(&mut self, db: &DB) -> impl Future<Output=Result<()>> {
+        async move { db.insert(self).await }
+        // Ok(())
     }
 
     /// Update the model instance in the database.
@@ -274,9 +275,9 @@ pub trait Model: Sized + Send + 'static {
     ///
     /// This method can return an error if the model with the given primary key
     /// could not be found in the database.
-    async fn update<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
-        db.update(self).await?;
-        Ok(())
+    fn update<DB: DatabaseBackend>(&mut self, db: &DB) -> impl Future<Output=Result<()>> {
+        async move { db.update(self).await }
+        // Ok(())
     }
 
     /// Bulk insert multiple model instances to the database in a single query.
@@ -318,9 +319,9 @@ pub trait Model: Sized + Send + 'static {
     /// // After insertion, all todos have populated IDs
     /// assert!(todos[0].id.is_fixed());
     /// ```
-    async fn bulk_insert<DB: DatabaseBackend>(db: &DB, instances: &mut [Self]) -> Result<()> {
-        db.bulk_insert(instances).await?;
-        Ok(())
+    fn bulk_insert<DB: DatabaseBackend>(db: &DB, instances: &mut [Self]) -> impl Future<Output=Result<()>> {
+        async move{ db.bulk_insert(instances).await }
+        // Ok(())
     }
 
     /// Bulk insert multiple model instances to the database in a single query,
@@ -357,14 +358,129 @@ pub trait Model: Sized + Send + 'static {
     /// // After insertion, all todos have populated IDs
     /// assert!(todos[0].id.is_fixed());
     /// ```
-    async fn bulk_insert_or_update<DB: DatabaseBackend>(
+    fn bulk_insert_or_update<DB: DatabaseBackend>(
         db: &DB,
         instances: &mut [Self],
-    ) -> Result<()> {
-        db.bulk_insert_or_update(instances).await?;
-        Ok(())
+    ) -> impl Future<Output=Result<()>> {
+        async move{ db.bulk_insert_or_update(instances).await }
+        // Ok(())
     }
 }
+
+// pub(crate) trait BoxModel: Sized + Send + 'static {
+//     type Fields;
+//     type PrimaryKey: PrimaryKey;
+//
+//     const APP_NAME: &'static str;
+//     const TABLE_NAME: Identifier;
+//     const PRIMARY_KEY_NAME: Identifier;
+//     const COLUMNS: &'static [Column];
+//
+//     fn from_db(db_row: Row) -> Result<Self>;
+//
+//     fn update_from_db(&mut self, db_row: Row, columns: &[usize]) -> Result<()>;
+//
+//     fn primary_key(&self) -> &Self::PrimaryKey;
+//
+//     fn set_primary_key(&mut self, primary_key: Self::PrimaryKey);
+//
+//     fn get_values(&self, columns: &[usize]) -> Vec<&dyn ToDbFieldValue>;
+//
+//     // #[must_use]
+//     // fn objects() -> Query<Self>{
+//     //     Query::new()
+//     // }
+//
+//     fn get_by_primary_key<DB: DatabaseBackend>(
+//         db: &DB,
+//         pk: Self::PrimaryKey,
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Option<Self>>> + Send>>;
+//
+//
+//     fn insert<'a>(
+//         &'a mut self,
+//         db: &'a impl DatabaseBackend,
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>>;
+//
+//     fn update<'a>(
+//         &'a mut self,
+//         db: &'a dyn DatabaseBackend,
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>>;
+//
+//     fn bulk_insert<'a>(
+//         db: &'a dyn DatabaseBackend,
+//         instances: &'a mut [Self],
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>>;
+//
+//     fn bulk_insert_or_update<'a>(
+//         db: &'a dyn DatabaseBackend,
+//         instances: &'a mut [Self],
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>>;
+// }
+//
+//
+// impl <T: Model> BoxModel for T {
+//     type Fields = T::Fields;
+//     type PrimaryKey = T::PrimaryKey;
+//
+//     const APP_NAME: &'static str = T::APP_NAME;
+//     const TABLE_NAME: Identifier = T::TABLE_NAME;
+//     const PRIMARY_KEY_NAME: Identifier = T::PRIMARY_KEY_NAME;
+//     const COLUMNS: &'static [Column] = T::COLUMNS;
+//
+//     fn from_db(db_row: Row) -> Result<Self> {
+//         T::from_db(db_row)
+//     }
+//
+//     fn update_from_db(&mut self, db_row: Row, columns: &[usize]) -> Result<()> {
+//         T::update_from_db(self, db_row, columns)
+//     }
+//
+//     fn primary_key(&self) -> &Self::PrimaryKey {
+//         self.primary_key()
+//     }
+//
+//     fn set_primary_key(&mut self, primary_key: Self::PrimaryKey) {
+//         self.set_primary_key(primary_key);
+//     }
+//
+//     fn get_values(&self, columns: &[usize]) -> Vec<&dyn ToDbFieldValue> {
+//         self.get_values(columns)
+//     }
+//
+//     fn get_by_primary_key<DB: BoxDatabaseBackend>(
+//         db: &DB,
+//         pk: Self::PrimaryKey,
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output=Result<Option<Self>>> + Send>> {
+//         Box::pin(async move { T::get_by_primary_key(db, pk).await })
+//     }
+//
+//     fn insert<'a>(
+//         &'a mut self,
+//         db: &'a dyn BoxDatabaseBackend,
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(async move { self.insert(db).await })
+//     }
+//
+//     fn update<'a>(
+//         &'a mut self,
+//         db: &'a dyn BoxDatabaseBackend,
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(async move { self.update(db).await })
+//     }
+//
+//     fn bulk_insert<'a>(
+//         db: &'a dyn BoxDatabaseBackend,
+//         instances: &'a mut [Self],
+//     ) -> std::pin::Pin<Box<dyn std::future::Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(async move { Self::bulk_insert(db, instances).await })
+//     }
+//
+//     fn bulk_insert_or_update<'a>(db: &'a dyn BoxDatabaseBackend, instances: &'a mut [Self]) -> Pin<Box<dyn Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(async move { Self::bulk_insert_or_update(db, instances).await })
+//     }
+// }
+
 
 /// An identifier structure that holds table or column name as a string.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Display, Deref)]
@@ -1590,7 +1706,7 @@ impl ColumnTypeMapper for Database {
 ///
 /// This trait is used to provide a backend for the database.
 #[cfg_attr(test, automock)]
-#[async_trait]
+// #[async_trait]
 pub trait DatabaseBackend: Send + Sync {
     /// Inserts a new row into the database, or updates an existing row if it
     /// already exists.
@@ -1600,7 +1716,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()>;
+    fn insert_or_update<T: Model>(&self, data: &mut T) -> impl Future<Output=Result<()>>;
 
     /// Inserts a new row into the database.
     ///
@@ -1609,7 +1725,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn insert<T: Model>(&self, data: &mut T) -> Result<()>;
+    fn insert<T: Model>(&self, data: &mut T) -> impl Future<Output=Result<()>>;
 
     /// Updates an existing row in the database.
     ///
@@ -1618,7 +1734,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be updated in the
     /// database, for instance because the migrations haven't been applied, or
     /// there was a problem with the database connection.
-    async fn update<T: Model>(&self, data: &mut T) -> Result<()>;
+    fn update<T: Model>(&self, data: &mut T) -> impl Future<Output=Result<()>>;
 
     /// Bulk inserts multiple rows into the database.
     ///
@@ -1627,7 +1743,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the rows could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()>;
+    fn bulk_insert<T: Model>(&self, data: &mut [T]) -> impl Future<Output=Result<()>>;
 
     /// Bulk inserts multiple rows into the database, or updates existing rows
     /// if they already exist.
@@ -1637,7 +1753,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the rows could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()>;
+    fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> impl Future<Output=Result<()>>;
 
     /// Executes a query and returns the results converted to the model type.
     ///
@@ -1650,7 +1766,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// generated or applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>>;
+    fn query<T: Model>(&self, query: &Query<T>) -> impl Future<Output=Result<Vec<T>>>;
 
     /// Returns the first row that matches the given query. If no rows match the
     /// query, returns `None`.
@@ -1664,7 +1780,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>>;
+    fn get<T: Model>(&self, query: &Query<T>) -> impl Future<Output=Result<Option<T>>>;
 
     /// Returns whether a row exists that matches the given query.
     ///
@@ -1677,7 +1793,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool>;
+    fn exists<T: Model>(&self, query: &Query<T>) -> impl Future<Output=Result<bool>>;
 
     /// Deletes all rows that match the given query.
     ///
@@ -1690,10 +1806,64 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult>;
+    fn delete<T: Model>(&self, query: &Query<T>) -> impl Future<Output=Result<StatementResult>>;
 }
 
-#[async_trait]
+
+// pub(crate) trait BoxDatabaseBackend: Send + Sync {
+//     fn insert_or_update<'a, T: Model>(&'a self, data: &'a mut T) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>;
+//     fn insert<'a, T: Model>(&'a self, data: &'a mut T) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>;
+//     fn update<'a, T: Model>(&'a self, data: &'a mut T) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>;
+//     fn bulk_insert<'a, T: Model>(&'a self, data: &'a mut [T]) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>;
+//     fn bulk_insert_or_update<'a, T: Model>(&'a self, data: &'a mut [T]) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>>;
+//     fn query<'a, T: Model>(&'a self, query: &'a Query<T>) -> Pin<Box<dyn Future<Output = Result<Vec<T>>> + Send + 'a>>;
+//     fn get<'a, T: Model>(&'a self, query: &'a Query<T>) -> Pin<Box<dyn Future<Output = Result<Option<T>>> + Send + 'a>>;
+//     fn exists<'a, T: Model>(&'a self, query: &'a Query<T>) -> Pin<Box<dyn Future<Output = Result<bool>> + Send + 'a>>;
+//     fn delete<'a, T: Model>(&'a self, query: &'a Query<T>) -> Pin<Box<dyn Future<Output = Result<StatementResult>> + Send + 'a>>;
+// }
+// 
+// 
+// 
+// impl <T: DatabaseBackend> BoxDatabaseBackend for T {
+//     fn insert_or_update<'a, M: Model>(&'a self, data: &'a mut M) -> Pin<Box<dyn Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(self.insert_or_update(data))
+//     }
+// 
+//     fn insert<'a, M: Model>(&'a self, data: &'a mut M) -> Pin<Box<dyn Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(self.insert(data))
+//     }
+// 
+//     fn update<'a, M: Model>(&'a self, data: &'a mut M) -> Pin<Box<dyn Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(self.update(data))
+//     }
+// 
+//     fn bulk_insert<'a, M: Model>(&'a self, data: &'a mut [M]) -> Pin<Box<dyn Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(self.bulk_insert(data))
+//     }
+// 
+//     fn bulk_insert_or_update<'a, M: Model>(&'a self, data: &'a mut [M]) -> Pin<Box<dyn Future<Output=Result<()>> + Send + 'a>> {
+//         Box::pin(self.bulk_insert_or_update(data))
+//     }
+// 
+//     fn query<'a, M: Model>(&'a self, query: &'a Query<M>) -> Pin<Box<dyn Future<Output=Result<Vec<M>>> + Send + 'a>> {
+//         Box::pin(self.query(query))
+//     }
+// 
+//     fn get<'a, M: Model>(&'a self, query: &'a Query<M>) -> Pin<Box<dyn Future<Output=Result<Option<M>>> + Send + 'a>> {
+//         Box::pin(self.get(query))
+//     }
+// 
+//     fn exists<'a, M: Model>(&'a self, query: &'a Query<M>) -> Pin<Box<dyn Future<Output=Result<bool>> + Send + 'a>> {
+//         Box::pin(self.exists(query))
+//     }
+// 
+//     fn delete<'a, M: Model>(&'a self, query: &'a Query<M>) -> Pin<Box<dyn Future<Output=Result<StatementResult>> + Send + 'a>> {
+//         Box::pin(self.delete(query))
+//     }
+// }
+
+
+// #[async_trait]
 impl DatabaseBackend for Database {
     async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
         Database::insert_or_update(self, data).await

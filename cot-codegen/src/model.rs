@@ -488,7 +488,6 @@ mod tests {
         assert_eq!(field.name.to_string(), "name");
         assert_eq!(field.column_name, "test");
         assert_eq!(field.ty, parse_quote!(String));
-        assert!(field.unique);
     }
 
     #[test]

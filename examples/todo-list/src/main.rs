@@ -1,19 +1,18 @@
 mod migrations;
 
-use askama::Template;
 use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::config::{DatabaseConfig, ProjectConfig};
 use cot::db::migrations::SyncDynMigration;
-use cot::db::{Auto, Model, model, query};
+use cot::db::{Auto, Database, Model, model, query};
 use cot::form::Form;
 use cot::html::Html;
-use cot::project::{MiddlewareContext, RegisterAppsContext};
-use cot::request::extractors::{Path, RequestDb, RequestForm};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
+use cot::request::extractors::{Path, RequestForm};
 use cot::response::Response;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project, reverse_redirect};
+use cot::{App, AppBuilder, Project, Template, reverse_redirect};
 
 #[derive(Debug, Clone)]
 #[model]
@@ -30,7 +29,7 @@ struct IndexTemplate<'a> {
     todo_items: Vec<TodoItem>,
 }
 
-async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Html> {
+async fn index(urls: Urls, db: Database) -> cot::Result<Html> {
     let todo_items = TodoItem::objects().all(&db).await?;
     let index_template = IndexTemplate {
         urls: &urls,
@@ -43,13 +42,13 @@ async fn index(urls: Urls, RequestDb(db): RequestDb) -> cot::Result<Html> {
 
 #[derive(Debug, Form)]
 struct TodoForm {
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     title: String,
 }
 
 async fn add_todo(
     urls: Urls,
-    RequestDb(db): RequestDb,
+    db: Database,
     RequestForm(todo_form): RequestForm<TodoForm>,
 ) -> cot::Result<Response> {
     let todo_form = todo_form.unwrap();
@@ -64,11 +63,7 @@ async fn add_todo(
     Ok(reverse_redirect!(urls, "index")?)
 }
 
-async fn remove_todo(
-    urls: Urls,
-    RequestDb(db): RequestDb,
-    Path(todo_id): Path<i32>,
-) -> cot::Result<Response> {
+async fn remove_todo(urls: Urls, db: Database, Path(todo_id): Path<i32>) -> cot::Result<Response> {
     query!(TodoItem, $id == todo_id).delete(&db).await?;
 
     Ok(reverse_redirect!(urls, "index")?)
@@ -117,7 +112,7 @@ impl Project for TodoProject {
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .build()

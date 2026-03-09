@@ -1,0 +1,4 @@
+# TODO: Safe to remove when https://github.com/rust-lang/rust/issues/141626 gets resolved.
+# Also, see https://github.com/cot-rs/cot/pull/419/changes#r2636869773 for more info.
+[target.'cfg(target_os = "windows")']
+linker = "rust-lld"

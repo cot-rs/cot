@@ -1,0 +1,14 @@
+error[E0599]: no method named `into_response` found for struct `Dummy` in the current scope
+ --> tests/ui/derive_into_response_missing_trait_impl.rs:3:10
+  |
+3 | #[derive(IntoResponse)]
+  |          ^^^^^^^^^^^^ method not found in `Dummy`
+...
+8 | struct Dummy;
+  | ------------ method `into_response` not found for this struct
+  |
+  = help: items from traits can only be used if the trait is implemented and in scope
+  = note: the following traits define an item `into_response`, perhaps you need to implement one of them:
+          candidate #1: `IntoResponse`
+          candidate #2: `axum_core::response::into_response::IntoResponse`
+  = note: this error originates in the derive macro `IntoResponse` (in Nightly builds, run with -Z macro-backtrace for more info)

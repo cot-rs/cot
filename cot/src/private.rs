@@ -6,14 +6,17 @@
 //!
 //! This is not a public API and should not be used directly.
 
-/// Askama's macros don't work when Askama is re-exported, so there's no point
-/// in re-exporting it publicly. However, we need to re-export it here so that
-/// our macros can implement traits from Askama.
-pub use askama;
+#[cfg(feature = "openapi")]
+pub use aide::openapi::{Operation, RequestBody, Response as OpenApiResponse, StatusCode};
 pub use async_trait::async_trait;
 pub use bytes::Bytes;
 pub use cot_macros::ModelHelper;
 pub use tokio;
+
+pub mod askama {
+    pub use askama::*;
+    pub use cot_macros::{Template, filter_fn};
+}
 
 // used in the CLI
 #[cfg(feature = "db")]

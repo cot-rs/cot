@@ -18,10 +18,10 @@ Arguments:
   [PATH]  Path to the crate directory to generate migrations for [default: current directory]
 
 Options:
-      --app-name <APP_NAME>      Name of the app to use in the migration (default: crate name)
+      --app-name <APP_NAME>      Name of the app to use in the migration [default: crate name]
   -v, --verbose...               Increase logging verbosity
-      --output-dir <OUTPUT_DIR>  Directory to write the migrations to (default: migrations/
-                                 directory in the crate's src/ directory)
+      --output-dir <OUTPUT_DIR>  Directory to write the migrations to [default: the migrations/
+                                 directory in the crate's src/ directory]
   -q, --quiet...                 Decrease logging verbosity
   -h, --help                     Print help
 

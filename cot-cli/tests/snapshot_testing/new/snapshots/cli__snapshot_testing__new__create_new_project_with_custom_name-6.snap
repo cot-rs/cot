@@ -8,7 +8,7 @@ info:
     - "--name"
     - my_project
     - "-vvvvv"
-    - /tmp/cot-test-IWoQbg/project
+    - /tmp/cot-test-sFO2nz/project
 ---
 success: true
 exit_code: 0
@@ -23,6 +23,7 @@ TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/t
 TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/templates/index.html"
 TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/config/dev.toml"
 TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/config/prod.toml.example"
+TIMESTAMP [35mTRACE[0m [2mcot_cli::new_project[0m[2m:[0m Writing file: "/tmp/TEMP_PATH/project/.cargo/config.toml"
 
 ----- stderr -----
 [1m[92m    Creating[0m Cot project `my_project`

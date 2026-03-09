@@ -9,7 +9,7 @@ exit_code: 2
 ----- stdout -----
 
 ----- stderr -----
-The Rust web framework for lazy developers - CLI tool.
+Command-line interface for the Cot web framework
 
 Usage: cot [OPTIONS] <COMMAND>
 

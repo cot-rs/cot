@@ -1,28 +1,25 @@
 {% let urls = urls %}
-
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel example</title>
-</head>
-<body>
-<h1>Admin panel-controlled TODO list</h1>
-
-{% if todo_items.is_empty() %}
-<p>There are no TODO items.</p>
-{% else %}
-<ul id="todo-list">
-    {% for todo in todo_items %}
-    <li>
-        {{ todo.title }}
-    </li>
-    {% endfor %}
-</ul>
-{% endif %}
-
-<p>Go to the <a href="{{ cot::reverse!(urls, "cot_admin:login")? }}">admin panel</a> to manage the TODO items.</p>
-<p>The username is <strong>admin</strong> and the password is <strong>admin</strong>.</p>
-</body>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Admin Panel example</title>
+    </head>
+    <body>
+        <h1>Admin panel-controlled TODO list</h1>
+        {% if todo_items.is_empty() %}
+            <p>There are no TODO items.</p>
+        {% else %}
+            <ul id="todo-list">
+                {% for todo in todo_items %}<li>{{ todo.title }}</li>{% endfor %}
+            </ul>
+        {% endif %}
+        <p>
+            Go to the <a href="{{ cot::reverse!(urls, "cot_admin:login")? }}">admin panel</a> to manage the TODO items.
+        </p>
+        <p>
+            The username is <strong>admin</strong> and the password is <strong>admin</strong>.
+        </p>
+    </body>
 </html>

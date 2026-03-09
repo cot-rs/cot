@@ -118,10 +118,10 @@ fn handle_binary_comparison(
     let bin_fn = format_ident!("{}", bin_fn);
     let bin_trait = format_ident!("{}", bin_trait);
 
-    if let Expr::FieldRef { ref field_name, .. } = lhs {
-        if let Some(rhs_tokens) = rhs.as_tokens() {
-            return quote!(#crate_name::db::query::#bin_trait::#bin_fn(<#model_name as #crate_name::db::Model>::Fields::#field_name, #rhs_tokens));
-        }
+    if let Expr::FieldRef { ref field_name, .. } = lhs
+        && let Some(rhs_tokens) = rhs.as_tokens()
+    {
+        return quote!(#crate_name::db::query::#bin_trait::#bin_fn(<#model_name as #crate_name::db::Model>::Fields::#field_name, #rhs_tokens));
     }
 
     let lhs = expr_to_tokens(model_name, lhs);

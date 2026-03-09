@@ -17,7 +17,7 @@ Arguments:
   <PATH>  Path to the directory to create the new project in
 
 Options:
-      --name <NAME>          Set the resulting crate name (defaults to the directory name)
+      --name <NAME>          Set the resulting crate name [default: the directory name]
   -v, --verbose...           Increase logging verbosity
   -q, --quiet...             Decrease logging verbosity
       --use-git              Use the latest `cot` version from git instead of a published crate

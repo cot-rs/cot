@@ -1,15 +1,14 @@
-use askama::Template;
 use base64::Engine;
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::form::fields::InMemoryUploadedFile;
 use cot::form::{Form, FormContext};
 use cot::html::Html;
-use cot::project::{MiddlewareContext, RegisterAppsContext};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler};
 use cot::request::extractors::RequestForm;
 use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project};
+use cot::{App, AppBuilder, Project, Template};
 
 #[derive(Debug, Template)]
 #[template(path = "index.html")]
@@ -30,9 +29,9 @@ async fn index(urls: Urls) -> cot::Result<Html> {
 
 #[derive(Debug, Form)]
 struct FileForm {
-    #[form(opt(max_length = 100))]
+    #[form(opts(max_length = 100))]
     title: String,
-    #[form(opt(accept = vec!["image/*".to_string()]))]
+    #[form(opts(accept = vec!["image/*".to_string()]))]
     file: InMemoryUploadedFile,
 }
 
@@ -95,7 +94,7 @@ impl Project for FileUploadProject {
         &self,
         handler: cot::project::RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .build()

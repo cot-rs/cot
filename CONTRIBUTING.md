@@ -39,9 +39,9 @@ pull request with your changes. If anything does not pass, typically it will be
 easier to iterate and fix it locally than waiting for the CI servers to run
 tests for you.
 
-We are also using [`pre-commit`](https://pre-commit.com/) hooks to handle
-formatting and linting. See the `pre-commit` website for installation
-instructions. This handles formatting of all the files in the repository.
+We are using [prek](https://prek.j178.dev/) (`pre-commit` Rust alternative) hooks to handle formatting and linting. See the `prek` website for installation instructions.
+
+Pre-commit still works for this project because `prek` and `pre-commit` share the same configuration file. However, the project may switch to a `prek`-specific configuration in the future.
 
 ### Tests that use database, cache, or other external resources
 
@@ -93,6 +93,25 @@ changes intentionally modify the output. You can do this by running:
 ```sh
 cargo insta test --review
 ```
+
+### Benchmarking
+
+Cot uses [Criterion](https://github.com/bheisler/criterion.rs) for performance benchmarking, with continuous benchmarking powered by [Bencher](https://bencher.dev) in CI.
+
+To run benchmarks locally:
+
+```sh
+cargo bench --package cot --features test
+```
+
+Benchmarks are located in `cot/benches/` and test core framework performance including routing, JSON handling, and nested router scenarios. The benchmarking utilities in `bench_utils.rs` provide scaffolding for creating HTTP request benchmarks against Cot applications.
+
+#### Continuous Benchmarking
+
+- **Base branch benchmarks** run automatically on pushes to `master`, establishing performance baselines
+- **PR benchmarks** run on pull requests, comparing performance against the base branch with statistical analysis
+- Results are tracked over time and regressions are automatically detected using t-tests
+- Performance results are posted as comments on pull requests
 
 ### Dependencies
 

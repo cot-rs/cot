@@ -163,7 +163,10 @@ fn create_models_foreign_key_two_migrations() {
 /// Test that the migration generator can generate a "create model" migration
 /// for a given model which compiles successfully.
 #[test]
-#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
 fn create_model_compile_test() {
     let generator = test_generator();
     let src = include_str!("migration_generator/create_model.rs");
@@ -178,6 +181,31 @@ fn create_model_compile_test() {
         content: migration_content,
     } = migration_opt;
 
+    compile_test(src, &migration_name, &migration_content);
+}
+
+#[test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
+fn custom_migration_compile_test() {
+    let generator = test_generator();
+    let src = "fn main() {}";
+    let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
+
+    let migration_opt = generator
+        .generate_custom_migration_from_files("custom", source_files)
+        .unwrap();
+    let MigrationAsSource {
+        name: migration_name,
+        content: migration_content,
+    } = migration_opt;
+
+    compile_test(src, &migration_name, &migration_content);
+}
+
+fn compile_test(src: &str, migration_name: &str, migration_content: &str) {
     let source_with_migrations = format!(
         r"
 {src}
@@ -255,7 +283,10 @@ fn find_source_files() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
 fn list_migrations() {
     let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
     let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
@@ -291,7 +322,10 @@ fn list_migrations_missing_cargo_toml() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // unsupported operation: extern static `pidfd_spawnp` is not supported by Miri
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
 fn list_migrations_missing_migrations_dir() {
     let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
     test_utils::make_package(temp_dir.path()).unwrap();

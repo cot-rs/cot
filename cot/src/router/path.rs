@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use cot_core::error::impl_into_cot_error;
 use thiserror::Error;
 use tracing::debug;
 
@@ -256,22 +257,27 @@ impl ReverseParamMap {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! reverse_param_map {
+    () => {{
+        $crate::router::path::ReverseParamMap::new()
+    }};
     ($($key:ident = $value:expr),*) => {{
-        #[allow(unused_mut)] // for the case when there are no parameters
         let mut map = $crate::router::path::ReverseParamMap::new();
         $( map.insert(stringify!($key), &$value); )*
         map
     }};
 }
 
+const ERROR_PREFIX: &str = "failed to reverse route:";
 /// An error that occurs when reversing a path with missing parameters.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ReverseError {
     /// A parameter is missing for the reverse operation.
-    #[error("Missing parameter for reverse: `{0}`")]
+    #[error("{ERROR_PREFIX} missing parameter for reverse: `{0}`")]
+    #[non_exhaustive]
     MissingParam(String),
 }
+impl_into_cot_error!(ReverseError);
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct CaptureResult<'matcher, 'path> {
@@ -494,7 +500,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
-            "Missing parameter for reverse: `post_id`"
+            "failed to reverse route: missing parameter for reverse: `post_id`"
         );
     }
 

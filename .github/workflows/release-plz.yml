@@ -7,10 +7,13 @@ on:
 
 jobs:
   release-plz-release:
+    if: ${{ github.repository_owner == 'cot-rs' }}
     name: Release-plz release
     runs-on: ubuntu-latest
+    environment: "crates.io release"
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Generate GitHub token
         uses: actions/create-github-app-token@v2
@@ -19,7 +22,7 @@ jobs:
           app-id: ${{ secrets.COTBOT_APP_ID }}
           private-key: ${{ secrets.COTBOT_PRIVATE_KEY }}
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Install Rust toolchain
@@ -30,9 +33,9 @@ jobs:
           command: release
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   release-plz-pr:
+    if: ${{ github.repository_owner == 'cot-rs' }}
     name: Release-plz PR
     runs-on: ubuntu-latest
     permissions:
@@ -49,7 +52,7 @@ jobs:
           app-id: ${{ secrets.COTBOT_APP_ID }}
           private-key: ${{ secrets.COTBOT_PRIVATE_KEY }}
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Install Rust toolchain
@@ -60,4 +63,3 @@ jobs:
           command: release-pr
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

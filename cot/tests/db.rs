@@ -12,6 +12,33 @@ use fake::rand::SeedableRng;
 use fake::rand::rngs::StdRng;
 use fake::{Dummy, Fake, Faker};
 
+struct WeekdaySetFaker;
+
+impl Dummy<WeekdaySetFaker> for chrono::WeekdaySet {
+    fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(_: &WeekdaySetFaker, rng: &mut R) -> Self {
+        use chrono::Weekday;
+
+        let mut set = chrono::WeekdaySet::EMPTY;
+        let weekdays = [
+            Weekday::Mon,
+            Weekday::Tue,
+            Weekday::Wed,
+            Weekday::Thu,
+            Weekday::Fri,
+            Weekday::Sat,
+            Weekday::Sun,
+        ];
+
+        for weekday in weekdays {
+            if rng.random_bool(0.5) {
+                set.insert(weekday);
+            }
+        }
+
+        set
+    }
+}
+
 #[derive(Debug, PartialEq)]
 #[model]
 struct TestModel {
@@ -194,6 +221,8 @@ struct AllFieldsModel {
     field_blob: Vec<u8>,
     field_option: Option<String>,
     field_limited_string: LimitedString<10>,
+    #[dummy(faker = "WeekdaySetFaker")]
+    field_weekday_set: chrono::WeekdaySet,
 }
 
 async fn migrate_all_fields_model(db: &Database) {
@@ -225,6 +254,7 @@ const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
         all_fields_migration_field!(blob, Vec<u8>),
         all_fields_migration_field!(option, Option<String>),
         all_fields_migration_field!(limited_string, LimitedString<10>),
+        all_fields_migration_field!(weekday_set, chrono::WeekdaySet),
     ])
     .build();
 
@@ -554,4 +584,351 @@ struct TestModelStringKey {
     #[model(primary_key)]
     id: String,
     name: String,
+}
+
+#[cot_macros::dbtest]
+#[expect(clippy::too_many_lines)]
+async fn weekday_set_field_functionality(db: &mut TestDatabase) {
+    use chrono::Weekday;
+
+    #[derive(Debug, PartialEq)]
+    #[model]
+    struct WeekdaySetModel {
+        #[model(primary_key)]
+        id: Auto<i32>,
+        schedule: chrono::WeekdaySet,
+        optional_schedule: Option<chrono::WeekdaySet>,
+    }
+
+    const CREATE_WEEKDAY_SET_MODEL: Operation = Operation::create_model()
+        .table_name(Identifier::new("cot__weekday_set_model"))
+        .fields(&[
+            Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
+                .primary_key()
+                .auto(),
+            Field::new(
+                Identifier::new("schedule"),
+                <chrono::WeekdaySet as DatabaseField>::TYPE,
+            ),
+            Field::new(
+                Identifier::new("optional_schedule"),
+                <Option<chrono::WeekdaySet> as DatabaseField>::TYPE,
+            )
+            .set_null(<Option<chrono::WeekdaySet> as DatabaseField>::NULLABLE),
+        ])
+        .build();
+
+    run_migrations!(db, CREATE_WEEKDAY_SET_MODEL);
+
+    // Test empty WeekdaySet
+    let mut model1 = WeekdaySetModel {
+        id: Auto::auto(),
+        schedule: chrono::WeekdaySet::EMPTY,
+        optional_schedule: None,
+    };
+    model1.save(&**db).await.unwrap();
+
+    // Test WeekdaySet with all weekdays
+    let mut all_days = chrono::WeekdaySet::EMPTY;
+    for day in [
+        Weekday::Mon,
+        Weekday::Tue,
+        Weekday::Wed,
+        Weekday::Thu,
+        Weekday::Fri,
+        Weekday::Sat,
+        Weekday::Sun,
+    ] {
+        all_days.insert(day);
+    }
+    let mut model2 = WeekdaySetModel {
+        id: Auto::auto(),
+        schedule: all_days,
+        optional_schedule: Some(chrono::WeekdaySet::EMPTY),
+    };
+    model2.save(&**db).await.unwrap();
+
+    // Test WeekdaySet with specific weekdays (weekdays only)
+    let mut weekdays_only = chrono::WeekdaySet::EMPTY;
+    for day in [
+        Weekday::Mon,
+        Weekday::Tue,
+        Weekday::Wed,
+        Weekday::Thu,
+        Weekday::Fri,
+    ] {
+        weekdays_only.insert(day);
+    }
+    let mut model3 = WeekdaySetModel {
+        id: Auto::auto(),
+        schedule: weekdays_only,
+        optional_schedule: Some(weekdays_only),
+    };
+    model3.save(&**db).await.unwrap();
+
+    // Test WeekdaySet with weekend only
+    let mut weekend_only = chrono::WeekdaySet::EMPTY;
+    weekend_only.insert(Weekday::Sat);
+    weekend_only.insert(Weekday::Sun);
+    let mut model4 = WeekdaySetModel {
+        id: Auto::auto(),
+        schedule: weekend_only,
+        optional_schedule: Some(all_days),
+    };
+    model4.save(&**db).await.unwrap();
+
+    // Retrieve all models and verify they match
+    let models_from_db = WeekdaySetModel::objects().all(&**db).await.unwrap();
+    assert_eq!(models_from_db.len(), 4);
+
+    // Find and verify each model
+    let db_model1 = models_from_db.iter().find(|m| m.id == model1.id).unwrap();
+    assert_eq!(db_model1.schedule, chrono::WeekdaySet::EMPTY);
+    assert_eq!(db_model1.optional_schedule, None);
+
+    let db_model2 = models_from_db.iter().find(|m| m.id == model2.id).unwrap();
+    assert_eq!(db_model2.schedule, all_days);
+    assert_eq!(db_model2.optional_schedule, Some(chrono::WeekdaySet::EMPTY));
+
+    let db_model3 = models_from_db.iter().find(|m| m.id == model3.id).unwrap();
+    assert_eq!(db_model3.schedule, weekdays_only);
+    assert_eq!(db_model3.optional_schedule, Some(weekdays_only));
+
+    let db_model4 = models_from_db.iter().find(|m| m.id == model4.id).unwrap();
+    assert_eq!(db_model4.schedule, weekend_only);
+    assert_eq!(db_model4.optional_schedule, Some(all_days));
+
+    // Test querying by WeekdaySet
+    let weekend_models = query!(WeekdaySetModel, $schedule == weekend_only)
+        .all(&**db)
+        .await
+        .unwrap();
+    assert_eq!(weekend_models.len(), 1);
+    assert_eq!(weekend_models[0].id, model4.id);
+
+    // Test updating WeekdaySet
+    let mut model_to_update = models_from_db
+        .into_iter()
+        .find(|m| m.id == model1.id)
+        .unwrap();
+    model_to_update.schedule = weekdays_only;
+    model_to_update.optional_schedule = Some(weekend_only);
+    model_to_update.save(&**db).await.unwrap();
+
+    let updated_model = WeekdaySetModel::get_by_primary_key(&**db, model_to_update.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(updated_model.schedule, weekdays_only);
+    assert_eq!(updated_model.optional_schedule, Some(weekend_only));
+}
+
+#[cot_macros::dbtest]
+async fn bulk_insert_basic(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+
+    let mut models = vec![
+        TestModel {
+            id: Auto::auto(),
+            name: "test1".to_owned(),
+        },
+        TestModel {
+            id: Auto::auto(),
+            name: "test2".to_owned(),
+        },
+        TestModel {
+            id: Auto::auto(),
+            name: "test3".to_owned(),
+        },
+    ];
+
+    TestModel::bulk_insert(&**test_db, &mut models)
+        .await
+        .unwrap();
+
+    assert!(matches!(models[0].id, Auto::Fixed(_)));
+    assert!(matches!(models[1].id, Auto::Fixed(_)));
+    assert!(matches!(models[2].id, Auto::Fixed(_)));
+
+    let objects = TestModel::objects().all(&**test_db).await.unwrap();
+    assert_eq!(objects.len(), 3);
+
+    let names: Vec<_> = objects.iter().map(|m| m.name.as_str()).collect();
+    assert!(names.contains(&"test1"));
+    assert!(names.contains(&"test2"));
+    assert!(names.contains(&"test3"));
+
+    // Verify IDs match between models and database
+    for model in &models {
+        if let Auto::Fixed(_) = model.id {
+            let db_model = TestModel::get_by_primary_key(&**test_db, model.id)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(db_model.name, model.name);
+        }
+    }
+}
+
+#[cot_macros::dbtest]
+async fn bulk_insert_or_update(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+
+    let mut models = vec![
+        TestModel {
+            id: Auto::auto(),
+            name: "test1".to_owned(),
+        },
+        TestModel {
+            id: Auto::auto(),
+            name: "test2".to_owned(),
+        },
+        TestModel {
+            id: Auto::auto(),
+            name: "test3".to_owned(),
+        },
+    ];
+    TestModel::bulk_insert(&**test_db, &mut models)
+        .await
+        .unwrap();
+
+    let mut models = vec![
+        TestModel {
+            id: models[0].id,
+            name: "test1_updated".to_owned(),
+        },
+        TestModel {
+            id: models[2].id,
+            name: "test3_updated".to_owned(),
+        },
+    ];
+    TestModel::bulk_insert_or_update(&**test_db, &mut models)
+        .await
+        .unwrap();
+
+    let objects = TestModel::objects().all(&**test_db).await.unwrap();
+    assert_eq!(objects.len(), 3);
+
+    let names: Vec<_> = objects.iter().map(|m| m.name.as_str()).collect();
+    assert!(names.contains(&"test1_updated"));
+    assert!(names.contains(&"test2"));
+    assert!(names.contains(&"test3_updated"));
+}
+
+#[cot_macros::dbtest]
+async fn bulk_insert_empty(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+
+    let mut models: Vec<TestModel> = vec![];
+    let result = TestModel::bulk_insert(&**test_db, &mut models).await;
+
+    assert!(result.is_ok());
+    let objects = TestModel::objects().all(&**test_db).await.unwrap();
+    assert_eq!(objects.len(), 0);
+}
+
+#[cot_macros::dbtest]
+async fn bulk_insert_large_batch(test_db: &mut TestDatabase) {
+    const BATCH_SIZE: usize = 100_000;
+
+    migrate_test_model(&*test_db).await;
+
+    let mut models: Vec<TestModel> = (0..BATCH_SIZE)
+        .map(|i| TestModel {
+            id: Auto::auto(),
+            name: format!("test{i}"),
+        })
+        .collect();
+
+    TestModel::bulk_insert(&**test_db, &mut models)
+        .await
+        .unwrap();
+
+    for model in &models {
+        assert!(matches!(model.id, Auto::Fixed(_)));
+    }
+
+    let objects = TestModel::objects().all(&**test_db).await.unwrap();
+    assert_eq!(objects.len(), BATCH_SIZE);
+}
+
+#[cot_macros::dbtest]
+async fn bulk_insert_no_values(test_db: &mut TestDatabase) {
+    #[derive(Debug, PartialEq)]
+    #[model]
+    struct PkOnlyModel {
+        #[model(primary_key)]
+        id: Auto<i32>,
+    }
+
+    const CREATE_PK_ONLY_MODEL: Operation = Operation::create_model()
+        .table_name(Identifier::new("cot__pk_only_model"))
+        .fields(&[
+            Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
+                .primary_key()
+                .auto(),
+        ])
+        .build();
+
+    async fn migrate_pk_only_model(db: &Database) {
+        CREATE_PK_ONLY_MODEL.forwards(db).await.unwrap();
+    }
+
+    const BATCH_SIZE: usize = 17;
+
+    migrate_pk_only_model(&*test_db).await;
+
+    let mut models: Vec<PkOnlyModel> = (0..BATCH_SIZE)
+        .map(|_| PkOnlyModel { id: Auto::auto() })
+        .collect();
+
+    let result = PkOnlyModel::bulk_insert(&**test_db, &mut models).await;
+
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        DatabaseError::BulkInsertNoValueColumns
+    ));
+}
+
+#[cot_macros::dbtest]
+async fn bulk_insert_with_fixed_pk(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+
+    let mut models = vec![
+        TestModel {
+            id: Auto::fixed(100),
+            name: "test100".to_owned(),
+        },
+        TestModel {
+            id: Auto::fixed(200),
+            name: "test200".to_owned(),
+        },
+        TestModel {
+            id: Auto::fixed(300),
+            name: "test300".to_owned(),
+        },
+    ];
+
+    TestModel::bulk_insert(&**test_db, &mut models)
+        .await
+        .unwrap();
+
+    let model100 = TestModel::get_by_primary_key(&**test_db, Auto::fixed(100))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(model100.name, "test100");
+
+    let model200 = TestModel::get_by_primary_key(&**test_db, Auto::fixed(200))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(model200.name, "test200");
+
+    let model300 = TestModel::get_by_primary_key(&**test_db, Auto::fixed(300))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(model300.name, "test300");
 }

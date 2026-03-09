@@ -15,7 +15,7 @@ List all migrations for a Cot project
 Usage: cot migration list [OPTIONS] [PATH]
 
 Arguments:
-  [PATH]  Path to the crate directory to list migrations for  [default: current directory]
+  [PATH]  Path to the crate directory to list migrations for [default: current directory]
 
 Options:
   -v, --verbose...  Increase logging verbosity

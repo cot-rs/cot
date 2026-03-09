@@ -1,0 +1,7 @@
+error: only tuple variants with a single field are supported
+ --> tests/ui/derive_into_response_invalid_variant_multi_tuple.rs:3:10
+  |
+3 | #[derive(IntoResponse)]
+  |          ^^^^^^^^^^^^
+  |
+  = note: this error originates in the derive macro `IntoResponse` (in Nightly builds, run with -Z macro-backtrace for more info)

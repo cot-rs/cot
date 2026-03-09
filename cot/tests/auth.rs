@@ -13,7 +13,7 @@ async fn database_user(test_db: &mut TestDatabase) {
     request_builder.with_db_auth(test_db.database()).await;
 
     let mut request = request_builder.clone().with_session().build();
-    let auth: Auth = request.extract_parts().await.unwrap();
+    let auth: Auth = request.extract_from_head().await.unwrap();
 
     // Anonymous user
     assert!(!auth.user().is_authenticated());
@@ -56,7 +56,7 @@ async fn database_user(test_db: &mut TestDatabase) {
 
     // User persists between requests
     let mut request = request_builder.clone().with_session_from(&request).build();
-    let auth: Auth = request.extract_parts().await.unwrap();
+    let auth: Auth = request.extract_from_head().await.unwrap();
 
     let user = auth.user();
     assert!(user.is_authenticated());

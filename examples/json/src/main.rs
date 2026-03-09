@@ -1,12 +1,14 @@
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
+use cot::error::handler::{DynErrorPageHandler, RequestError};
 use cot::json::Json;
 use cot::openapi::swagger_ui::SwaggerUi;
-use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
+use cot::response::IntoResponse;
 use cot::router::method::openapi::api_post;
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project};
+use cot::{App, AppBuilder, Project};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
@@ -56,11 +58,7 @@ impl Project for JsonProject {
         Ok(ProjectConfig::dev_default())
     }
 
-    fn middlewares(
-        &self,
-        handler: RootHandlerBuilder,
-        context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    fn middlewares(&self, handler: RootHandlerBuilder, context: &MiddlewareContext) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .build()
@@ -70,6 +68,20 @@ impl Project for JsonProject {
         apps.register_with_views(SwaggerUi::new(), "/swagger");
         apps.register_with_views(AddApp, "");
     }
+
+    fn error_handler(&self) -> DynErrorPageHandler {
+        DynErrorPageHandler::new(error_handler)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+struct ErrorResponse {
+    message: String,
+}
+
+async fn error_handler(error: RequestError) -> impl IntoResponse {
+    let message = error.to_string();
+    Json(ErrorResponse { message }).with_status(error.status_code())
 }
 
 #[cot::main]

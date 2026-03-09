@@ -11,48 +11,121 @@ use crate::db::{
     LimitedString, Model, PrimaryKey, Result, SqlxValueRef, ToDbFieldValue, ToDbValue,
 };
 
+mod chrono_fields;
+mod chrono_wrapper;
+
 macro_rules! impl_from_sqlite_default {
     () => {
         #[cfg(feature = "sqlite")]
-        fn from_sqlite(value: SqliteValueRef<'_>) -> Result<Self> {
+        fn from_sqlite(
+            value: crate::db::impl_sqlite::SqliteValueRef<'_>,
+        ) -> crate::db::Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
         }
     };
+    ($wrapper_ty:ty) => {
+        #[cfg(feature = "sqlite")]
+        fn from_sqlite(
+            value: crate::db::impl_sqlite::SqliteValueRef<'_>,
+        ) -> crate::db::Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_sqlite(value).map(|val| val.into())
+        }
+    };
+    ($wrapper_ty:ty, option) => {
+        #[cfg(feature = "sqlite")]
+        fn from_sqlite(
+            value: crate::db::impl_sqlite::SqliteValueRef<'_>,
+        ) -> crate::db::Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_sqlite(value).map(|val| val.map(|val| val.into()))
+        }
+    };
 }
+use impl_from_sqlite_default;
 
 macro_rules! impl_from_postgres_default {
     () => {
         #[cfg(feature = "postgres")]
-        fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
+        fn from_postgres(
+            value: crate::db::impl_postgres::PostgresValueRef<'_>,
+        ) -> crate::db::Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
         }
     };
+    ($wrapper_ty:ty) => {
+        #[cfg(feature = "postgres")]
+        fn from_postgres(
+            value: crate::db::impl_postgres::PostgresValueRef<'_>,
+        ) -> crate::db::Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_postgres(value).map(|val| val.into())
+        }
+    };
+    ($wrapper_ty:ty, option) => {
+        #[cfg(feature = "postgres")]
+        fn from_postgres(
+            value: crate::db::impl_postgres::PostgresValueRef<'_>,
+        ) -> crate::db::Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_postgres(value).map(|val| val.map(|val| val.into()))
+        }
+    };
 }
+use impl_from_postgres_default;
 
 macro_rules! impl_from_mysql_default {
     () => {
         #[cfg(feature = "mysql")]
-        fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
+        fn from_mysql(value: crate::db::impl_mysql::MySqlValueRef<'_>) -> Result<Self> {
+            use crate::db::SqlxValueRef;
             value.get::<Self>()
+        }
+    };
+    ($wrapper_ty:ty) => {
+        #[cfg(feature = "mysql")]
+        fn from_mysql(value: crate::db::impl_mysql::MySqlValueRef<'_>) -> Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_mysql(value).map(|val| val.into())
+        }
+    };
+    ($wrapper_ty:ty, option) => {
+        #[cfg(feature = "mysql")]
+        fn from_mysql(value: crate::db::impl_mysql::MySqlValueRef<'_>) -> Result<Self> {
+            <$wrapper_ty as FromDbValue>::from_mysql(value).map(|val| val.map(|val| val.into()))
         }
     };
 }
 
 macro_rules! impl_to_db_value_default {
     ($ty:ty) => {
-        impl ToDbValue for $ty {
-            fn to_db_value(&self) -> DbValue {
+        impl crate::db::ToDbValue for $ty {
+            fn to_db_value(&self) -> crate::db::DbValue {
                 self.clone().into()
             }
         }
 
-        impl ToDbValue for Option<$ty> {
-            fn to_db_value(&self) -> DbValue {
+        impl crate::db::ToDbValue for Option<$ty> {
+            fn to_db_value(&self) -> crate::db::DbValue {
                 self.clone().into()
             }
         }
     };
+
+    ($ty:ty, $wrapper_ty:ty) => {
+        impl crate::db::ToDbValue for $ty {
+            fn to_db_value(&self) -> crate::db::DbValue {
+                Into::<$wrapper_ty>::into(self.clone()).to_db_value()
+            }
+        }
+
+        impl crate::db::ToDbValue for Option<$ty> {
+            fn to_db_value(&self) -> crate::db::DbValue {
+                self.clone()
+                    .map(|val| Into::<$wrapper_ty>::into(val))
+                    .to_db_value()
+            }
+        }
+    };
 }
+use impl_to_db_value_default;
 
 macro_rules! impl_db_field {
     ($ty:ty, $column_type:ident) => {
@@ -78,6 +151,29 @@ macro_rules! impl_db_field {
 
         impl_to_db_value_default!($ty);
     };
+    ($ty:ty, $column_type:ident, with $wrapper_ty:ty) => {
+        impl DatabaseField for $ty {
+            const TYPE: ColumnType = ColumnType::$column_type;
+        }
+
+        impl FromDbValue for $ty {
+            impl_from_sqlite_default!($wrapper_ty);
+
+            impl_from_postgres_default!($wrapper_ty);
+
+            impl_from_mysql_default!($wrapper_ty);
+        }
+
+        impl FromDbValue for Option<$ty> {
+            impl_from_sqlite_default!(Option<$wrapper_ty>, option);
+
+            impl_from_postgres_default!(Option<$wrapper_ty>, option);
+
+            impl_from_mysql_default!(Option<$wrapper_ty>, option);
+        }
+
+        impl_to_db_value_default!($ty, $wrapper_ty);
+    };
 }
 
 macro_rules! impl_db_field_with_postgres_int_cast {
@@ -93,8 +189,12 @@ macro_rules! impl_db_field_with_postgres_int_cast {
 
             #[cfg(feature = "postgres")]
             fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
-                #[allow(clippy::cast_possible_truncation)]
-                #[allow(clippy::cast_sign_loss)]
+                #[allow(
+                    clippy::allow_attributes,
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    reason = "needed for casting from larger to smaller integer types"
+                )]
                 value.get::<$src_ty>().map(|v| v as $dest_ty)
             }
         }
@@ -106,8 +206,12 @@ macro_rules! impl_db_field_with_postgres_int_cast {
 
             #[cfg(feature = "postgres")]
             fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
-                #[allow(clippy::cast_possible_truncation)]
-                #[allow(clippy::cast_sign_loss)]
+                #[allow(
+                    clippy::allow_attributes,
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    reason = "needed for casting from larger to smaller integer types"
+                )]
                 value
                     .get::<Option<$src_ty>>()
                     .map(|v| v.map(|v| v as $dest_ty))
@@ -132,6 +236,11 @@ impl_db_field!(f64, Double);
 impl_db_field!(chrono::NaiveDate, Date);
 impl_db_field!(chrono::NaiveTime, Time);
 impl_db_field!(chrono::NaiveDateTime, DateTime);
+impl_db_field!(
+    chrono::WeekdaySet,
+    TinyUnsignedInteger,
+    with chrono_wrapper::WeekdaySet
+);
 impl_db_field!(String, Text);
 impl_db_field!(Vec<u8>, Blob);
 
@@ -140,35 +249,6 @@ impl ToDbValue for &str {
         (*self).to_string().into()
     }
 }
-
-impl DatabaseField for chrono::DateTime<chrono::FixedOffset> {
-    const TYPE: ColumnType = ColumnType::DateTimeWithTimeZone;
-}
-
-impl FromDbValue for chrono::DateTime<chrono::FixedOffset> {
-    impl_from_sqlite_default!();
-
-    impl_from_postgres_default!();
-
-    #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
-        Ok(value.get::<chrono::DateTime<chrono::Utc>>()?.fixed_offset())
-    }
-}
-impl FromDbValue for Option<chrono::DateTime<chrono::FixedOffset>> {
-    impl_from_sqlite_default!();
-
-    impl_from_postgres_default!();
-
-    #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
-        Ok(value
-            .get::<Option<chrono::DateTime<chrono::Utc>>>()?
-            .map(|dt| dt.fixed_offset()))
-    }
-}
-
-impl_to_db_value_default!(chrono::DateTime<chrono::FixedOffset>);
 
 impl ToDbValue for Option<&str> {
     fn to_db_value(&self) -> DbValue {

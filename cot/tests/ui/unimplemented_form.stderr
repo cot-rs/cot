@@ -4,6 +4,15 @@ error[E0277]: `MyForm` does not implement the `Form` trait
 6 |     let _ = <<MyForm as Form>::Context as FormContext>::new();
   |               ^^^^^^ `MyForm` is not a form
   |
-  = help: the trait `cot::form::Form` is not implemented for `MyForm`
+help: the trait `cot::form::Form` is not implemented for `MyForm`
+ --> tests/ui/unimplemented_form.rs:3:1
+  |
+3 | struct MyForm {}
+  | ^^^^^^^^^^^^^
   = note: add #[derive(cot::form::Form)] to the struct to automatically derive the trait
-  = help: the trait `cot::form::Form` is implemented for `DatabaseUser`
+help: the trait `cot::form::Form` is implemented for `DatabaseUser`
+ --> src/auth/db.rs
+  |
+  | #[derive(Debug, Clone, Form, AdminModel)]
+  |                        ^^^^
+  = note: this error originates in the derive macro `Form` (in Nightly builds, run with -Z macro-backtrace for more info)

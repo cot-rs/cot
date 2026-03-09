@@ -2099,7 +2099,7 @@ impl Default for EmailConfig {
 /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
 /// ```
 #[repr(transparent)]
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Deserialize)]
 #[serde(from = "String")]
 #[cfg(not(miri))]
 pub struct SecretKey(SecureBytes);
@@ -2213,18 +2213,18 @@ impl From<&str> for SecretKey {
     }
 }
 
-impl PartialEq for SecretKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.ct_eq(&other.0).into()
-    }
-}
-
 impl Eq for SecretKey {}
 
 impl Debug for SecretKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // write in single line, regardless whether alternate mode was used or not
         write!(f, "SecretKey(\"**********\")")
+    }
+}
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes().ct_eq(other.as_bytes()).into()
     }
 }
 
@@ -2417,17 +2417,6 @@ impl From<&str> for CacheUrl {
     }
 }
 
-impl PartialEq for SecretKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_bytes().ct_eq(other.as_bytes()).into()
-    }
-}
-
-impl Eq for SecretKey {}
-
-impl Default for SecretKey {
-    fn default() -> Self {
-        Self::new(&[])
 #[cfg(feature = "cache")]
 impl TryFrom<CacheUrl> for CacheType {
     type Error = ParseCacheTypeError;
@@ -2796,6 +2785,7 @@ mod tests {
         let serialized = serde_json::to_string(&key).unwrap();
         // Should serialize as a byte array
         assert_eq!(serialized, "[97,98,99,49,50,51]");
+    }
     #[test]
     #[cfg(feature = "redis")]
     fn cache_type_from_str_redis() {

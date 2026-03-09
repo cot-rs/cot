@@ -496,6 +496,20 @@ mod tests {
     }
 
     #[test]
+    fn field_opts_specified_field_name() {
+        let input: syn::Field = parse_quote! {
+            #[model(field_name="test_field")]
+            test: String
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let field = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"TestModel".to_string()))
+            .unwrap();
+        assert_eq!(field.name.to_string(), "test");
+        assert_eq!(field.column_name, "test_field");
+    }
+
+    #[test]
     fn find_type_resolved() {
         let input: syn::Type =
             parse_quote! { ::my_crate::MyContainer<'a, Vec<std::string::String>> };

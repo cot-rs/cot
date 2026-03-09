@@ -146,6 +146,7 @@ pub struct FieldOpts {
     pub ty: syn::Type,
     pub primary_key: darling::util::Flag,
     pub unique: darling::util::Flag,
+    pub field_name: Option<String>,
 }
 
 impl FieldOpts {
@@ -206,7 +207,12 @@ impl FieldOpts {
         self_reference: Option<&String>,
     ) -> Result<Field, syn::Error> {
         let name = self.ident.clone().expect("Only structs are supported");
-        let column_name = name.unraw().to_string();
+
+        let column_name = if let Some(specified_field_name) = &self.field_name {
+            specified_field_name.clone()
+        } else {
+            name.unraw().to_string()
+        };
 
         let (auto_value, foreign_key) = (
             self.find_type("cot::db::Auto", symbol_resolver).is_some(),

@@ -33,7 +33,7 @@ use crate::db::{
 pub struct Query<T> {
     filter: Option<Expr>,
     limit: Option<u64>,
-    order_by: Option<(String, Order)>,
+    order_by: Option<(FieldRef<T>, Order)>,
     offset: Option<u64>,
     phantom_data: PhantomData<fn() -> T>,
 }
@@ -167,10 +167,10 @@ impl<T: Model> Query<T> {
     ///     age: i32,
     /// }
     ///
-    /// let query = Query::<User>::new().order_by("age", Order::Asc); // or Order::Desc
+    /// let query = Query::<User>::new().order_by(User::age, Order::Asc); // or Order::Desc
     /// ```
-    pub fn order_by(&mut self, order_by: (String, Order)) -> &mut Self {
-        self.order_by = Some(self.order_by);
+    pub fn order_by(&mut self, order_by: (FieldRef<T>, Order)) -> &mut Self {
+        self.order_by = Some(order_by);
         self
     }
 
@@ -271,7 +271,8 @@ impl<T: Model> Query<T> {
 
     pub(super) fn add_order_by_to_statement(&self, statement: &mut sea_query::SelectStatement) {
         if let Some(order_by) = self.order_by {
-            statement.order_by(order_by.0, order_by.1);
+            let column_name = order_by.0.identifier;
+            statement.order_by(column_name, order_by.1);
         }
     }
 

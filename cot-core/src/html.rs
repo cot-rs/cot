@@ -54,6 +54,9 @@ use std::fmt::Write;
 
 use askama::filters::Escaper;
 use derive_more::{Deref, Display, From};
+#[cfg(feature = "schemars")]
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 /// A type that represents HTML content as a string.
 ///
@@ -65,7 +68,23 @@ use derive_more::{Deref, Display, From};
 /// let html = Html::new("<div>Hello</div>");
 /// assert_eq!(html.as_str(), "<div>Hello</div>");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Deref, From, Display)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    Deref,
+    From,
+    Display,
+    Serialize,
+    Deserialize,
+)]
+#[cfg_attr(feature = "schemars", derive(JsonSchema))]
+#[serde(transparent)]
 pub struct Html(pub String);
 
 impl Html {

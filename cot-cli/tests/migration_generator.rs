@@ -216,6 +216,11 @@ fn create_model_keywords_source() {
             .content
             .contains(r#"::cot::db::Identifier::new("type")"#)
     );
+    assert!(
+        migration
+            .content
+            .contains(r#"::cot::db::Identifier::new("cot__use")"#)
+    );
 }
 
 /// Test that the migration generator can generate a "create model" migration

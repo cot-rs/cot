@@ -205,7 +205,10 @@ impl FieldOpts {
         symbol_resolver: &SymbolResolver,
         self_reference: Option<&String>,
     ) -> Result<Field, syn::Error> {
-        let name = self.ident.clone().expect("Only structs are supported");
+        let name = self
+            .ident
+            .clone()
+            .expect("Only named struct fields are supported");
         let column_name = name.unraw().to_string();
 
         let (auto_value, foreign_key) = (

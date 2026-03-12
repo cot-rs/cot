@@ -1,4 +1,4 @@
-use cot::db::{Auto, ForeignKey, model};
+use cot::db::{Auto, model};
 
 #[model]
 struct r#const {

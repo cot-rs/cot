@@ -174,7 +174,7 @@ fn create_model_keywords() {
     assert_eq!(migration.migration_name, "m_0001_initial");
     assert!(migration.dependencies.is_empty());
 
-    let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
+    let (table_name, fields) = unwrap_create_model(&migration.operations[1]);
     assert_eq!(table_name, "cot__const");
     assert_eq!(fields.len(), 3);
 

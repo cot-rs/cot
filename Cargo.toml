@@ -1,10 +1,10 @@
 [workspace]
 members = [
-    "cot",
-    "cot-cli",
-    "cot-codegen",
-    "cot-macros",
-    "cot-core",
+    "crates/cot",
+    "crates/cot-cli",
+    "crates/cot-codegen",
+    "crates/cot-macros",
+    "crates/cot-core",
     # Examples
     "examples/admin",
     "examples/custom-error-pages",
@@ -77,10 +77,10 @@ clap = { version = "4.5.60", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.2.31"
-cot = { version = "0.5.0", path = "cot" }
-cot_core = { version = "0.5.0", path = "cot-core" }
-cot_codegen = { version = "0.5.0", path = "cot-codegen" }
-cot_macros = { version = "0.5.0", path = "cot-macros" }
+cot = { version = "0.5.0", path = "crates/cot" }
+cot_core = { version = "0.5.0", path = "crates/cot-core" }
+cot_codegen = { version = "0.5.0", path = "crates/cot-codegen" }
+cot_macros = { version = "0.5.0", path = "crates/cot-macros" }
 criterion = "0.8"
 darling = "0.23"
 deadpool-redis = { version = "0.23", default-features = false }

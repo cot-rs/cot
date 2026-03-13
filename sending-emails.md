@@ -2,11 +2,11 @@
 title: Sending Emails
 ---
 
-Cot provides a unified interface for sending emails, allowing you to switch between different email backends (like SMTP, Memory, or Console) easily. This is powered by the popular [`lettre`](https://crates.io/crates/lettre) crate.
+Cot provides a unified interface for sending emails, allowing you to switch between different [`email backends`](cot::email::transport) (like [`SMTP`](cot::email::transport::smtp), or [`Console`](cot::email::transport::console)) easily. This is powered by the popular [`lettre`](https://crates.io/crates/lettre) crate.
 
 ## Configuration
 
-To use the email system, you need to enable the `email` feature in `cot` and configure it.
+To use the email system, you need to enable the [`email`](feature@email) feature in `cot` and configure it.
 
 ### Enabling the Feature
 
@@ -31,7 +31,7 @@ url = "smtp://user:password@localhost:587" # For SMTP
 mechanism = "plain" # or "login", "xoauth2"
 ```
 
-For development, you might want to use the `console` transport, which prints emails to stdout:
+For development, you might want to use the [`Console`](cot::email::transport::console) transport, which prints emails to stdout:
 
 ```toml
 [email.transport]
@@ -63,7 +63,7 @@ async fn send_welcome_email(email_sender: EmailService) -> cot::Result<Html> {
 
 ## Email Message Builder
 
-The `EmailMessage::builder()` provides a fluent interface to construct emails. It supports:
+The [`EmailMessage::builder()`](struct@cot::email::EmailMessage#method.builder) provides a fluent interface to construct emails. It supports:
 
 - **From/To/Cc/Bcc**: Set recipients and sender.
 - **Subject**: Set the email subject.
@@ -71,5 +71,5 @@ The `EmailMessage::builder()` provides a fluent interface to construct emails. I
 - **Html**: Set the HTML body (if supported).
 - **Attachments**: Add file attachments.
 
-See the [API reference](https://docs.rs/cot/0.5/cot/email/struct.EmailMessageBuilder.html)
+See the [API reference](struct@cot::email::EmailMessageBuilder)
 for more details.

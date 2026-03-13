@@ -6,7 +6,7 @@ Cot has form processing capabilities that allows you to create forms and handle 
 
 ## Form trait
 
-The core of the form processing lies in the `Form` trait inside the `cot::form` module. This trait is used to define the form and the fields that are part of the form. Below is an example of how you can define a form:
+The core of the form processing lies in the [`Form`](trait@cot::form::Form) trait inside the [`cot::form`](cot::form) module. This trait is used to define the form and the fields that are part of the form. Below is an example of how you can define a form:
 
 ```rust
 use cot::form::Form;
@@ -76,7 +76,7 @@ There are several ways how can you use the forms in your templates. The easiest 
 </form>
 ```
 
-This is especially useful for prototyping new forms, as it doesn't allow you to customize the rendering of your form. If you need a bit more control, you can use the `form.fields()` method to render the fields individually:
+This is especially useful for prototyping new forms, as it doesn't allow you to customize the rendering of your form. If you need a bit more control, you can use the [`form.fields()`](trait@cot::form::FormContext#tymethod.fields) method to render the fields individually:
 
 ```html.j2
 {% let request = request %}

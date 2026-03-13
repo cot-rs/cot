@@ -13,8 +13,8 @@ Sometimes, though, the changes need to be made in a backwards-incompatible manne
 ### General
 
 * **MSRV Bump**: The Minimum Supported Rust Version (MSRV) has been bumped to 1.88.
-* **Templates**: `cot` now re-exports `Template` trait and `#[derive(Template)]` macro. You should update your imports from `use askama::Template;` to `use cot::Template;`. This change allows you to remove `askama` from your `Cargo.toml` dependencies.
-* **Database**: `Database` struct now uses `Arc` internally. If you were wrapping `Database` in `Arc` (e.g. `Arc<Database>`), you should remove the `Arc` wrapper as `Database` is now cheap to clone.
+* **Templates**: `cot` now re-exports [`Template`](trait@cot::Template) trait and [`#[derive(Template)]`](macro@cot::Template) macro. You should update your imports from `use askama::Template;` to `use cot::Template;`. This change allows you to remove `askama` from your `Cargo.toml` dependencies.
+* **Database**: [`Database`](struct@cot::db::Database) struct now uses `Arc` internally. If you were wrapping [`Database`](struct@cot::db::Database) in `Arc` (e.g. `Arc<Database>`), you should remove the `Arc` wrapper as [`Database`](struct@cot::db::Database) is now cheap to clone.
 
 ### Forms
 

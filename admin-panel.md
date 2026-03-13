@@ -75,7 +75,7 @@ impl App for MyApp {
 
 ## Registering Models in the Admin
 
-To make your models appear in the admin interface, you need to implement the `AdminModel` trait. The easiest way is to use the `#[derive(AdminModel)]` macro:
+To make your models appear in the admin interface, you need to implement the [`AdminModel`](trait@cot::admin::AdminModel) trait. The easiest way is to use the [`#[derive(AdminModel)]`](derive@cot::admin::AdminModel) macro:
 
 ```rust
 use cot::admin::AdminModel;
@@ -93,7 +93,7 @@ struct BlogPost {
 }
 ```
 
-Note however that in order to derive the `AdminModel` trait, you need to also derive the `Form` and `Model` traits (the latter is provided by the `#[model]` attribute). In addition to that, your model needs to implement the `Display` trait—for instance, in the case above, we could add it like so:
+Note however that in order to derive the  [`AdminModel`](trait@cot::admin::AdminModel) trait, you need to also derive the [`Form`](trait@cot::form::Form) and [`Model`](trait@cot::db::Model) traits (the latter is provided by the [`#[model]`](attr@cot::db::model) attribute). In addition to that, your model needs to implement the `Display` trait—for instance, in the case above, we could add it like so:
 
 ```rust
 impl Display for BlogPost {
@@ -103,7 +103,7 @@ impl Display for BlogPost {
 }
 ```
 
-After adding the `AdminModel` trait, you can add your model to the admin panel using `DefaultAdminModelManager`. This is as easy as adding the following code to your `App` implementation:
+After adding the [`AdminModel`](trait@cot::admin::AdminModel) trait, you can add your model to the admin panel using [`DefaultAdminModelManager`](struct@cot::admin::DefaultAdminModelManager). This is as easy as adding the following code to your [`App`](trait@cot::project::App) implementation:
 
 ```rust
 impl App for MyApp {

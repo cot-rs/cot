@@ -16,7 +16,7 @@ This chapter will guide you through setting up OpenAPI in your Cot project and s
 
 ## Prerequisites
 
-To use OpenAPI features in Cot, you need to enable the `openapi` and `swagger-ui` features in your project's `Cargo.toml`:
+To use OpenAPI features in Cot, you need to enable the [`openapi`](feature@openapi) and [`swagger-ui`](feature@swagger-ui) features in your project's `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -24,13 +24,13 @@ cot = { version = "...", features = ["openapi", "swagger-ui"] }
 schemars = "0.9" # Required for JSON Schema generation
 ```
 
-The `schemars` crate is necessary for creating JSON Schema definitions for your request and response types.
+The [`schemars`](https://docs.rs/schemars/latest/schemars/) crate is necessary for creating JSON Schema definitions for your request and response types.
 
 ## Setting Up Your API
 
 ### Define Your Data Types
 
-First, define your request and response data types with `serde` for serialization and `schemars` for schema generation:
+First, define your request and response data types with [`serde`](https://docs.rs/serde/latest/serde/) for serialization and [`schemars`](https://docs.rs/schemars/latest/schemars/) for schema generation:
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ struct AddResponse {
 }
 ```
 
-Note the use of `#[derive(JsonSchema)]` which comes from the `schemars` crate. This attribute generates schema information that Cot uses to build the OpenAPI specification.
+Note the use of `#[derive(JsonSchema)]` which comes from the [`schemars`](https://docs.rs/schemars/latest/schemars/) crate. This attribute generates schema information that Cot uses to build the OpenAPI specification.
 
 ### Create API Handlers
 
@@ -83,12 +83,12 @@ fn create_router() -> Router {
 
 The key differences from standard routes are:
 
-- Using `with_api_handler` instead of `with_handler`
-- Using `api_post` instead of `post`
+- Using [`with_api_handler`](struct@cot::router::Route#method.with_api_handler) instead of [`with_handler`](struct@cot::router::Route#method.with_handler)
+- Using [`api_post`](fn@cot::router::method::openapi::api_post) instead of [`post`](fn@cot::router::method::post)
 
 ### Register the Swagger UI App
 
-To expose the interactive documentation UI, register the `SwaggerUi` app in your project:
+To expose the interactive documentation UI, register the [`SwaggerUi`](struct@cot::openapi::swagger_ui::SwaggerUi) app in your project:
 
 ```rust
 use cot::openapi::swagger_ui::SwaggerUi;
@@ -119,7 +119,7 @@ impl Project for MyProject {
 }
 ```
 
-Don't forget to include the `StaticFilesMiddleware` as it's required for the Swagger UI to serve its CSS and JavaScript files!
+Don't forget to include the [`StaticFilesMiddleware`](struct@cot::static_files::StaticFilesMiddleware) as it's required for the Swagger UI to serve its CSS and JavaScript files!
 
 ## Complete Example
 
@@ -253,7 +253,7 @@ Route::with_api_handler("/users", api_get(list_users))
 
 ### Excluding Routes from OpenAPI Documentation
 
-Sometimes you might want to exclude certain routes from your API documentation. You can do this by using `NoApi`:
+Sometimes you might want to exclude certain routes from your API documentation. You can do this by using [`NoApi`](struct@cot::openapi::NoApi):
 
 ```rust
 use cot::openapi::NoApi;
@@ -278,7 +278,7 @@ async fn handler(
 
 ### Multiple HTTP Methods
 
-The `ApiMethodRouter` allows you to define multiple HTTP methods for a single route and include them all in the OpenAPI documentation:
+The [`ApiMethodRouter`](struct@cot::router::method::openapi::ApiMethodRouter) allows you to define multiple HTTP methods for a single route and include them all in the OpenAPI documentation:
 
 ```rust
 use cot::router::method::openapi::ApiMethodRouter;

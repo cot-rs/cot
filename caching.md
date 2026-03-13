@@ -6,7 +6,7 @@ Cot provides a flexible caching system that allows you to store and retrieve dat
 
 ## Configuration
 
-To use the caching system, you first need to configure it in your `ProjectConfig` (or via configuration files).
+To use the caching system, you first need to configure it in your[ `ProjectConfig`](struct@cot::config::ProjectConfig) (or via configuration files).
 
 ### Configuration via TOML
 
@@ -33,7 +33,7 @@ pool_size = 20 # Optional: connection pool size
 
 ## Usage
 
-You can access the cache by using the `Cache` extractor. The cache interface provides standard methods like `get`, `insert`, `remove`, etc.
+You can access the cache by using the `Cache` extractor. The cache interface provides standard methods like [`get`](struct@cot::cache::Cache#method.get), [`insert`](struct@cot::cache::Cache#method.insert), [`remove`](struct@cot::cache::Cache#method.remove), etc.
 
 ```rust
 use cot::cache::Cache;
@@ -74,7 +74,7 @@ cache.insert_expiring(
 
 #### Lazy Computation
 
-You can use `get_or_insert_with` to lazily compute and cache values:
+You can use [`get_or_insert_with`](struct@cot::cache::Cache#method.get_or_insert_with) to lazily compute and cache values:
 
 ```rust
 let value: String = cache.get_or_insert_with("expensive_key", || async {
@@ -101,10 +101,10 @@ prefix = "v1"
 Cot supports the following cache backends:
 
 - **Memory**: Stores data in memory. Fast, but data is lost when the server restarts. Good for development or short-lived cache.
-- **Redis**: Stores data in a Redis instance. Persistent and shared across multiple server instances. Requires the `redis` feature.
+- **Redis**: Stores data in a Redis instance. Persistent and shared across multiple server instances. Requires the [`redis`](feature@redis) feature.
 - **File**: Stores data in files. Persistent but slower than memory/Redis. Requires configuring a path.
 
-To use Redis, make sure to enable the `redis` feature in your `Cargo.toml`:
+To use Redis, make sure to enable the [`redis`](feature@redis) feature in your `Cargo.toml`:
 
 ```toml
 [dependencies]

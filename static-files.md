@@ -12,7 +12,7 @@ The Cot CLI generates a `static` directory in your project root, which serves as
 
 ### Registering Static Files
 
-To serve static files, you'll need to register them in your application's `static_files()` method within the `CotApp` implementation. Here's a basic example:
+To serve static files, you'll need to register them in your application's [`static_files()`](trait@cot::project::App#method.static_files) method within the `CotApp` implementation. Here's a basic example:
 
 ```rust
 impl App for MyApp {
@@ -22,7 +22,7 @@ impl App for MyApp {
 }
 ```
 
-To add more files, simply include them in the `static_files!` macro. For example, after adding a logo to your project:
+To add more files, simply include them in the [`static_files!`](macro@cot::static_files) macro. For example, after adding a logo to your project:
 
 ```rust
 impl App for MyApp {
@@ -64,7 +64,7 @@ rewrite = "query_param"  # set to "none" to disable hashing
 cache_timeout = "1year"  # "Cache-Control" header value
 ```
 
-Please refer to [humantime crate documentation](https://docs.rs/humantime/latest/humantime/fn.parse_duration.html) on the details about the `cache_timeout` configuration format.
+Please refer to [humantime crate documentation](https://docs.rs/humantime/latest/humantime/fn.parse_duration.html) on the details about the [`cache_timeout`](struct@cot::config::StaticFilesConfig#structfield.cache_timeout) configuration format.
 
 ## Production Deployment
 
@@ -80,7 +80,7 @@ This command aggregates all static files into the specified directory (in this c
 
 ### Disabling Static File Serving
 
-If you prefer not to serve static files through the Cot server, you can disable this functionality by removing the `StaticFilesMiddleware` from your project configuration:
+If you prefer not to serve static files through the Cot server, you can disable this functionality by removing the [`StaticFilesMiddleware`](struct@cot::static_files::StaticFilesMiddleware) from your project configuration:
 
 ```rust
 fn middlewares(

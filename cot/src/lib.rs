@@ -84,6 +84,7 @@ pub(crate) mod utils;
 
 #[cfg(feature = "openapi")]
 pub use aide;
+pub use bytes;
 /// A wrapper around a handler that's used in [`Bootstrapper`].
 ///
 /// It is returned by [`Bootstrapper::finish`]. Typically, you don't need to
@@ -181,9 +182,9 @@ pub use cot_macros::e2e_test;
 /// ```
 pub use cot_macros::main;
 pub use cot_macros::test;
+pub use http;
 #[cfg(feature = "openapi")]
 pub use schemars;
-pub use {bytes, http};
 
 pub use crate::__private::askama::{Template, filter_fn};
 pub use crate::project::{

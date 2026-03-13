@@ -9,4 +9,4 @@ edition = "2024"
 [dependencies]
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }
-cot = { path = "../../cot" }
+cot = { path = "../../crates/cot" }

@@ -8,4 +8,4 @@ edition = "2024"
 
 [dependencies]
 async-trait = "0.1"
-cot = { path = "../../cot", features = ["live-reload"] }
+cot = { path = "../../crates/cot", features = ["live-reload"] }

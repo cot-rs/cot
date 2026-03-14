@@ -418,7 +418,7 @@ jobs:
         with:
           log-level: warn
           command: check licenses
-          command-arguments: --config .cargo/cargo-deny.toml
+          command-arguments: --config .cargo/deny.toml
   semver-check:
     if: github.event_name == 'pull_request'
     name: Semver compatibility check

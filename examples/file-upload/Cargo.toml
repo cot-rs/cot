@@ -8,4 +8,4 @@ edition = "2024"
 
 [dependencies]
 base64 = "0.22"
-cot = { path = "../../cot" }
+cot = { path = "../../crates/cot" }

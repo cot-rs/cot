@@ -1,5 +1,7 @@
 services:
   web:
-    build: .
+    build:
+      context: ..
+      dockerfile: docs-site.dockerfile
     container_name: cot_site
     restart: unless-stopped

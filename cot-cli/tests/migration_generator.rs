@@ -161,6 +161,39 @@ fn create_models_foreign_key_two_migrations() {
 }
 
 #[test]
+fn create_models_foreign_key_path_mismatch() {
+    let generator = test_generator();
+
+    let main_src = include_str!("migration_generator/path_mismatch/main.rs");
+    let models_mod_src = include_str!("migration_generator/path_mismatch/models/mod.rs");
+    let tags_src = include_str!("migration_generator/path_mismatch/models/tags.rs");
+    let posts_src = include_str!("migration_generator/path_mismatch/models/posts.rs");
+
+    let source_files = vec![
+        SourceFile::parse(PathBuf::from("main.rs"), main_src).unwrap(),
+        SourceFile::parse(PathBuf::from("models/mod.rs"), models_mod_src).unwrap(),
+        SourceFile::parse(PathBuf::from("models/tags.rs"), tags_src).unwrap(),
+        SourceFile::parse(PathBuf::from("models/posts.rs"), posts_src).unwrap(),
+    ];
+
+    let migration = generator
+        .generate_migrations_as_generated_from_files(source_files)
+        .unwrap()
+        .unwrap();
+
+    // Tags should be created before Posts
+    assert_eq!(migration.operations.len(), 2);
+    let (table_name, _) = unwrap_create_model(&migration.operations[0]);
+    assert_eq!(table_name, "cot__tags");
+    let (table_name, _) = unwrap_create_model(&migration.operations[1]);
+    assert_eq!(table_name, "cot__posts");
+
+    // This is where the bug happens: it shouldn't have any external dependencies
+    // if Tags are created in the same migration.
+    assert_eq!(migration.dependencies.len(), 0);
+}
+
+#[test]
 fn create_model_keywords() {
     let generator = test_generator();
     let src = include_str!("migration_generator/keywords.rs");

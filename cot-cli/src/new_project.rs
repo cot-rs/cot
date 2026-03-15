@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use heck::ToPascalCase;
-use rand::rngs::StdRng;
-use rand::{RngCore, SeedableRng};
+use rand::rngs::{StdRng, SysRng};
+use rand::{Rng, SeedableRng};
 use tracing::trace;
 
 use crate::utils::{StatusType, print_status_msg};
@@ -106,7 +106,8 @@ fn generate_secret_key() -> String {
     // Cryptographically secure random number generator:
     // https://rust-random.github.io/book/guide-rngs.html#cryptographically-secure-pseudo-random-number-generators-csprngs
     // https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html#secure-random-number-generation
-    let mut rng = StdRng::from_os_rng();
+    let mut rng =
+        StdRng::try_from_rng(&mut SysRng).expect("failed to initialize random number generator");
     let mut key = [0u8; 32];
     rng.fill_bytes(&mut key);
     hex::encode(key)

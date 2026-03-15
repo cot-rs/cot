@@ -11,10 +11,6 @@
 [![Open Collective backers](https://img.shields.io/opencollective/backers/cot?label=Open%20Collective%20backers)](https://opencollective.com/cot)
 </div>
 
-> [!WARNING]
-> Cot is currently missing a lot of features and is **not ready** for anything even remotely close to production use.
-> That said, you are more than welcome to try it out and provide feedback!
-
 Cot is an easy to use, modern, and fast web framework for Rust. It has been designed to be familiar if you've ever
 used [Django](https://www.djangoproject.com/), and easy to learn if you haven't. It's a batteries-included framework
 built on top of [axum](https://github.com/tokio-rs/axum).

@@ -29,7 +29,8 @@ http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
 indexmap.workspace = true
-serde.workspace = true
+schemars = { workspace = true, optional = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 serde_html_form = { workspace = true, features = ["de", "std"] }
 serde_json.workspace = true
 serde_path_to_error.workspace = true
@@ -47,3 +48,4 @@ tokio.workspace = true
 [features]
 default = []
 json = []
+schemars = ["dep:schemars"]

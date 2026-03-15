@@ -17,7 +17,7 @@ env:
 
   _RUST_STABLE: &rust_stable stable
   # Pinning the nightly version to a "stable" version to avoid CI breakages.
-  _RUST_NIGHTLY: &rust_nightly nightly-2025-11-11
+  _RUST_NIGHTLY: &rust_nightly nightly-2026-02-28
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
@@ -198,7 +198,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          # branch coverage is currently optional and requires nightly
           toolchain: *rust_nightly
           components: llvm-tools-preview
 
@@ -227,11 +226,13 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
+      # TODO: consider enabling branch coverage once it's supported in stable
+      # https://github.com/taiki-e/cargo-llvm-cov/issues/8
       - name: Generate code coverage
-        run: cargo llvm-cov --all-features --workspace --branch --no-report -- --include-ignored
+        run: cargo llvm-cov --all-features --workspace --no-report -- --include-ignored
 
       - name: Generate code coverage - doctests
-        run: cargo llvm-cov --all-features --workspace --branch --doc --no-report
+        run: cargo llvm-cov --all-features --workspace --doc --no-report
 
       - name: Merge code coverage reports
         run: cargo llvm-cov report --codecov --output-path codecov.json

@@ -6,6 +6,6 @@ license = "MIT OR Apache-2.0"
 edition = "2024"
 
 [dependencies]
-cot = { path = "../../crates/cot" , features = ["full"]}
+cot = { path = "../../cot" , features = ["full"]}
 chrono = "0.4.44"
 chrono-tz = "0.10.4"

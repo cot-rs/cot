@@ -64,6 +64,8 @@ cargo run
 **We recommend you to read the [official guide](https://cot.rs/guide/latest/) to learn more about Cot
 and how to use it.**
 
+Got interested or have questions? Join our [Discord server](https://discord.cot.rs/) — we'd love to hear from you!
+
 ### cot-cli packages
 
 If you prefer to use your operating system's package manager to manage the `cot-cli` package, you can find it in the

@@ -1,7 +1,7 @@
 FROM docker.io/library/rust:1.93 AS builder
 WORKDIR /usr/src/cot
 COPY . .
-WORKDIR /usr/src/cot/docs-site
+WORKDIR /usr/src/cot/site
 RUN cargo install --path . --locked
 
 FROM docker.io/library/debian:13-slim

@@ -2,10 +2,11 @@
 <h1><img src="https://raw.githubusercontent.com/cot-rs/media/6585c518/logo/logo-text.svg" alt="Cot" width="300"></h1>
 
 [![Rust Build Status](https://github.com/cot-rs/cot/workflows/Rust%20CI/badge.svg)](https://github.com/cot-rs/cot/actions/workflows/rust.yml)
+[![codecov](https://codecov.io/gh/cot-rs/cot/branch/master/graph/badge.svg)](https://codecov.io/gh/cot-rs/cot)
 [![crates.io](https://img.shields.io/crates/v/cot.svg)](https://crates.io/crates/cot)
 [![Guide](https://img.shields.io/website?url=https%3A%2F%2Fcot.rs%2Fguide%2Flatest%2F&label=guide&up_message=online)](https://cot.rs/guide/latest/)
 [![Documentation](https://docs.rs/cot/badge.svg)](https://docs.rs/cot)
-[![codecov](https://codecov.io/gh/cot-rs/cot/branch/master/graph/badge.svg)](https://codecov.io/gh/cot-rs/cot)
+<br>
 [![Discord chat](https://img.shields.io/discord/1330137289287925781?logo=Discord&logoColor=white)](https://discord.cot.rs)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/cot-rs?label=GitHub%20sponsors)](https://github.com/sponsors/cot-rs)
 [![Open Collective backers](https://img.shields.io/opencollective/backers/cot?label=Open%20Collective%20backers)](https://opencollective.com/cot)

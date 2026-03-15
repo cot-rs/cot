@@ -90,6 +90,15 @@ Thanks in advance for your contributions, anything is appreciated!
  </picture>
 </a>
 
+## Sponsorship
+
+Cot is an independent, open-source project. If you find it useful, please consider sponsoring its development — your support helps us dedicate more time to building and maintaining the framework.
+
+- [GitHub Sponsors](https://github.com/sponsors/cot-rs)
+- [Open Collective](https://opencollective.com/cot)
+
+A huge thank you to all our existing sponsors — your generosity makes this project possible!
+
 ## Contributors
 
 <a href="https://github.com/cot-rs/cot/graphs/contributors">

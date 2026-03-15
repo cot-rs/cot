@@ -15,3 +15,5 @@ RUN apt-get update &&  \
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["docs-site", "-l", "0.0.0.0:8000"]
 EXPOSE 8000
+
+LABEL org.opencontainers.image.source=https://github.com/cot-rs/cot

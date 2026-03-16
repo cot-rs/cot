@@ -78,7 +78,7 @@ manager might not be the latest one, so we recommend just using the official pac
 
 If you want to contribute to Cot, please read the [contributing guide](https://cot.rs/guide/latest/contributing). It will guide you through the process of setting up your development environment and making contributions.
 
-Thanks in advance for your contributions, anything is appreciated!
+Thanks in advance for your contributions — every contribution is appreciated!
 
 ## Star History
 

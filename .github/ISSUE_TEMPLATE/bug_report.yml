@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a bug or unexpected behavior in Cot
+type: bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug! Please fill out the sections below to help us reproduce and fix it.
+
+        If you're unsure whether this is a bug, consider opening a [discussion](https://github.com/cot-rs/cot/discussions/new/choose) or joining our [Discord server](https://discord.cot.rs/) first.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug — what happened and what you expected to happen instead.
+      placeholder: |
+        When I do X, Y happens. I expected Z to happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Provide a [Minimal, Complete, and Verifiable example](https://stackoverflow.com/help/mcve) that demonstrates the bug. The easier it is to reproduce, the faster we can fix it.
+      placeholder: |
+        1. Create a project with `cot new my-app`
+        2. Add the following to `src/main.rs`: ...
+        3. Run `cargo run`
+        4. See error: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please fill in the details below.
+      value: |
+        **Cot version**:
+        **Rust environment**:
+        ```
+        // Output of `rustc --version --verbose`
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other information that might be relevant — logs, error messages, related issues, etc.

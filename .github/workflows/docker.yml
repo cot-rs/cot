@@ -2,6 +2,8 @@ name: Docker Images
 
 on:
   push:
+  pull_request:
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -36,6 +38,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: docs/
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.ref == 'refs/heads/master' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

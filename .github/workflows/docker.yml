@@ -14,6 +14,7 @@ jobs:
     # This is to avoid double running on PRs from internal branches
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
 
+    name: Build and push docs website
     runs-on: ubuntu-latest
     permissions:
       contents: read

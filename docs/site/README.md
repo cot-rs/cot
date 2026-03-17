@@ -31,3 +31,11 @@ bacon serve
 ```
 
 All the changes you do in Rust source files or the templates should be automatically reflected in the web browser.
+
+## Docker image
+
+You can also build and run the website using Docker. To build the image, run the following command inside the `docs/` directory:
+
+```bash
+docker build -t cot-site . && docker run -it cot-site
+```

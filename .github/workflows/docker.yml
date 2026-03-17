@@ -10,6 +10,10 @@ env:
 
 jobs:
   build-and-push-docs-site:
+    # Run on external PRs and pushes to branches on the repo
+    # This is to avoid double running on PRs from internal branches
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
     runs-on: ubuntu-latest
     permissions:
       contents: read

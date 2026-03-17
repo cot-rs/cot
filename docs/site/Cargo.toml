@@ -9,4 +9,4 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 # TODO: change to crates.io version once it's published
 cot = { git = "https://github.com/cot-rs/cot.git", rev = "6774ea6710e620e41ec162b258a21284eef5ab3e", default-features = false }
-cot-site = { git = "https://github.com/cot-rs/cot-site.git", rev = "0869a5dd33753830c64562a34af587c2bd59cb46" }
+cot-site = { git = "https://github.com/cot-rs/cot-site.git", rev = "b05894043d5d215c74d304a525aa30d58c75c651" }

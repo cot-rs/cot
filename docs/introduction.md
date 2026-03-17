@@ -175,73 +175,65 @@ Now, when you visit [`localhost:8000/hello/John/Smith/`](http://localhost:8000/h
 
 ### App
 
-Along with an example view, the entire Cot project structure has been created for you. Let's take a look one by one at what you can find in `main.rs`:
+An **app** is a self-contained collection of views, models, and static files that represent a specific functional unit of your service (e.g., an admin panel, a blog, or a user authentication system). Apps are designed to be modular and reusable.
+
+When you define an app, you implement the `App` trait:
 
 ```rust
-struct CotTutorialApp;
+struct MyBlogApp;
 
-impl App for CotTutorialApp {
+#[async_trait::async_trait]
+impl App for MyBlogApp {
     fn name(&self) -> &'static str {
-        env!("CARGO_CRATE_NAME")
+        "blog"
     }
-```
 
-An app is a collection of views and other components that make up a part of your service. Typically, they represent a part of your service, like the main website, an admin panel, or an API. An app usually corresponds to a single Rust crate, hence we're just using the name of the crate as the app name. The app name is used in many places, such as in the database table names, in the admin panel, or when reversing the URLs, so it needs to be unique in your project.
-
-```rust
-    fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
-        cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
+    fn router(&self) -> Router {
+        Router::with_urls([
+            Route::with_handler_and_name("/", index, "index"),
+        ])
     }
-```
 
-This defines the database migration list that will be applied when your server starts. You shouldn't normally need to modify this, and the migrations can be generated automatically using the Cot CLI – more on this in the chapter about database models.
-
-```rust
     fn static_files(&self) -> Vec<StaticFile> {
-        static_files!("css/main.css")
+        static_files!("css/blog.css")
     }
 }
 ```
 
-This defines a list of static files that will be served by the server. More on that will be covered in the chapter about static files.
+The `App` trait provides several hooks for initializing your application, defining routes, migrations, and administrative interfaces.
 
 ### Project
 
-A project is a collection of apps, middlewares, and other components that make up your service. It ties everything together and is the entry point for your application. Here's the default project implementation's structure analyzed step by step:
+A **project** is the top-level container that ties multiple apps together and defines global configurations, middlewares, and the overall structure of your service. It's the entry point for your application.
+
+When you define a project, you implement the `Project` trait:
 
 ```rust
-struct CotTutorialProject;
+struct MyProject;
 
-impl Project for CotTutorialProject {
-    fn cli_metadata(&self) -> CliMetadata {
-        cot::cli::metadata!()
-    }
-```
-
-This defines the project and sets the CLI metadata (like the name, version, and description) that will be displayed when you run `cargo run -- --help` by using the metadata from your Cargo crate.
-
-```rust
+impl Project for MyProject {
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
-        apps.register_with_views(CotTutorialApp, "");
+        // Registering an app with a URL prefix
+        apps.register_with_views(MyBlogApp, "/blog");
+
+        // Registering a built-in app
+        apps.register(DatabaseUserApp::new());
     }
-```
 
-This registers all the apps that your project is using.
-
-```rust
-    fn middlewares(
-        &self,
-        handler: RootHandlerBuilder,
-        context: &MiddlewareContext,
-    ) -> RootHandler {
+    fn middlewares(&self, handler: RootHandlerBuilder, context: &MiddlewareContext) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
-            .middleware(LiveReloadMiddleware::from_context(context))
+            .middleware(SessionMiddleware::from_context(context))
             .build()
     }
+}
 ```
 
-This registers the middlewares that will be applied to all routes in the project. Note that the `LiveReloadMiddleware` may be dynamically disabled in runtime using config!
+The `Project` trait is responsible for:
+- **Registering apps**: Using `AppBuilder` to include apps and their routers in the project.
+- **Configuring middlewares**: Defining the stack of middlewares that apply to all requests.
+- **Providing CLI metadata**: Setting information for the generated CLI.
+- **Handling global configuration**: Defining how the project is configured for different environments.
 
 ```rust
 #[cot::main]
@@ -260,6 +252,6 @@ In this chapter, you learned about:
 * running your first Cot project,
 * create views, registering them in the router and passing parameters to them.
 
-In the next chapter, we'll dive deeper into templates, which will allow us to create more sophisticated HTML pages.
+In the next chapter, we'll dive deeper into routing, which will allow us to define more complex URL structures for our application.
 
 Remember to use `cargo doc --open` to browse the Cot documentation locally, or visit the [online documentation](https://docs.rs/cot) for more details about any of the components we've discussed.

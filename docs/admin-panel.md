@@ -119,4 +119,4 @@ Now your model can be managed through the admin interface at `http://localhost:8
 
 ## Summary
 
-In this chapter, you learned how to enable the Cot admin panel, create an admin user, and register your models in the admin interface. In the next chapter, we'll learn how to handle static assets in Cot.
+In this chapter, you learned how to enable the Cot admin panel, create an admin user, and register your models in the admin interface. In the next chapter, we'll dive deeper into Cot's authentication system and how you can use it to secure your applications.

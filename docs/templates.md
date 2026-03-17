@@ -349,6 +349,6 @@ impl Display for Item {
 }
 ```
 
-## Read More
+## Summary
 
-This chapter only covers the basics of Askama. For more detailed information, advanced usage, and additional examples, check out the [Askama documentation](https://askama.readthedocs.io/).
+In this chapter, you learned the basics of templating in Cot using Askama, including inheritance, including other templates, and how to use URL reversing in your HTML. In the next chapter, we'll explore middlewares and how they allow you to modify requests and responses.

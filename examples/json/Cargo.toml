@@ -7,6 +7,6 @@ license = "MIT OR Apache-2.0"
 edition = "2024"
 
 [dependencies]
-cot = { path = "../../cot", features = ["openapi", "swagger-ui"] }
+cot = { path = "../../crates/cot", features = ["openapi", "swagger-ui"] }
 serde = "1"
 schemars = "0.9"

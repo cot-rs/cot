@@ -1,6 +1,6 @@
 use cot::db::{Auto, ForeignKey, model};
 
-use crate::Tags;
+use crate::tags::Tags;
 
 #[model]
 pub struct Posts {

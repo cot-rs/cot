@@ -8,7 +8,102 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, bail};
 use cot::db::migrations::{DynMigration, MigrationEngine};
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
-use cot_codegen::symbol_resolver::SymbolResolver;
+use cot_codegen::symbol_resolver::{SymbolResolver, VisibleSymbol, VisibleSymbolKind};
+
+struct CanonicalResolver {
+    canonical_paths: HashSet<String>,
+    globs: Vec<GlobImport>,
+}
+
+struct GlobImport {
+    module_path: String,
+    globbed_path: String,
+}
+
+impl CanonicalResolver {
+    fn new(symbols: &[VisibleSymbol], globs: Vec<GlobImport>) -> Self {
+        let mut canonical_paths = HashSet::new();
+        for symbol in symbols {
+            canonical_paths.insert(symbol.full_path.clone());
+
+            // Also add parent modules to canonical paths
+            let mut path = symbol.full_path.clone();
+            while let Some(pos) = path.rfind("::") {
+                path.truncate(pos);
+                if path.is_empty() {
+                    break;
+                }
+                canonical_paths.insert(path.clone());
+            }
+        }
+
+        Self {
+            canonical_paths,
+            globs,
+        }
+    }
+
+    fn canonicalize_type(&self, ty: &mut syn::Type) {
+        if let syn::Type::Path(path) = ty {
+            self.canonicalize_type_path(path);
+        }
+    }
+
+    fn canonicalize_type_path(&self, path: &mut syn::TypePath) {
+        let path_str = path
+            .path
+            .segments
+            .iter()
+            .map(|s| s.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::");
+
+        if let Some(canonical) = self.canonicalize_path(&path_str)
+            && canonical != path_str
+        {
+            let new_path: syn::Path =
+                syn::parse_str(&canonical).expect("canonical path should be valid");
+            // Preserve arguments of the last segment if possible
+            let last_args = path.path.segments.last().unwrap().arguments.clone();
+            path.path = new_path;
+            path.path.segments.last_mut().unwrap().arguments = last_args;
+        }
+
+        for segment in &mut path.path.segments {
+            if let syn::PathArguments::AngleBracketed(args) = &mut segment.arguments {
+                for arg in &mut args.args {
+                    if let syn::GenericArgument::Type(ty) = arg {
+                        self.canonicalize_type(ty);
+                    }
+                }
+            }
+        }
+    }
+
+    fn canonicalize_path(&self, path: &str) -> Option<String> {
+        if self.canonical_paths.contains(path) {
+            return Some(path.to_string());
+        }
+
+        for glob in &self.globs {
+            if let Some(suffix) = path.strip_prefix(&glob.module_path) {
+                let suffix = suffix.strip_prefix("::").unwrap_or(suffix);
+                if !suffix.is_empty() {
+                    let tried_path = if glob.globbed_path.is_empty() {
+                        suffix.to_string()
+                    } else {
+                        format!("{}::{}", glob.globbed_path, suffix)
+                    };
+                    if let Some(canonical) = self.canonicalize_path(&tried_path) {
+                        return Some(canonical);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+}
 use darling::FromMeta;
 use heck::ToSnakeCase;
 use petgraph::graph::DiGraph;
@@ -339,11 +434,94 @@ impl MigrationGenerator {
 
     fn process_source_files(&self, source_files: Vec<SourceFile>) -> anyhow::Result<AppState> {
         let mut app_state = AppState::new();
+        let mut file_resolvers = Vec::new();
 
-        for source_file in source_files {
+        // Pass 1: Create initial resolvers and collect all canonical symbols and globs
+        let mut all_canonical_symbols = Vec::new();
+        let mut temp_globs = Vec::new();
+        for source_file in &source_files {
+            let module_path =
+                cot_codegen::symbol_resolver::ModulePath::from_fs_path(&source_file.path)
+                    .to_string();
+            let resolver = SymbolResolver::from_file(&source_file.content, &source_file.path);
+            for symbol in resolver.symbols().values() {
+                if symbol.kind != VisibleSymbolKind::Use && symbol.kind != VisibleSymbolKind::Glob {
+                    all_canonical_symbols.push(symbol.clone());
+                }
+            }
+            for glob in resolver.globs() {
+                temp_globs.push((module_path.clone(), glob.full_path.clone()));
+            }
+            file_resolvers.push(resolver);
+        }
+
+        let mut canonical_paths = HashSet::new();
+        for symbol in &all_canonical_symbols {
+            canonical_paths.insert(symbol.full_path.clone());
+
+            // Also add parent modules to canonical paths
+            let mut path = symbol.full_path.clone();
+            while let Some(pos) = path.rfind("::") {
+                path.truncate(pos);
+                if path.is_empty() {
+                    break;
+                }
+                canonical_paths.insert(path.clone());
+            }
+        }
+
+        let mut all_globs = Vec::new();
+        for (module_path, glob_path) in temp_globs {
+            let mut final_glob_path = glob_path.clone();
+            if !final_glob_path.starts_with("crate") {
+                let local_path = format!("{module_path}::{final_glob_path}");
+                if canonical_paths.contains(&local_path) {
+                    final_glob_path = local_path;
+                }
+            }
+            all_globs.push(GlobImport {
+                module_path,
+                globbed_path: final_glob_path,
+            });
+        }
+
+        let canonical_resolver = CanonicalResolver::new(&all_canonical_symbols, all_globs);
+
+        // Pass 2: Expand globs in each resolver
+        for resolver in &mut file_resolvers {
+            let mut extra_symbols = Vec::new();
+            for glob in resolver.globs() {
+                let glob_path = &glob.full_path;
+                for canonical in &all_canonical_symbols {
+                    if let Some(suffix) = canonical.full_path.strip_prefix(glob_path)
+                        && let Some(suffix) = suffix.strip_prefix("::")
+                    {
+                        // If it's a direct child (no more :: in suffix)
+                        if !suffix.contains("::") {
+                            extra_symbols.push(VisibleSymbol::new(
+                                suffix,
+                                &canonical.full_path,
+                                VisibleSymbolKind::Use,
+                            ));
+                        }
+                    }
+                }
+            }
+            for symbol in extra_symbols {
+                resolver.add_symbol(symbol);
+            }
+        }
+
+        // Pass 3: Process models using updated resolvers and canonicalize
+        for (source_file, resolver) in source_files.into_iter().zip(file_resolvers) {
             let path = source_file.path.clone();
-            self.process_parsed_file(source_file, &mut app_state)
-                .with_context(|| format!("unable to find models in file: {}", path.display()))?;
+            self.process_parsed_file_with_resolver(
+                source_file,
+                &resolver,
+                &canonical_resolver,
+                &mut app_state,
+            )
+            .with_context(|| format!("unable to find models in file: {}", path.display()))?;
         }
 
         Ok(app_state)
@@ -361,17 +539,17 @@ impl MigrationGenerator {
         SourceFile::parse(path, &src)
     }
 
-    fn process_parsed_file(
+    fn process_parsed_file_with_resolver(
         &self,
         SourceFile {
             path,
             content: file,
         }: SourceFile,
+        symbol_resolver: &SymbolResolver,
+        canonical_resolver: &CanonicalResolver,
         app_state: &mut AppState,
     ) -> anyhow::Result<()> {
         trace!("Processing file: {:?}", &path);
-
-        let symbol_resolver = SymbolResolver::from_file(&file, &path);
 
         let mut migration_models = Vec::new();
         for item in file.items {
@@ -381,12 +559,22 @@ impl MigrationGenerator {
                         symbol_resolver.resolve_struct(&mut item);
 
                         let args = Self::model_args_from_attr(&path, attr)?;
-                        let model_in_source = ModelInSource::from_item(
+                        let mut model_in_source = ModelInSource::from_item(
                             self.crate_name.as_str(),
                             item,
                             &args,
-                            &symbol_resolver,
+                            symbol_resolver,
                         )?;
+
+                        // Canonicalize all types in the model
+                        canonical_resolver
+                            .canonicalize_type(&mut model_in_source.model.resolved_ty);
+                        for field in &mut model_in_source.model.fields {
+                            canonical_resolver.canonicalize_type(&mut field.ty);
+                            if let Some(foreign_key) = &mut field.foreign_key {
+                                canonical_resolver.canonicalize_type(&mut foreign_key.to_model);
+                            }
+                        }
 
                         match args.model_type {
                             ModelType::Application => {

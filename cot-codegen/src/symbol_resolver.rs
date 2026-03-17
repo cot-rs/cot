@@ -8,25 +8,32 @@ use std::path::Path;
 use quote::format_ident;
 #[cfg(feature = "symbol-resolver")]
 use syn::UseTree;
-#[cfg(feature = "symbol-resolver")]
-use tracing::warn;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolResolver {
     /// List of imports in the format `"HashMap" -> VisibleSymbol`
     symbols: HashMap<String, VisibleSymbol>,
+    /// List of glob imports
+    globs: Vec<VisibleSymbol>,
 }
 
 impl SymbolResolver {
     #[must_use]
     pub fn new(symbols: Vec<VisibleSymbol>) -> Self {
         let mut symbol_map = HashMap::new();
+        let mut globs = Vec::new();
         for symbol in symbols {
-            symbol_map.insert(symbol.alias.clone(), symbol);
+            match symbol.kind {
+                VisibleSymbolKind::Glob => globs.push(symbol),
+                _ => {
+                    symbol_map.insert(symbol.alias.clone(), symbol);
+                }
+            }
         }
 
         Self {
             symbols: symbol_map,
+            globs,
         }
     }
 
@@ -35,6 +42,21 @@ impl SymbolResolver {
     pub fn from_file(file: &syn::File, module_path: &Path) -> Self {
         let imports = Self::get_imports(file, &ModulePath::from_fs_path(module_path));
         Self::new(imports)
+    }
+
+    #[must_use]
+    pub fn symbols(&self) -> &HashMap<String, VisibleSymbol> {
+        &self.symbols
+    }
+
+    #[must_use]
+    pub fn globs(&self) -> &[VisibleSymbol] {
+        &self.globs
+    }
+
+    /// Add a symbol to the resolver.
+    pub fn add_symbol(&mut self, symbol: VisibleSymbol) {
+        self.symbols.insert(symbol.alias.clone(), symbol);
     }
 
     /// Return the list of top-level `use` statements, structs, and constants as
@@ -53,6 +75,9 @@ impl SymbolResolver {
                 }
                 syn::Item::Const(item_const) => {
                     imports.push(VisibleSymbol::from_item_const(item_const, module_path));
+                }
+                syn::Item::Mod(item_mod) => {
+                    imports.push(VisibleSymbol::from_item_mod(item_mod, module_path));
                 }
                 _ => {}
             }
@@ -187,13 +212,17 @@ pub enum VisibleSymbolKind {
     Use,
     Struct,
     Const,
+    Glob,
+    Module,
 }
 
 impl VisibleSymbol {
     #[must_use]
     pub fn new(alias: &str, full_path: &str, kind: VisibleSymbolKind) -> Self {
-        assert_ne!(alias, "", "alias must not be empty");
-        assert!(!alias.contains("::"), "alias must not contain '::'");
+        if kind != VisibleSymbolKind::Glob {
+            assert_ne!(alias, "", "alias must not be empty");
+            assert!(!alias.contains("::"), "alias must not contain '::'");
+        }
         Self {
             alias: alias.to_string(),
             full_path: full_path.to_string(),
@@ -208,6 +237,11 @@ impl VisibleSymbol {
     #[cfg(feature = "symbol-resolver")]
     fn new_use(alias: &str, full_path: &str) -> Self {
         Self::new(alias, full_path, VisibleSymbolKind::Use)
+    }
+
+    #[cfg(feature = "symbol-resolver")]
+    fn new_glob(full_path: &str) -> Self {
+        Self::new("", full_path, VisibleSymbolKind::Glob)
     }
 
     #[cfg(feature = "symbol-resolver")]
@@ -240,6 +274,18 @@ impl VisibleSymbol {
     }
 
     #[cfg(feature = "symbol-resolver")]
+    fn from_item_mod(item: &syn::ItemMod, module_path: &ModulePath) -> Self {
+        let ident = item.ident.to_string();
+        let full_path = Self::module_path(module_path, &ident);
+
+        Self {
+            alias: ident,
+            full_path,
+            kind: VisibleSymbolKind::Module,
+        }
+    }
+
+    #[cfg(feature = "symbol-resolver")]
     fn module_path(module_path: &ModulePath, ident: &str) -> String {
         format!("{module_path}::{ident}")
     }
@@ -259,39 +305,42 @@ impl VisibleSymbol {
                     ident
                 };
 
-                return Self::from_tree(&path.tree, current_module)
+                Self::from_tree(&path.tree, current_module)
                     .into_iter()
                     .map(|import| {
-                        Self::new_use(
-                            &import.alias,
-                            &format!("{}::{}", resolved_path, import.full_path),
-                        )
+                        let full_path = if import.full_path.is_empty() {
+                            resolved_path.clone()
+                        } else {
+                            format!("{}::{}", resolved_path, import.full_path)
+                        };
+
+                        if import.kind == VisibleSymbolKind::Glob {
+                            Self::new_glob(&full_path)
+                        } else {
+                            Self::new_use(&import.alias, &full_path)
+                        }
                     })
-                    .collect();
+                    .collect()
             }
             UseTree::Name(name) => {
                 let ident = name.ident.to_string();
-                return vec![Self::new_use(&ident, &ident)];
+                vec![Self::new_use(&ident, &ident)]
             }
             UseTree::Rename(rename) => {
-                return vec![Self::new_use(
+                vec![Self::new_use(
                     &rename.rename.to_string(),
                     &rename.ident.to_string(),
-                )];
+                )]
             }
             UseTree::Glob(_) => {
-                warn!("Glob imports are not supported");
+                vec![Self::new_glob("")]
             }
-            UseTree::Group(group) => {
-                return group
-                    .items
-                    .iter()
-                    .flat_map(|tree| Self::from_tree(tree, current_module))
-                    .collect();
-            }
+            UseTree::Group(group) => group
+                .items
+                .iter()
+                .flat_map(|tree| Self::from_tree(tree, current_module))
+                .collect(),
         }
-
-        vec![]
     }
 }
 
@@ -409,6 +458,11 @@ const MY_CONSTANT: u8 = 42;
                 alias: "Formatter".to_string(),
                 full_path: "std::fmt::Formatter".to_string(),
                 kind: VisibleSymbolKind::Use,
+            },
+            VisibleSymbol {
+                alias: String::new(),
+                full_path: "std::fs".to_string(),
+                kind: VisibleSymbolKind::Glob,
             },
             VisibleSymbol {
                 alias: "r".to_string(),

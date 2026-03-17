@@ -1179,12 +1179,10 @@ impl Database {
                 limit: max_params,
             });
         }
-
-        let batch_size = if num_value_fields > 0 {
-            max_params / num_value_fields
-        } else {
+        if num_value_fields == 0 {
             return Err(DatabaseError::BulkInsertNoValueColumns);
-        };
+        }
+        let batch_size = max_params / num_value_fields;
 
         for chunk in data.chunks_mut(batch_size) {
             self.bulk_insert_chunk(

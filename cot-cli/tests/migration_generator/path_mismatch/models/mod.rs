@@ -1,2 +1,2 @@
-pub mod Tags;
-pub mod Posts;
+pub mod posts;
+pub mod tags;

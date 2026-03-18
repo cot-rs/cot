@@ -41,7 +41,9 @@ tower.workspace = true
 
 [dev-dependencies]
 async-stream.workspace = true
-cot = { workspace = true, features = ["test"] }
+# Specifying path directly to avoid circular dependencies on publishing cot and cot-core.
+# When publishing, path dependencies are dropped, removing the cycle.
+cot = { path = "../cot", features = ["test"] }
 futures.workspace = true
 tokio.workspace = true
 

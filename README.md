@@ -2,10 +2,11 @@
 <h1><img src="https://raw.githubusercontent.com/cot-rs/media/6585c518/logo/logo-text.svg" alt="Cot" width="300"></h1>
 
 [![Rust Build Status](https://github.com/cot-rs/cot/workflows/Rust%20CI/badge.svg)](https://github.com/cot-rs/cot/actions/workflows/rust.yml)
+[![codecov](https://codecov.io/gh/cot-rs/cot/branch/master/graph/badge.svg)](https://codecov.io/gh/cot-rs/cot)
 [![crates.io](https://img.shields.io/crates/v/cot.svg)](https://crates.io/crates/cot)
 [![Guide](https://img.shields.io/website?url=https%3A%2F%2Fcot.rs%2Fguide%2Flatest%2F&label=guide&up_message=online)](https://cot.rs/guide/latest/)
 [![Documentation](https://docs.rs/cot/badge.svg)](https://docs.rs/cot)
-[![codecov](https://codecov.io/gh/cot-rs/cot/branch/master/graph/badge.svg)](https://codecov.io/gh/cot-rs/cot)
+<br>
 [![Discord chat](https://img.shields.io/discord/1330137289287925781?logo=Discord&logoColor=white)](https://discord.cot.rs)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/cot-rs?label=GitHub%20sponsors)](https://github.com/sponsors/cot-rs)
 [![Open Collective backers](https://img.shields.io/opencollective/backers/cot?label=Open%20Collective%20backers)](https://opencollective.com/cot)
@@ -63,6 +64,8 @@ cargo run
 **We recommend you to read the [official guide](https://cot.rs/guide/latest/) to learn more about Cot
 and how to use it.**
 
+Got interested or have questions? Join our [Discord server](https://discord.cot.rs/) — we'd love to hear from you!
+
 ### cot-cli packages
 
 If you prefer to use your operating system's package manager to manage the `cot-cli` package, you can find it in the
@@ -73,21 +76,13 @@ manager might not be the latest one, so we recommend just using the official pac
 
 ## Development
 
-### Testing
+If you want to contribute to Cot, please read the [contributing guide](https://cot.rs/guide/latest/contributing). It will guide you through the process of setting up your development environment and making contributions.
 
-Tests that require using external databases are ignored by default. In order to run them, execute the following in the
-root of the repository:
+Thanks in advance for your contributions — every contribution is appreciated!
 
-```shell
-docker compose up -d
-cargo test --all-features -- --include-ignored
-```
+### Guide
 
-You can them execute the following command to stop the database:
-
-```shell
-docker compose down
-```
+The guide served at the [official website](https://cot.rs/guide/latest/) is built from the Markdown files located in the `docs` directory. See the [docs/README.md](docs/README.md) file for more information about the guide and how to build the website locally.
 
 ## Star History
 
@@ -98,6 +93,15 @@ docker compose down
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=cot-rs/cot&type=Date" />
  </picture>
 </a>
+
+## Sponsorship
+
+Cot is an independent, open-source project. If you find it useful, please consider sponsoring its development — your support helps us dedicate more time to building and maintaining the framework.
+
+- [GitHub Sponsors](https://github.com/sponsors/cot-rs)
+- [Open Collective](https://opencollective.com/cot)
+
+A huge thank you to all our existing sponsors — your generosity makes this project possible!
 
 ## Contributors
 

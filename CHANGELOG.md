@@ -26,8 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Update README to remove production warning ([#478](https://github.com/cot-rs/cot/pull/478)) (by [@m4tx](https://github.com/m4tx))
 - *(deps)* Bump all deps ([#498](https://github.com/cot-rs/cot/pull/498)) (by [@m4tx](https://github.com/m4tx))
 - *(ci)* Disable branch coverage for now ([#500](https://github.com/cot-rs/cot/pull/500)) (by [@m4tx](https://github.com/m4tx))
-- Move crates to crates directory ([#506](https://github.com/cot-rs/cot/pull/506)) (by [@seqre](https://github.com/seqre))
-- *(revert)* "chore: move crates to crates directory ([#506](https://github.com/cot-rs/cot/pull/506))" ([#508](https://github.com/cot-rs/cot/pull/508)) (by [@m4tx](https://github.com/m4tx))
 - Add docs-site with locally-sourced docs ([#510](https://github.com/cot-rs/cot/pull/510)) (by [@m4tx](https://github.com/m4tx))
 - Improve repository configuration ([#511](https://github.com/cot-rs/cot/pull/511)) (by [@seqre](https://github.com/seqre))
 

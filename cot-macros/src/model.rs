@@ -160,7 +160,6 @@ impl ModelBuilder {
 
     #[must_use]
     fn build_model_impl(&self) -> TokenStream {
-        let crate_ident = cot_ident();
         let orm_ident = orm_ident();
 
         let name = &self.name;
@@ -176,7 +175,6 @@ impl ModelBuilder {
         let fields_as_get_values = &self.fields_as_get_values;
 
         quote! {
-            // #[#crate_ident::__private::async_trait]
             #[automatically_derived]
             impl #orm_ident::Model for #name {
                 type Fields = #fields_struct_name;

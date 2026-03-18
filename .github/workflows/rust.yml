@@ -413,16 +413,14 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
-
       - name: Check licenses
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           log-level: warn
           command: check licenses
-
+          command-arguments: --config .cargo/deny.toml
   semver-check:
     if: github.event_name == 'pull_request'
-
     name: Semver compatibility check
     runs-on: ubuntu-latest
     env:

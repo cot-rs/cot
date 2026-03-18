@@ -25,4 +25,5 @@ allow = [
     "MIT",
     "Unicode-3.0",
     "Zlib",
+    "Unlicense",
 ]

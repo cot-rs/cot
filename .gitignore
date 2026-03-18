@@ -13,3 +13,6 @@ target/
 *.db
 *.sqlite3
 *.sqlite3-journal
+
+# VSCode
+.vscode/

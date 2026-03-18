@@ -47,6 +47,7 @@ mime.workspace = true
 mime_guess.workspace = true
 multer.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
+secure-string.workspace = true
 pin-project-lite.workspace = true
 redis = { workspace = true, features = ["aio", "tokio-comp"], optional = true }
 schemars = { workspace = true, optional = true, features = ["derive"] }

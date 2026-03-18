@@ -615,7 +615,7 @@ mod tests {
         let mut mock_db = MockDatabaseBackend::new();
         mock_db
             .expect_insert::<DatabaseUser>()
-            .returning(|_| Ok(()));
+            .returning(|_| Box::pin(async { Ok(()) }));
 
         let username = "testuser".to_string();
         let password = Password::new("password123");
@@ -636,9 +636,10 @@ mod tests {
             &Password::new("password123"),
         );
 
-        mock_db
-            .expect_get::<DatabaseUser>()
-            .returning(move |_| Ok(Some(user.clone())));
+        mock_db.expect_get::<DatabaseUser>().returning(move |_| {
+            let user = user.clone();
+            Box::pin(async move { Ok(Some(user.clone())) })
+        });
 
         let result = DatabaseUser::get_by_id(&mock_db, 1).await.unwrap();
         assert!(result.is_some());
@@ -655,9 +656,10 @@ mod tests {
             &Password::new("password123"),
         );
 
-        mock_db
-            .expect_get::<DatabaseUser>()
-            .returning(move |_| Ok(Some(user.clone())));
+        mock_db.expect_get::<DatabaseUser>().returning(move |_| {
+            let user = user.clone();
+            Box::pin(async move { Ok(Some(user.clone())) })
+        });
 
         let credentials =
             DatabaseUserCredentials::new("testuser".to_string(), Password::new("password123"));
@@ -675,7 +677,7 @@ mod tests {
 
         mock_db
             .expect_get::<DatabaseUser>()
-            .returning(move |_| Ok(None));
+            .returning(|_| Box::pin(async { Ok(None) }));
 
         let credentials =
             DatabaseUserCredentials::new("testuser".to_string(), Password::new("password123"));
@@ -695,9 +697,10 @@ mod tests {
             &Password::new("password123"),
         );
 
-        mock_db
-            .expect_get::<DatabaseUser>()
-            .returning(move |_| Ok(Some(user.clone())));
+        mock_db.expect_get::<DatabaseUser>().returning(move |_| {
+            let user = user.clone();
+            Box::pin(async move { Ok(Some(user.clone())) })
+        });
 
         let credentials =
             DatabaseUserCredentials::new("testuser".to_string(), Password::new("invalid"));

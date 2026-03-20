@@ -35,6 +35,82 @@ cot migration make
 
 This will create a new file in your `migrations` directory in the crate's src directory. We will come back to the contents of this file later in this guide, but for now, let's focus on how to use the model to interact with the database.
 
+## Model Fields
+
+
+### primary_key
+This is used to mark a field as the primary key of the table. This is a required field for every model.
+
+```rust
+#[model]
+pub struct Post {
+    #[model(primary_key)]
+    id: Auto<i64>,
+    title: String,
+    content: String,
+}
+```
+
+### unique
+This is used to mark a field as unique, which means that each value in this field must be unique across all rows in the table. For more information see the [model field reference](https://docs.rs/cot_macros/0.5.0/cot_macros/attr.model.html).
+
+```rust
+#[model]
+pub struct User {
+    #[model(primary_key)]
+    id: Auto<i64>,
+    #[model(unique)]
+    username: String,
+}
+```
+
+## Field Types
+
+Cot
+
+## Relationships
+Relational databases are all about relationships between tables, and Cot provides a convenient way to define database relationships between models.
+
+
+### Foreign keys
+
+To define a foreign key relationship between two models, you can use the [`ForeignKey`](https://docs.rs/cot/latest/cot/db/enum.ForeignKey.html) type. Here's an example of how you can define a foreign key relationship between a `Link` model and some other `User` model:
+
+```rust
+use cot::db::ForeignKey;
+
+#[model]
+pub struct Link {
+    #[model(primary_key)]
+    id: Auto<i64>,
+    #[model(unique)]
+    slug: LimitedString<32>,
+    url: String,
+    user: ForeignKey<User>,
+}
+
+#[model]
+pub struct User {
+    #[model(primary_key)]
+    id: Auto<i64>,
+    name: String,
+}
+```
+
+When you define a foreign key relationship, Cot will automatically create a foreign key constraint in the database. This constraint will ensure that the value in the `user_id` field of the `Link` model corresponds to a valid primary key in the `User` model.
+
+When you retrieve a model that has a foreign key relationship, Cot will not automatically fetch the related model and populate the foreign key field with the corresponding value. Instead, you need to explicitly fetch the related model using the `get` method of the `ForeignKey` object. Here's an example of how you can fetch the related user for a link:
+
+```rust
+let mut link = query!(Link, $slug == LimitedString::new("cot").unwrap())
+    .get(db)
+    .await?
+    .expect("Link not found");
+
+let user = link.user.get(db).await?;
+```
+
+
 ## Common operations
 
 ### Saving models
@@ -42,9 +118,9 @@ This will create a new file in your `migrations` directory in the crate's src di
 In order to write a model instance to the database, you can use the [`save`](trait@cot::db::Model#method.save) method. Note that you need to have an instance of the [`Database`](struct@cot::db::Database) structure to do this – typically you can get it from the request object in your view. Here's an example of how you can save a new link to the database inside a view:
 
 ```rust
-use cot::request::extractors::RequestDb;
+use cot::db::{Auto, LimitedString, Database};
 
-async fn create_link(RequestDb(db): RequestDb) -> cot::Result<Html> {
+async fn create_link(db: Database) -> cot::Result<Html> {
     let mut link = Link {
         id: Auto::default(),
         slug: LimitedString::new("slug").unwrap(),
@@ -138,44 +214,6 @@ Similarly, there is also [`bulk_insert_or_update`](trait@cot::db::Model#method.b
 
 ```rust
 Link::bulk_insert_or_update(db, &mut links).await?;
-```
-
-## Foreign keys
-
-To define a foreign key relationship between two models, you can use the [`ForeignKey`](enum@cot::db::ForeignKey) type. Here's an example of how you can define a foreign key relationship between a `Link` model and some other `User` model:
-
-```rust
-use cot::db::ForeignKey;
-
-#[model]
-pub struct Link {
-    #[model(primary_key)]
-    id: Auto<i64>,
-    #[model(unique)]
-    slug: LimitedString<32>,
-    url: String,
-    user: ForeignKey<User>,
-}
-
-#[model]
-pub struct User {
-    #[model(primary_key)]
-    id: Auto<i64>,
-    name: String,
-}
-```
-
-When you define a foreign key relationship, Cot will automatically create a foreign key constraint in the database. This constraint will ensure that the value in the `user_id` field of the `Link` model corresponds to a valid primary key in the `User` model.
-
-When you retrieve a model that has a foreign key relationship, Cot will not automatically fetch the related model and populate the foreign key field with the corresponding value. Instead, you need to explicitly fetch the related model using the [`get`](enum@cot::db::ForeignKey#method.get) method of the [`ForeignKey`](enum@cot::db::ForeignKey) object. Here's an example of how you can fetch the related user for a link:
-
-```rust
-let mut link = query!(Link, $slug == LimitedString::new("cot").unwrap())
-    .get(db)
-    .await?
-    .expect("Link not found");
-
-let user = link.user.get(db).await?;
 ```
 
 ## Database Configuration

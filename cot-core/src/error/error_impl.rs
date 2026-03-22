@@ -171,7 +171,26 @@ impl Error {
 
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self.repr, f)
+        // If the alternate (`{:#?}`) formatting has been specified, print out the
+        // `Debug` formatting normally. If not, (which is the case when using
+        // `Result::unwrap()` or `Result::expect()`) pretty print the error.
+        if f.alternate() {
+            Debug::fmt(&self.repr, f)
+        } else {
+            Display::fmt(&self.repr.inner, f)?;
+
+            writeln!(f)?;
+            writeln!(f)?;
+            writeln!(f, "caused by:")?;
+            let mut source = self.source();
+            while let Some(e) = source {
+                writeln!(f, "    {e}")?;
+
+                source = e.source();
+            }
+
+            Ok(())
+        }
     }
 }
 

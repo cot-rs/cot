@@ -1,19 +1,31 @@
+# AREAS
+A-ci:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**/*.yml"]
+
+A-docs:
+  - changed-files:
+      - any-glob-to-any-file: ["docs/**", "**/*.md"]
+
+A-deps:
+  - changed-files:
+      - any-glob-to-any-file: ["**/Cargo.toml", "Cargo.lock"]
+
+# CRATES
 C-lib:
   - changed-files:
-      - any-glob-to-any-file: ['cot/**']
+      - any-glob-to-any-file: ["cot/**"]
 
 C-cli:
   - changed-files:
-      - any-glob-to-any-file: ['cot-cli/**']
-
-C-macros:
-  - changed-files:
-      - any-glob-to-any-file: ['cot-macros/**']
+      - any-glob-to-any-file: ["cot-cli/**"]
 
 C-codegen:
   - changed-files:
-      - any-glob-to-any-file: ['cot-codegen/**']
+      - any-glob-to-any-file: ["cot-codegen/**"]
 
-A-ci:
+C-macros:
   - changed-files:
-      - any-glob-to-any-file: ['.github/**']
+      - any-glob-to-any-file: ["cot-macros/**"]
+
+# OTHERS

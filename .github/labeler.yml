@@ -9,7 +9,7 @@ A-docs:
 
 A-deps:
   - changed-files:
-      - any-glob-to-any-file: ["**/Cargo.toml", "Cargo.lock"]
+      - any-glob-to-any-file: ["**/Cargo.lock"]
 
 # CRATES
 C-lib:
@@ -23,6 +23,10 @@ C-cli:
 C-codegen:
   - changed-files:
       - any-glob-to-any-file: ["cot-codegen/**"]
+
+C-core:
+  - changed-files:
+      - any-glob-to-any-file: ["cot-core/**"]
 
 C-macros:
   - changed-files:

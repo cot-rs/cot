@@ -237,7 +237,7 @@ jobs:
       - name: Merge code coverage reports
         run: cargo llvm-cov report --codecov --output-path codecov.json
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           files: codecov.json
           flags: rust

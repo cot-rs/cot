@@ -1078,7 +1078,7 @@ dependencies = [
 [[package]]
 name = "cot-site"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=9151caddc7a8dcae3d968439b40a310d9ad3efb6#9151caddc7a8dcae3d968439b40a310d9ad3efb6"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=924a1f16c1bbdff06f6da0db861d2252dd538778#924a1f16c1bbdff06f6da0db861d2252dd538778"
 dependencies = [
  "askama",
  "async-trait",
@@ -1099,7 +1099,7 @@ dependencies = [
 [[package]]
 name = "cot-site-common"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=9151caddc7a8dcae3d968439b40a310d9ad3efb6#9151caddc7a8dcae3d968439b40a310d9ad3efb6"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=924a1f16c1bbdff06f6da0db861d2252dd538778#924a1f16c1bbdff06f6da0db861d2252dd538778"
 dependencies = [
  "comrak",
  "semver",
@@ -1110,7 +1110,7 @@ dependencies = [
 [[package]]
 name = "cot-site-macros"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=9151caddc7a8dcae3d968439b40a310d9ad3efb6#9151caddc7a8dcae3d968439b40a310d9ad3efb6"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=924a1f16c1bbdff06f6da0db861d2252dd538778#924a1f16c1bbdff06f6da0db861d2252dd538778"
 dependencies = [
  "comrak",
  "cot-site-common",

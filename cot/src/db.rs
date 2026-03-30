@@ -20,7 +20,6 @@ use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use cot_core::error::impl_into_cot_error;
 pub use cot_macros::{model, query};
 use derive_more::{Debug, Deref, Display};
@@ -151,7 +150,6 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
 ///     name: String,
 /// }
 /// ```
-#[async_trait]
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not marked as a database model",
     label = "`{Self}` is not annotated with `#[cot::db::model]`",
@@ -228,10 +226,10 @@ pub trait Model: Sized + Send + 'static {
     /// This method can return an error if the model instance could not be
     /// found in the database, or there was a problem with the database
     /// connection.
-    async fn get_by_primary_key<DB: DatabaseBackend>(
+    fn get_by_primary_key<DB: DatabaseBackend>(
         db: &DB,
         pk: Self::PrimaryKey,
-    ) -> Result<Option<Self>>;
+    ) -> impl Future<Output = Result<Option<Self>>>;
 
     /// Inserts the model instance to the database, or updates an instance
     /// with the same primary key if it already exists.
@@ -245,9 +243,8 @@ pub trait Model: Sized + Send + 'static {
     /// inserted into the database, for instance because the migrations
     /// haven't been applied, or there was a problem with the database
     /// connection.
-    async fn save<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
-        db.insert_or_update(self).await?;
-        Ok(())
+    fn save<DB: DatabaseBackend>(&mut self, db: &DB) -> impl Future<Output = Result<()>> {
+        async move { db.insert_or_update(self).await }
     }
 
     /// Insert the model instance to the database.
@@ -258,9 +255,8 @@ pub trait Model: Sized + Send + 'static {
     /// inserted into the database, for instance because the migrations
     /// haven't been applied, or there was a problem with the database
     /// connection.
-    async fn insert<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
-        db.insert(self).await?;
-        Ok(())
+    fn insert<DB: DatabaseBackend>(&mut self, db: &DB) -> impl Future<Output = Result<()>> {
+        async move { db.insert(self).await }
     }
 
     /// Update the model instance in the database.
@@ -274,9 +270,8 @@ pub trait Model: Sized + Send + 'static {
     ///
     /// This method can return an error if the model with the given primary key
     /// could not be found in the database.
-    async fn update<DB: DatabaseBackend>(&mut self, db: &DB) -> Result<()> {
-        db.update(self).await?;
-        Ok(())
+    fn update<DB: DatabaseBackend>(&mut self, db: &DB) -> impl Future<Output = Result<()>> {
+        async move { db.update(self).await }
     }
 
     /// Bulk insert multiple model instances to the database in a single query.
@@ -318,9 +313,11 @@ pub trait Model: Sized + Send + 'static {
     /// // After insertion, all todos have populated IDs
     /// assert!(todos[0].id.is_fixed());
     /// ```
-    async fn bulk_insert<DB: DatabaseBackend>(db: &DB, instances: &mut [Self]) -> Result<()> {
-        db.bulk_insert(instances).await?;
-        Ok(())
+    fn bulk_insert<DB: DatabaseBackend>(
+        db: &DB,
+        instances: &mut [Self],
+    ) -> impl Future<Output = Result<()>> {
+        async move { db.bulk_insert(instances).await }
     }
 
     /// Bulk insert multiple model instances to the database in a single query,
@@ -357,12 +354,11 @@ pub trait Model: Sized + Send + 'static {
     /// // After insertion, all todos have populated IDs
     /// assert!(todos[0].id.is_fixed());
     /// ```
-    async fn bulk_insert_or_update<DB: DatabaseBackend>(
+    fn bulk_insert_or_update<DB: DatabaseBackend>(
         db: &DB,
         instances: &mut [Self],
-    ) -> Result<()> {
-        db.bulk_insert_or_update(instances).await?;
-        Ok(())
+    ) -> impl Future<Output = Result<()>> {
+        async move { db.bulk_insert_or_update(instances).await }
     }
 }
 
@@ -1590,7 +1586,6 @@ impl ColumnTypeMapper for Database {
 ///
 /// This trait is used to provide a backend for the database.
 #[cfg_attr(test, automock)]
-#[async_trait]
 pub trait DatabaseBackend: Send + Sync {
     /// Inserts a new row into the database, or updates an existing row if it
     /// already exists.
@@ -1600,7 +1595,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()>;
+    fn insert_or_update<T: Model>(&self, data: &mut T) -> impl Future<Output = Result<()>>;
 
     /// Inserts a new row into the database.
     ///
@@ -1609,7 +1604,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn insert<T: Model>(&self, data: &mut T) -> Result<()>;
+    fn insert<T: Model>(&self, data: &mut T) -> impl Future<Output = Result<()>>;
 
     /// Updates an existing row in the database.
     ///
@@ -1618,7 +1613,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the row could not be updated in the
     /// database, for instance because the migrations haven't been applied, or
     /// there was a problem with the database connection.
-    async fn update<T: Model>(&self, data: &mut T) -> Result<()>;
+    fn update<T: Model>(&self, data: &mut T) -> impl Future<Output = Result<()>>;
 
     /// Bulk inserts multiple rows into the database.
     ///
@@ -1627,7 +1622,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the rows could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn bulk_insert<T: Model>(&self, data: &mut [T]) -> Result<()>;
+    fn bulk_insert<T: Model>(&self, data: &mut [T]) -> impl Future<Output = Result<()>>;
 
     /// Bulk inserts multiple rows into the database, or updates existing rows
     /// if they already exist.
@@ -1637,7 +1632,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// This method can return an error if the rows could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
-    async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()>;
+    fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> impl Future<Output = Result<()>>;
 
     /// Executes a query and returns the results converted to the model type.
     ///
@@ -1650,7 +1645,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// generated or applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>>;
+    fn query<T: Model>(&self, query: &Query<T>) -> impl Future<Output = Result<Vec<T>>>;
 
     /// Returns the first row that matches the given query. If no rows match the
     /// query, returns `None`.
@@ -1664,7 +1659,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>>;
+    fn get<T: Model>(&self, query: &Query<T>) -> impl Future<Output = Result<Option<T>>>;
 
     /// Returns whether a row exists that matches the given query.
     ///
@@ -1677,7 +1672,7 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool>;
+    fn exists<T: Model>(&self, query: &Query<T>) -> impl Future<Output = Result<bool>>;
 
     /// Deletes all rows that match the given query.
     ///
@@ -1690,10 +1685,9 @@ pub trait DatabaseBackend: Send + Sync {
     /// applied).
     ///
     /// Can return an error if the database connection is lost.
-    async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult>;
+    fn delete<T: Model>(&self, query: &Query<T>) -> impl Future<Output = Result<StatementResult>>;
 }
 
-#[async_trait]
 impl DatabaseBackend for Database {
     async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
         Database::insert_or_update(self, data).await

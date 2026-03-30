@@ -1481,7 +1481,8 @@ mod tests {
     #[cot::test]
     async fn query_all() {
         let mut db = MockDatabaseBackend::new();
-        db.expect_query().returning(|_| Ok(Vec::<MockModel>::new()));
+        db.expect_query()
+            .returning(|_| Box::pin(async { Ok(Vec::<MockModel>::new()) }));
         let query: Query<MockModel> = Query::new();
 
         let result = query.all(&db).await;
@@ -1492,7 +1493,8 @@ mod tests {
     #[cot::test]
     async fn query_get() {
         let mut db = MockDatabaseBackend::new();
-        db.expect_get().returning(|_| Ok(Option::<MockModel>::None));
+        db.expect_get()
+            .returning(|_| Box::pin(async { Ok(Option::<MockModel>::None) }));
         let query: Query<MockModel> = Query::new();
 
         let result = query.get(&db).await;
@@ -1504,7 +1506,7 @@ mod tests {
     async fn query_exists() {
         let mut db = MockDatabaseBackend::new();
         db.expect_exists()
-            .returning(|_: &Query<MockModel>| Ok(false));
+            .returning(|_: &Query<MockModel>| Box::pin(async { Ok(false) }));
 
         let query: Query<MockModel> = Query::new();
 
@@ -1515,8 +1517,9 @@ mod tests {
     #[cot::test]
     async fn query_delete() {
         let mut db = MockDatabaseBackend::new();
-        db.expect_delete()
-            .returning(|_: &Query<MockModel>| Ok(StatementResult::new(RowsNum(0))));
+        db.expect_delete().returning(|_: &Query<MockModel>| {
+            Box::pin(async { Ok(StatementResult::new(RowsNum(0))) })
+        });
         let query: Query<MockModel> = Query::new();
 
         let result = query.delete(&db).await;

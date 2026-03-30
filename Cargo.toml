@@ -80,7 +80,7 @@ chrono-tz = { version = "0.10.4", default-features = false }
 clap = { version = "4.5.60", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
-clap_mangen = "0.2.31"
+clap_mangen = "0.3.0"
 cot = { version = "0.6.0", path = "cot" }
 cot_core = { version = "0.6.0", path = "cot-core" }
 cot_codegen = { version = "0.6.0", path = "cot-codegen" }

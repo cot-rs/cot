@@ -883,15 +883,16 @@ checksum = "75984efb6ed102a0d42db99afb6c1948f0380d1d91808d5529916e6c08b49d8d"
 
 [[package]]
 name = "comrak"
-version = "0.50.0"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "321d20bf105b6871a49da44c5fbb93e90a7cd6178ea5a9fe6cbc1e6d4504bc5e"
+checksum = "9f07383e7799d964bf7ffa6fc4457d177c54a44614661c7458bb0bd91b108e32"
 dependencies = [
  "bon",
  "caseless",
  "clap",
  "emojis 0.8.0",
  "entities",
+ "finl_unicode",
  "fmt2io",
  "jetscii",
  "phf 0.13.1",
@@ -901,7 +902,6 @@ dependencies = [
  "smallvec",
  "syntect",
  "typed-arena",
- "unicode_categories",
  "xdg",
 ]
 
@@ -1030,8 +1030,9 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "cot"
-version = "0.5.0"
-source = "git+https://github.com/cot-rs/cot.git?rev=6774ea6710e620e41ec162b258a21284eef5ab3e#6774ea6710e620e41ec162b258a21284eef5ab3e"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86599f83c4c655eec5d93c17f0ae42f37435e5940cf99c06145813309f059f07"
 dependencies = [
  "ahash 0.8.12",
  "askama",
@@ -1077,7 +1078,7 @@ dependencies = [
 [[package]]
 name = "cot-site"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=0869a5dd33753830c64562a34af587c2bd59cb46#0869a5dd33753830c64562a34af587c2bd59cb46"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=9151caddc7a8dcae3d968439b40a310d9ad3efb6#9151caddc7a8dcae3d968439b40a310d9ad3efb6"
 dependencies = [
  "askama",
  "async-trait",
@@ -1098,7 +1099,7 @@ dependencies = [
 [[package]]
 name = "cot-site-common"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=0869a5dd33753830c64562a34af587c2bd59cb46#0869a5dd33753830c64562a34af587c2bd59cb46"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=9151caddc7a8dcae3d968439b40a310d9ad3efb6#9151caddc7a8dcae3d968439b40a310d9ad3efb6"
 dependencies = [
  "comrak",
  "semver",
@@ -1109,7 +1110,7 @@ dependencies = [
 [[package]]
 name = "cot-site-macros"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=0869a5dd33753830c64562a34af587c2bd59cb46#0869a5dd33753830c64562a34af587c2bd59cb46"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=9151caddc7a8dcae3d968439b40a310d9ad3efb6#9151caddc7a8dcae3d968439b40a310d9ad3efb6"
 dependencies = [
  "comrak",
  "cot-site-common",
@@ -1123,8 +1124,9 @@ dependencies = [
 
 [[package]]
 name = "cot_codegen"
-version = "0.5.0"
-source = "git+https://github.com/cot-rs/cot.git?rev=6774ea6710e620e41ec162b258a21284eef5ab3e#6774ea6710e620e41ec162b258a21284eef5ab3e"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fb54edb7e3f83eacaf6d8e76da12448ba5d34e481193e59aa89820e034d3221"
 dependencies = [
  "darling 0.23.0",
  "heck 0.5.0",
@@ -1135,8 +1137,9 @@ dependencies = [
 
 [[package]]
 name = "cot_core"
-version = "0.5.0"
-source = "git+https://github.com/cot-rs/cot.git?rev=6774ea6710e620e41ec162b258a21284eef5ab3e#6774ea6710e620e41ec162b258a21284eef5ab3e"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439acd4526d5ca44174a30ba68842cd938751993cfbdc1451d2225d5ffc2a8c1"
 dependencies = [
  "askama",
  "axum",
@@ -1163,8 +1166,9 @@ dependencies = [
 
 [[package]]
 name = "cot_macros"
-version = "0.5.0"
-source = "git+https://github.com/cot-rs/cot.git?rev=6774ea6710e620e41ec162b258a21284eef5ab3e#6774ea6710e620e41ec162b258a21284eef5ab3e"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "250406bc5d4d20de14064500759e91cf5a2bcabaca719688cd83f2a78a9735fa"
 dependencies = [
  "askama_derive",
  "cot_codegen",
@@ -1598,6 +1602,12 @@ name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
+
+[[package]]
+name = "finl_unicode"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9844ddc3a6e533d62bba727eb6c28b5d360921d5175e9ff0f1e621a5c590a4d5"
 
 [[package]]
 name = "flate2"
@@ -4252,12 +4262,6 @@ name = "unicode-xid"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
-
-[[package]]
-name = "unicode_categories"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39ec24b3121d976906ece63c9daad25b85969647682eee313cb5779fdd69e14e"
 
 [[package]]
 name = "url"

@@ -77,7 +77,6 @@ bytes = "1.11"
 cargo_toml = "0.22"
 chrono = { version = "0.4.44", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
-chumsky = { version = "0.9.3", default-features = false }
 clap = { version = "4.5.60", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"

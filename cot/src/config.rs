@@ -415,7 +415,7 @@ impl ProjectConfigBuilder {
             middlewares: self.middlewares.clone().unwrap_or_default(),
             #[cfg(feature = "email")]
             email: self.email.clone().unwrap_or_default(),
-            extra: Default::default(),
+            extra: toml::Table::default(),
         }
     }
 }

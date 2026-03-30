@@ -81,7 +81,7 @@ trybuild.workspace = true
 
 [build-dependencies]
 ahash.workspace = true
-grass.workspace = true
+grass_compiler.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
@@ -89,8 +89,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-machete]
 ignored = [
-    # Used indirectly by `grass`, but it doesn't work with the latest versions of Rust if minimal dependency versions
-    # are used
+    # Used indirectly by `grass_compiler`, but it doesn't work with the latest versions of Rust if minimal dependency
+    # versions are used
     "ahash",
     # Used by `lettre`, but it causes dependency issues if minimal dependency versions are used
     "chumsky",

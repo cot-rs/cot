@@ -8,8 +8,8 @@ use cot::db::{
     ForeignKeyOnUpdatePolicy, Identifier, LimitedString, Model, model, query,
 };
 use cot::test::TestDatabase;
-use fake::rand::SeedableRng;
 use fake::rand::rngs::StdRng;
+use fake::rand::{RngExt, SeedableRng};
 use fake::{Dummy, Fake, Faker};
 
 struct WeekdaySetFaker;

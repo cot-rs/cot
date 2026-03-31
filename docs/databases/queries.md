@@ -49,7 +49,7 @@ pub struct Order {
 
 ## Creating an object
 
-To create a new model instance, cot provides the [`insert`](trait@cot::db::Model#method.insert) method. 
+To create a new model instance, cot provides the [`insert`](trait@cot::db::Model#method.insert) method.
 In the example below, we create a new `Customer` instance and save it to the database.
 
 ```rust
@@ -82,7 +82,7 @@ async fn create_customer(db: Database) -> cot::Result<()> {
         is_verified: false,
     };
     customer1.insert(db).await?;
-    
+
     // This will fail with a UniqueViolation error.
     let mut customer2 = Customer {
         id: Auto::fixed(1),
@@ -110,7 +110,7 @@ The example below shows how to create multiple `Customer` instances.
 use cot::db::{Auto, Database};
 use cot::common_types::Email;
 
-async fn create_customers(db: Database) -> cot::Result<()> { 
+async fn create_customers(db: Database) -> cot::Result<()> {
     let customers = vec![
         Customer {
             id: Auto::default(),
@@ -122,10 +122,10 @@ async fn create_customers(db: Database) -> cot::Result<()> {
             id: Auto::default(),
             email: Email::from_str("jondoe@example.com").unwrap(),
             full_name: LimitedString::new("Jon Doe").unwrap(),
-            is_verified: false, 
+            is_verified: false,
         },
     ];
-    
+
     Customer::bulk_insert(db, customers).await?;
 }
 ```
@@ -159,7 +159,7 @@ async fn save_customer(db: Database) -> cot::Result<()> {
         is_verified: false,
     };
     customer.save(db).await?;
-    
+
     // update the customer's verified status
     customer.is_verified = true;
     customer.save(db).await?;
@@ -170,7 +170,7 @@ async fn save_customer(db: Database) -> cot::Result<()> {
 Saving a foreign key field is similar to saving a regular field. There are two variants of foreign key fields provided by cot:
 
 ### `ForeignKey::Model`
-This is the most common variant which allows you to save a foreign key field with a model instance. 
+This is the most common variant which allows you to save a foreign key field with a model instance.
 The example below shows how to save a `Customer` instance as a foreign key field of an `Order` instance.
 
 ```rust
@@ -185,7 +185,7 @@ async fn save_order(db: Database) -> cot::Result<()> {
         is_verified: false,
     };
     customer.save(db).await?;
-    
+
     let product = Product {
         id: Auto::default(),
         sku: "ABC123".into(),
@@ -195,7 +195,7 @@ async fn save_order(db: Database) -> cot::Result<()> {
         is_available: true,
     };
     product.save(db).await?;
-    
+
     let mut order = Order {
         id: Auto::default(),
         customer: ForeignKey::Model(Box::new(customer)),
@@ -232,9 +232,9 @@ Note that this will fail if the primary key of the referenced model does not exi
 
 ## Retrieving objects
 
-To retrieve objects from the database, cot provides the [`Query`](struct@cot::query::Query) struct which allows you to 
-perform various queries on the database. The [`Query`](struct@cot::query::Query) struct provides methods such as `filter`, which can be used filter to the 
-results of a query.The [`Query`](struct@cot::query::Query) object can be accessed by calling the `objects` method on the model. The example below shows how to retrieve a 
+To retrieve objects from the database, cot provides the [`Query`](struct@cot::query::Query) struct which allows you to
+perform various queries on the database. The [`Query`](struct@cot::query::Query) struct provides methods such as `filter`, which can be used filter to the
+results of a query.The [`Query`](struct@cot::query::Query) object can be accessed by calling the `objects` method on the model. The example below shows how to retrieve a
 Customer instance with the primary key of `5`.
 
 ```rust
@@ -318,6 +318,3 @@ async fn delete_customer(db: Database) -> cot::Result<()> {
 
 ### Other Query methods
 The methods listed on this page are the most commonly used query methods. For a complete comprehensive list of supported query methods, see the [`Query`](struct@cot::query::Query) docs.
-
-
-

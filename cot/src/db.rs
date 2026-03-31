@@ -2009,7 +2009,7 @@ impl<const LIMIT: u32> LimitedString<LIMIT> {
 #[cfg(feature = "fake")]
 impl<const LIMIT: u32> fake::Dummy<usize> for LimitedString<LIMIT> {
     fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(len: &usize, rng: &mut R) -> Self {
-        use fake::rand::Rng;
+        use fake::rand::distr::SampleString;
 
         assert!(
             *len <= LIMIT as usize,
@@ -2020,11 +2020,7 @@ impl<const LIMIT: u32> fake::Dummy<usize> for LimitedString<LIMIT> {
             )
         );
 
-        let str: String = rng
-            .sample_iter(&fake::rand::distr::Alphanumeric)
-            .take(*len)
-            .map(char::from)
-            .collect();
+        let str: String = fake::rand::distr::Alphanumeric.sample_string(rng, *len);
         Self::new(str).unwrap()
     }
 }

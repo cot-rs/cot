@@ -35,10 +35,10 @@ cot migration make
 
 This will create a new file in your `migrations` directory in the crate's src directory. We will come back to the contents of this file later in this guide, but for now, let's focus on how to use the model to interact with the database.
 
-## Model Fields
+## Model Fields Options
+Cot provides specific field-level attributes that provide special meaning to fields in a model. The most common ones are listed below:
 
-
-### primary_key
+### `primary_key`
 This is used to mark a field as the primary key of the table. This is a required field for every model.
 
 ```rust
@@ -51,7 +51,7 @@ pub struct Post {
 }
 ```
 
-### unique
+### `unique`
 This is used to mark a field as unique, which means that each value in this field must be unique across all rows in the table. For more information see the [model field reference](https://docs.rs/cot_macros/0.5.0/cot_macros/attr.model.html).
 
 ```rust

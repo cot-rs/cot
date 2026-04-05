@@ -256,7 +256,7 @@ async fn get_customer(db: Database) -> cot::Result<()> {
     println!("Customer: {:?}", customer);
 }
 ```
-The [`get`](struct@cot::db::query::Query#method.get) method (as well as the [`all`](struct@cot::db::query::Query#method.all) method which we'll see in the next section) are terminal query methods which are applied to the query object after filtering to retrieve the final results. 
+The [`get`](struct@cot::db::query::Query#method.get) method (as well as the [`all`](struct@cot::db::query::Query#method.all) method which we'll see in the next section) are terminal query methods which are applied to the query object after filtering to retrieve the final results.
 Also note that the [`get`](struct@cot::db::query::Query#method.get) method will return an error if the query returns more than one result.
 
 ### Retrieving all objects

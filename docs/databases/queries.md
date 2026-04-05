@@ -2,9 +2,9 @@
 title: Queries
 ---
 
-Cot provides a [`Query`](struct@cot::query::Query) interface that allows you to write queries
+Cot provides a [`Query`](struct@cot::db::query::Query) interface that allows you to write queries
 to the database. In this guide, we'll cover the basics of writing queries after you've setup your
-database and models. For a complete reference, see the [`Query`](struct@cot::query::Query) docs.
+database and models. For a complete reference, see the [`Query`](struct@cot::db::query::Query) docs.
 
 For the rest of this guide, we'll use the following models which show a simple e-commerce application.
 
@@ -67,7 +67,7 @@ async fn create_customer(db: Database) -> cot::Result<()> {
 }
 ```
 
-Note that the `insert` method will return a `UniqueViolation` error if a record with the same primary key already exists.
+Note that the [`insert`](trait@cot::db::Model#method.insert) method will return a `UniqueViolation` error if a record with the same primary key already exists.
 The example below shows an attempt to insert a new `Customer` instance with the same primary key as an existing one.
 
 ```rust
@@ -94,15 +94,9 @@ async fn create_customer(db: Database) -> cot::Result<()> {
 }
 ```
 
-[//]: # (Cot also provides the [`save`]&#40;trait@cot::db::Model#method.save&#41; method, which is a shortcut for)
-
-[//]: # (inserting a new model instance if it doesn't exist, or updating it if it does. Replacing `insert` with `save`)
-
-[//]: # (in the previous example should yield the same result.)
-
 #### Creating multiple objects
 If you need to create multiple objects, cot provides the [`bulk_insert`](trait@cot::db::Model#method.bulk_insert) method for this purpose.
-It is recommended to prefer `bulk_insert` for multiple insertions as it performs the operations in a single database query which is much more efficient than performing multiple individual `insert` or `save` calls.
+It is recommended to prefer [`bulk_insert`](trait@cot::db::Model#method.bulk_insert) for multiple insertions as it performs the operations in a single database query which is much more efficient than performing multiple individual [`insert`](trait@cot::db::Model#method.insert) or [`save`](trait@cot::db::Model#method.save) calls.
 
 The example below shows how to create multiple `Customer` instances.
 
@@ -111,7 +105,7 @@ use cot::db::{Auto, Database};
 use cot::common_types::Email;
 
 async fn create_customers(db: Database) -> cot::Result<()> {
-    let customers = vec![
+    let mut customers = vec![
         Customer {
             id: Auto::default(),
             email: Email::from_str("janedoe@example.com").unwrap(),
@@ -126,7 +120,7 @@ async fn create_customers(db: Database) -> cot::Result<()> {
         },
     ];
 
-    Customer::bulk_insert(db, customers).await?;
+    Customer::bulk_insert(db, &mut customers).await?;
 }
 ```
 
@@ -171,7 +165,7 @@ Saving a foreign key field is similar to saving a regular field. There are two v
 
 ### `ForeignKey::Model`
 This is the most common variant which allows you to save a foreign key field with a model instance.
-The example below shows how to save a `Customer` instance as a foreign key field of an `Order` instance.
+The example below shows how to save a `Customer` instance and a `Product` instance as foreign key fields of an `Order` instance.
 
 ```rust
 use cot::db::{Auto, Database};
@@ -218,8 +212,8 @@ use cot::common_types::Email;
 async fn save_order(db: Database) -> cot::Result<()> {
     let mut order = Order {
         id: Auto::default(),
-        customer: ForeignKey::PrimaryKey(Auto::fixed(1)), // customer id
-        product: ForeignKey::PrimaryKey(Auto::fixed(1)), // product id
+        customer: ForeignKey::PrimaryKey(Auto::fixed(1)),
+        product: ForeignKey::PrimaryKey(Auto::fixed(1)),
         quantity: 1,
         is_fulfilled: false,
     };
@@ -232,9 +226,9 @@ Note that this will fail if the primary key of the referenced model does not exi
 
 ## Retrieving objects
 
-To retrieve objects from the database, cot provides the [`Query`](struct@cot::query::Query) struct which allows you to
-perform various queries on the database. The [`Query`](struct@cot::query::Query) struct provides methods such as `filter`, which can be used filter to the
-results of a query.The [`Query`](struct@cot::query::Query) object can be accessed by calling the `objects` method on the model. The example below shows how to retrieve a
+To retrieve objects from the database, cot provides the [`Query`](struct@cot::db::query::Query) struct which allows you to
+perform various queries on the database. The [`Query`](struct@cot::db::query::Query) struct provides methods such as [`filter`](struct@cot::db::query::Query#method.filter), which can be used filter to the
+results of a query.The [`Query`](struct@cot::db::query::Query) object can be accessed by calling the [`objects`](trait@cot::db::Model#method.objects) method on the model. The example below shows how to retrieve a
 Customer instance with the primary key of `5`.
 
 ```rust
@@ -247,10 +241,10 @@ async fn get_customer(db: Database) -> cot::Result<()> {
 
 ```
 
-The `filter` method takes a [`filter expression`](enum@cot::db::query::Expr). In the example above, the expression, `Expr::eq(Expr::field("id"), Expr::value("5"))`, is
+The [`filter`](struct@cot::db::query::Query#method.filter) method takes a [`filter expression`](enum@cot::db::query::Expr). In the example above, the expression, `Expr::eq(Expr::field("id"), Expr::value("5"))`, is
 evaluated as `id = 5`.
 
-Cot also provides the [`query!`](macro@cot::query) macro which provides a convenient way to write queries in a declarative style without having to manually construct [`Expr`] expressions.
+Cot also provides the [`query!`](macro@cot::db::query) macro which provides a convenient way to write queries in a declarative style without having to manually construct [`Expr`](enum@cot::db::query::Expr) expressions.
 The example above can be rewritten as follows:
 
 ```rust
@@ -262,11 +256,12 @@ async fn get_customer(db: Database) -> cot::Result<()> {
     println!("Customer: {:?}", customer);
 }
 ```
-Note that the `get` method will return an error if the query returns more than one result.
+The [`get`](struct@cot::db::query::Query#method.get) method (as well as the [`all`](struct@cot::db::query::Query#method.all) method which we'll see in the next section) are terminal query methods which are applied to the query object after filtering to retrieve the final results. 
+Also note that the [`get`](struct@cot::db::query::Query#method.get) method will return an error if the query returns more than one result.
 
 ### Retrieving all objects
 
-One way to retrieve all objects of a model is to call the `all` method after filtering the query results.
+One way to retrieve all objects of a model is to call the [`all`](struct@cot::db::query::Query#method.all) method after filtering the query results.
 
 ```rust
 use cot::db::{Database};
@@ -282,7 +277,7 @@ The example above retrieves all customers with a primary key greater than `5`. T
 
 
 ##### Chaining filters
-The `filter` method returns a new [`Query`](struct@cot::query::Query) instance which makes it convenient to chain multiple filters.
+The [`filter`](struct@cot::db::query::Query#method.filter) method returns a new [`Query`](struct@cot::db::query::Query) instance which makes it convenient to chain multiple filters.
 
 ```rust
 use cot::db::{Database};
@@ -298,13 +293,13 @@ async fn get_customers(db: Database) -> cot::Result<()> {
 
 The example above shows how to retrieve all customers with a primary key greater than `5` and whose full name is `Jon Doe`.
 
-> Note: Although this example works, the idiomatic way to do this is to use the [`Expr::and`]() expression instead.
+> Note: Although this example works, the idiomatic way to do this is to use the [`Expr::and`](enum@cot::db::query::Expr::method.and) expression instead.
 
-Similarly, the [`query`](macro@cot::query) macro returns a new [`Query`](struct@cot::query::Query) instance which can be used to chain multiple filters.
+Similarly, the [`query`](macro@cot::db::query) macro returns a new [`Query`](struct@cot::db::query::Query) instance which can be used to chain multiple filters.
 
 
 ## Removing an object
-The `delete` method can be used to remove an object from the database. The example below shows how to remove a `Customer` instance with the primary key of `5`.
+The [`delete`](struct@cot::db::query::Query#method.delete) method can be used to remove an object from the database. The example below shows how to remove a `Customer` instance with the primary key of `5`.
 
 ```rust
 use cot::db::{Database};
@@ -317,4 +312,4 @@ async fn delete_customer(db: Database) -> cot::Result<()> {
 ```
 
 ### Other Query methods
-The methods listed on this page are the most commonly used query methods. For a complete comprehensive list of supported query methods, see the [`Query`](struct@cot::query::Query) docs.
+The methods listed on this page are the most commonly used query methods. For a complete comprehensive list of supported query methods, see the [`Query`](struct@cot::db::query::Query) docs.

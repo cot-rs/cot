@@ -416,6 +416,7 @@ pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
 /// use cot::db::{Database, model, query};
 ///
 /// #[model]
+/// #[derive(Debug, Clone)]
 /// struct Customer {
 ///     #[model(primary_key)]
 ///     id: i32,
@@ -423,7 +424,7 @@ pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
 /// }
 ///
 /// # async fn run(db: Database) -> cot::Result<()> {
-/// let customer = query!(Customer, $id == 5).get(db).await?;
+/// let customer = query!(Customer, $id == 5).get(&db).await?;
 /// println!("Customer: {:?}", customer);
 /// # Ok(())
 /// # }

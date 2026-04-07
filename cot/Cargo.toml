@@ -33,6 +33,7 @@ derive_more = { workspace = true, features = ["debug", "deref", "display", "from
 email_address.workspace = true
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 form_urlencoded.workspace = true
+fs4 = { workspace = true, optional = true }
 futures-core.workspace = true
 futures-util.workspace = true
 hex.workspace = true
@@ -111,7 +112,7 @@ json = ["dep:serde_json", "cot_core/json"]
 openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
-cache = ["json"]
+cache = ["json", "fs4"]
 test = []
 
 [lib]

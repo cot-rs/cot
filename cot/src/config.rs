@@ -876,6 +876,31 @@ impl CacheStoreConfigBuilder {
 }
 
 #[cfg(feature = "cache")]
+pub(crate) const DEFAULT_FILE_STORE_WORKER_COUNT: usize = default_file_store_pool_worker_count();
+
+#[cfg(feature = "cache")]
+pub(crate) const DEFAULT_FILE_STORE_QUEUE_SIZE: usize = default_file_store_pool_queue_size();
+
+#[cfg(feature = "cache")]
+pub(crate) const DEFAULT_FILE_STORE_ACQUISITION_TIMEOUT_MS: u64 =
+    default_file_store_pool_acquisition_timeout_ms();
+
+#[cfg(feature = "cache")]
+const fn default_file_store_pool_worker_count() -> usize {
+    10
+}
+
+#[cfg(feature = "cache")]
+const fn default_file_store_pool_queue_size() -> usize {
+    128
+}
+
+#[cfg(feature = "cache")]
+const fn default_file_store_pool_acquisition_timeout_ms() -> u64 {
+    2000
+}
+
+#[cfg(feature = "cache")]
 pub(crate) const DEFAULT_REDIS_POOL_SIZE: usize = default_redis_pool_size();
 
 #[cfg(feature = "cache")]
@@ -951,7 +976,7 @@ pub enum CacheStoreTypeConfig {
         pool_size: usize,
     },
     /// File-based cache store.
-
+    ///
     /// This stores cache data in files on the local filesystem. The path to
     /// the directory where the cache files will be stored must be specified.
     File {
@@ -964,10 +989,52 @@ pub enum CacheStoreTypeConfig {
         ///
         /// let config = CacheStoreTypeConfig::File {
         ///     path: PathBuf::from("/tmp/cache"),
+        ///     worker_count: 10,
+        ///     queue_size: 100,
+        ///     acquisition_timeout_ms: 2000,
         /// };
         /// ```
         /// The path to the directory where cache files will be stored.
         path: PathBuf,
+
+        /// Specifies the maximum number of concurrent blocking tasks permitted
+        /// for file lock acquisition.
+        ///
+        /// When a blocking task is spawned to acquire a file lock, it may
+        /// remain occupied until the underlying operating system
+        /// returns control to the application. If the filesystem
+        /// becomes unresponsive, these tasks will remain allocated and
+        /// unavailable for further requests until the kernel-level operation
+        /// completes or fails.
+        ///
+        /// Setting this value to `0` opts out of spawning background tasks for
+        /// contested file locks. In this configuration, it is
+        /// recommended to also set `queue_size` to `0` to ensure that
+        /// requests requiring a lock fail immediately rather than
+        /// entering a pending state that cannot be serviced.
+        ///
+        /// If the maximum worker count has been reached and the associated
+        /// request queue is full, any incoming request that requires
+        /// file locking will return an error immediately to prevent
+        /// further resource contention.
+        #[serde(default = "default_file_store_pool_worker_count")]
+        worker_count: usize,
+
+        /// Specifies the maximum number of waiting insertions allowed in the
+        /// queue.
+        ///
+        /// Incoming requests that require file locking will return an
+        /// error immediately if this queue is full.
+        #[serde(default = "default_file_store_pool_queue_size")]
+        queue_size: usize,
+
+        /// Sets the  maximum duration (in milliseconds) to wait for lock
+        /// acquisition.
+        ///
+        /// This does not include time spent waiting in the queue or
+        /// the duration of I/O operations once the lock is acquired.
+        #[serde(default = "default_file_store_pool_acquisition_timeout_ms")]
+        acquisition_timeout_ms: u64,
     },
 }
 
@@ -2927,6 +2994,9 @@ mod tests {
             [cache.store]
             type = "file"
             path = "/tmp/cache"
+            worker_count = 8
+            queue_size = 100
+            acquisition_timeout_ms = 4000
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
@@ -2938,8 +3008,17 @@ mod tests {
         );
         assert_eq!(config.cache.prefix, Some("dev".to_string()));
 
-        if let CacheStoreTypeConfig::File { path } = &config.cache.store.store_type {
+        if let CacheStoreTypeConfig::File {
+            path,
+            worker_count,
+            queue_size,
+            acquisition_timeout_ms,
+        } = &config.cache.store.store_type
+        {
             assert_eq!(path, &PathBuf::from("/tmp/cache"));
+            assert_eq!(worker_count, &8usize);
+            assert_eq!(queue_size, &100usize);
+            assert_eq!(acquisition_timeout_ms, &4000u64);
         }
     }
 

@@ -65,8 +65,61 @@ pub struct User {
 ```
 
 ## Field Types
+To use a type in a model, they **must** implement both the [`ToDbValue`](trait@cot::db::ToDbValue) and [`FromDbValue`](trait@cot::db::FromDbValue) traits. The [`ToDbValue`](trait@cot::db::ToDbValue) trait tells Cot how to serialize the field value into a format that can be stored in the database (e.g. a string, a number, a boolean, etc.) while the [`FromDbValue`](trait@cot::db::FromDbValue) trait tells Cot how to deserialize the field value from the database format back into the Rust type.
+Cot provides implementations of these traits for many common types on a best-effort basis. Refer to the [implementations](trait@cot::db::FromDbValue#foreign-impls) and [implementors](trait@cot::db::FromDbValue#implementors) section of the docs for a complete list of the supported types.
 
-Cot
+In the example below, we show how to use a custom type as a field in a model:
+
+```rust
+use cot::db::{DbFieldValue, model, Auto};
+use cot::db::{ToDbFieldValue, FromDbValue, SqlxValueRef};
+use cot::db::impl_mysql::MySqlValueRef;
+use cot::db::impl_postgres::PostgresValueRef;
+use cot::db::impl_sqlite::SqliteValueRef;
+
+#[derive(Debug, Clone)]
+struct NewType(i32);
+
+impl FromDbValue for NewType {
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized
+    {
+        Ok(NewType(value.get::<i32>()?))
+    }
+
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized
+    {
+        Ok(NewType(value.get::<i32>()?))
+    }
+
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized
+    {
+        Ok(NewType(value.get::<i32>()?))
+    }
+}
+
+
+impl ToDbFieldValue for NewType {
+    fn to_db_field_value(&self) -> DbFieldValue {
+        self.0.clone().into()
+    }
+}
+
+
+#[model]
+#[derive(Debug, Clone)]
+pub struct Post {
+    #[model(primary_key)]
+    id: Auto<i64>,
+    new_type: NewType,
+}
+
+```
 
 ## Relationships
 Relational databases are all about relationships between tables, and Cot provides a convenient way to define database relationships between models.
@@ -129,6 +182,30 @@ url = "mysql://user:password@localhost/dbname"
 
 Cot tries to be as consistent as possible when it comes to the database engine you are using. This means that you can use SQLite for development and testing, and then switch to PostgreSQL or MySQL for production without changing your code. The only thing you need to do is to change the [`url`](struct@cot::config::DatabaseConfig#structfield.url) value in the configuration file!
 
+As an alternative to setting the database configuration in the `TOML` file, you can also set it programmatically in the [`config`](trait@cot::project::Project#method.config) method of your project:
+
+
+```rust
+use cot::config::DatabaseConfig;
+
+struct MyProject;
+
+impl Project for MyProject {
+    fn config(&self) -> cot::Result<ProjectConfig> {
+        Ok(
+            ProjectConfig::builder()
+                .database(
+                    DatabaseConfig::builder()
+                        .url("sqlite://db.sqlite3?mode=rwc")
+                        .build(),
+                )
+                .build()
+        )
+    }
+}
+
+```
+
 ## Summary
 
-In this chapter you learned how to define your own models in Cot, how to interact with the database using these models, and how to define foreign key relationships between models. In the next chapter, we'll try to register these models in the admin panel so that you can manage them through an easy-to-use web interface.
+In this chapter you learned about the Cot ORM and how to define models, fields, and relationships between models. You also learned how to configure your database connection and how to use the models to interact with the database. In the next chapter, we will dive deeper into how to perform various database operations using the Cot ORM.

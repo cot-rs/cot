@@ -281,8 +281,6 @@ pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
 ///
 /// ## Comparison operators
 ///
-/// ### Equality
-///
 /// ```
 /// use cot::db::{model, query};
 ///
@@ -292,64 +290,11 @@ pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
 /// #     id: i32,
 /// # }
 /// let _ = query!(Customer, $id == 5);
-/// ```
-///
-/// ### Inequality
-///
-/// ```
-/// use cot::db::{model, query};
-///
-/// # #[model]
-/// # struct Customer {
-/// #     #[model(primary_key)]
-/// #     id: i32,
-/// # }
 /// let _ = query!(Customer, $id != 5);
-/// ```
-///
-/// ### Less than and less than or equal
-///
-/// ```
-/// use cot::db::{model, query};
-///
-/// # #[model]
-/// # struct Customer {
-/// #     #[model(primary_key)]
-/// #     id: i32,
-/// # }
 /// let _ = query!(Customer, $id < 10);
 /// let _ = query!(Customer, $id <= 10);
-/// ```
-///
-/// ### Greater than and greater than or equal
-///
-/// ```
-/// use cot::db::{model, query};
-///
-/// # #[model]
-/// # struct Customer {
-/// #     #[model(primary_key)]
-/// #     id: i32,
-/// # }
 /// let _ = query!(Customer, $id > 5);
 /// let _ = query!(Customer, $id >= 5);
-/// ```
-///
-/// ## Boolean operators
-///
-/// Combine expressions with `&&` and `||`.
-///
-/// ```
-/// use cot::db::{model, query};
-///
-/// # #[model]
-/// # struct Customer {
-/// #     #[model(primary_key)]
-/// #     id: i32,
-/// #     full_name: String,
-/// # }
-/// let _ = query!(Customer, $id > 5 && $full_name == "Jon Doe");
-/// let _ = query!(Customer, $id < 5 || $id > 100);
 /// ```
 ///
 /// ## Arithmetic operators

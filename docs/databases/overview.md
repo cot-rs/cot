@@ -103,13 +103,11 @@ impl FromDbValue for NewType {
     }
 }
 
-
 impl ToDbFieldValue for NewType {
     fn to_db_field_value(&self) -> DbFieldValue {
         self.0.clone().into()
     }
 }
-
 
 #[model]
 #[derive(Debug, Clone)]
@@ -123,7 +121,6 @@ pub struct Post {
 
 ## Relationships
 Relational databases are all about relationships between tables, and Cot provides a convenient way to define database relationships between models.
-
 
 ### Foreign keys
 
@@ -163,7 +160,6 @@ let mut link = query!(Link, $slug == LimitedString::new("cot").unwrap())
 let user = link.user.get(db).await?;
 ```
 
-
 ## Database Configuration
 
 Configure your database connection in the configuration files inside your `config` directory:
@@ -181,6 +177,12 @@ url = "mysql://user:password@localhost/dbname"
 ```
 
 Cot tries to be as consistent as possible when it comes to the database engine you are using. This means that you can use SQLite for development and testing, and then switch to PostgreSQL or MySQL for production without changing your code. The only thing you need to do is to change the [`url`](struct@cot::config::DatabaseConfig#structfield.url) value in the configuration file!
+
+Currently, Cot supports the following database engines:
+* SQLite
+* PostgreSQL
+* MySQL
+
 
 As an alternative to setting the database configuration in the `TOML` file, you can also set it programmatically in the [`config`](trait@cot::project::Project#method.config) method of your project:
 

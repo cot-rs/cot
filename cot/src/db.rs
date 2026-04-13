@@ -1808,7 +1808,7 @@ pub struct RowsNum(pub u64);
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Ord, PartialOrd)]
 pub enum Auto<T> {
     /// A fixed value.
     Fixed(T),

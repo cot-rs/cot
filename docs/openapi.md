@@ -55,14 +55,14 @@ Note the use of `#[derive(JsonSchema)]` which comes from the [`schemars`](https:
 Next, create your API handlers using Cot's extractors:
 
 ```rust
-use cot::json::Json;
-
+# struct AddRequest { a: i32, b: i32 }
+# struct AddResponse { result: i32 }
 async fn add(Json(add_request): Json<AddRequest>) -> cot::Result<Json<AddResponse>> {
     let response = AddResponse {
         result: add_request.a + add_request.b,
     };
 
-    Json(response)
+    Ok(Json(response))
 }
 ```
 
@@ -74,6 +74,7 @@ Instead of using regular method routers, use the OpenAPI-enabled versions that a
 use cot::router::method::openapi::api_post;
 use cot::router::{Route, Router};
 
+# async fn add(_request: cot::request::Request) -> cot::Result<Response> { todo!() }
 fn create_router() -> Router {
     Router::with_urls([
         Route::with_api_handler("/add/", api_post(add)),
@@ -91,10 +92,9 @@ The key differences from standard routes are:
 To expose the interactive documentation UI, register the [`SwaggerUi`](struct@cot::openapi::swagger_ui::SwaggerUi) app in your project:
 
 ```rust
-use cot::openapi::swagger_ui::SwaggerUi;
-use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Project};
-
+# use cot::openapi::swagger_ui::SwaggerUi;
+# struct MyApiApp;
+# impl App for MyApiApp { fn name(&self) -> &'static str { "api" } }
 struct MyProject;
 
 impl Project for MyProject {
@@ -102,14 +102,14 @@ impl Project for MyProject {
         &self,
         handler: RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         // StaticFilesMiddleware is required for SwaggerUI to serve its assets
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .build()
     }
 
-    fn register_apps(&self, apps: &mut AppBuilder, context: &RegisterAppsContext) {
+    fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         // Register the Swagger UI at the /swagger path
         apps.register_with_views(SwaggerUi::new(), "/swagger");
 
@@ -125,16 +125,16 @@ Don't forget to include the [`StaticFilesMiddleware`](struct@cot::static_files::
 
 Here's a complete example of a simple API with OpenAPI documentation:
 
-```rust
+```rust,has_main
 use cot::cli::CliMetadata;
 use cot::config::ProjectConfig;
 use cot::json::Json;
 use cot::openapi::swagger_ui::SwaggerUi;
-use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder};
+use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandlerBuilder, RootHandler};
 use cot::router::method::openapi::api_post;
 use cot::router::{Route, Router};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, BoxedHandler, Project};
+use cot::{App, AppBuilder, Project};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -153,7 +153,7 @@ async fn add(Json(add_request): Json<AddRequest>) -> cot::Result<Json<AddRespons
         result: add_request.a + add_request.b,
     };
 
-    Json(response)
+    Ok(Json(response))
 }
 
 struct AddApp;
@@ -183,7 +183,7 @@ impl Project for ApiProject {
         &self,
         handler: RootHandlerBuilder,
         context: &MiddlewareContext,
-    ) -> BoxedHandler {
+    ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(context))
             .build()
@@ -224,10 +224,14 @@ use cot::request::extractors::Path;
 
 async fn get_user(Path(user_id): Path<i32>) -> cot::Result<Response> {
     // ...
+#   todo!()
 }
 
+# use cot::router::method::openapi::api_get;
+# fn foo() {
 // Register the route
-Route::with_api_handler("/users/{user_id}", api_get(get_user))
+Route::with_api_handler("/users/{user_id}", api_get(get_user));
+# }
 ```
 
 ### URL Query Parameters
@@ -245,10 +249,14 @@ struct UserQuery {
 
 async fn list_users(UrlQuery(query): UrlQuery<UserQuery>) -> cot::Result<Response> {
     // ...
+#   todo!()
 }
 
+# use cot::router::method::openapi::api_get;
+# fn foo() {
 // Register the route
-Route::with_api_handler("/users", api_get(list_users))
+Route::with_api_handler("/users", api_get(list_users));
+# }
 ```
 
 ### Excluding Routes from OpenAPI Documentation
@@ -256,23 +264,35 @@ Route::with_api_handler("/users", api_get(list_users))
 Sometimes you might want to exclude certain routes from your API documentation. You can do this by using [`NoApi`](struct@cot::openapi::NoApi):
 
 ```rust
-use cot::openapi::NoApi;
-
+# use cot::openapi::NoApi;
+# use cot::router::method::openapi::api_get;
+# async fn visible_handler(_request: cot::request::Request) -> cot::Result<Response> { todo!() }
+# async fn hidden_handler(_request: cot::request::Request) -> cot::Result<Response> { todo!() }
+# fn foo() {
 // This handler will be in the API docs
-Route::with_api_handler("/visible", api_get(visible_handler))
+Route::with_api_handler("/visible", api_get(visible_handler));
 
 // This handler will work but won't appear in the docs
-Route::with_api_handler("/hidden", api_get(NoApi(hidden_handler)))
+Route::with_api_handler("/hidden", api_get(NoApi(hidden_handler)));
+# }
 ```
 
 You can also exclude specific parameters from the OpenAPI docs:
 
 ```rust
+# use cot::request::extractors::{FromRequestHead, Path};
+# use cot::request::RequestHead;
+# use cot::openapi::NoApi;
+# struct MyContext;
+# impl FromRequestHead for MyContext {
+#     async fn from_request_head(_head: &RequestHead) -> cot::Result<Self> { todo!() }
+# }
 async fn handler(
     Path(id): Path<i32>,                   // Included in OpenAPI docs
     NoApi(context): NoApi<MyContext>,      // Excluded from OpenAPI docs
 ) -> cot::Result<Response> {
     // ... implementation
+    todo!()
 }
 ```
 
@@ -281,8 +301,12 @@ async fn handler(
 The [`ApiMethodRouter`](struct@cot::router::method::openapi::ApiMethodRouter) allows you to define multiple HTTP methods for a single route and include them all in the OpenAPI documentation:
 
 ```rust
-use cot::router::method::openapi::ApiMethodRouter;
-
+# async fn list_items() -> cot::Result<Response> { todo!() }
+# async fn create_item() -> cot::Result<Response> { todo!() }
+# async fn update_item() -> cot::Result<Response> { todo!() }
+# async fn delete_item() -> cot::Result<Response> { todo!() }
+# use cot::router::method::openapi::ApiMethodRouter;
+# fn foo() {
 Route::with_api_handler(
     "/items",
     ApiMethodRouter::new()
@@ -290,7 +314,8 @@ Route::with_api_handler(
         .post(create_item)
         .put(update_item)
         .delete(delete_item)
-)
+);
+# }
 ```
 
 Each method will be properly documented in the OpenAPI specification.

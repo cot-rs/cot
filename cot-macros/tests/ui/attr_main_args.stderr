@@ -1,7 +1,7 @@
 error: cot::main function must have zero arguments
  --> tests/ui/attr_main_args.rs:2:15
   |
-2 | async fn main(arg: i32) -> cot::Result<CotProject> {
+2 | async fn main(arg: i32) -> cot::Result<cot::Project> {
   |               ^^^^^^^^
 
 error[E0601]: `main` function not found in crate `$CRATE`

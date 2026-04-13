@@ -73,3 +73,8 @@ test-ignored:
     docker compose up -d --wait
     cargo nextest run --all-features --run-ignored only
     docker compose down
+
+alias td := test-docs
+
+test-docs:
+    cargo nextest run -p cot-test

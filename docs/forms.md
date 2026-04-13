@@ -23,11 +23,8 @@ struct ContactForm {
 And here is how you can process the form inside a request handler:
 
 ```rust
-use cot::form::{Form, FormResult};
-use cot::html::Html;
-use cot::request::{Request, RequestExt};
-use cot::response::{Response, ResponseExt};
-
+# #[derive(Form)] struct ContactForm { name: String, email: String, message: String }
+# #[derive(Template)] #[template(source = "", ext = "html")] struct ContactTemplate<'a> { request: &'a Request, form: &'a dyn FormContext }
 async fn contact(mut request: Request) -> cot::Result<Response> {
     // Handle POST request (form submission)
     if request.method() == Method::POST {
@@ -43,19 +40,20 @@ async fn contact(mut request: Request) -> cot::Result<Response> {
                 // Form has errors - render the template with error messages
                 let template = ContactTemplate {
                     request: &request,
-                    form: context,
+                    form: &context,
                 };
-                Ok(Html::new(template.render()?).into())
+                Ok(Html::new(template.render()?).into_response()?)
             }
         }
     } else {
         // Handle GET request (display empty form)
+        let form_context = ContactForm::build_context(&mut request).await?;
         let template = ContactTemplate {
             request: &request,
-            form: ContactForm::build_context(&mut request).await?,
+            form: &form_context,
         };
 
-        Ok(Html::new(template.render()?).into())
+        Ok(Html::new(template.render()?).into_response()?)
     }
 }
 ```
@@ -125,6 +123,8 @@ struct ArticleForm {
 You can implement custom validation by handling the validation result:
 
 ```rust
+# #[derive(Form)] struct ArticleForm { title: String }
+# fn render_template(_: impl cot::form::FormContext) -> cot::Result<String> { Ok("".to_string()) }
 async fn handle_form(mut request: Request) -> cot::Result<Response> {
     match ArticleForm::from_request(&mut request).await? {
         FormResult::Ok(form) => {
@@ -137,7 +137,7 @@ async fn handle_form(mut request: Request) -> cot::Result<Response> {
                 );
 
                 // Re-render form with error
-                return Ok(Html::new(render_template(context)?).into());
+                return Ok(Html::new(render_template(context)?).into_response()?);
             }
 
             // Process valid form...
@@ -145,7 +145,7 @@ async fn handle_form(mut request: Request) -> cot::Result<Response> {
         }
         FormResult::ValidationError(context) => {
             // Handle validation errors...
-            Ok(Html::new(render_template(context)?).into())
+            Ok(Html::new(render_template(context)?).into_response()?)
         }
     }
 }

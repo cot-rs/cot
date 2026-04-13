@@ -59,15 +59,18 @@ async fn cache_example(cache: Cache) -> cot::Result<Html> {
 You can set an expiration time for specific keys:
 
 ```rust
-use std::time::Duration;
-use cot::config::Timeout;
-
+# use std::time::Duration;
+# use cot::config::Timeout;
+# use cot::cache::Cache;
+# async fn foo(cache: Cache) -> cot::Result<()> {
 // Cache for 60 seconds
 cache.insert_expiring(
     "temp_key",
     "temp_value",
     Timeout::After(Duration::from_secs(60))
 ).await?;
+# Ok(())
+# }
 ```
 
 ## Advanced Topics
@@ -77,10 +80,14 @@ cache.insert_expiring(
 You can use [`get_or_insert_with`](struct@cot::cache::Cache#method.get_or_insert_with) to lazily compute and cache values:
 
 ```rust
+# use cot::cache::Cache;
+# async fn foo(cache: Cache) -> cot::Result<()> {
 let value: String = cache.get_or_insert_with("expensive_key", || async {
     // Perform expensive computation
     Ok("expensive_result".to_string())
 }).await?;
+# Ok(())
+# }
 ```
 
 #### Prefix

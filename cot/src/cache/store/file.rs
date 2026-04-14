@@ -482,29 +482,38 @@ impl FileStore {
     /// # Examples
     ///
     /// ```
-    /// use std::path::PathBuf;
+    /// use std::path::{PathBuf, Path};
     ///
     /// use cot::cache::store::file::{FileStore, FileStorePoolConfig};
     ///
     /// # #[tokio::main]
     /// # async fn main() {
     /// // Using a string slice
-    /// let path = PathBuf::from("cache");
     /// let store = FileStore::new(
-    ///     path,
+    ///     Path::new("cache"),
     ///     FileStorePoolConfig::builder()
     ///         .worker_count(10)
     ///         .queue_size(128)
     ///         .acquisition_timeout_ms(2000)
+    ///         .waiting_timeout_ms(4000)
     ///         .build(),
     /// )
     /// .unwrap();
     ///
     /// // Using a PathBuf
-    /// let path = PathBuf::from("cache_lib");
-    /// let store = FileStore::new(path, FileStorePoolConfig::builder().build()).unwrap();
+    /// let path_from_pathbuf = PathBuf::from("cache_lib");
+    /// let store = FileStore::new(
+    ///     path_from_pathbuf.clone(),
+    ///     FileStorePoolConfig::builder()
+    ///         .worker_count(10)
+    ///         .queue_size(128)
+    ///         .acquisition_timeout_ms(2000)
+    ///         .waiting_timeout_ms(4000)
+    ///         .build()
+    /// )
+    /// .unwrap();
     /// # let _ = tokio::fs::remove_dir_all("cache").await;
-    /// # let _ = tokio::fs::remove_dir_all("cache_lib").await;
+    /// # let _ = tokio::fs::remove_dir_all(path_from_pathbuf).await;
     /// # }
     /// ```
     pub fn new(

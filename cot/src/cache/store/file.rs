@@ -6,7 +6,7 @@
 //!
 //! # Examples
 //!
-//! ```no_run
+//! ```
 //! # use cot::cache::store::file::{FileStore, FileStorePoolConfig};
 //! # use cot::cache::store::CacheStore;
 //! # use cot::config::Timeout;
@@ -15,10 +15,11 @@
 //! # async fn main() {
 //!
 //! let path = PathBuf::from("./cache_data");
-//! let store = FileStore::new(path, FileStorePoolConfig::builder()
+//! let store = FileStore::new(path.clone(), FileStorePoolConfig::builder()
 //!     .worker_count(8)
 //!     .queue_size(128)
 //!     .acquisition_timeout_ms(2000)
+//!     .waiting_timeout_ms(4000)
 //!     .build()
 //! )
 //! .expect("Failed to initialize store");
@@ -30,6 +31,8 @@
 //!
 //! let retrieved = store.get(&key).await.unwrap();
 //! assert_eq!(retrieved, Some(value));
+//!
+//! # let _ = tokio::fs::remove_dir_all(&path).await;
 //! # }
 //! ```
 //!
@@ -49,6 +52,7 @@
 //! | Expiry header | 0           | 7         | i64 (8 bytes)  |
 //! | Cache data    | 8           | EOF       | length of data |
 use std::borrow::Cow;
+use std::fs::TryLockError;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -70,20 +74,18 @@ const TEMPFILE_SUFFIX: &str = "tmp";
 
 // Custom error messages for implementation related
 // failure modes
-const PERMISSION_ERROR_OR_BUSY: &str = "file-system busy or permission error";
+const FILE_SYSTEM_BUSY: &str = "file-system too busy to carry out normal operation";
 const POOL_QUEUE_FULL: &str = "file-store pool queue full";
 const POOL_BUSY: &str = "file-store pool busy";
 // Use this for cases that should not happen under normal
 // operating conditions, e.g., runtime quirks.
 const UNEXPECTED_ERROR: &str = "unexpected error";
+const TIMEOUT_REACHED: &str = "file-store pool took to long to respond";
 
 // This is a retry limit for edge-cases where a file has been
 // created but failed to be locked immediately, where such case
 // happens multiple times.
 const INTERNAL_MAX_RETRIES: i32 = 5;
-
-// The timeout is set to 2000ms to allow the queue to drain efficiently
-// while giving requests a reasonable window to acquire a file lock.
 
 // This header offset skips exactly one i64 integer,
 // which is the basis of our current expiry timestamp
@@ -147,12 +149,14 @@ struct FileStorePool {
 /// The `new()` method will provide default values for  `FileStorePoolConfig`
 ///
 /// #  Examples
-/// ```no_run
+/// ```
 /// use std::path::PathBuf;
 ///
-/// use crate::cot::cache::store::file::{FileStore, FileStorePoolConfig};
+/// use cot::cache::store::file::{FileStore, FileStorePoolConfig};
 ///
-/// let store_path = PathBuf::from("./cache");
+/// # #[tokio::main]
+/// # async fn main() {
+/// let store_path = PathBuf::from("cache");
 ///
 /// // Using default values
 /// let default_config = FileStorePoolConfig::builder().build();
@@ -160,6 +164,7 @@ struct FileStorePool {
 /// assert_eq!(default_config.worker_count(), 10);
 /// assert_eq!(default_config.queue_size(), 128);
 /// assert_eq!(default_config.acquisition_timeout_ms(), 2000);
+/// assert_eq!(default_config.waiting_timeout_ms(), 4000);
 /// let store_default = FileStore::new(store_path.clone(), default_config).unwrap();
 ///
 /// // Specifying values
@@ -167,12 +172,16 @@ struct FileStorePool {
 ///     .worker_count(4)
 ///     .queue_size(100)
 ///     .acquisition_timeout_ms(1000)
+///     .waiting_timeout_ms(2000)
 ///     .build();
 ///
 /// assert_eq!(specified_config.worker_count(), 4);
 /// assert_eq!(specified_config.queue_size(), 100);
 /// assert_eq!(specified_config.acquisition_timeout_ms(), 1000);
-/// let store_custom = FileStore::new(store_path, specified_config).unwrap();
+/// assert_eq!(specified_config.waiting_timeout_ms(), 2000);
+/// let store_custom = FileStore::new(store_path.clone(), specified_config).unwrap();
+/// # let _ = tokio::fs::remove_dir_all(&store_path).await;
+/// # }
 /// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FileStorePoolConfigBuilder {
@@ -222,12 +231,27 @@ impl FileStorePoolConfigBuilder {
         self.file_store_pool_config.acquisition_timeout_ms = acquisition_timeout_ms;
         self
     }
+    /// Sets the maximum duration (in milliseconds) for requests to wait until
+    /// it can be processed.
+    ///
+    /// This only accounts for the time spent waiting in the queue.
+    /// When the timeout is reached before the request gets the file,
+    /// the request would get dropped and returns error.
+    #[must_use]
+    pub fn waiting_timeout_ms(mut self, waiting_timeout_ms: u64) -> Self {
+        self.file_store_pool_config.waiting_timeout_ms = waiting_timeout_ms;
+        self
+    }
+
     /// Consumes this struct and builds the `FileStorePoolConfig`
     ///
     /// # Panics
     ///
-    /// This method will panic if a value > `usize::MAX >> 3`
-    /// was provided in the `worker_count()` and `queue_size()` setters.
+    /// This method will panic if
+    /// *  a value > `usize::MAX >> 3`was provided in the `worker_count()` and `queue_size()` setters.
+    /// * `worker_count` == 0 with  `queue_size`!= 0 and vice-versa.
+    /// * `waiting_timeout_ms` < `acquisition_timeout_ms`.
+    ///
     #[must_use]
     pub fn build(self) -> FileStorePoolConfig {
         assert!(
@@ -237,6 +261,16 @@ impl FileStorePoolConfigBuilder {
         assert!(
             self.file_store_pool_config.queue_size <= usize::MAX >> 3,
             "the provided `queue_size` must not be bigger than usize::MAX >> 3"
+        );
+        assert!(
+            (self.file_store_pool_config.worker_count == 0)
+                == (self.file_store_pool_config.queue_size == 0),
+            "`queue_size` must be 0 when `worker_count` is 0 and vice versa"
+        );
+        assert!(
+            self.file_store_pool_config.waiting_timeout_ms
+                >= self.file_store_pool_config.acquisition_timeout_ms,
+            "`waiting_timeout_ms` must be greater or equal to `acquisition_timeout_ms`"
         );
 
         self.file_store_pool_config
@@ -257,6 +291,7 @@ pub struct FileStorePoolConfig {
     worker_count: usize,
     queue_size: usize,
     acquisition_timeout_ms: u64,
+    waiting_timeout_ms: u64,
 }
 
 impl FileStorePoolConfig {
@@ -266,7 +301,7 @@ impl FileStorePoolConfig {
     /// default values.
     ///
     /// # Examples
-    /// ```no_run
+    /// ```
     /// use crate::cot::cache::store::file::{FileStore, FileStorePoolConfig};
     ///
     /// let default_config = FileStorePoolConfig::default();
@@ -302,6 +337,16 @@ impl FileStorePoolConfig {
     pub fn acquisition_timeout_ms(&self) -> u64 {
         self.acquisition_timeout_ms
     }
+    /// Returns the maximum duration (in milliseconds) for requests to wait
+    /// until it can be processed.
+    ///
+    /// This only accounts for the time spent waiting in the queue.
+    /// When the timeout is reached before the request gets the file,
+    /// the request would get dropped and returns error.
+    #[must_use]
+    pub fn waiting_timeout_ms(&self) -> u64 {
+        self.waiting_timeout_ms
+    }
 }
 
 impl Default for FileStorePoolConfig {
@@ -310,6 +355,7 @@ impl Default for FileStorePoolConfig {
             worker_count: crate::config::DEFAULT_FILE_STORE_WORKER_COUNT,
             queue_size: crate::config::DEFAULT_FILE_STORE_QUEUE_SIZE,
             acquisition_timeout_ms: crate::config::DEFAULT_FILE_STORE_ACQUISITION_TIMEOUT_MS,
+            waiting_timeout_ms: crate::config::DEFAULT_FILE_STORE_WAITING_TIMEOUT_MS,
         }
     }
 }
@@ -333,11 +379,13 @@ impl FileStorePool {
     async fn run(&mut self) {
         while let Some(data) = self.work_receiver.recv().await {
             let permits = self.permits.clone();
-            let tx = data.file_handle_sender;
+            let mut tx = data.file_handle_sender;
 
             let acquire_permit_result = tokio::select! {
                 r = permits.acquire_owned() => Ok(r),
                 _r = tokio::time::sleep(self.acquisiton_timeout_duration) => Err(FileCacheStoreError::TempFileCreation(POOL_BUSY.into())),
+                _r = tx.closed() => {
+                     Err(FileCacheStoreError::TempFileCreation(UNEXPECTED_ERROR.into()))},
             };
 
             match acquire_permit_result {
@@ -346,10 +394,9 @@ impl FileStorePool {
 
                     // We spawn the task here since
                     // 1. We don't want to spawn tasks just to wait on semaphore
-                    // 2. We don't want the spawn_blocking await to block
-                    // the main loop
+                    // 2. We don't want the spawn_blocking await to block the main loop
                     tokio::spawn(async move {
-                        if let Ok(file_acquisition_result) = spawn_blocking(move || {
+                        let task = spawn_blocking(move || {
                             let file_handle = std::fs::OpenOptions::new()
                                 .write(true)
                                 .read(true)
@@ -362,18 +409,12 @@ impl FileStorePool {
                                 .lock()
                                 .map_err(|e| FileCacheStoreError::TempFileCreation(Box::new(e)))?;
 
-                            file_handle
-                                .set_len(0)
-                                .map_err(|e| FileCacheStoreError::TempFileCreation(Box::new(e)))?;
-
                             drop(acquired_permit);
                             Ok(tokio::fs::File::from_std(file_handle))
-                        })
-                        .await
-                        {
+                        });
+                        if let Ok(file_acquisition_result) = task.await {
                             // No-op on error because we can't really notify the consumers if the
                             // request was aborted.
-
                             let _ = tx.send(file_acquisition_result);
                         } else {
                             let _ = tx.send(Err(FileCacheStoreError::TempFileCreation(
@@ -401,13 +442,15 @@ impl FileStorePool {
 /// This store uses the local file system for caching.
 ///
 /// # Examples
-/// ```no_run
+/// ```
 /// use std::path::Path;
 ///
 /// use cot::cache::store::file::{FileStore, FileStorePoolConfig};
 ///
+/// # #[tokio::main]
+/// # async fn main() {
 /// let store = FileStore::new(
-///     Path::new("./cache_dir"),
+///     Path::new("cache_dir"),
 ///     FileStorePoolConfig::builder()
 ///         .worker_count(10)
 ///         .queue_size(128)
@@ -415,11 +458,14 @@ impl FileStorePool {
 ///         .build(),
 /// )
 /// .unwrap();
+/// # let _ = tokio::fs::remove_dir_all("cache_dir").await;
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct FileStore {
     dir_path: Cow<'static, Path>,
     file_path_sender: tokio::sync::mpsc::Sender<FileAcquisitionWork>,
+    waiting_timeout_duration: tokio::time::Duration,
 }
 
 impl FileStore {
@@ -435,13 +481,15 @@ impl FileStore {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use std::path::PathBuf;
     ///
     /// use cot::cache::store::file::{FileStore, FileStorePoolConfig};
     ///
+    /// # #[tokio::main]
+    /// # async fn main() {
     /// // Using a string slice
-    /// let path = PathBuf::from("./cache");
+    /// let path = PathBuf::from("cache");
     /// let store = FileStore::new(
     ///     path,
     ///     FileStorePoolConfig::builder()
@@ -453,8 +501,11 @@ impl FileStore {
     /// .unwrap();
     ///
     /// // Using a PathBuf
-    /// let path = PathBuf::from("/var/lib/myapp/cache");
+    /// let path = PathBuf::from("cache_lib");
     /// let store = FileStore::new(path, FileStorePoolConfig::builder().build()).unwrap();
+    /// # let _ = tokio::fs::remove_dir_all("cache").await;
+    /// # let _ = tokio::fs::remove_dir_all("cache_lib").await;
+    /// # }
     /// ```
     pub fn new(
         dir: impl Into<Cow<'static, Path>>,
@@ -466,6 +517,7 @@ impl FileStore {
         let store = Self {
             dir_path,
             file_path_sender: tx,
+            waiting_timeout_duration: tokio::time::Duration::from_millis(config.waiting_timeout_ms),
         };
 
         store.create_dir_root_sync()?;
@@ -480,21 +532,30 @@ impl FileStore {
         std::fs::create_dir_all(&self.dir_path)
             .map_err(|e| FileCacheStoreError::DirCreation(Box::new(e)))?;
 
-        // When a crash happens mid-flight, we'll may have some .tmp files
+        // When a crash happens mid-flight, we may have some .tmp files
         // This ensures that we have no .tmp files lingering around on startup
         if let Ok(entries) = std::fs::read_dir(&self.dir_path) {
             for entry in entries.flatten() {
                 let path = entry.path();
 
-                if path.extension().is_some_and(|ext| ext == TEMPFILE_SUFFIX)
-                    && let Ok(file) = std::fs::OpenOptions::new()
+                if path.extension().is_some_and(|ext| ext == TEMPFILE_SUFFIX) {
+                    let file = std::fs::OpenOptions::new()
                         .write(true)
-                        .create(true)
                         .truncate(false)
                         .open(&path)
-                    && file.try_lock().is_ok()
-                {
-                    let _ = std::fs::remove_file(path);
+                        .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
+                    match file.try_lock() {
+                        Ok(()) => {
+                            let _ = std::fs::remove_file(path);
+                        }
+                        // No-op on this since the file is currently used.
+                        // This process is intented to only clean orphaned .tmp files.
+                        // Therefore, we don't steal the files here.
+                        Err(TryLockError::WouldBlock) => {}
+                        Err(TryLockError::Error(e)) => {
+                            return Err(FileCacheStoreError::Io(Box::new(e)))?;
+                        }
+                    }
                 }
             }
         }
@@ -513,49 +574,49 @@ impl FileStore {
     async fn write(&self, key: String, value: Value, expiry: Timeout) -> CacheStoreResult<()> {
         let key_hash = FileStore::create_key_hash(&key);
         let (mut file, file_path) = self.create_file_temp(&key_hash).await?;
+        file.set_len(0)
+            .await
+            .map_err(|e| FileCacheStoreError::Serialize(Box::new(e)))?;
 
         self.serialize_data(value, expiry, &mut file, &file_path)
             .await?;
 
-        // Here's the flow:
-        // We sync the data after writing to it. This ensures that we get the correctly
-        // written data even if the later ops fail. We unlock first to let
-        // progress move. This is free when there are no concurrent accessor. If we
-        // rename then unlock, the final file gets locked instead when subsequent
-        // readers progress, defeating the purpose of this method. We create a
-        // new file handle to see whether the file still exists or not. If it doesn't
-        // exist, we move on. It's most likely has been deleted by
-        // `create_dir_root_sync` or `clear`. Finally, we rename only if the
-        // thread reasonably hold the "last" lock to the .tmp. This doesn't
-        // guarantee that no .tmp file will be renamed by another thread, but it pushes
-        // the guarantees towards "writers write and hold in .tmp file, not contesting
-        // the final file"
+        // Sync data to synchronize content to the disk
         file.sync_data()
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
+        // Unlock the file to ensure that the locked file is not
+        // the switched file
         file.unlock_async()
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
 
         // The return `Ok(())`on these two methods
-        // are to anticipate the "unlocked file" window mentioned in
+        // is to anticipate the "unlocked file" window mentioned in
         // `create_file_temp()`.
-
         let new_file_handle = match OpenOptions::new().read(true).open(&file_path).await {
             Ok(handle) => handle,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
             Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)))?,
         };
 
-        if new_file_handle.try_lock_shared().is_ok_and(|lock| lock)
-            && let Err(e) = tokio::fs::rename(&file_path, self.dir_path.join(&key_hash)).await
-        {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                return Ok(());
+        // Try to lock one last time, but for shared so that it won't block readers
+        // If `rename()` fails, we check the error result. NotFound means someone stole
+        // the file. Other errors would otherwise be propagated as legitimate
+        // errors.
+        match new_file_handle.try_lock_shared() {
+            Ok(true) => {
+                if let Err(e) = tokio::fs::rename(&file_path, self.dir_path.join(&key_hash)).await {
+                    if e.kind() == std::io::ErrorKind::NotFound {
+                        return Ok(());
+                    }
+                    return Err(FileCacheStoreError::Io(Box::new(e)))?;
+                }
             }
-
-            return Err(FileCacheStoreError::Io(Box::new(e)))?;
+            // Other task is currently holding the file locked
+            Ok(false) => return Ok(()),
+            Err(e) => return Err(FileCacheStoreError::Io(Box::new(e)))?,
         }
 
         Ok(())
@@ -611,10 +672,8 @@ impl FileStore {
         result
     }
 
-    // Check expiry also removes the file
-    // when expired. This makes the read
-    // process more efficient with less
-    // error propagation
+    // Check expiry also removes expired files.
+    // This makes the read process more efficient with less error propagation
     async fn check_expiry(
         &self,
         file: &mut tokio::fs::File,
@@ -663,15 +722,15 @@ impl FileStore {
             return Ok(None);
         }
 
+        // In supported platforms, this would be succesful. Consequently, when a
+        // platform does not support this operation, it would always fail and we
+        // handle it as unexpected error
+        let expiry_offset = u64::try_from(EXPIRY_HEADER_OFFSET)
+            .map_err(|_| FileCacheStoreError::Deserialize(UNEXPECTED_ERROR.into()))?;
         let mut buffer = Vec::new();
 
         // Advances cursor by the expiry header offset
-        // EXPIRY_HEADER_OFFSET is a usize that stores
-        // the size of i64. It is unlikely that this will
-        // overflow.
-        // This direct cast currently works without any other
-        // wrapping addition or fallback conversion
-        file.seek(SeekFrom::Start(EXPIRY_HEADER_OFFSET as u64))
+        file.seek(SeekFrom::Start(expiry_offset))
             .await
             .map_err(|e| FileCacheStoreError::Io(Box::new(e)))?;
         file.read_to_end(&mut buffer)
@@ -719,24 +778,22 @@ impl FileStore {
                 .write(true)
                 .read(true)
                 .create_new(true)
-                .truncate(true)
+                .truncate(false)
                 .open(&temp_path)
                 .await
             {
                 Ok(handle) => {
-                    if let Ok(lock_acquired) = handle.try_lock_exclusive()
-                        && lock_acquired
-                    {
-                        break handle;
-                    }
-
-                    // We try again when we can't lock maybe due to external processes.
-                    // However, if failure keeps happening here, we must abort.
-                    retry_count += 1;
-                    if retry_count > INTERNAL_MAX_RETRIES {
-                        return Err(FileCacheStoreError::TempFileCreation(
-                            PERMISSION_ERROR_OR_BUSY.into(),
-                        ))?;
+                    match handle.try_lock_exclusive() {
+                        Ok(true) => break handle,
+                        Ok(false) => {
+                            retry_count += 1;
+                            if retry_count > INTERNAL_MAX_RETRIES {
+                                return Err(FileCacheStoreError::TempFileCreation(
+                                    FILE_SYSTEM_BUSY.into(),
+                                ))?;
+                            }
+                        }
+                        Err(e) => return Err(FileCacheStoreError::TempFileCreation(Box::new(e)))?,
                     }
                     continue;
                 }
@@ -749,13 +806,17 @@ impl FileStore {
                         file_handle_sender: tx,
                     }) {
                         Ok(()) => {
-                            let Ok(new_temp_file) = rx.await else {
-                                // This shouldn't happen because the rx is created here
-                                return Err(FileCacheStoreError::TempFileCreation(
-                                    POOL_BUSY.into(),
-                                ))?;
-                            };
-                            break new_temp_file?;
+                            let rx_result = tokio::time::timeout(self.waiting_timeout_duration, rx)
+                                .await
+                                .map_err(|_| {
+                                    FileCacheStoreError::TempFileCreation(TIMEOUT_REACHED.into())
+                                })?;
+
+                            let new_file_temp = rx_result.map_err(|_| {
+                                FileCacheStoreError::TempFileCreation(UNEXPECTED_ERROR.into())
+                            })?;
+
+                            break new_file_temp?;
                         }
                         Err(_) => {
                             return Err(FileCacheStoreError::TempFileCreation(
@@ -825,16 +886,23 @@ impl CacheStore for FileStore {
             return Ok(());
         }
 
-        if let Ok(entries) = std::fs::read_dir(&self.dir_path) {
-            for entry in entries.flatten() {
+        if let Ok(mut entries) = tokio::fs::read_dir(&self.dir_path).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
                 let path = entry.path();
                 if let Ok(file) = std::fs::OpenOptions::new()
                     .write(true)
                     .truncate(false)
                     .open(&path)
-                    && file.try_lock().is_ok()
                 {
-                    let _ = std::fs::remove_file(&path);
+                    match file.try_lock() {
+                        // We can steal the .tmp files to prevent ghost files
+                        Ok(()) | Err(TryLockError::WouldBlock) => {
+                            let _ = tokio::fs::remove_file(&path).await;
+                        }
+                        Err(TryLockError::Error(e)) => {
+                            return Err(FileCacheStoreError::Io(Box::new(e)))?;
+                        }
+                    }
                 }
             }
         }
@@ -885,6 +953,7 @@ mod tests {
 
     use crate::cache::store::file::{
         FileCacheStoreError, FileStore, FileStorePoolConfig, POOL_BUSY, POOL_QUEUE_FULL,
+        TIMEOUT_REACHED,
     };
     use crate::cache::store::{CacheStore, CacheStoreError};
     use crate::config::Timeout;
@@ -1131,18 +1200,21 @@ mod tests {
         let path = make_store_path();
         let store =
             FileStore::new(path.clone(), FileStorePoolConfig::default()).expect("failed to init");
-        let _ = tokio::fs::remove_dir_all(&path).await;
+        let value = serde_json::json!({ "id": 1 });
+        let key = "key";
 
         let mut handles = Vec::new();
         for i in 0..10 {
             let s = store.clone();
+            let v = value.clone();
             handles.push(tokio::spawn(async move {
                 if i % 2 == 0 {
-                    let _ = s
-                        .insert("k".into(), serde_json::json!({"i": i}), Timeout::Never)
-                        .await;
+                    // We currently implement the "aggressive clear."
+                    // This removes the files and directory  at any cycle during write,
+                    // so we can't be sure this does not error
+                    let _ = s.insert(key.into(), v, Timeout::Never).await;
                 } else {
-                    let _ = s.clear().await;
+                    s.clear().await.expect("clear should not fail");
                 }
             }));
         }
@@ -1150,6 +1222,16 @@ mod tests {
         for h in handles {
             h.await.unwrap();
         }
+        let received = store.read(key).await.expect("failed to read from store");
+        if let Some(received_value) = received {
+            assert_eq!(received_value, value);
+        }
+
+        // However, we guarantee that after clear, the system is stable again
+        store
+            .insert(key.into(), value, Timeout::Never)
+            .await
+            .expect("write should not fail");
         let _ = tokio::fs::remove_dir_all(&path).await;
     }
 
@@ -1247,7 +1329,7 @@ mod tests {
 
     #[cfg_attr(miri, ignore)]
     #[cot::test]
-    async fn test_thundering_write_with_timeout_exceeded() {
+    async fn test_thundering_write_with_acquisition_timeout_exceeded() {
         let path = make_store_path();
         let store = FileStore::new(
             path.clone(),
@@ -1273,8 +1355,6 @@ mod tests {
                     let file_store_error = FileCacheStoreError::TempFileCreation(POOL_BUSY.into());
                     let cache_store_error: CacheStoreError = file_store_error.into();
 
-                    println!("timeout error check triggered");
-
                     assert_eq!(e.to_string(), cache_store_error.to_string());
                 });
             }
@@ -1284,6 +1364,58 @@ mod tests {
         assert_eq!(retrieved.unwrap(), value);
 
         let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cfg_attr(miri, ignore)]
+    #[cot::test]
+    async fn test_thundering_write_with_waiting_timeout_exceeded() {
+        let path = make_store_path();
+        let store = FileStore::new(
+            path.clone(),
+            FileStorePoolConfig::builder()
+                .worker_count(1)
+                .acquisition_timeout_ms(0)
+                .waiting_timeout_ms(0)
+                .build(),
+        )
+        .expect("failed to init");
+        let value = serde_json::json!({ "id": 1 });
+
+        let tasks: Vec<_> = (0..10)
+            .map(|_| {
+                let s = store.clone();
+                let v = value.clone();
+                tokio::spawn(async move { s.insert("key".into(), v, Timeout::Never).await })
+            })
+            .collect();
+
+        for h in tasks {
+            if let Ok(result) = h.await {
+                let _ = result.map_err(|e| {
+                    let file_store_error =
+                        FileCacheStoreError::TempFileCreation(TIMEOUT_REACHED.into());
+                    let cache_store_error: CacheStoreError = file_store_error.into();
+
+                    assert_eq!(e.to_string(), cache_store_error.to_string());
+                });
+            }
+        }
+
+        // When ALL tasks enter handoff, they are subject to the timeout
+        if let Some(retrieved) = store.read("key").await.expect("failed to read from store") {
+            assert_eq!(retrieved, value);
+        }
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[test]
+    #[should_panic(expected = "`queue_size` must be 0")]
+    fn test_invalid_file_store_pool_config_creation() {
+        let _file_store = FileStorePoolConfig::builder()
+            .worker_count(0)
+            .queue_size(10)
+            .acquisition_timeout_ms(2000)
+            .build();
     }
 
     #[cot::test]

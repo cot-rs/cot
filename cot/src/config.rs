@@ -875,29 +875,53 @@ impl CacheStoreConfigBuilder {
     }
 }
 
+// The default values for `FileStorePoolConfig`
+// These are reasonable guesses for approaching the behavior
+// of `FileStorePool` and the `FileStore`
+//
+// `worker_count` represent the `Semaphore` in the loop dispatcher.
+// This number determines how many `spawn_blocking` is allowed to acquire a
+// lock. The default is small because these workers are ultimately allocated to
+// park on OS processes.
 #[cfg(feature = "cache")]
-pub(crate) const DEFAULT_FILE_STORE_WORKER_COUNT: usize = default_file_store_pool_worker_count();
+pub(crate) const DEFAULT_FILE_STORE_WORKER_COUNT: usize = 10;
 
+// `queue_size` determines how many queued requests go into the `FileStorePool`
+// This should be larger than the `worker_count` itself.
 #[cfg(feature = "cache")]
-pub(crate) const DEFAULT_FILE_STORE_QUEUE_SIZE: usize = default_file_store_pool_queue_size();
+pub(crate) const DEFAULT_FILE_STORE_QUEUE_SIZE: usize = 128;
 
+// This value relates to how long the dispatcher would wait for a worker to be
+// available. The timeout is set to 2000ms to allow the queue to drain
+// efficiently while giving requests a reasonable window to acquire a file lock.
 #[cfg(feature = "cache")]
-pub(crate) const DEFAULT_FILE_STORE_ACQUISITION_TIMEOUT_MS: u64 =
-    default_file_store_pool_acquisition_timeout_ms();
+pub(crate) const DEFAULT_FILE_STORE_ACQUISITION_TIMEOUT_MS: u64 = 2000;
+
+// This value relates to how long a request would wait during
+// `create_file_temp`. It should be slightly longer than
+// `acquisition_timeout_ms` to give time for the `FileStorePool` to free up the
+// workers if they were occupied.
+#[cfg(feature = "cache")]
+pub(crate) const DEFAULT_FILE_STORE_WAITING_TIMEOUT_MS: u64 = 4000;
 
 #[cfg(feature = "cache")]
 const fn default_file_store_pool_worker_count() -> usize {
-    10
+    DEFAULT_FILE_STORE_WORKER_COUNT
 }
 
 #[cfg(feature = "cache")]
 const fn default_file_store_pool_queue_size() -> usize {
-    128
+    DEFAULT_FILE_STORE_QUEUE_SIZE
 }
 
 #[cfg(feature = "cache")]
 const fn default_file_store_pool_acquisition_timeout_ms() -> u64 {
-    2000
+    DEFAULT_FILE_STORE_ACQUISITION_TIMEOUT_MS
+}
+
+#[cfg(feature = "cache")]
+const fn default_file_store_pool_waiting_timeout_ms() -> u64 {
+    DEFAULT_FILE_STORE_WAITING_TIMEOUT_MS
 }
 
 #[cfg(feature = "cache")]
@@ -980,6 +1004,8 @@ pub enum CacheStoreTypeConfig {
     /// This stores cache data in files on the local filesystem. The path to
     /// the directory where the cache files will be stored must be specified.
     File {
+        /// The path to the directory where cache files will be stored.
+        ///
         /// # Examples
         ///
         /// ```
@@ -992,9 +1018,9 @@ pub enum CacheStoreTypeConfig {
         ///     worker_count: 10,
         ///     queue_size: 100,
         ///     acquisition_timeout_ms: 2000,
+        ///     waiting_timeout_ms: 4000,
         /// };
         /// ```
-        /// The path to the directory where cache files will be stored.
         path: PathBuf,
 
         /// Specifies the maximum number of concurrent blocking tasks permitted
@@ -1006,17 +1032,6 @@ pub enum CacheStoreTypeConfig {
         /// becomes unresponsive, these tasks will remain allocated and
         /// unavailable for further requests until the kernel-level operation
         /// completes or fails.
-        ///
-        /// Setting this value to `0` opts out of spawning background tasks for
-        /// contested file locks. In this configuration, it is
-        /// recommended to also set `queue_size` to `0` to ensure that
-        /// requests requiring a lock fail immediately rather than
-        /// entering a pending state that cannot be serviced.
-        ///
-        /// If the maximum worker count has been reached and the associated
-        /// request queue is full, any incoming request that requires
-        /// file locking will return an error immediately to prevent
-        /// further resource contention.
         #[serde(default = "default_file_store_pool_worker_count")]
         worker_count: usize,
 
@@ -1028,13 +1043,22 @@ pub enum CacheStoreTypeConfig {
         #[serde(default = "default_file_store_pool_queue_size")]
         queue_size: usize,
 
-        /// Sets the  maximum duration (in milliseconds) to wait for lock
+        /// Specifies the maximum duration (in milliseconds) to wait for lock
         /// acquisition.
         ///
         /// This does not include time spent waiting in the queue or
         /// the duration of I/O operations once the lock is acquired.
         #[serde(default = "default_file_store_pool_acquisition_timeout_ms")]
         acquisition_timeout_ms: u64,
+
+        /// Specifies the maximum duration (in milliseconds) for requests to
+        /// wait until it can be processed.
+        ///
+        /// This only accounts for the time spent waiting in the queue.
+        /// When the timeout is reached before the request gets the file,
+        /// the request would get dropped and returns error.
+        #[serde(default = "default_file_store_pool_waiting_timeout_ms")]
+        waiting_timeout_ms: u64,
     },
 }
 
@@ -2997,6 +3021,7 @@ mod tests {
             worker_count = 8
             queue_size = 100
             acquisition_timeout_ms = 4000
+            waiting_timeout_ms = 5000
         "#;
 
         let config = ProjectConfig::from_toml(toml_content).unwrap();
@@ -3013,13 +3038,61 @@ mod tests {
             worker_count,
             queue_size,
             acquisition_timeout_ms,
+            waiting_timeout_ms,
         } = &config.cache.store.store_type
         {
             assert_eq!(path, &PathBuf::from("/tmp/cache"));
             assert_eq!(worker_count, &8usize);
             assert_eq!(queue_size, &100usize);
             assert_eq!(acquisition_timeout_ms, &4000u64);
+            assert_eq!(waiting_timeout_ms, &5000u64);
         }
+    }
+
+    #[test]
+    #[cfg(feature = "cache")]
+    fn cache_config_defaults_file() {
+        let toml_content = r#"
+            [cache]
+
+            [cache.store]
+            type = "file"
+            path = "tmp/cache"
+        "#;
+
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        if let CacheStoreTypeConfig::File {
+            path,
+            worker_count,
+            queue_size,
+            acquisition_timeout_ms,
+            waiting_timeout_ms,
+        } = &config.cache.store.store_type
+        {
+            assert_eq!(path, "tmp/cache");
+            assert_eq!(worker_count, &DEFAULT_FILE_STORE_WORKER_COUNT);
+            assert_eq!(queue_size, &DEFAULT_FILE_STORE_QUEUE_SIZE);
+            assert_eq!(
+                acquisition_timeout_ms,
+                &DEFAULT_FILE_STORE_ACQUISITION_TIMEOUT_MS
+            );
+            assert_eq!(waiting_timeout_ms, &DEFAULT_FILE_STORE_WAITING_TIMEOUT_MS);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "missing field `path`")]
+    #[cfg(feature = "cache")]
+    fn cache_config_missing_path_file() {
+        let toml_content = r#"
+            [cache]
+
+            [cache.store]
+            type = "file" 
+        "#;
+
+        let _config = ProjectConfig::from_toml(toml_content).unwrap();
     }
 
     #[test]

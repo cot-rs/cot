@@ -792,6 +792,7 @@ impl Cache {
                     worker_count,
                     queue_size,
                     acquisition_timeout_ms,
+                    waiting_timeout_ms,
                 } => {
                     let file_store = FileStore::new(
                         path.clone(),
@@ -799,6 +800,7 @@ impl Cache {
                             .worker_count(worker_count)
                             .queue_size(queue_size)
                             .acquisition_timeout_ms(acquisition_timeout_ms)
+                            .waiting_timeout_ms(waiting_timeout_ms)
                             .build(),
                     )?;
                     Self::new(file_store, config.prefix.clone(), config.timeout)
@@ -1016,6 +1018,7 @@ mod tests {
                     worker_count: default_file_store_pool_config.worker_count(),
                     queue_size: default_file_store_pool_config.queue_size(),
                     acquisition_timeout_ms: default_file_store_pool_config.acquisition_timeout_ms(),
+                    waiting_timeout_ms: default_file_store_pool_config.waiting_timeout_ms(),
                 },
             })
             .prefix("test_file")

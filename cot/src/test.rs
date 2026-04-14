@@ -1909,13 +1909,13 @@ impl TestCache {
     /// Create a new file store test cache
     ///
     /// This will create a new directory for the test cache instance
-    /// in  `{tmp_dir}/cot_test_cache_run_{i}` where `tmp_dir` is
-    /// the path returned by `std::env::temp_dir()` and `i` is the
-    /// instance number of the directory. The constructor will iterate
-    /// over the base path before committing the directory where the
-    /// cache directory will be created.
+    /// in `{tmp_dir}/cot_test_cache_{process_id}/run_{i}` where `tmp_dir` is
+    /// the path returned by `std::env::temp_dir()`, `process_id` is the current
+    /// process id,  and `i` is the entry number of the directory.
     ///
-    /// # Examples
+    /// The constructor will try to create an entry based on current count base
+    /// path entries. If collision happens, it will increment the `i` until
+    /// a directory is created. # Examples
     ///
     /// ```no_run
     /// use cot::test::TestCache;
@@ -1934,6 +1934,13 @@ impl TestCache {
     /// # Errors
     ///
     /// Returns error if the cache directory could not be created
+    ///
+    /// # Panics
+    ///
+    /// Panics if:
+    /// * The path `{tmp_dir}/cot_test_cache_{process_id}/` doesn't exist
+    /// * The process lacks the permission to read the directory
+    /// * The path `{tmp_dir}/cot_test_cache_{process_id}/` is not a directory
     pub fn new_file() -> Result<Self> {
         use crate::cache::store::file::FileStorePoolConfig;
         use crate::config::{
@@ -1945,14 +1952,14 @@ impl TestCache {
 
         let _ = std::fs::create_dir_all(&base_path);
 
-        let mut i = 0;
+        let mut dir_length = std::fs::read_dir(&base_path).unwrap().count() + 1;
         let path = loop {
-            let candidate = base_path.join(format!("run_{i}"));
+            let candidate = base_path.join(format!("run_{dir_length}"));
 
             match std::fs::create_dir(&candidate) {
                 Ok(()) => break candidate,
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                    i += 1;
+                    dir_length += 1;
                 }
                 Err(e) => return Err(FileCacheStoreError::DirCreation(Box::new(e)))?,
             }

@@ -482,7 +482,7 @@ impl FileStore {
     /// # Examples
     ///
     /// ```
-    /// use std::path::{PathBuf, Path};
+    /// use std::path::{Path, PathBuf};
     ///
     /// use cot::cache::store::file::{FileStore, FileStorePoolConfig};
     ///
@@ -509,7 +509,7 @@ impl FileStore {
     ///         .queue_size(128)
     ///         .acquisition_timeout_ms(2000)
     ///         .waiting_timeout_ms(4000)
-    ///         .build()
+    ///         .build(),
     /// )
     /// .unwrap();
     /// # let _ = tokio::fs::remove_dir_all("cache").await;

@@ -3089,7 +3089,7 @@ mod tests {
             [cache]
 
             [cache.store]
-            type = "file" 
+            type = "file"
         "#;
 
         let _config = ProjectConfig::from_toml(toml_content).unwrap();

@@ -3070,7 +3070,7 @@ mod tests {
             waiting_timeout_ms,
         } = &config.cache.store.store_type
         {
-            assert_eq!(path, "tmp/cache");
+            assert_eq!(path, &PathBuf::from("tmp/cache"));
             assert_eq!(worker_count, &DEFAULT_FILE_STORE_WORKER_COUNT);
             assert_eq!(queue_size, &DEFAULT_FILE_STORE_QUEUE_SIZE);
             assert_eq!(

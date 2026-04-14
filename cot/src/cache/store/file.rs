@@ -248,10 +248,10 @@ impl FileStorePoolConfigBuilder {
     /// # Panics
     ///
     /// This method will panic if
-    /// *  a value > `usize::MAX >> 3`was provided in the `worker_count()` and `queue_size()` setters.
+    /// * a value > `usize::MAX >> 3`was provided in the `worker_count()` and
+    ///   `queue_size()` setters.
     /// * `worker_count` == 0 with  `queue_size`!= 0 and vice-versa.
     /// * `waiting_timeout_ms` < `acquisition_timeout_ms`.
-    ///
     #[must_use]
     pub fn build(self) -> FileStorePoolConfig {
         assert!(

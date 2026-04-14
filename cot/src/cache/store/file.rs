@@ -1427,6 +1427,15 @@ mod tests {
             .build();
     }
 
+    #[test]
+    #[should_panic(expected = "must be greater or equal to")]
+    fn test_invalid_timeout_file_store_pool_config_creation() {
+        let _file_store = FileStorePoolConfig::builder()
+            .waiting_timeout_ms(1999)
+            .acquisition_timeout_ms(2000)
+            .build();
+    }
+
     #[cot::test]
     async fn test_from_file_cache_store_error_to_cache_store_error() {
         let file_error = FileCacheStoreError::Io(Box::new(std::io::Error::other("disk failure")));

@@ -75,7 +75,7 @@ fn test_query_comparison() {
 }
 
 #[test]
-fn test_query_arithmetic() {
+fn test_query_add_fields() {
     assert_eq!(
         <MyModel as ::cot::db::Model>::objects().filter(Expr::eq(
             <MyModel as ::cot::db::Model>::Fields::id.as_expr(),
@@ -113,7 +113,10 @@ fn test_query_arithmetic() {
         )),
         query!(MyModel, $quantity + $id)
     );
+}
 
+#[test]
+fn test_query_sub_fields() {
     assert_eq!(
         Query::<MyModel>::new().filter(Expr::eq(
             Expr::field("id"),
@@ -151,7 +154,10 @@ fn test_query_arithmetic() {
         )),
         query!(MyModel, $quantity - 1)
     );
+}
 
+#[test]
+fn test_query_mul_fields() {
     assert_eq!(
         <MyModel as ::cot::db::Model>::objects().filter(Expr::eq(
             <MyModel as ::cot::db::Model>::Fields::id.as_expr(),
@@ -189,7 +195,10 @@ fn test_query_arithmetic() {
         )),
         query!(MyModel, $quantity * 5)
     );
+}
 
+#[test]
+fn test_query_div_fields() {
     assert_eq!(
         Query::<MyModel>::new().filter(Expr::eq(
             Expr::field("id"),
@@ -229,6 +238,10 @@ fn test_query_arithmetic() {
     );
 }
 
+struct Outer {
+    inner: i32,
+}
+
 #[test]
 fn test_query_rust_expressions() {
     assert_eq!(
@@ -237,9 +250,6 @@ fn test_query_rust_expressions() {
         query!(MyModel, $id == 10)
     );
 
-    struct Outer {
-        inner: i32,
-    }
     let outer = Outer { inner: 20 };
     assert_eq!(
         <MyModel as ::cot::db::Model>::objects().filter(ExprEq::eq(
@@ -249,9 +259,8 @@ fn test_query_rust_expressions() {
         query!(MyModel, $id == outer.inner)
     );
 
-    fn get_id() -> i32 {
-        30
-    }
+    let get_id = || 30;
+
     assert_eq!(
         <MyModel as ::cot::db::Model>::objects().filter(ExprEq::eq(
             <MyModel as ::cot::db::Model>::Fields::id,

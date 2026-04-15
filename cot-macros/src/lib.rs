@@ -236,7 +236,11 @@ pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
 ///     is_active: bool
 /// }
 ///
-/// let query = query!(Customer, $id == 5 && $full_name == "Jon Doe");
+///  # async fn run(db: Database) -> cot::Result<()> {
+/// let customer = query!(Customer, $id > 5 && $full_name == "Jon Doe").await?;
+/// println!("Customer: {:?}", customer);
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// In the example above, `$id` and `$full_name` refer to fields on the
@@ -256,8 +260,7 @@ pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
 /// #     id: i32,
 /// #     full_name: String,
 /// # }
-/// let _ = query!(Customer, $id);
-/// let _ = query!(Customer, $full_name);
+/// let _ = query!(Customer, $id == 5);
 /// ```
 ///
 /// ## Literal values
@@ -312,10 +315,10 @@ pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
 /// #     stock: i32,
 /// #     quantity: i32,
 /// # }
-/// let _ = query!(Customer, $price + 10);
-/// let _ = query!(Customer, $stock - 1);
-/// let _ = query!(Customer, $quantity * 2);
-/// let _ = query!(Customer, $price / 2);
+/// let _ = query!(Customer, $price + 10 > 20);
+/// let _ = query!(Customer, $stock - 1 == 20);
+/// let _ = query!(Customer, $quantity * 2 < 100);
+/// let _ = query!(Customer, $price / 2 != $quantity);
 /// ```
 ///
 /// ## Rust-side value expressions
@@ -350,29 +353,6 @@ pub fn derive_model_helper(_item: TokenStream) -> TokenStream {
 /// let _ = query!(Customer, $id == user.id);
 /// let _ = query!(Customer, $status == constants::ACTIVE_STATUS);
 /// let _ = query!(Customer, $id == next_customer_id());
-/// ```
-///
-/// # Executing a query
-///
-/// `query!` builds a query. To execute it and retrieve results, call a terminal
-/// query method such as [`Query::get`] or [`Query::all`].
-///
-/// ```
-/// use cot::db::{Database, model, query};
-///
-/// #[model]
-/// #[derive(Debug, Clone)]
-/// struct Customer {
-///     #[model(primary_key)]
-///     id: i32,
-///     full_name: String,
-/// }
-///
-/// # async fn run(db: Database) -> cot::Result<()> {
-/// let customer = query!(Customer, $id == 5).get(&db).await?;
-/// println!("Customer: {:?}", customer);
-/// # Ok(())
-/// # }
 /// ```
 ///
 /// [`Query`]: query/struct.Query.html

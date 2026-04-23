@@ -36,11 +36,7 @@ impl PathMatcher {
             .chain([None])
             .enumerate()
             .peekable();
-        loop {
-            let Some((index, ch)) = char_iter.next() else {
-                break;
-            };
-
+        while let Some((index, ch)) = char_iter.next() {
             match (ch, state) {
                 (Some('{') | None, State::Literal { start }) => {
                     let literal = &path_pattern[start..index];

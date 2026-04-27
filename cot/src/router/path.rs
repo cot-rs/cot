@@ -513,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn test_non_ascii_path_pattern() {
+    fn non_ascii_path_pattern() {
         let path_parser = PathMatcher::new("/café/{id}");
         let mut params = ReverseParamMap::new();
         params.insert("id", "123");
@@ -521,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn test_non_ascii_path_literal() {
+    fn non_ascii_path_literal() {
         let path_parser = PathMatcher::new("/café/test");
         let params = ReverseParamMap::new();
         assert_eq!(path_parser.reverse(&params).unwrap(), "/café/test");

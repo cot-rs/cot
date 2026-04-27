@@ -31,10 +31,9 @@ impl PathMatcher {
         let mut state = State::Literal { start: 0 };
 
         let mut char_iter = path_pattern
-            .chars()
-            .map(Some)
-            .chain([None])
-            .enumerate()
+            .char_indices()
+            .map(|(i, c)| (i, Some(c)))
+            .chain(std::iter::once((path_pattern.len(), None)))
             .peekable();
         while let Some((index, ch)) = char_iter.next() {
             match (ch, state) {
@@ -511,5 +510,20 @@ mod tests {
             path_parser.reverse(&params).unwrap(),
             "/users/123/posts/456"
         );
+    }
+
+    #[test]
+    fn test_non_ascii_path_pattern() {
+        let path_parser = PathMatcher::new("/café/{id}");
+        let mut params = ReverseParamMap::new();
+        params.insert("id", "123");
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/café/123");
+    }
+
+    #[test]
+    fn test_non_ascii_path_literal() {
+        let path_parser = PathMatcher::new("/café/test");
+        let params = ReverseParamMap::new();
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/café/test");
     }
 }

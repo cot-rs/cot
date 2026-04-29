@@ -499,7 +499,9 @@ mod tests {
 
     #[test]
     fn option_limited_string_is_nullable_string_field() {
-        assert!(<Option<LimitedString<255>> as DatabaseField>::NULLABLE);
+        const {
+            assert!(<Option<LimitedString<255>> as DatabaseField>::NULLABLE);
+        }
         assert_eq!(
             <Option<LimitedString<255>> as DatabaseField>::TYPE,
             ColumnType::String(255),

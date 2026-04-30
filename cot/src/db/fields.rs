@@ -481,30 +481,3 @@ impl PrimaryKey for u32 {}
 impl PrimaryKey for u64 {}
 
 impl PrimaryKey for String {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn assert_from_db_value<T: FromDbValue>() {}
-    fn assert_to_db_field_value<T: ToDbFieldValue>() {}
-    fn assert_database_field<T: DatabaseField>() {}
-
-    #[test]
-    fn option_limited_string_implements_field_traits() {
-        assert_from_db_value::<Option<LimitedString<255>>>();
-        assert_to_db_field_value::<Option<LimitedString<255>>>();
-        assert_database_field::<Option<LimitedString<255>>>();
-    }
-
-    #[test]
-    fn option_limited_string_is_nullable_string_field() {
-        const {
-            assert!(<Option<LimitedString<255>> as DatabaseField>::NULLABLE);
-        }
-        assert_eq!(
-            <Option<LimitedString<255>> as DatabaseField>::TYPE,
-            ColumnType::String(255),
-        );
-    }
-}

@@ -221,6 +221,7 @@ struct AllFieldsModel {
     field_blob: Vec<u8>,
     field_option: Option<String>,
     field_limited_string: LimitedString<10>,
+    field_option_limited_string: Option<LimitedString<10>>,
     #[dummy(faker = "WeekdaySetFaker")]
     field_weekday_set: chrono::WeekdaySet,
 }
@@ -254,6 +255,7 @@ const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
         all_fields_migration_field!(blob, Vec<u8>),
         all_fields_migration_field!(option, Option<String>),
         all_fields_migration_field!(limited_string, LimitedString<10>),
+        all_fields_migration_field!(option_limited_string, Option<LimitedString<10>>),
         all_fields_migration_field!(weekday_set, chrono::WeekdaySet),
     ])
     .build();
@@ -313,6 +315,54 @@ macro_rules! run_migrations {
             .await
             .unwrap();
     };
+}
+
+#[cot_macros::dbtest]
+async fn option_limited_string_field(db: &mut TestDatabase) {
+    #[derive(Debug, Clone, PartialEq)]
+    #[model]
+    struct OptionalLimitedStringModel {
+        #[model(primary_key)]
+        id: Auto<i32>,
+        name: Option<LimitedString<10>>,
+    }
+
+    const CREATE_OPTIONAL_LIMITED_STRING_MODEL: Operation = Operation::create_model()
+        .table_name(Identifier::new("cot__optional_limited_string_model"))
+        .fields(&[
+            Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
+                .primary_key()
+                .auto(),
+            Field::new(
+                Identifier::new("name"),
+                <Option<LimitedString<10>> as DatabaseField>::TYPE,
+            )
+            .set_null(<Option<LimitedString<10>> as DatabaseField>::NULLABLE),
+        ])
+        .build();
+
+    run_migrations!(db, CREATE_OPTIONAL_LIMITED_STRING_MODEL);
+
+    let mut with_name = OptionalLimitedStringModel {
+        id: Auto::auto(),
+        name: Some(LimitedString::new("named").unwrap()),
+    };
+    with_name.save(&**db).await.unwrap();
+
+    let mut without_name = OptionalLimitedStringModel {
+        id: Auto::auto(),
+        name: None,
+    };
+    without_name.save(&**db).await.unwrap();
+
+    let models = OptionalLimitedStringModel::objects()
+        .all(&**db)
+        .await
+        .unwrap();
+
+    assert_eq!(models.len(), 2);
+    assert!(models.contains(&with_name));
+    assert!(models.contains(&without_name));
 }
 
 #[cot_macros::dbtest]

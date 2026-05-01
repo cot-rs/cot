@@ -363,6 +363,23 @@ async fn option_limited_string_field(db: &mut TestDatabase) {
     assert_eq!(models.len(), 2);
     assert!(models.contains(&with_name));
     assert!(models.contains(&without_name));
+
+    let with_name_from_db = query!(OptionalLimitedStringModel, $id == with_name.id)
+        .get(&**db)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        with_name_from_db.name,
+        Some(LimitedString::new("named").unwrap())
+    );
+
+    let without_name_from_db = query!(OptionalLimitedStringModel, $id == without_name.id)
+        .get(&**db)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(without_name_from_db.name, None);
 }
 
 #[cot_macros::dbtest]

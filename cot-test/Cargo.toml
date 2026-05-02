@@ -1,0 +1,27 @@
+[package]
+name = "cot-test"
+description = "Internal crate containing various integrations tests and test utilities."
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+readme.workspace = true
+authors.workspace = true
+
+[dependencies]
+comrak.workspace = true
+cot-cli = { workspace = true, features = ["test_utils"] }
+cot.workspace = true
+glob.workspace = true
+libtest-mimic.workspace = true
+
+[lints]
+workspace = true
+
+[[test]]
+name = "doc_code_blocks"
+path = "tests/doc_code_blocks.rs"
+harness = false

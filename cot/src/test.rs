@@ -649,6 +649,24 @@ impl TestRequestBuilder {
         self
     }
 
+    /// Add a cache to the request builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::{TestCache, TestRequestBuilder};
+    ///
+    /// let test_cache = TestCache::new_memory();
+    /// let request = TestRequestBuilder::get("/")
+    ///     .cache(test_cache.cache())
+    ///     .build();
+    /// ```
+    #[cfg(feature = "cache")]
+    pub fn cache(&mut self, cache: Cache) -> &mut Self {
+        self.cache = Some(cache);
+        self
+    }
+
     /// Add form data to the request builder.
     ///
     /// # Examples

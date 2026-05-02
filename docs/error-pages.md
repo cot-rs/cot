@@ -62,7 +62,7 @@ impl Project for MyProject {
 
 Create `templates/error.html`:
 
-```html
+```html.j2
 <!DOCTYPE html>
 <html lang="en">
 <head>

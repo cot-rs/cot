@@ -16,6 +16,8 @@ use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHand
 use cot::static_files::StaticFilesMiddleware;
 
 struct MyProject;
+# struct MyApp;
+# impl App for MyApp { fn name(&self) -> &'static str { "test" } }
 
 impl Project for MyProject {
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
@@ -31,7 +33,7 @@ impl Project for MyProject {
     ) -> RootHandler {
         handler
             .middleware(StaticFilesMiddleware::from_context(app_context))
-            .middleware(SessionMiddleware::new())  // Required for admin login
+            .middleware(SessionMiddleware::from_context(app_context))  // Required for admin login
             .build()
     }
 
@@ -49,6 +51,7 @@ use cot::ProjectContext;
 use cot::auth::db::DatabaseUser;
 use cot::common_types::Password;
 use std::env;
+# struct MyApp;
 
 // In your main.rs:
 #[async_trait]
@@ -56,20 +59,16 @@ impl App for MyApp {
     async fn init(&self, context: &mut ProjectContext) -> cot::Result<()> {
         // Check if admin user exists
         let admin_username = env::var("ADMIN_USER")
-                .unwrap_or_else(|_| "admin".to_string());
+            .unwrap_or_else(|_| "admin".to_string());
         let user = DatabaseUser::get_by_username(context.database(), &admin_username).await?;
         if user.is_none() {
             let password = env::var("ADMIN_PASSWORD")
-                    .unwrap_or_else(|_| "change_me".to_string());
-            // Create admin user
-            DatabaseUser::create_user(
-                context.database(),
-                &admin_username,
-                &Password::new(&password)
-            ).await?;
+                .unwrap_or_else(|_| "change_me".to_string());
+            DatabaseUser::create_user(context.database(), &admin_username, password.as_str()).await?;
         }
         Ok(())
     }
+#   fn name(&self) -> &str { todo!() }
 }
 ```
 
@@ -91,11 +90,13 @@ struct BlogPost {
     content: String,
     published: bool,
 }
+# impl Display for BlogPost { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) } }
 ```
 
 Note however that in order to derive the  [`AdminModel`](trait@cot::admin::AdminModel) trait, you need to also derive the [`Form`](trait@cot::form::Form) and [`Model`](trait@cot::db::Model) traits (the latter is provided by the [`#[model]`](attr@cot::db::model) attribute). In addition to that, your model needs to implement the `Display` trait—for instance, in the case above, we could add it like so:
 
 ```rust
+# struct BlogPost { title: String }
 impl Display for BlogPost {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.title)
@@ -106,11 +107,18 @@ impl Display for BlogPost {
 After adding the [`AdminModel`](trait@cot::admin::AdminModel) trait, you can add your model to the admin panel using [`DefaultAdminModelManager`](struct@cot::admin::DefaultAdminModelManager). This is as easy as adding the following code to your [`App`](trait@cot::project::App) implementation:
 
 ```rust
+# use cot::admin::{AdminModel, AdminModelManager, DefaultAdminModelManager};
+# #[derive(Debug, Form, AdminModel)]
+# #[model]
+# struct BlogPost { #[model(primary_key)] id: Auto<i32> }
+# impl Display for BlogPost { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) } }
+# struct MyApp;
 impl App for MyApp {
     fn admin_model_managers(&self) -> Vec<Box<dyn AdminModelManager>> {
         vec![Box::new(DefaultAdminModelManager::<BlogPost>::new())]
     }
 
+#   fn name(&self) -> &'static str { "test" }
     // ...
 }
 ```

@@ -15,7 +15,9 @@ The Cot CLI generates a `static` directory in your project root, which serves as
 To serve static files, you'll need to register them in your application's [`static_files()`](trait@cot::project::App#method.static_files) method within the `CotApp` implementation. Here's a basic example:
 
 ```rust
+# struct MyApp;
 impl App for MyApp {
+#   fn name(&self) -> &str { "test" }
     fn static_files(&self) -> Vec<StaticFile> {
         static_files!("css/main.css")
     }
@@ -25,7 +27,9 @@ impl App for MyApp {
 To add more files, simply include them in the [`static_files!`](macro@cot::static_files) macro. For example, after adding a logo to your project:
 
 ```rust
+# struct MyApp;
 impl App for MyApp {
+#   fn name(&self) -> &str { "test" }
     fn static_files(&self) -> Vec<StaticFile> {
         static_files!(
             "css/main.css",
@@ -83,6 +87,8 @@ This command aggregates all static files into the specified directory (in this c
 If you prefer not to serve static files through the Cot server, you can disable this functionality by removing the [`StaticFilesMiddleware`](struct@cot::static_files::StaticFilesMiddleware) from your project configuration:
 
 ```rust
+# struct MyProject;
+# impl Project for MyProject {
 fn middlewares(
     &self,
     handler: RootHandlerBuilder,
@@ -93,6 +99,7 @@ fn middlewares(
         // ...
         .build()
 }
+# }
 ```
 
 Simply remove the `.middleware(StaticFilesMiddleware ...)` line to disable static file serving.

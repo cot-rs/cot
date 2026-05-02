@@ -85,6 +85,9 @@ At the heart of any web application is the ability to handle requests and return
 When you open the `src/main.rs` file, you'll see the following example view that has been generated for you:
 
 ```rust
+# #[derive(Template)]
+# #[template(source = "", ext = "html")]
+# struct IndexTemplate;
 async fn index() -> cot::Result<Html> {
     let index_template = IndexTemplate {};
     let rendered = index_template.render()?;
@@ -96,14 +99,15 @@ async fn index() -> cot::Result<Html> {
 Further in the file you can see that this view is registered in the [`App`](trait@cot::project::App) implementation:
 
 ```rust
-struct CotTutorialApp;
-
+# struct CotTutorialApp;
+# async fn index(_request: cot::request::Request) -> cot::Result<cot::response::Response> { todo!() }
 impl App for CotTutorialApp {
     // ...
 
     fn router(&self) -> Router {
         Router::with_urls([Route::with_handler_and_name("/", index, "index")])
     }
+#   fn name(&self) -> &str { todo!() }
 }
 ```
 
@@ -112,17 +116,17 @@ This is how you specify the URL the view will be available at – in this case, 
 You can add more views by adding more routes to the [`Router`](struct@cot::router::Router) by simply defining more functions and registering them in the [`router`](trait@cot::project::App#method.router) method:
 
 ```rust
-async fn hello() -> Html {
-    Html::new("Hello World!")
-}
-
-// inside `impl App`:
-
-fn router(&self) -> Router {
-    Router::with_urls([
-        Route::with_handler_and_name("/", index, "index"),
-        Route::with_handler_and_name("/hello", hello, "hello"),
-    ])
+# struct CotTutorialApp;
+# async fn index(_request: Request) -> cot::Result<Response> { todo!() }
+# async fn hello(_request: Request) -> cot::Result<Response> { todo!() }
+impl App for CotTutorialApp {
+    fn router(&self) -> Router {
+        Router::with_urls([
+            Route::with_handler_and_name("/", index, "index"),
+            Route::with_handler_and_name("/hello", hello, "hello"),
+        ])
+    }
+#   fn name(&self) -> &str { todo!() }
 }
 ```
 
@@ -135,14 +139,15 @@ You can also define dynamic routes by using the [`Route::with_handler_and_name`]
 At the core of Cot's request handling are _extractors_, which allow you to extract data from the request and pass it to the handler as arguments. One of such extractors is the [`Path`](struct@cot::request::extractors::Path) extractor, which allows you to extract path parameters from the URL. In order to use it, you need to define a parameter in the handler function, passing the parameter type as the generic parameter, like so:
 
 ```rust
-use cot::request::extractors::Path;
-
+# struct MyApp;
+# async fn index() -> cot::Result<Html> { todo!() }
+# async fn hello() -> cot::Result<Html> { todo!() }
 async fn hello_name(Path(name): Path<String>) -> cot::Result<Html> {
     Ok(Html::new(format!("Hello, {}!", name)))
 }
 
 // inside `impl App`:
-
+# impl App for MyApp {
 fn router(&self) -> Router {
     Router::with_urls([
         Route::with_handler_and_name("/", index, "index"),
@@ -150,23 +155,28 @@ fn router(&self) -> Router {
         Route::with_handler_and_name("/hello/{name}", hello_name, "hello_name"),
     ])
 }
+#   fn name(&self) -> &str { todo!() }
+# }
 ```
 
 This works for multiple parameters, too—you just need to define a tuple of parameters in the handler function:
 
 ```rust
+# struct MyApp;
 async fn hello_name(Path((first_name, last_name)): Path<(String, String)>) -> cot::Result<Html> {
     Ok(Html::new(format!("Hello, {first_name} {last_name}!")))
 }
 
 // inside `impl App`:
-
+# impl App for MyApp {
 fn router(&self) -> Router {
     Router::with_urls([
         // ...
         Route::with_handler_and_name("/hello/{first_name}/{last_name}/", hello_name, "hello_name"),
     ])
 }
+#   fn name(&self) -> &str { todo!() }
+# }
 ```
 
 Now, when you visit [`localhost:8000/hello/John/Smith/`](http://localhost:8000/hello/John), you should see `Hello, John Smith!` displayed on the page!
@@ -184,23 +194,33 @@ impl App for CotTutorialApp {
     fn name(&self) -> &'static str {
         env!("CARGO_CRATE_NAME")
     }
+# }
 ```
 
 An app is a collection of views and other components that make up a part of your service. Typically, they represent a part of your service, like the main website, an admin panel, or an API. An app usually corresponds to a single Rust crate, hence we're just using the name of the crate as the app name. The app name is used in many places, such as in the database table names, in the admin panel, or when reversing the URLs, so it needs to be unique in your project.
 
 ```rust
+# use cot::db::migrations::SyncDynMigration;
+# struct CotTutorialApp;
+# mod migrations { pub const MIGRATIONS: &[&'static cot::db::migrations::SyncDynMigration] = &[]; }
+# impl App for CotTutorialApp {
     fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
         cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)
     }
+#   fn name(&self) -> &str { todo!() }
+# }
 ```
 
 This defines the database migration list that will be applied when your server starts. You shouldn't normally need to modify this, and the migrations can be generated automatically using the Cot CLI – more on this in the chapter about database models.
 
 ```rust
+# struct CotTutorialApp;
+# impl App for CotTutorialApp {
     fn static_files(&self) -> Vec<StaticFile> {
         static_files!("css/main.css")
     }
-}
+#   fn name(&self) -> &str { todo!() }
+# }
 ```
 
 This defines a list of static files that will be served by the server. More on that will be covered in the chapter about static files.
@@ -216,19 +236,28 @@ impl Project for CotTutorialProject {
     fn cli_metadata(&self) -> CliMetadata {
         cot::cli::metadata!()
     }
+# }
 ```
 
 This defines the project and sets the CLI metadata (like the name, version, and description) that will be displayed when you run `cargo run -- --help` by using the metadata from your Cargo crate.
 
 ```rust
+# struct CotTutorialProject;
+# struct CotTutorialApp;
+# impl App for CotTutorialApp { fn name(&self) -> &str { "test" } }
+# impl Project for CotTutorialProject {
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register_with_views(CotTutorialApp, "");
     }
+# }
 ```
 
 This registers all the apps that your project is using.
 
 ```rust
+# use cot::middleware::LiveReloadMiddleware;
+# struct CotTutorialProject;
+# impl Project for CotTutorialProject {
     fn middlewares(
         &self,
         handler: RootHandlerBuilder,
@@ -239,11 +268,15 @@ This registers all the apps that your project is using.
             .middleware(LiveReloadMiddleware::from_context(context))
             .build()
     }
+# }
 ```
 
 This registers the middlewares that will be applied to all routes in the project. Note that the [`LiveReloadMiddleware`](struct@cot::middleware::LiveReloadMiddleware) may be dynamically disabled in runtime using config!
 
-```rust
+```rust,has_main
+# use cot::Project;
+# struct CotTutorialProject;
+# impl Project for CotTutorialProject {}
 #[cot::main]
 fn main() -> impl Project {
     CotTutorialProject

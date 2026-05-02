@@ -1,0 +1,9 @@
+[test-groups]
+# Guide doc tests build Rust project (which already uses all available CPU
+# cores) and reuse the target directory (which is shared across all tests),
+# so we limit the number of concurrently running guide doc tests to 1
+doc-code-blocks = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = 'package(cot-test)'
+test-group = 'doc-code-blocks'

@@ -42,9 +42,8 @@ This will create a new file in your `migrations` directory in the crate's src di
 In order to write a model instance to the database, you can use the [`save`](trait@cot::db::Model#method.save) method. Note that you need to have an instance of the [`Database`](struct@cot::db::Database) structure to do this – typically you can get it from the request object in your view. Here's an example of how you can save a new link to the database inside a view:
 
 ```rust
-use cot::request::extractors::RequestDb;
-
-async fn create_link(RequestDb(db): RequestDb) -> cot::Result<Html> {
+# #[model] pub struct Link { #[model(primary_key)] id: Auto<i64>, slug: LimitedString<32>, url: String }
+async fn create_link(db: &Database) -> cot::Result<Html> {
     let mut link = Link {
         id: Auto::default(),
         slug: LimitedString::new("slug").unwrap(),
@@ -53,6 +52,7 @@ async fn create_link(RequestDb(db): RequestDb) -> cot::Result<Html> {
     link.save(db).await?;
 
     // ...
+#   todo!()
 }
 ```
 
@@ -61,8 +61,12 @@ async fn create_link(RequestDb(db): RequestDb) -> cot::Result<Html> {
 Updating a model is similar to saving a new one, but you need to have an existing instance of the model that you want to update, or another instance with the same primary key. Here's an example of how you can update an existing link in the database:
 
 ```rust
+# #[model] pub struct Link { #[model(primary_key)] id: Auto<i64>, slug: LimitedString<32>, url: String }
+# async fn foo(db: &Database, mut link: Link) -> cot::Result<()> {
 link.url = "https://example.org".to_string();
 link.save(db).await?;
+# Ok(())
+# }
 ```
 
 Note that the [`save`](trait@cot::db::Model#method.save) is a convenient method that can be used for both creating new rows and updating existing ones. If the primary key of the model is set to [`Auto`](enum@cot::db::Auto), the method will always create a new row in the database. If the primary key is set to a specific value, the method will update the row with that primary key, or create a new one if it doesn't exist.
@@ -70,19 +74,27 @@ Note that the [`save`](trait@cot::db::Model#method.save) is a convenient method 
 If you specifically want to update a row in the database for given primary key, you can use the [`update`](trait@cot::db::Model#method.update) method:
 
 ```rust
+# #[model] pub struct Link { #[model(primary_key)] id: Auto<i64>, slug: LimitedString<32>, url: String }
+# async fn foo(db: &Database, mut link: Link) -> cot::Result<()> {
 link.url = "https://example.org".to_string();
 link.update(db).await?;
+# Ok(())
+# }
 ```
 
 Similarly, if you want to insert a new row in the database and cause an error if a row with the same primary key already exists, you can use the [`insert`](trait@cot::db::Model#method.insert) method:
 
 ```rust
+# #[model] pub struct Link { #[model(primary_key)] id: Auto<i64>, slug: LimitedString<32>, url: String }
+# async fn foo(db: &Database) -> cot::Result<()> {
 let mut link = Link {
     id: Auto::default(),
     slug: LimitedString::new("slug").unwrap(),
     url: "https://example.com".to_string(),
 };
 link.insert(db).await?;
+# Ok(())
+# }
 ```
 
 ### Retrieving models
@@ -92,11 +104,14 @@ The basis for retrieving models from the database is the [`Query`](struct@cot::d
 The easiest way to work with the [`Query`](struct@cot::db::query::Query) structure is the [`query!`](macro@cot::db::query) macro, which allows you to write complicated queries in readable way using Rusty syntax. For example, to retrieve the link which has slug "cot" from the database, you can write:
 
 ```rust
-use cot::db::query;
-
+# use cot::db::{query, Database, LimitedString};
+# #[model] struct Link { #[model(primary_key)] id: Auto<i32>, slug: LimitedString<32> }
+# async fn foo(db: &Database) -> cot::Result<()> {
 let link = query!(Link, $slug == LimitedString::new("cot").unwrap())
     .get(db)
     .await?;
+# Ok(())
+# }
 ```
 
 As you can see, the [`Query`](struct@cot::db::query::Query) macro takes the model type as the first argument, followed by the filter expression. The filter expression supports many of the common comparison operators, such as `==`, `!=`, `>`, `<`, `>=`, and `<=`. You can also use logical operators like `&&` and `||` to combine multiple conditions. The `$` sign is used to access the fields of the model in the filter expression—this is needed so that the macro can differentiate between fields of the model and other variables. What's nice about the filter expression is that it's type-checked at compile time, so not only you won't be able to filter using a non-existent field, but also you won't be able to compare fields of different types.
@@ -106,7 +121,12 @@ As you can see, the [`Query`](struct@cot::db::query::Query) macro takes the mode
 To delete a model from the database, you can use the [`delete`](struct@cot::db::query::Query#method.delete) method of the [`Query`](struct@cot::db::query::Query) object returned by the [`query!`](macro@cot::db::query) macro. Here's an example of how you can delete a link from the database:
 
 ```rust
+# use cot::db::{query, Database, LimitedString, model, Auto};
+# #[model] struct Link { #[model(primary_key)] id: Auto<i32>, slug: LimitedString<32> }
+# async fn foo(db: &Database) -> cot::Result<()> {
 query!(Link, $slug == LimitedString::new("cot").unwrap()).delete(db).await?;
+# Ok(())
+# }
 ```
 
 ### Bulk operations
@@ -114,22 +134,27 @@ query!(Link, $slug == LimitedString::new("cot").unwrap()).delete(db).await?;
 If you need to insert multiple rows at once, you can use the [`bulk_insert`](trait@cot::db::Model#method.bulk_insert) method. This is much more efficient than calling [`save`](trait@cot::db::Model#method.save) or [`insert`](trait@cot::db::Model#method.insert) for each row individually, as it performs the operation in a single database query.
 
 ```rust
+# #[model] struct User { #[model(primary_key)] id: Auto<i32> }
+# #[model] struct Link { #[model(primary_key)] id: Auto<i32>, slug: LimitedString<32>, url: String, user: ForeignKey<User> }
+# async fn foo(db: &Database) -> cot::Result<()> {
 let mut links = vec![
     Link {
         id: Auto::default(),
         slug: LimitedString::new("cot").unwrap(),
         url: "https://cot.rs".to_string(),
-        user: ForeignKey::new(1),
+        user: ForeignKey::PrimaryKey(Auto::fixed(1)),
     },
     Link {
         id: Auto::default(),
         slug: LimitedString::new("rust").unwrap(),
         url: "https://rust-lang.org".to_string(),
-        user: ForeignKey::new(1),
+        user: ForeignKey::PrimaryKey(Auto::fixed(1)),
     },
 ];
 
 Link::bulk_insert(db, &mut links).await?;
+# Ok(())
+# }
 ```
 
 Note that [`bulk_insert`](trait@cot::db::Model#method.bulk_insert) takes a mutable slice of models, because it needs to update the primary keys of the inserted models with the values generated by the database.
@@ -137,7 +162,11 @@ Note that [`bulk_insert`](trait@cot::db::Model#method.bulk_insert) takes a mutab
 Similarly, there is also [`bulk_insert_or_update`](trait@cot::db::Model#method.bulk_insert_or_update) method, which works like [`bulk_insert`](trait@cot::db::Model#method.bulk_insert), but updates the existing rows if they conflict with the new ones.
 
 ```rust
+# #[model] struct Link { #[model(primary_key)] id: Auto<i32>, slug: LimitedString<32> }
+# async fn foo(db: &Database, mut links: Vec<Link>) -> cot::Result<()> {
 Link::bulk_insert_or_update(db, &mut links).await?;
+# Ok(())
+# }
 ```
 
 ## Foreign keys
@@ -170,12 +199,17 @@ When you define a foreign key relationship, Cot will automatically create a fore
 When you retrieve a model that has a foreign key relationship, Cot will not automatically fetch the related model and populate the foreign key field with the corresponding value. Instead, you need to explicitly fetch the related model using the [`get`](enum@cot::db::ForeignKey#method.get) method of the [`ForeignKey`](enum@cot::db::ForeignKey) object. Here's an example of how you can fetch the related user for a link:
 
 ```rust
+# #[model] struct User { #[model(primary_key)] id: Auto<i32> }
+# #[model] struct Link { #[model(primary_key)] id: Auto<i32>, slug: LimitedString<32>, user: ForeignKey<User> }
+# async fn foo(db: &Database) -> cot::Result<()> {
 let mut link = query!(Link, $slug == LimitedString::new("cot").unwrap())
     .get(db)
     .await?
     .expect("Link not found");
 
 let user = link.user.get(db).await?;
+# Ok(())
+# }
 ```
 
 ## Database Configuration
@@ -188,10 +222,10 @@ Configure your database connection in the configuration files inside your `confi
 url = "sqlite://db.sqlite3?mode=rwc"
 
 # Or PostgreSQL
-url = "postgresql://user:password@localhost/dbname"
+# url = "postgresql://user:password@localhost/dbname"
 
 # Or MySQL
-url = "mysql://user:password@localhost/dbname"
+# url = "mysql://user:password@localhost/dbname"
 ```
 
 Cot tries to be as consistent as possible when it comes to the database engine you are using. This means that you can use SQLite for development and testing, and then switch to PostgreSQL or MySQL for production without changing your code. The only thing you need to do is to change the [`url`](struct@cot::config::DatabaseConfig#structfield.url) value in the configuration file!

@@ -685,6 +685,50 @@ impl ToDbValue for PasswordHash {
     }
 }
 
+#[cfg(feature = "db")]
+impl FromDbValue for Option<PasswordHash> {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: crate::db::impl_sqlite::SqliteValueRef<'_>) -> cot::db::Result<Self> {
+        value
+            .get::<Option<String>>()
+            .map(|op_str| op_str.map(PasswordHash::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(
+        value: crate::db::impl_postgres::PostgresValueRef<'_>,
+    ) -> cot::db::Result<Self> {
+        value
+            .get::<Option<String>>()
+            .map(|op_str| op_str.map(PasswordHash::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: crate::db::impl_mysql::MySqlValueRef<'_>) -> crate::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|op_str| op_str.map(PasswordHash::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
+impl ToDbValue for Option<PasswordHash> {
+    fn to_db_value(&self) -> DbValue {
+        match self {
+            Some(hash) => hash.to_db_value(),
+            None => <Option<String>>::None.to_db_value(),
+        }
+    }
+}
+
 /// Authentication helper structure.
 ///
 /// This is an object that provides methods to sign users in and out, by using

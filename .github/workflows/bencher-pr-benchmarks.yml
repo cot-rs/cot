@@ -34,7 +34,7 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Setup Bencher
         uses: bencherdev/bencher@main

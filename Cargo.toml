@@ -81,10 +81,10 @@ clap = { version = "4.6.1", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.3.0"
-cot = { version = "0.6.0", path = "cot" }
-cot_core = { version = "0.6.0", path = "cot-core" }
-cot_codegen = { version = "0.6.0", path = "cot-codegen" }
-cot_macros = { version = "0.6.0", path = "cot-macros" }
+cot = { version = "0.7.0", path = "cot" }
+cot_core = { version = "0.6.1", path = "cot-core" }
+cot_codegen = { version = "0.6.1", path = "cot-codegen" }
+cot_macros = { version = "0.6.1", path = "cot-macros" }
 criterion = "0.8"
 darling = "0.23"
 deadpool-redis = { version = "0.23", default-features = false }

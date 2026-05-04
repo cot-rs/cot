@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1](https://github.com/cot-rs/cot/compare/cot-cli-v0.6.0...cot-cli-v0.6.1) - 2026-05-04
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.6.0/cot-cli/0.6.1/Cargo.toml)
+
+### Fixes
+
+- Place correct contributing guide link ([#557](https://github.com/cot-rs/cot/pull/557)) (by [@kingazm](https://github.com/kingazm))
+
+### Other
+
+- *(deps)* Remove chumsky ([#538](https://github.com/cot-rs/cot/pull/538)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump the dependencies group with 11 updates ([#564](https://github.com/cot-rs/cot/pull/564)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+
 ## [0.6.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.5.0...cot-cli-v0.6.0) - 2026-03-18
 
 [View diff on diff.rs](https://diff.rs/cot-cli/0.5.0/cot-cli/0.6.0/Cargo.toml)

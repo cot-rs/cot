@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/cot-rs/cot/compare/cot-v0.6.0...cot-v0.7.0) - 2026-05-04
+
+[View diff on diff.rs](https://diff.rs/cot/0.6.0/cot/0.7.0/Cargo.toml)
+
+### New features
+
+- Allow accessing extra config ([#518](https://github.com/cot-rs/cot/pull/518)) (by [@m4tx](https://github.com/m4tx))
+- Derive `Ord` and `PartialOrd` for `Auto` ([#544](https://github.com/cot-rs/cot/pull/544)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+
+### Fixes
+
+- Place correct contributing guide link ([#557](https://github.com/cot-rs/cot/pull/557)) (by [@kingazm](https://github.com/kingazm))
+- Non-ASCII URLs can be properly routed now ([#561](https://github.com/cot-rs/cot/pull/561)) (by [@m4tx](https://github.com/m4tx))
+
+### Other
+
+- *(deps)* Bump fake from 4.4.0 to 5.1.0 ([#533](https://github.com/cot-rs/cot/pull/533)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- *(deps)* Use `grass_compiler` directly ([#537](https://github.com/cot-rs/cot/pull/537)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Remove chumsky ([#538](https://github.com/cot-rs/cot/pull/538)) (by [@m4tx](https://github.com/m4tx))
+- Fix clippy errors ([#560](https://github.com/cot-rs/cot/pull/560)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.6.0](https://github.com/cot-rs/cot/compare/cot-v0.5.0...cot-v0.6.0) - 2026-03-18
 
 [View diff on diff.rs](https://diff.rs/cot/0.5.0/cot/0.6.0/Cargo.toml)

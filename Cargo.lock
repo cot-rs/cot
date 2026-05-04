@@ -188,7 +188,21 @@ version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f9670bc84a28bb3da91821ef74226949ab63f1265aff7c751634f1dd0e6f97c"
 dependencies = [
- "askama_parser",
+ "askama_parser 0.15.6",
+ "memchr",
+ "proc-macro2",
+ "quote",
+ "rustc-hash",
+ "syn",
+]
+
+[[package]]
+name = "askama_derive"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1c7065972a130eafa84215f21352ae15b4a7393da48c1f5e103904490736738"
+dependencies = [
+ "askama_parser 0.16.0",
  "memchr",
  "proc-macro2",
  "quote",
@@ -202,7 +216,7 @@ version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0756b45480437dded0565dfc568af62ccce146fb6cfe902e808ba86e445f44f"
 dependencies = [
- "askama_derive",
+ "askama_derive 0.15.6",
 ]
 
 [[package]]
@@ -210,6 +224,17 @@ name = "askama_parser"
 version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d0af3691ba3af77949c0b5a3925444b85cb58a0184cc7fec16c68ba2e7be868"
+dependencies = [
+ "rustc-hash",
+ "unicode-ident",
+ "winnow 1.0.1",
+]
+
+[[package]]
+name = "askama_parser"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7db09fde9143e7ac4513358fb32ee32847125b63b18ea715afd487956da715da"
 dependencies = [
  "rustc-hash",
  "unicode-ident",
@@ -1022,7 +1047,7 @@ dependencies = [
 name = "cot_macros"
 version = "0.6.0"
 dependencies = [
- "askama_derive",
+ "askama_derive 0.16.0",
  "cot",
  "cot_codegen",
  "darling 0.23.0",

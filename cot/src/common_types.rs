@@ -430,7 +430,7 @@ impl FromDbValue for Option<Url> {
 
 impl ToDbValue for Option<Url> {
     fn to_db_value(&self) -> DbValue {
-        self.clone().map(|url| url.into_string()).into()
+        self.clone().map(Url::into_string).into()
     }
 }
 

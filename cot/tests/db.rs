@@ -51,18 +51,18 @@ impl Dummy<EmailFaker> for Email {
         let domain: String = (0..10)
             .map(|_| (0x61u8 + (rng.next_u32() % 26) as u8) as char)
             .collect();
-        Email::new(format!("{}@{}.com", username, domain)).expect("Generated email should be valid")
+        Email::new(format!("{username}@{domain}.com")).expect("Generated email should be valid")
     }
 }
 
 struct UrlFaker;
 
 impl Dummy<UrlFaker> for Url {
-    fn dummy_with_rng<R: RngExt + ?Sized>(config: &UrlFaker, rng: &mut R) -> Self {
+    fn dummy_with_rng<R: RngExt + ?Sized>(_config: &UrlFaker, rng: &mut R) -> Self {
         let domain: String = (0..10)
             .map(|_| (0x61u8 + (rng.next_u32() % 26) as u8) as char)
             .collect();
-        Url::new(format!("https://{}.com", domain)).expect("Generated URL should be valid")
+        Url::new(format!("https://{domain}.com")).expect("Generated URL should be valid")
     }
 }
 

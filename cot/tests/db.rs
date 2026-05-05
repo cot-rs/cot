@@ -383,9 +383,12 @@ async fn password_hash_field(db: &TestDatabase) {
 
     run_migrations!(db, CREATE_OPTIONAL_PASSWORD_HASH_MODEL);
 
+    let generated_password: String = Faker.fake_with_rng(&mut StdRng::from_os_rng());
     let mut with_password = OptionPasswordHashModel {
         id: Auto::auto(),
-        password: Some(PasswordHash::from_password(&Password::new("password123"))),
+        password: Some(PasswordHash::from_password(&Password::new(
+            &generated_password,
+        ))),
     };
     with_password.save(&**db).await.unwrap();
 

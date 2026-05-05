@@ -393,6 +393,47 @@ impl FromDbValue for Url {
     }
 }
 
+impl FromDbValue for Option<Url> {
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
+impl ToDbValue for Option<Url> {
+    fn to_db_value(&self) -> DbValue {
+        self.clone().map(Url::into_string).into()
+    }
+}
+
 #[cfg(feature = "db")]
 impl DatabaseField for Url {
     const TYPE: ColumnType = ColumnType::Text;
@@ -680,6 +721,49 @@ impl FromDbValue for Email {
         Self: Sized,
     {
         Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for Option<Email> {
+    fn to_db_value(&self) -> DbValue {
+        self.clone().map(|email| email.email()).into()
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for Option<Email> {
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
     }
 }
 

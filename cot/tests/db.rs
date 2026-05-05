@@ -1,6 +1,8 @@
 #![cfg(feature = "fake")]
 #![cfg_attr(miri, ignore)]
 
+use cot::auth::PasswordHash;
+use cot::common_types::{Email, Password, Url};
 use cot::db::migrations::{Field, Operation};
 use cot::db::query::ExprEq;
 use cot::db::{
@@ -36,6 +38,31 @@ impl Dummy<WeekdaySetFaker> for chrono::WeekdaySet {
         }
 
         set
+    }
+}
+
+struct EmailFaker;
+
+impl Dummy<EmailFaker> for Email {
+    fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(_: &EmailFaker, rng: &mut R) -> Self {
+        let username: String = (0..10)
+            .map(|_| (0x61u8 + (rng.next_u32() % 26) as u8) as char)
+            .collect();
+        let domain: String = (0..10)
+            .map(|_| (0x61u8 + (rng.next_u32() % 26) as u8) as char)
+            .collect();
+        Email::new(format!("{username}@{domain}.com")).expect("Generated email should be valid")
+    }
+}
+
+struct UrlFaker;
+
+impl Dummy<UrlFaker> for Url {
+    fn dummy_with_rng<R: RngExt + ?Sized>(_config: &UrlFaker, rng: &mut R) -> Self {
+        let domain: String = (0..10)
+            .map(|_| (0x61u8 + (rng.next_u32() % 26) as u8) as char)
+            .collect();
+        Url::new(format!("https://{domain}.com")).expect("Generated URL should be valid")
     }
 }
 
@@ -221,8 +248,17 @@ struct AllFieldsModel {
     field_blob: Vec<u8>,
     field_option: Option<String>,
     field_limited_string: LimitedString<10>,
+    field_option_limited_string: Option<LimitedString<10>>,
     #[dummy(faker = "WeekdaySetFaker")]
     field_weekday_set: chrono::WeekdaySet,
+    #[dummy(faker = "EmailFaker")]
+    field_email: Email,
+    #[dummy(faker = "EmailFaker")]
+    field_option_email: Option<Email>,
+    #[dummy(faker = "UrlFaker")]
+    field_url: Url,
+    #[dummy(faker = "UrlFaker")]
+    field_option_url: Option<Url>,
 }
 
 async fn migrate_all_fields_model(db: &Database) {
@@ -254,7 +290,13 @@ const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
         all_fields_migration_field!(blob, Vec<u8>),
         all_fields_migration_field!(option, Option<String>),
         all_fields_migration_field!(limited_string, LimitedString<10>),
+        all_fields_migration_field!(option_limited_string, Option<LimitedString<10>>),
         all_fields_migration_field!(weekday_set, chrono::WeekdaySet),
+        all_fields_migration_field!(email, Email),
+        all_fields_migration_field!(option_email, Option<Email>),
+        all_fields_migration_field!(url, Url),
+        all_fields_migration_field!(option_url, Option<Url>),
+        all_fields_migration_field!(option_password_hash, Option<PasswordHash>),
     ])
     .build();
 
@@ -313,6 +355,52 @@ macro_rules! run_migrations {
             .await
             .unwrap();
     };
+}
+
+#[cot_macros::dbtest]
+async fn password_hash_field(db: &TestDatabase) {
+    #[derive(Debug, Clone)]
+    #[model]
+    struct OptionPasswordHashModel {
+        #[model(primary_key)]
+        id: Auto<i32>,
+        password: Option<PasswordHash>,
+    }
+
+    const CREATE_OPTIONAL_PASSWORD_HASH_MODEL: Operation = Operation::create_model()
+        .table_name(Identifier::new("cot__option_password_hash_model"))
+        .fields(&[
+            Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
+                .primary_key()
+                .auto(),
+            Field::new(
+                Identifier::new("password"),
+                <Option<PasswordHash> as DatabaseField>::TYPE,
+            )
+            .set_null(<Option<PasswordHash> as DatabaseField>::NULLABLE),
+        ])
+        .build();
+
+    run_migrations!(db, CREATE_OPTIONAL_PASSWORD_HASH_MODEL);
+
+    let generated_password: String = Faker.fake_with_rng(&mut StdRng::from_os_rng());
+    let mut with_password = OptionPasswordHashModel {
+        id: Auto::auto(),
+        password: Some(PasswordHash::from_password(&Password::new(
+            &generated_password,
+        ))),
+    };
+    with_password.save(&**db).await.unwrap();
+
+    let mut without_password = OptionPasswordHashModel {
+        id: Auto::auto(),
+        password: None,
+    };
+    without_password.save(&**db).await.unwrap();
+
+    let models = OptionPasswordHashModel::objects().all(&**db).await.unwrap();
+
+    assert_eq!(models.len(), 2);
 }
 
 #[cot_macros::dbtest]

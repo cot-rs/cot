@@ -76,7 +76,7 @@ manager might not be the latest one, so we recommend just using the official pac
 
 ## Development
 
-If you want to contribute to Cot, please read the [contributing guide](https://cot.rs/guide/latest/contributing). It will guide you through the process of setting up your development environment and making contributions.
+If you want to contribute to Cot, please read the [contributing guide](https://github.com/cot-rs/cot/blob/master/CONTRIBUTING.md). It will guide you through the process of setting up your development environment and making contributions.
 
 Thanks in advance for your contributions — every contribution is appreciated!
 

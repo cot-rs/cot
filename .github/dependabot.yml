@@ -10,6 +10,8 @@ updates:
         update-types:
           - minor
           - patch
+    labels:
+      - A-deps
 
   - package-ecosystem: github-actions
     directory: /
@@ -19,3 +21,5 @@ updates:
       dependencies:
         patterns:
           - "*"
+    labels:
+      - A-deps

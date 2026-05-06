@@ -1,6 +1,6 @@
 [package]
 name = "cot_core"
-version = "0.5.0"
+version = "0.6.0"
 description = "The Rust web framework for lazy developers - framework core."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true
@@ -41,7 +41,9 @@ tower.workspace = true
 
 [dev-dependencies]
 async-stream.workspace = true
-cot = { workspace = true, features = ["test"] }
+# Specifying path directly to avoid circular dependencies on publishing cot and cot-core.
+# When publishing, path dependencies are dropped, removing the cycle.
+cot = { path = "../cot", features = ["test"] }
 futures.workspace = true
 tokio.workspace = true
 

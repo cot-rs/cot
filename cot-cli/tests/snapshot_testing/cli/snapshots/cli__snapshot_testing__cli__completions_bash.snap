@@ -29,85 +29,85 @@ _cot() {
                 cmd="cot"
                 ;;
             cot,cli)
-                cmd="cot__cli"
+                cmd="cot__subcmd__cli"
                 ;;
             cot,help)
-                cmd="cot__help"
+                cmd="cot__subcmd__help"
                 ;;
             cot,migration)
-                cmd="cot__migration"
+                cmd="cot__subcmd__migration"
                 ;;
             cot,new)
-                cmd="cot__new"
+                cmd="cot__subcmd__new"
                 ;;
-            cot__cli,completions)
-                cmd="cot__cli__completions"
+            cot__subcmd__cli,completions)
+                cmd="cot__subcmd__cli__subcmd__completions"
                 ;;
-            cot__cli,help)
-                cmd="cot__cli__help"
+            cot__subcmd__cli,help)
+                cmd="cot__subcmd__cli__subcmd__help"
                 ;;
-            cot__cli,manpages)
-                cmd="cot__cli__manpages"
+            cot__subcmd__cli,manpages)
+                cmd="cot__subcmd__cli__subcmd__manpages"
                 ;;
-            cot__cli__help,completions)
-                cmd="cot__cli__help__completions"
+            cot__subcmd__cli__subcmd__help,completions)
+                cmd="cot__subcmd__cli__subcmd__help__subcmd__completions"
                 ;;
-            cot__cli__help,help)
-                cmd="cot__cli__help__help"
+            cot__subcmd__cli__subcmd__help,help)
+                cmd="cot__subcmd__cli__subcmd__help__subcmd__help"
                 ;;
-            cot__cli__help,manpages)
-                cmd="cot__cli__help__manpages"
+            cot__subcmd__cli__subcmd__help,manpages)
+                cmd="cot__subcmd__cli__subcmd__help__subcmd__manpages"
                 ;;
-            cot__help,cli)
-                cmd="cot__help__cli"
+            cot__subcmd__help,cli)
+                cmd="cot__subcmd__help__subcmd__cli"
                 ;;
-            cot__help,help)
-                cmd="cot__help__help"
+            cot__subcmd__help,help)
+                cmd="cot__subcmd__help__subcmd__help"
                 ;;
-            cot__help,migration)
-                cmd="cot__help__migration"
+            cot__subcmd__help,migration)
+                cmd="cot__subcmd__help__subcmd__migration"
                 ;;
-            cot__help,new)
-                cmd="cot__help__new"
+            cot__subcmd__help,new)
+                cmd="cot__subcmd__help__subcmd__new"
                 ;;
-            cot__help__cli,completions)
-                cmd="cot__help__cli__completions"
+            cot__subcmd__help__subcmd__cli,completions)
+                cmd="cot__subcmd__help__subcmd__cli__subcmd__completions"
                 ;;
-            cot__help__cli,manpages)
-                cmd="cot__help__cli__manpages"
+            cot__subcmd__help__subcmd__cli,manpages)
+                cmd="cot__subcmd__help__subcmd__cli__subcmd__manpages"
                 ;;
-            cot__help__migration,list)
-                cmd="cot__help__migration__list"
+            cot__subcmd__help__subcmd__migration,list)
+                cmd="cot__subcmd__help__subcmd__migration__subcmd__list"
                 ;;
-            cot__help__migration,make)
-                cmd="cot__help__migration__make"
+            cot__subcmd__help__subcmd__migration,make)
+                cmd="cot__subcmd__help__subcmd__migration__subcmd__make"
                 ;;
-            cot__help__migration,new)
-                cmd="cot__help__migration__new"
+            cot__subcmd__help__subcmd__migration,new)
+                cmd="cot__subcmd__help__subcmd__migration__subcmd__new"
                 ;;
-            cot__migration,help)
-                cmd="cot__migration__help"
+            cot__subcmd__migration,help)
+                cmd="cot__subcmd__migration__subcmd__help"
                 ;;
-            cot__migration,list)
-                cmd="cot__migration__list"
+            cot__subcmd__migration,list)
+                cmd="cot__subcmd__migration__subcmd__list"
                 ;;
-            cot__migration,make)
-                cmd="cot__migration__make"
+            cot__subcmd__migration,make)
+                cmd="cot__subcmd__migration__subcmd__make"
                 ;;
-            cot__migration,new)
-                cmd="cot__migration__new"
+            cot__subcmd__migration,new)
+                cmd="cot__subcmd__migration__subcmd__new"
                 ;;
-            cot__migration__help,help)
-                cmd="cot__migration__help__help"
+            cot__subcmd__migration__subcmd__help,help)
+                cmd="cot__subcmd__migration__subcmd__help__subcmd__help"
                 ;;
-            cot__migration__help,list)
-                cmd="cot__migration__help__list"
+            cot__subcmd__migration__subcmd__help,list)
+                cmd="cot__subcmd__migration__subcmd__help__subcmd__list"
                 ;;
-            cot__migration__help,make)
-                cmd="cot__migration__help__make"
+            cot__subcmd__migration__subcmd__help,make)
+                cmd="cot__subcmd__migration__subcmd__help__subcmd__make"
                 ;;
-            cot__migration__help,new)
-                cmd="cot__migration__help__new"
+            cot__subcmd__migration__subcmd__help,new)
+                cmd="cot__subcmd__migration__subcmd__help__subcmd__new"
                 ;;
             *)
                 ;;
@@ -129,7 +129,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__cli)
+        cot__subcmd__cli)
             opts="-v -q -h --verbose --quiet --help manpages completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -143,7 +143,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__cli__completions)
+        cot__subcmd__cli__subcmd__completions)
             opts="-v -q -h --verbose --quiet --help bash elvish fish powershell zsh"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -157,7 +157,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__cli__help)
+        cot__subcmd__cli__subcmd__help)
             opts="manpages completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -171,7 +171,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__cli__help__completions)
+        cot__subcmd__cli__subcmd__help__subcmd__completions)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -185,7 +185,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__cli__help__help)
+        cot__subcmd__cli__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -199,7 +199,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__cli__help__manpages)
+        cot__subcmd__cli__subcmd__help__subcmd__manpages)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -213,7 +213,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__cli__manpages)
+        cot__subcmd__cli__subcmd__manpages)
             opts="-o -c -v -q -h --output-dir --create --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -235,7 +235,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help)
+        cot__subcmd__help)
             opts="new migration cli help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -249,7 +249,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__cli)
+        cot__subcmd__help__subcmd__cli)
             opts="manpages completions"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -263,7 +263,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__cli__completions)
+        cot__subcmd__help__subcmd__cli__subcmd__completions)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -277,7 +277,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__cli__manpages)
+        cot__subcmd__help__subcmd__cli__subcmd__manpages)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -291,7 +291,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__help)
+        cot__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -305,7 +305,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__migration)
+        cot__subcmd__help__subcmd__migration)
             opts="list make new"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -319,7 +319,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__migration__list)
+        cot__subcmd__help__subcmd__migration__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -333,7 +333,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__migration__make)
+        cot__subcmd__help__subcmd__migration__subcmd__make)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -347,7 +347,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__migration__new)
+        cot__subcmd__help__subcmd__migration__subcmd__new)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -361,7 +361,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__help__new)
+        cot__subcmd__help__subcmd__new)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -375,7 +375,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration)
+        cot__subcmd__migration)
             opts="-v -q -h --verbose --quiet --help list make new help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -389,7 +389,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration__help)
+        cot__subcmd__migration__subcmd__help)
             opts="list make new help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -403,7 +403,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration__help__help)
+        cot__subcmd__migration__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -417,7 +417,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration__help__list)
+        cot__subcmd__migration__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -431,7 +431,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration__help__make)
+        cot__subcmd__migration__subcmd__help__subcmd__make)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -445,7 +445,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration__help__new)
+        cot__subcmd__migration__subcmd__help__subcmd__new)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -459,7 +459,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration__list)
+        cot__subcmd__migration__subcmd__list)
             opts="-v -q -h --verbose --quiet --help [PATH]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -473,7 +473,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration__make)
+        cot__subcmd__migration__subcmd__make)
             opts="-v -q -h --app-name --output-dir --verbose --quiet --help [PATH]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -495,7 +495,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__migration__new)
+        cot__subcmd__migration__subcmd__new)
             opts="-v -q -h --app-name --verbose --quiet --help <NAME> [PATH]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -513,7 +513,7 @@ _cot() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cot__new)
+        cot__subcmd__new)
             opts="-v -q -h --name --use-git --cot-path --verbose --quiet --help <PATH>"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

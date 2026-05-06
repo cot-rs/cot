@@ -173,6 +173,24 @@ pub fn derive_admin_model(input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
+/// ## `field_name`
+/// The `field_name` attribute is used to provide a specific name for the field
+/// in the created database table to which the Rust field is mapped to. This
+/// allows, in the following example, to map the `name` parameter to the
+/// `username` column in the database.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(field_name = "username")]
+///     name: String,
+/// }
+/// ```
+///
 /// [`Model`]: trait.Model.html
 /// [`DatabaseField`]: trait.DatabaseField.html
 #[proc_macro_attribute]

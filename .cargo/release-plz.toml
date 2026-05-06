@@ -34,10 +34,10 @@ body = """
     {% if previous.version -%}\
         [View diff on diff.rs](https://diff.rs/{{ package }}/{{ previous.version }}/{{ package }}/{{ version }}/Cargo.toml)
     {%- endif %}
-{% for group, commits in commits | sort(attribute="remote.pr_number") | reverse | group_by(attribute="group") %}
+{% for group, group_commits in commits | filter(attribute="remote.pr_number") | sort(attribute="remote.pr_number") | reverse | group_by(attribute="group") %}
 ### {{ group | striptags | trim | upper_first }}
 
-    {% for commit in commits | sort(attribute="breaking") | reverse %}
+    {% for commit in group_commits | sort(attribute="breaking") | reverse %}
         {%- if commit.scope -%}
             - {% if commit.breaking %}[**breaking**] {% endif %}*({{commit.scope}})* \
                 {{ commit.message | upper_first }}{{ self::username(commit=commit) }}
@@ -46,6 +46,11 @@ body = """
         {% endif -%}
     {% endfor -%}
 {% endfor %}
+{%- for commit in commits -%}
+    {%- if not commit.remote.pr_number %}
+- {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}{{ self::username(commit=commit) }}
+    {%- endif -%}
+{%- endfor %}
 {%- macro username(commit) -%}
     {% if commit.remote.username %} (by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }})){% endif -%}
 {% endmacro -%}
@@ -64,7 +69,9 @@ commit_preprocessors = [
     # Replace the issue/PR number with the link. It will work for PRs as well as GitHub has a redirect.
     { pattern = "\\(#([0-9]+)\\)", replace = "([#${1}](https://github.com/cot-rs/cot/pull/${1}))" },
     # Hyperlink bare commit hashes like "abcd1234" in commit logs, with short commit hash as description.
-    { pattern = "([ \\n])(([a-f0-9]{7})[a-f0-9]*)", replace = "${1}commit [${3}](https://github.com/cot-rs/cot/commit/${2})" }
+    { pattern = "([ \\n])(([a-f0-9]{7})[a-f0-9]*)", replace = "${1}commit [${3}](https://github.com/cot-rs/cot/commit/${2})" },
+    # Fix automatic revert commit name
+    { pattern = "^Revert", replace = "chore(revert):" }
 ]
 
 [[package]]

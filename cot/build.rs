@@ -23,7 +23,7 @@ fn build_css() {
 
         println!("cargo::rerun-if-changed={scss_path}");
 
-        let css = grass::from_path(scss_path, &options).expect("failed to compile SCSS");
+        let css = grass_compiler::from_path(scss_path, &options).expect("failed to compile SCSS");
 
         let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR should be set");
         let css_path = PathBuf::from(out_dir).join(css_file);
@@ -35,6 +35,6 @@ fn build_css() {
     }
 }
 
-fn scss_options() -> grass::Options<'static> {
-    grass::Options::default().style(grass::OutputStyle::Compressed)
+fn scss_options() -> grass_compiler::Options<'static> {
+    grass_compiler::Options::default().style(grass_compiler::OutputStyle::Compressed)
 }

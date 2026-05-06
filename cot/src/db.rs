@@ -22,7 +22,163 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use cot_core::error::impl_into_cot_error;
-pub use cot_macros::{model, query};
+pub use cot_macros::model;
+/// A convenient macro that allows you to write queries in a declarative
+/// fashion.
+///
+/// `query!` parses a query expression and lowers it into a
+/// [`Query`](cot::db::query::Query) builder. The resulting query is still lazy:
+/// it is only executed when you call a terminal query method such as
+/// [`Query::get`](cot::db::query::Query::get) or
+/// [`Query::all`](cot::db::query::Query::all).
+///
+/// The macro expands roughly to:
+///
+/// ```ignore
+/// <Model as cot::db::Model>::objects().filter(...)
+/// ```
+///
+/// # Query syntax
+///
+/// Query expressions can reference model fields with `$field_name`, combine
+/// conditions with boolean operators, and use comparison and arithmetic
+/// operators.
+///
+/// ```
+/// use cot::db::{Database, model, query};
+///
+/// #[model]
+/// #[derive(Debug, Clone)]
+/// struct Customer {
+///     #[model(primary_key)]
+///     id: i32,
+///     full_name: String,
+///     status: String,
+///     price: i32,
+///     stock: i32,
+///     quantity: i32,
+///     is_active: bool
+/// }
+///
+/// # async fn run(db: Database) -> cot::Result<()> {
+/// let customer = query!(Customer, $id == 5).get(&db).await?;
+/// println!("Customer: {:?}", customer);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// In the example above, `$id` and `$full_name` refer to fields on the
+/// `Customer` model.
+///
+///
+/// ## Field references
+///
+/// Use `$name` to refer to a model field.
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// # }
+/// let _ = query!(Customer, $id == 5);
+/// ```
+///
+/// ## Literal values
+///
+/// Rust literals can be used directly in expressions.
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// #     is_active: bool,
+/// # }
+/// let _ = query!(Customer, $id == 5);
+/// let _ = query!(Customer, $full_name == "Jon Doe");
+/// let _ = query!(Customer, $is_active == true);
+/// ```
+///
+/// ## Comparison operators
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// # }
+/// let _ = query!(Customer, $id == 5);
+/// let _ = query!(Customer, $id != 5);
+/// let _ = query!(Customer, $id < 10);
+/// let _ = query!(Customer, $id <= 10);
+/// let _ = query!(Customer, $id > 5);
+/// let _ = query!(Customer, $id >= 5);
+/// ```
+///
+/// ## Arithmetic operators
+///
+/// Query expressions also support arithmetic over fields and values.
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     price: i32,
+/// #     stock: i32,
+/// #     quantity: i32,
+/// # }
+/// let _ = query!(Customer, $price + 10 > 20);
+/// let _ = query!(Customer, $stock - 1 == 20);
+/// let _ = query!(Customer, $quantity * 2 < 100);
+/// let _ = query!(Customer, $price / 2 != $quantity);
+/// ```
+///
+/// ## Rust-side value expressions
+///
+/// When an expression does not reference a database field, `query!` can treat
+/// it as a Rust value expression. This includes member access, path access, and
+/// function calls.
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     status: String,
+/// # }
+/// struct User {
+///     id: i32,
+/// }
+///
+/// mod constants {
+///     pub const ACTIVE_STATUS: &str = "active";
+/// }
+///
+/// fn next_customer_id() -> i32 {
+///     42
+/// }
+///
+/// let user = User { id: 5 };
+///
+/// let _ = query!(Customer, $id == user.id);
+/// let _ = query!(Customer, $status == constants::ACTIVE_STATUS);
+/// let _ = query!(Customer, $id == next_customer_id());
+/// ```
+pub use cot_macros::query;
 use derive_more::{Debug, Deref, Display};
 #[cfg(test)]
 use mockall::automock;
@@ -1180,11 +1336,9 @@ impl Database {
             });
         }
 
-        let batch_size = if num_value_fields > 0 {
-            max_params / num_value_fields
-        } else {
-            return Err(DatabaseError::BulkInsertNoValueColumns);
-        };
+        let batch_size = max_params
+            .checked_div(num_value_fields)
+            .ok_or(DatabaseError::BulkInsertNoValueColumns)?;
 
         for chunk in data.chunks_mut(batch_size) {
             self.bulk_insert_chunk(
@@ -1808,7 +1962,7 @@ pub struct RowsNum(pub u64);
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Ord, PartialOrd)]
 pub enum Auto<T> {
     /// A fixed value.
     Fixed(T),
@@ -2009,7 +2163,7 @@ impl<const LIMIT: u32> LimitedString<LIMIT> {
 #[cfg(feature = "fake")]
 impl<const LIMIT: u32> fake::Dummy<usize> for LimitedString<LIMIT> {
     fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(len: &usize, rng: &mut R) -> Self {
-        use fake::rand::Rng;
+        use fake::rand::distr::SampleString;
 
         assert!(
             *len <= LIMIT as usize,
@@ -2020,11 +2174,7 @@ impl<const LIMIT: u32> fake::Dummy<usize> for LimitedString<LIMIT> {
             )
         );
 
-        let str: String = rng
-            .sample_iter(&fake::rand::distr::Alphanumeric)
-            .take(*len)
-            .map(char::from)
-            .collect();
+        let str: String = fake::rand::distr::Alphanumeric.sample_string(rng, *len);
         Self::new(str).unwrap()
     }
 }

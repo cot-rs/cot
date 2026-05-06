@@ -176,7 +176,7 @@ pub fn derive_admin_model(input: TokenStream) -> TokenStream {
 /// ## `field_name`
 /// The `field_name` attribute is used to provide a specific name for the field
 /// in the created database table to which the Rust field is mapped to. This
-/// allows, in the following example, to map the `name` parameter to the 
+/// allows, in the following example, to map the `name` parameter to the
 /// `username` column in the database.
 ///
 /// ```

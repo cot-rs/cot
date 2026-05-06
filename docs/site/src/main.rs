@@ -6,7 +6,8 @@ use cot::error::handler::DynErrorPageHandler;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{AppBuilder, Project};
-use cot_site::{CotSiteApp, cot_site_common, cot_site_handle_error, md_page};
+use cot_site::{CotSiteApp, cot_site_common, cot_site_handle_error, md_page, GuideItem};
+
 
 struct CotSiteProject;
 
@@ -34,21 +35,32 @@ impl Project for CotSiteProject {
                 (
                     "Getting started",
                     vec![
-                        md_page!("introduction"),
-                        md_page!("templates"),
-                        md_page!("forms"),
-                        md_page!("db-models"),
-                        md_page!("admin-panel"),
-                        md_page!("static-files"),
-                        md_page!("sending-emails"),
-                        md_page!("caching"),
-                        md_page!("error-pages"),
-                        md_page!("openapi"),
-                        md_page!("testing"),
+                        GuideItem::Page(md_page!("introduction")),
+                        GuideItem::Page(md_page!("templates")),
+                        GuideItem::Page(md_page!("forms")),
+                        GuideItem::SubCategory {
+                            title: "Database",
+                            pages: vec![
+                                md_page!("databases/overview"),
+                                md_page!("databases/queries"),
+                            ],
+                        },
+                        GuideItem::Page(md_page!("admin-panel")),
+                        GuideItem::Page(md_page!("static-files")),
+                        GuideItem::Page(md_page!("sending-emails")),
+                        GuideItem::Page(md_page!("caching")),
+                        GuideItem::Page(md_page!("error-pages")),
+                        GuideItem::Page(md_page!("openapi")),
+                        GuideItem::Page(md_page!("testing")),
                     ],
                 ),
-                ("Upgrading", vec![md_page!("upgrade-guide")]),
-                ("About", vec![md_page!("framework-comparison")]),
+                ("Upgrading", vec![
+                    GuideItem::Page(md_page!("upgrade-guide"))
+                ]
+                ),
+                ("About", vec![
+                    GuideItem::Page(md_page!("framework-comparison"))
+                ]),
             ]),
             "",
         );

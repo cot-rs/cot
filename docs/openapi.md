@@ -305,7 +305,7 @@ In order for your parameter or response type to generate OpenAPI specification, 
 
 The key is to modify the `Operation` object appropriately for your extractor, adding parameters, request bodies, or other OpenAPI elements as needed.
 
-## Conclusion
+## Summary
 
 Cot's OpenAPI integration provides a powerful way to automatically generate comprehensive API documentation while maintaining type safety. By leveraging the schema generation capabilities, you can create well-documented APIs with minimal overhead, making your services more accessible and easier to use.
 

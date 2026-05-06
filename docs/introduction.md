@@ -252,7 +252,7 @@ fn main() -> impl Project {
 
 Finally, the `main` function just returns the Project implementation, which is the entry point for your application. Cot takes care of running it by providing a command line interface!
 
-## Final words
+## Summary
 
 In this chapter, you learned about:
 

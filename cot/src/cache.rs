@@ -122,6 +122,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 
+use crate::cache::store::file::{FileStore, FileStorePoolConfig};
 use crate::cache::store::memory::Memory;
 #[cfg(feature = "redis")]
 use crate::cache::store::redis::Redis;
@@ -786,9 +787,26 @@ impl Cache {
                     let redis_store = Redis::new(url, pool_size)?;
                     Self::new(redis_store, config.prefix.clone(), config.timeout)
                 }
-                _ => {
-                    unimplemented!();
+                CacheStoreTypeConfig::File {
+                    ref path,
+                    worker_count,
+                    queue_size,
+                    acquisition_timeout_ms,
+                    waiting_timeout_ms,
+                } => {
+                    let file_store = FileStore::new(
+                        path.clone(),
+                        FileStorePoolConfig::builder()
+                            .worker_count(worker_count)
+                            .queue_size(queue_size)
+                            .acquisition_timeout_ms(acquisition_timeout_ms)
+                            .waiting_timeout_ms(waiting_timeout_ms)
+                            .build(),
+                    )?;
+                    Self::new(file_store, config.prefix.clone(), config.timeout)
                 }
+                #[expect(unused)]
+                _ => unimplemented!(),
             }
         };
 
@@ -980,5 +998,44 @@ mod tests {
 
         let result = Cache::from_config(&config).await;
         assert!(result.is_ok());
+    }
+
+    #[cot::test]
+    async fn test_cache_from_config_file() {
+        use std::env;
+
+        use crate::config::{CacheConfig, CacheStoreConfig};
+
+        let temp_path =
+            env::temp_dir().join(format!("test_cot_cache_file_store_{}", std::process::id()));
+        let cloned_path = temp_path.clone();
+        let default_file_store_pool_config = FileStorePoolConfig::default();
+
+        let config = CacheConfig::builder()
+            .store(CacheStoreConfig {
+                store_type: CacheStoreTypeConfig::File {
+                    path: temp_path,
+                    worker_count: default_file_store_pool_config.worker_count(),
+                    queue_size: default_file_store_pool_config.queue_size(),
+                    acquisition_timeout_ms: default_file_store_pool_config.acquisition_timeout_ms(),
+                    waiting_timeout_ms: default_file_store_pool_config.waiting_timeout_ms(),
+                },
+            })
+            .prefix("test_file")
+            .timeout(Timeout::After(Duration::from_secs(60)))
+            .build();
+
+        let cache = Cache::from_config(&config)
+            .await
+            .expect("Failed to create cache from config");
+
+        cache
+            .insert("test_key", "test_value".to_string())
+            .await
+            .unwrap();
+        let retrieved = cache.get("test_key").await.unwrap();
+        assert_eq!(retrieved, Some("test_value".to_string()));
+
+        let _ = tokio::fs::remove_dir_all(&cloned_path).await;
     }
 }

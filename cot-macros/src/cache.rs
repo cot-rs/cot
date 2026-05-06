@@ -6,6 +6,7 @@ pub(super) fn fn_to_cache_test(test_fn: &ItemFn) -> TokenStream {
     let test_fn_name = &test_fn.sig.ident;
     let memory_ident = format_ident!("{}_memory", test_fn_name);
     let redis_ident = format_ident!("{}_redis", test_fn_name);
+    let file_ident = format_ident!("{}_file", test_fn_name);
 
     let result = quote! {
         #[::cot::test]
@@ -28,7 +29,17 @@ pub(super) fn fn_to_cache_test(test_fn: &ItemFn) -> TokenStream {
             cache.cleanup().await.unwrap_or_else(|err| panic!("Failed to cleanup: {err:?}"));
 
             #test_fn
-    }
+        }
+
+        #[::cot::test]
+        async fn #file_ident() {
+            let mut cache = cot::test::TestCache::new_file().unwrap();
+            #test_fn_name(&mut cache).await;
+
+             cache.cleanup().await.unwrap_or_else(|err| panic!("Failed to cleanup file cache: {err:?}"));
+
+             #test_fn
+         }
     };
     result
 }

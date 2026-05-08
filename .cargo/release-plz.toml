@@ -37,12 +37,12 @@ body = """
 {% for group, group_commits in commits | filter(attribute="remote.pr_number") | sort(attribute="remote.pr_number") | reverse | group_by(attribute="group") %}
 ### {{ group | striptags | trim | upper_first }}
 
-    {% for commit in group_commits | sort(attribute="breaking") | reverse %}
-        {%- if commit.scope -%}
-            - {% if commit.breaking %}[**breaking**] {% endif %}*({{commit.scope}})* \
-                {{ commit.message | upper_first }}{{ self::username(commit=commit) }}
-        {% else -%}
-            - {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}{{ self::username(commit=commit) }}
+    {% for commit in group_commits %}
+        {%- if commit.breaking -%}{{ self::commit_line(commit=commit) }}
+        {% endif -%}
+    {% endfor -%}
+    {% for commit in group_commits %}
+        {%- if not commit.breaking -%}{{ self::commit_line(commit=commit) }}
         {% endif -%}
     {% endfor -%}
 {% endfor %}
@@ -54,6 +54,15 @@ body = """
 {%- macro username(commit) -%}
     {% if commit.remote.username %} (by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }})){% endif -%}
 {% endmacro -%}
+{%- macro commit_line(commit) -%}
+- {% if commit.breaking %}
+    [**breaking**]
+  {% endif %}
+  {% if commit.scope %}
+    *({{commit.scope}})*
+  {% endif %}
+  {{ commit.message | upper_first }}{{ self::username(commit=commit) }}
+{%- endmacro -%}
 """
 
 protect_breaking_commits = true

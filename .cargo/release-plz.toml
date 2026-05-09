@@ -55,12 +55,10 @@ body = """
     {% if commit.remote.username %} (by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }})){% endif -%}
 {% endmacro -%}
 {%- macro commit_line(commit) -%}
-- {% if commit.breaking %}
-    [**breaking**]
-  {% endif %}
-  {% if commit.scope %}
-    *({{commit.scope}})*
-  {% endif %}
+- {% if commit.breaking -%}
+    [**breaking**] {% endif -%}
+  {%- if commit.scope -%}
+    *({{commit.scope}})* {% endif -%}
   {{ commit.message | upper_first }}{{ self::username(commit=commit) }}
 {%- endmacro -%}
 """

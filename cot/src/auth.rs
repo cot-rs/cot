@@ -720,6 +720,7 @@ impl FromDbValue for Option<PasswordHash> {
     }
 }
 
+#[cfg(feature = "db")]
 impl ToDbValue for Option<PasswordHash> {
     fn to_db_value(&self) -> DbValue {
         match self {

@@ -1,8 +1,9 @@
-use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
+use cot_codegen::model::{Field, ManyToManySpec, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::{SymbolResolver, VisibleSymbol, VisibleSymbolKind};
 use darling::FromMeta;
 use darling::ast::NestedMeta;
 use heck::ToSnakeCase;
+use proc_macro2::Literal;
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, TokenStreamExt, format_ident, quote};
 use syn::Token;
@@ -82,6 +83,7 @@ struct ModelBuilder {
     fields_as_update_from_db: Vec<TokenStream>,
     fields_as_get_values: Vec<TokenStream>,
     fields_as_field_refs: Vec<TokenStream>,
+    fields_as_m2m_consts: Vec<TokenStream>,
 }
 
 impl ToTokens for ModelBuilder {
@@ -116,6 +118,7 @@ impl ModelBuilder {
             fields_as_update_from_db: Vec::with_capacity(field_count),
             fields_as_get_values: Vec::with_capacity(field_count),
             fields_as_field_refs: Vec::with_capacity(field_count),
+            fields_as_m2m_consts: Vec::with_capacity(field_count),
         };
         for field in &model.fields {
             model_builder.push_field(field);
@@ -131,6 +134,39 @@ impl ModelBuilder {
         let ty = &field.ty;
         let index = self.fields_as_columns.len();
         let column_name = &field.column_name;
+
+        if let Some(m2m_spec) = &field.many_to_many {
+            let target_ty = &m2m_spec.to_model;
+            self.fields_as_from_db.push(quote!(
+                #name: #orm_ident::ManyToMany::<#target_ty>::default()
+            ));
+
+            self.fields_as_update_from_db.push(quote!(
+                _ => { /* many-to-many relation is not present in this row (stored in a join table) */ }
+            ));
+
+            let (join_table, left_col, right_col) = self.infer_m2m_names(field, m2m_spec);
+            let join_table_lit = Literal::string(&join_table);
+            let left_col_lit = Literal::string(&left_col);
+            let right_col_lit = Literal::string(&right_col);
+
+            let const_ident = format_ident!("{}_M2M", name.to_string().to_uppercase());
+
+            let owner_ty = &self.name;
+
+            let m2m_const = quote!(
+                #[doc = concat!("Many-to-many metadata for the `", stringify!(#name), "` field.")]
+                pub const #const_ident: #orm_ident::ManyToManyField<#target_ty, #owner_ty> =
+                    #orm_ident::ManyToManyField::new(
+                        #join_table_lit,
+                        #left_col_lit,
+                        #right_col_lit,
+                    );
+            );
+
+            self.fields_as_m2m_consts.push(m2m_const);
+            return;
+        }
 
         {
             let field_as_column = quote!(#orm_ident::Column::new(
@@ -156,6 +192,37 @@ impl ModelBuilder {
             pub const #name: #orm_ident::query::FieldRef<#ty> =
                 #orm_ident::query::FieldRef::<#ty>::new(#orm_ident::Identifier::new(#column_name));
         ));
+    }
+
+    fn infer_m2m_names(&self, field: &Field, m2m: &ManyToManySpec) -> (String, String, String) {
+        // owner table as available in ModelBuilder
+        let owner_table = self.table_name.clone(); // already snake-cased + app namespace if needed
+        let owner_pk_col = self.pk_field.column_name.clone();
+
+        let target_table = m2m.target_table_name.clone();
+        let target_pk_col = "id".to_string();
+
+        let join_table = if let Some(t) = &m2m.attr.table {
+            t.clone()
+        } else {
+            format!("{}_{}", owner_table, field.name.to_string().to_snake_case())
+        };
+
+        let left_col = if let Some(l) = &m2m.attr.owner_field {
+            l.clone()
+        } else {
+            format!("{}_{}", owner_table, owner_pk_col)
+        };
+
+        let right_col = if let Some(r) = &m2m.attr.target_field {
+            r.clone()
+        } else if owner_table == target_table {
+            format!("{}_id", field.name.to_string().to_snake_case())
+        } else {
+            format!("{}_{}", target_table, target_pk_col)
+        };
+
+        (join_table, left_col, right_col)
     }
 
     #[must_use]
@@ -242,6 +309,7 @@ impl ModelBuilder {
         let vis = &self.vis;
         let fields_struct_name = &self.fields_struct_name;
         let fields_as_field_refs = &self.fields_as_field_refs;
+        let m2m_consts = &self.fields_as_m2m_consts;
 
         quote! {
             #[doc = concat!("Fields of the model [`", stringify!(#name), "`].")]
@@ -251,6 +319,8 @@ impl ModelBuilder {
             #[expect(non_upper_case_globals)]
             impl #fields_struct_name {
                 #(#fields_as_field_refs)*
+
+                #(#m2m_consts)*
             }
         }
     }

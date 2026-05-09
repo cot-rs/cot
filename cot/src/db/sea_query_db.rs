@@ -27,6 +27,15 @@ macro_rules! impl_sea_query_db_backend {
                 Ok(())
             }
 
+            pub(super) async fn begin(
+                &self,
+            ) -> crate::db::Result<sqlx::Transaction<'static, $sqlx_db_ty>> {
+                self.db_connection
+                    .begin()
+                    .await
+                    .map_err(crate::db::sea_query_db::map_sqlx_error)
+            }
+
             pub(super) async fn fetch_option<T: sea_query_binder::SqlxBinder + Send + Sync>(
                 &self,
                 statement: &T,
@@ -36,7 +45,7 @@ macro_rules! impl_sea_query_db_backend {
                 let row = Self::sqlx_query_with(&sql, values)
                     .fetch_optional(&self.db_connection)
                     .await
-                    .map_err(|err| crate::db::sea_query_db::map_sqlx_error(err))?;
+                    .map_err(crate::db::sea_query_db::map_sqlx_error)?;
                 Ok(row.map($row_name::new))
             }
 
@@ -185,4 +194,97 @@ pub(crate) fn map_sqlx_error(err: sqlx::Error) -> crate::db::DatabaseError {
     crate::db::DatabaseError::from(err)
 }
 
-pub(super) use impl_sea_query_db_backend;
+pub(crate) use impl_sea_query_db_backend;
+
+/// Implements the transaction backend for a specific engine using `SeaQuery`.
+macro_rules! impl_sea_query_transaction_backend {
+    ($db_name:ident, $transaction_name:ident : $sqlx_db_ty:ty, $row_name:ident, $query_builder:expr) => {
+        #[derive(derive_more::Debug)]
+        pub(super) struct $transaction_name<'a> {
+            #[debug("...")]
+            pub(crate) inner: sqlx::Transaction<'a, $sqlx_db_ty>,
+        }
+
+        impl<'a> $transaction_name<'a> {
+            pub(super) fn new(transaction: sqlx::Transaction<'a, $sqlx_db_ty>) -> Self {
+                Self { inner: transaction }
+            }
+
+            pub(super) async fn commit(self) -> crate::db::Result<()> {
+                self.inner
+                    .commit()
+                    .await
+                    .map_err(crate::db::sea_query_db::map_sqlx_error)
+            }
+
+            pub(super) async fn rollback(self) -> crate::db::Result<()> {
+                self.inner
+                    .rollback()
+                    .await
+                    .map_err(crate::db::sea_query_db::map_sqlx_error)
+            }
+
+            pub(super) async fn fetch_option<T: sea_query_binder::SqlxBinder + Send + Sync>(
+                &mut self,
+                statement: &T,
+            ) -> crate::db::Result<Option<$row_name>> {
+                let (sql, values) = $db_name::build_sql(statement);
+
+                let row = $db_name::sqlx_query_with(&sql, values)
+                    .fetch_optional(&mut *self.inner)
+                    .await
+                    .map_err(crate::db::sea_query_db::map_sqlx_error)?;
+                Ok(row.map($row_name::new))
+            }
+
+            pub(super) async fn fetch_all<T: sea_query_binder::SqlxBinder + Send + Sync>(
+                &mut self,
+                statement: &T,
+            ) -> crate::db::Result<Vec<$row_name>> {
+                let (sql, values) = $db_name::build_sql(statement);
+
+                let result = $db_name::sqlx_query_with(&sql, values)
+                    .fetch_all(&mut *self.inner)
+                    .await
+                    .map_err(crate::db::sea_query_db::map_sqlx_error)?
+                    .into_iter()
+                    .map($row_name::new)
+                    .collect();
+                Ok(result)
+            }
+
+            pub(super) async fn execute_statement<T: sea_query_binder::SqlxBinder + Send + Sync>(
+                &mut self,
+                statement: &T,
+            ) -> crate::db::Result<crate::db::StatementResult> {
+                let (sql, mut values) = $db_name::build_sql(statement);
+                $db_name::prepare_values(&mut values);
+
+                self.execute_sqlx($db_name::sqlx_query_with(&sql, values))
+                    .await
+            }
+
+            async fn execute_sqlx<'b, A>(
+                &mut self,
+                sqlx_statement: sqlx::query::Query<'b, $sqlx_db_ty, A>,
+            ) -> crate::db::Result<crate::db::StatementResult>
+            where
+                A: 'b + sqlx::IntoArguments<'b, $sqlx_db_ty>,
+            {
+                let result = sqlx_statement
+                    .execute(&mut *self.inner)
+                    .await
+                    .map_err(crate::db::sea_query_db::map_sqlx_error)?;
+                let result = crate::db::StatementResult {
+                    rows_affected: crate::db::RowsNum(result.rows_affected()),
+                    last_inserted_row_id: $db_name::last_inserted_row_id_for(&result),
+                };
+
+                tracing::debug!("Rows affected: {}", result.rows_affected.0);
+                Ok(result)
+            }
+        }
+    };
+}
+
+pub(crate) use impl_sea_query_transaction_backend;

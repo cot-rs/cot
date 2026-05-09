@@ -1,9 +1,10 @@
 //! Database interface implementation – MySQL backend.
 
 use crate::db::ColumnType;
-use crate::db::sea_query_db::impl_sea_query_db_backend;
+use crate::db::sea_query_db::{impl_sea_query_db_backend, impl_sea_query_transaction_backend};
 
 impl_sea_query_db_backend!(DatabaseMySql: sqlx::mysql::MySql, sqlx::mysql::MySqlPool, MySqlRow, MySqlValueRef, sea_query::MysqlQueryBuilder);
+impl_sea_query_transaction_backend!(DatabaseMySql, TransactionMySql: sqlx::mysql::MySql, MySqlRow, sea_query::MysqlQueryBuilder);
 
 impl DatabaseMySql {
     #[expect(clippy::unused_async)]

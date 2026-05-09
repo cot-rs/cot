@@ -738,6 +738,7 @@ impl ToDbValue for Option<Email> {
 
 #[cfg(feature = "db")]
 impl FromDbValue for Option<Email> {
+    #[cfg(feature = "sqlite")]
     fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -749,6 +750,7 @@ impl FromDbValue for Option<Email> {
             .map_err(cot::db::DatabaseError::value_decode)
     }
 
+    #[cfg(feature = "postgres")]
     fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,
@@ -760,6 +762,7 @@ impl FromDbValue for Option<Email> {
             .map_err(cot::db::DatabaseError::value_decode)
     }
 
+    #[cfg(feature = "mysql")]
     fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
     where
         Self: Sized,

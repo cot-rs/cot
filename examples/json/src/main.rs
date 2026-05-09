@@ -4,11 +4,11 @@ use cot::error::handler::{DynErrorPageHandler, RequestError};
 use cot::json::Json;
 use cot::openapi::swagger_ui::SwaggerUi;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
-use cot::response::IntoResponse;
+use cot::response::{IntoResponse, Response};
 use cot::router::method::openapi::api_post;
-use cot::router::{Route, Router};
+use cot::router::{Route, Router, Urls};
 use cot::static_files::StaticFilesMiddleware;
-use cot::{App, AppBuilder, Project};
+use cot::{App, AppBuilder, Project, reverse_redirect};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
@@ -30,6 +30,10 @@ async fn add(Json(add_request): Json<AddRequest>) -> Json<AddResponse> {
     Json(response)
 }
 
+async fn index(urls: Urls) -> cot::Result<Response> {
+    Ok(reverse_redirect!(urls, "swagger-ui:index")?)
+}
+
 struct AddApp;
 
 impl App for AddApp {
@@ -38,7 +42,10 @@ impl App for AddApp {
     }
 
     fn router(&self) -> Router {
-        Router::with_urls([Route::with_api_handler("/add/", api_post(add))])
+        Router::with_urls([
+            Route::with_api_handler_and_name("/add/", api_post(add), "add"),
+            Route::with_handler_and_name("/", index, "index"),
+        ])
     }
 }
 

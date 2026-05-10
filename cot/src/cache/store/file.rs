@@ -198,15 +198,13 @@ impl FileStorePoolConfigBuilder {
     /// will remain allocated and unavailable for further requests until the
     /// kernel-level operation completes or fails.
     ///
-    /// Setting this value to `0` opts out of spawning background tasks for
-    /// contested file locks. In this configuration, it is recommended to
-    /// also set `queue_size` to `0` to ensure that requests requiring a
-    /// lock fail immediately rather than entering a pending state that
-    /// cannot be serviced.
-    ///
     /// If the maximum worker count has been reached and the associated request
     /// queue is full, any incoming request that requires file locking will
     /// return an error immediately to prevent further resource contention.
+    ///
+    /// Setting this value to `0` opts out of spawning background tasks for
+    /// contested file locks, similar to the behavior for providing `0` to
+    /// `queue_size`.
     #[must_use]
     pub fn worker_count(mut self, worker_count: usize) -> Self {
         self.file_store_pool_config.worker_count = worker_count;
@@ -216,6 +214,10 @@ impl FileStorePoolConfigBuilder {
     ///
     /// Incoming requests that require file locking will return an
     /// error immediately if this queue is full.
+    ///
+    /// Setting this value to `0` opts out of spawning background tasks for
+    /// contested file locks, similar to the behavior for providing `0` to
+    /// `worker_count`.
     #[must_use]
     pub fn queue_size(mut self, queue_size: usize) -> Self {
         self.file_store_pool_config.queue_size = queue_size;
@@ -250,7 +252,6 @@ impl FileStorePoolConfigBuilder {
     /// This method will panic if
     /// * a value > `usize::MAX >> 3`was provided in the `worker_count()` and
     ///   `queue_size()` setters.
-    /// * `worker_count` == 0 with  `queue_size`!= 0 and vice-versa.
     /// * `waiting_timeout_ms` < `acquisition_timeout_ms`.
     #[must_use]
     pub fn build(self) -> FileStorePoolConfig {
@@ -261,11 +262,6 @@ impl FileStorePoolConfigBuilder {
         assert!(
             self.file_store_pool_config.queue_size <= usize::MAX >> 3,
             "the provided `queue_size` must not be bigger than usize::MAX >> 3"
-        );
-        assert!(
-            (self.file_store_pool_config.worker_count == 0)
-                == (self.file_store_pool_config.queue_size == 0),
-            "`queue_size` must be 0 when `worker_count` is 0 and vice versa"
         );
         assert!(
             self.file_store_pool_config.waiting_timeout_ms
@@ -362,8 +358,15 @@ impl Default for FileStorePoolConfig {
 
 impl FileStorePool {
     fn new(config: FileStorePoolConfig) -> (Self, tokio::sync::mpsc::Sender<FileAcquisitionWork>) {
-        let (tx, rx) = tokio::sync::mpsc::channel(config.queue_size);
-        let semaphore = tokio::sync::Semaphore::new(config.worker_count);
+        let (resolve_queue_size, resolve_worker_count) =
+            if config.worker_count == 0 || config.queue_size == 0 {
+                (1, 0)
+            } else {
+                (config.queue_size, config.worker_count)
+            };
+
+        let (tx, rx) = tokio::sync::mpsc::channel(resolve_queue_size);
+        let semaphore = tokio::sync::Semaphore::new(resolve_worker_count);
         (
             Self {
                 acquisiton_timeout_duration: tokio::time::Duration::from_millis(
@@ -522,11 +525,17 @@ impl FileStore {
     ) -> CacheStoreResult<Self> {
         let dir_path = dir.into();
 
+        let resolved_waiting_timeout = if config.worker_count == 0 || config.queue_size == 0 {
+            0
+        } else {
+            config.waiting_timeout_ms
+        };
+
         let (mut pool, tx) = FileStorePool::new(config);
         let store = Self {
             dir_path,
             file_path_sender: tx,
-            waiting_timeout_duration: tokio::time::Duration::from_millis(config.waiting_timeout_ms),
+            waiting_timeout_duration: tokio::time::Duration::from_millis(resolved_waiting_timeout),
         };
 
         store.create_dir_root_sync()?;
@@ -1338,6 +1347,79 @@ mod tests {
 
     #[cfg_attr(miri, ignore)]
     #[cot::test]
+    async fn test_does_not_panic_on_opt_out_queue_empty() {
+        let path = make_store_path();
+        let _store = FileStore::new(
+            path.clone(),
+            FileStorePoolConfig::builder().queue_size(0).build(),
+        )
+        .expect("failed to init");
+
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cfg_attr(miri, ignore)]
+    #[cot::test]
+    async fn test_does_not_panic_on_opt_out_worker_count_empty() {
+        let path = make_store_path();
+        let _store = FileStore::new(
+            path.clone(),
+            FileStorePoolConfig::builder().worker_count(0).build(),
+        )
+        .expect("failed to init");
+
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cfg_attr(miri, ignore)]
+    #[cot::test]
+    async fn test_opt_out_behavior() {
+        let path = make_store_path();
+        let store = FileStore::new(
+            path.clone(),
+            FileStorePoolConfig::builder().worker_count(0).build(),
+        )
+        .expect("failed to init");
+        let value = serde_json::json!({ "id": 1 });
+
+        let tasks: Vec<_> = (0..10)
+            .map(|_| {
+                let s = store.clone();
+                let v = value.clone();
+                tokio::spawn(async move { s.insert("key".into(), v, Timeout::Never).await })
+            })
+            .collect();
+
+        for h in tasks {
+            if let Ok(result) = h.await {
+                let _ = result.map_err(|e| {
+                    let first_store_error =
+                        FileCacheStoreError::TempFileCreation(POOL_QUEUE_FULL.into());
+                    let then_store_error =
+                        FileCacheStoreError::TempFileCreation(TIMEOUT_REACHED.into());
+
+                    let first_cache_store_error: CacheStoreError = first_store_error.into();
+
+                    let then_cache_store_error: CacheStoreError = then_store_error.into();
+
+                    assert!(
+                        e.to_string() == then_cache_store_error.to_string()
+                            || e.to_string() == first_cache_store_error.to_string()
+                    );
+                });
+            }
+        }
+
+        // When ALL tasks enter handoff, they are subject to the timeout
+        if let Some(retrieved) = store.read("key").await.expect("failed to read from store") {
+            assert_eq!(retrieved, value);
+        }
+
+        let _ = tokio::fs::remove_dir_all(&path).await;
+    }
+
+    #[cfg_attr(miri, ignore)]
+    #[cot::test]
     async fn test_thundering_write_with_acquisition_timeout_exceeded() {
         let path = make_store_path();
         let store = FileStore::new(
@@ -1415,16 +1497,6 @@ mod tests {
             assert_eq!(retrieved, value);
         }
         let _ = tokio::fs::remove_dir_all(&path).await;
-    }
-
-    #[test]
-    #[should_panic(expected = "`queue_size` must be 0")]
-    fn test_invalid_file_store_pool_config_creation() {
-        let _file_store = FileStorePoolConfig::builder()
-            .worker_count(0)
-            .queue_size(10)
-            .acquisition_timeout_ms(2000)
-            .build();
     }
 
     #[test]

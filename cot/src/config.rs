@@ -1032,6 +1032,10 @@ pub enum CacheStoreTypeConfig {
         /// becomes unresponsive, these tasks will remain allocated and
         /// unavailable for further requests until the kernel-level operation
         /// completes or fails.
+        ///
+        /// Setting this value to `0` opts out of spawning background tasks for
+        /// contested file locks, similar to the behavior for providing `0` to
+        /// `queue_size`.
         #[serde(default = "default_file_store_pool_worker_count")]
         worker_count: usize,
 
@@ -1040,6 +1044,10 @@ pub enum CacheStoreTypeConfig {
         ///
         /// Incoming requests that require file locking will return an
         /// error immediately if this queue is full.
+        ///
+        /// Setting this value to `0` opts out of spawning background tasks for
+        /// contested file locks, similar to the behavior for providing `0` to
+        /// `worker_count`.
         #[serde(default = "default_file_store_pool_queue_size")]
         queue_size: usize,
 

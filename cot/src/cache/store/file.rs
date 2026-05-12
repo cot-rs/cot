@@ -975,16 +975,19 @@ mod tests {
     use crate::cache::store::{CacheStore, CacheStoreError};
     use crate::config::Timeout;
 
-    fn make_store_path() -> std::path::PathBuf {
+    fn make_store_path(test_name: &str) -> std::path::PathBuf {
         let base_env = std::env::temp_dir();
-        let this_runner = std::thread::current().id();
-        let this_test_dir = format!("cache-store-file-unit-test-{this_runner:#?}");
+        let thread_id = std::thread::current().id();
+        let pid = std::process::id();
+
+        let this_test_dir = format!("cache-store-{test_name}-{pid}-{thread_id:#?}");
+
         base_env.join(this_test_dir)
     }
 
     #[cot::test]
     async fn test_create_dir() {
-        let path = make_store_path();
+        let path = make_store_path("test_create_dir");
         let _ = FileStore::new(path.clone(), FileStorePoolConfig::default())
             .expect("failed to init store");
 
@@ -998,7 +1001,7 @@ mod tests {
 
     #[cot::test]
     async fn test_create_dir_on_existing() {
-        let path = make_store_path();
+        let path = make_store_path("test_create_dir_on_existing");
         let _ = FileStore::new(path.clone(), FileStorePoolConfig::default())
             .expect("failed to init store");
         let _ = FileStore::new(path.clone(), FileStorePoolConfig::default())
@@ -1014,7 +1017,7 @@ mod tests {
 
     #[cot::test]
     async fn test_insert_and_read_single() {
-        let path = make_store_path();
+        let path = make_store_path("test_insert_and_read_single");
 
         let store = FileStore::new(path.clone(), FileStorePoolConfig::default())
             .expect("failed to init store");
@@ -1040,7 +1043,7 @@ mod tests {
 
     #[cot::test]
     async fn test_insert_and_read_after_delete_single() {
-        let path = make_store_path();
+        let path = make_store_path("test_insert_and_read_after_delete_single");
 
         let store = FileStore::new(path.clone(), FileStorePoolConfig::default())
             .expect("failed to init store");
@@ -1062,7 +1065,7 @@ mod tests {
 
     #[cot::test]
     async fn test_clear_double_free() {
-        let path = make_store_path();
+        let path = make_store_path("test_clear_double_free");
 
         let store = FileStore::new(path.clone(), FileStorePoolConfig::default())
             .expect("failed to init store");
@@ -1090,7 +1093,7 @@ mod tests {
 
     #[cot::test]
     async fn test_approx_size() {
-        let path = make_store_path();
+        let path = make_store_path("test_approx_size");
 
         let store = FileStore::new(path.clone(), FileStorePoolConfig::default())
             .expect("failed to init store");
@@ -1126,7 +1129,7 @@ mod tests {
 
     #[cot::test]
     async fn test_contains_key() {
-        let path = make_store_path();
+        let path = make_store_path("test_contains_key");
 
         let store = FileStore::new(path.clone(), FileStorePoolConfig::default())
             .expect("failed to init store");
@@ -1150,7 +1153,7 @@ mod tests {
 
     #[cot::test]
     async fn test_expiration_integrity() {
-        let path = make_store_path();
+        let path = make_store_path("test_expiration_integrity");
 
         let store = FileStore::new(path.clone(), FileStorePoolConfig::default())
             .expect("failed to init store");
@@ -1189,7 +1192,8 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_interference_during_write() {
-        let path = make_store_path();
+        let path = make_store_path("test_interference_during_write");
+
         let store =
             FileStore::new(path.clone(), FileStorePoolConfig::default()).expect("failed to init");
         let key = "test_key".to_string();
@@ -1217,7 +1221,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_clear_during_write() {
-        let path = make_store_path();
+        let path = make_store_path("test_clear_during_write");
         let store =
             FileStore::new(path.clone(), FileStorePoolConfig::default()).expect("failed to init");
         let value = serde_json::json!({ "id": 1 });
@@ -1258,7 +1262,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_thundering_write() {
-        let path = make_store_path();
+        let path = make_store_path("test_thundering_write");
         let store =
             FileStore::new(path.clone(), FileStorePoolConfig::default()).expect("failed to init");
         let value = serde_json::json!({ "id": 1 });
@@ -1284,7 +1288,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_thundering_write_with_semaphore_congestion() {
-        let path = make_store_path();
+        let path = make_store_path("test_thundering_write_with_semaphore_congestion");
         let store = FileStore::new(
             path.clone(),
             FileStorePoolConfig::builder().worker_count(1).build(),
@@ -1313,7 +1317,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_thundering_write_with_queue_full() {
-        let path = make_store_path();
+        let path = make_store_path("test_thundering_write_with_queue_full");
         let store = FileStore::new(
             path.clone(),
             FileStorePoolConfig::builder().queue_size(1).build(),
@@ -1350,7 +1354,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_does_not_panic_on_opt_out_queue_empty() {
-        let path = make_store_path();
+        let path = make_store_path("test_does_not_panic_on_opt_out_queue_empty");
         let _store = FileStore::new(
             path.clone(),
             FileStorePoolConfig::builder().queue_size(0).build(),
@@ -1363,7 +1367,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_does_not_panic_on_opt_out_worker_count_empty() {
-        let path = make_store_path();
+        let path = make_store_path("test_does_not_panic_on_opt_out_worker_count_empty");
         let _store = FileStore::new(
             path.clone(),
             FileStorePoolConfig::builder().worker_count(0).build(),
@@ -1376,7 +1380,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_opt_out_behavior() {
-        let path = make_store_path();
+        let path = make_store_path("test_opt_out_behavior");
         let store = FileStore::new(
             path.clone(),
             FileStorePoolConfig::builder().worker_count(0).build(),
@@ -1423,7 +1427,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_thundering_write_with_acquisition_timeout_exceeded() {
-        let path = make_store_path();
+        let path = make_store_path("test_thundering_write_with_acquisition_timeout_exceeded");
         let store = FileStore::new(
             path.clone(),
             FileStorePoolConfig::builder()
@@ -1462,7 +1466,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cot::test]
     async fn test_thundering_write_with_waiting_timeout_exceeded() {
-        let path = make_store_path();
+        let path = make_store_path("test_thundering_write_with_waiting_timeout_exceeded");
         let store = FileStore::new(
             path.clone(),
             FileStorePoolConfig::builder()

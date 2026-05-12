@@ -978,9 +978,11 @@ mod tests {
     fn make_store_path(test_name: &str) -> std::path::PathBuf {
         let base_env = std::env::temp_dir();
         let thread_id = std::thread::current().id();
+        let tid_num = format!("{thread_id:?}").replace(|c: char| !c.is_ascii_digit(), "");
+
         let pid = std::process::id();
 
-        let this_test_dir = format!("cache-store-{test_name}-{pid}-{thread_id:#?}");
+        let this_test_dir = format!("cache-store-{test_name}-{pid}-{tid_num}");
 
         base_env.join(this_test_dir)
     }

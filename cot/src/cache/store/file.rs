@@ -967,7 +967,6 @@ mod tests {
     use std::time::Duration;
 
     use chrono::Utc;
-    use tempfile::tempdir;
 
     use crate::cache::store::file::{
         FileCacheStoreError, FileStore, FileStorePoolConfig, POOL_BUSY, POOL_QUEUE_FULL,
@@ -977,7 +976,10 @@ mod tests {
     use crate::config::Timeout;
 
     fn make_store_path() -> std::path::PathBuf {
-        tempdir().expect("failed to create dir").keep()
+        let base_env = std::env::temp_dir();
+        let this_runner = std::thread::current().id();
+        let this_test_dir = format!("cache-store-file-unit-test-{this_runner:#?}");
+        base_env.join(this_test_dir)
     }
 
     #[cot::test]

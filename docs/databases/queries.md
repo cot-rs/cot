@@ -48,7 +48,6 @@ pub struct Order {
 ```
 
 ## Creating an object
-
 To create a new model instance, cot provides the [`insert`](trait@cot::db::Model#method.insert) method.
 In the example below, we create a new `Customer` instance and save it to the database.
 
@@ -223,9 +222,7 @@ async fn save_order(db: Database) -> cot::Result<()> {
 
 Note that this will fail if the primary key of the referenced model does not exist.
 
-
 ## Retrieving objects
-
 To retrieve objects from the database, cot provides the [`Query`](struct@cot::db::query::Query) struct which allows you to
 perform various queries on the database. The [`Query`](struct@cot::db::query::Query) struct provides methods such as [`filter`](struct@cot::db::query::Query#method.filter), which can be used filter to the
 results of a query.The [`Query`](struct@cot::db::query::Query) object can be accessed by calling the [`objects`](trait@cot::db::Model#method.objects) method on the model. The example below shows how to retrieve a
@@ -256,11 +253,10 @@ async fn get_customer(db: Database) -> cot::Result<()> {
     println!("Customer: {:?}", customer);
 }
 ```
+
 The [`get`](struct@cot::db::query::Query#method.get) method (as well as the [`all`](struct@cot::db::query::Query#method.all) method which we'll see in the next section) are terminal query methods which are applied to the query object after filtering to retrieve the final results.
-Also note that the [`get`](struct@cot::db::query::Query#method.get) method will return an error if the query returns more than one result.
 
 ### Retrieving all objects
-
 One way to retrieve all objects of a model is to call the [`all`](struct@cot::db::query::Query#method.all) method after filtering the query results.
 
 ```rust
@@ -274,7 +270,6 @@ async fn get_all_customers(db: Database) -> cot::Result<()> {
 ```
 
 The example above retrieves all customers with a primary key greater than `5`. This returns a list of `Customer` instances.
-
 
 ##### Chaining filters
 The [`filter`](struct@cot::db::query::Query#method.filter) method returns a new [`Query`](struct@cot::db::query::Query) instance which makes it convenient to chain multiple filters.
@@ -296,7 +291,6 @@ The example above shows how to retrieve all customers with a primary key greater
 > Note: Although this example works, the idiomatic way to do this is to use the [`Expr::and`](enum@cot::db::query::Expr::method.and) expression instead.
 
 Similarly, the [`query`](macro@cot::db::query) macro returns a new [`Query`](struct@cot::db::query::Query) instance which can be used to chain multiple filters.
-
 
 ## Removing an object
 The [`delete`](struct@cot::db::query::Query#method.delete) method can be used to remove an object from the database. The example below shows how to remove a `Customer` instance with the primary key of `5`.

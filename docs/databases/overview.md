@@ -5,7 +5,6 @@ title: Overview
 Cot comes with its own ORM (Object-Relational Mapping) system, which is a layer of abstraction that allows you to interact with your database using objects instead of raw SQL queries. This makes it easier to work with your database and allows you to write more maintainable code. It abstracts over the specific database engine that you are using, so you can switch between different databases without changing your code. The Cot ORM is also capable of automatically creating migrations for you, so you can easily update your database schema as your application evolves, just by modifying the corresponding Rust structures.
 
 ## Defining models
-
 To define a model in Cot, you need to create a new Rust structure that implements the [`Model`](trait@cot::db::Model) trait. This trait requires you to define the name of the table that the model corresponds to, as well as the fields that the table should have. Here's an example of a simple model that represents a link in a link shortener service:
 
 ```rust
@@ -65,14 +64,13 @@ pub struct User {
 ```
 
 ## Field Types
-To use a type in a model, they **must** implement both the [`ToDbValue`](trait@cot::db::ToDbValue) and [`FromDbValue`](trait@cot::db::FromDbValue) traits. The [`ToDbValue`](trait@cot::db::ToDbValue) trait tells Cot how to serialize the field value into a format that can be stored in the database (e.g. a string, a number, a boolean, etc.) while the [`FromDbValue`](trait@cot::db::FromDbValue) trait tells Cot how to deserialize the field value from the database format back into the Rust type.
+To use a type in a model, they **must** implement the [`ToDbValue`](trait@cot::db::ToDbValue) and [`FromDbValue`](trait@cot::db::FromDbValue) traits. The [`ToDbValue`](trait@cot::db::ToDbValue) trait tells Cot how to serialize the field value into a format that can be stored in the database (e.g. a string, a number, a boolean, etc.) while the [`FromDbValue`](trait@cot::db::FromDbValue) trait tells Cot how to deserialize the field value from the database format back into the Rust type.
 Cot provides implementations of these traits for many common types on a best-effort basis. Refer to the [implementations](trait@cot::db::FromDbValue#foreign-impls) and [implementors](trait@cot::db::FromDbValue#implementors) section of the docs for a complete list of the supported types.
 
 In the example below, we show how to use a custom type as a field in a model:
 
 ```rust
-use cot::db::{DbFieldValue, model, Auto};
-use cot::db::{ToDbFieldValue, FromDbValue, SqlxValueRef};
+use cot::db::{Auto, ColumnType, DatabaseField, DbFieldValue, FromDbValue, model, SqlxValueRef, ToDbFieldValue};
 use cot::db::impl_mysql::MySqlValueRef;
 use cot::db::impl_postgres::PostgresValueRef;
 use cot::db::impl_sqlite::SqliteValueRef;
@@ -123,7 +121,6 @@ pub struct Post {
 Relational databases are all about relationships between tables, and Cot provides a convenient way to define database relationships between models.
 
 ### Foreign keys
-
 To define a foreign key relationship between two models, you can use the [`ForeignKey`](https://docs.rs/cot/latest/cot/db/enum.ForeignKey.html) type. Here's an example of how you can define a foreign key relationship between a `Link` model and some other `User` model:
 
 ```rust
@@ -161,7 +158,6 @@ let user = link.user.get(db).await?;
 ```
 
 ## Database Configuration
-
 Configure your database connection in the configuration files inside your `config` directory:
 
 ```toml
@@ -183,9 +179,10 @@ Currently, Cot supports the following database engines:
 * PostgreSQL
 * MySQL
 
+As an alternative to setting the database configuration in the `TOML` file, you can also set it programmatically in the [`config`](trait@cot::project::Project#method.config) method of your project.
+Note that when you do this, the config values from the `TOML` file will be entirely ignored.
 
-As an alternative to setting the database configuration in the `TOML` file, you can also set it programmatically in the [`config`](trait@cot::project::Project#method.config) method of your project:
-
+Here's an example of how you can set the database configuration programmatically:
 
 ```rust
 use cot::config::DatabaseConfig;

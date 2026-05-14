@@ -361,14 +361,55 @@ macro_rules! run_migrations {
 async fn password_hash_field(db: &TestDatabase) {
     #[derive(Debug, Clone)]
     #[model]
-    struct OptionPasswordHashModel {
+    struct PasswordHashModel {
+        #[model(primary_key)]
+        id: Auto<i32>,
+        password: PasswordHash,
+    }
+
+    const CREATE_OPTIONAL_PASSWORD_HASH_MODEL: Operation = Operation::create_model()
+        .table_name(Identifier::new("cot__password_hash_model"))
+        .fields(&[
+            Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
+                .primary_key()
+                .auto(),
+            Field::new(
+                Identifier::new("password"),
+                <PasswordHash as DatabaseField>::TYPE,
+            ),
+        ])
+        .build();
+
+    run_migrations!(db, CREATE_OPTIONAL_PASSWORD_HASH_MODEL);
+
+    let generated_password: String = Faker.fake();
+    let mut password_model = PasswordHashModel {
+        id: Auto::auto(),
+        password: PasswordHash::from_password(&Password::new(&generated_password)),
+    };
+    password_model.save(&**db).await.unwrap();
+
+    let models = PasswordHashModel::objects().all(&**db).await.unwrap();
+
+    assert_eq!(models.len(), 1);
+    assert_eq!(
+        models[0].password.as_str(),
+        password_model.password.as_str()
+    );
+}
+
+#[cot_macros::dbtest]
+async fn password_hash_option(db: &TestDatabase) {
+    #[derive(Debug, Clone)]
+    #[model]
+    struct PasswordHashModel {
         #[model(primary_key)]
         id: Auto<i32>,
         password: Option<PasswordHash>,
     }
 
     const CREATE_OPTIONAL_PASSWORD_HASH_MODEL: Operation = Operation::create_model()
-        .table_name(Identifier::new("cot__option_password_hash_model"))
+        .table_name(Identifier::new("cot__password_hash_model"))
         .fields(&[
             Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
                 .primary_key()
@@ -384,7 +425,7 @@ async fn password_hash_field(db: &TestDatabase) {
     run_migrations!(db, CREATE_OPTIONAL_PASSWORD_HASH_MODEL);
 
     let generated_password: String = Faker.fake();
-    let mut with_password = OptionPasswordHashModel {
+    let mut with_password = PasswordHashModel {
         id: Auto::auto(),
         password: Some(PasswordHash::from_password(&Password::new(
             &generated_password,
@@ -392,15 +433,20 @@ async fn password_hash_field(db: &TestDatabase) {
     };
     with_password.save(&**db).await.unwrap();
 
-    let mut without_password = OptionPasswordHashModel {
+    let mut without_password = PasswordHashModel {
         id: Auto::auto(),
         password: None,
     };
     without_password.save(&**db).await.unwrap();
 
-    let models = OptionPasswordHashModel::objects().all(&**db).await.unwrap();
+    let models = PasswordHashModel::objects().all(&**db).await.unwrap();
 
     assert_eq!(models.len(), 2);
+    assert_eq!(
+        models[0].password.as_ref().unwrap().as_str(),
+        with_password.password.as_ref().unwrap().as_str()
+    );
+    assert!(models[1].password.is_none());
 }
 
 #[cot_macros::dbtest]

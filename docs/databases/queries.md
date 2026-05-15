@@ -93,7 +93,7 @@ async fn create_customer(db: Database) -> cot::Result<()> {
 }
 ```
 
-#### Creating multiple objects
+### Creating multiple objects
 If you need to create multiple objects, cot provides the [`bulk_insert`](trait@cot::db::Model#method.bulk_insert) method for this purpose.
 It is recommended to prefer [`bulk_insert`](trait@cot::db::Model#method.bulk_insert) for multiple insertions as it performs the operations in a single database query which is much more efficient than performing multiple individual [`insert`](trait@cot::db::Model#method.insert) or [`save`](trait@cot::db::Model#method.save) calls.
 
@@ -225,8 +225,7 @@ Note that this will fail if the primary key of the referenced model does not exi
 ## Retrieving objects
 To retrieve objects from the database, cot provides the [`Query`](struct@cot::db::query::Query) struct which allows you to
 perform various queries on the database. The [`Query`](struct@cot::db::query::Query) struct provides methods such as [`filter`](struct@cot::db::query::Query#method.filter), which can be used filter to the
-results of a query.The [`Query`](struct@cot::db::query::Query) object can be accessed by calling the [`objects`](trait@cot::db::Model#method.objects) method on the model. The example below shows how to retrieve a
-Customer instance with the primary key of `5`.
+results of a query. The [`Query`](struct@cot::db::query::Query) object can be accessed by calling the [`objects`](trait@cot::db::Model#method.objects) method on the model. The example below shows how to retrieve a Customer instance with the primary key of `5`.
 
 ```rust
 use cot::db::{Database};
@@ -238,11 +237,9 @@ async fn get_customer(db: Database) -> cot::Result<()> {
 
 ```
 
-The [`filter`](struct@cot::db::query::Query#method.filter) method takes a [`filter expression`](enum@cot::db::query::Expr). In the example above, the expression, `Expr::eq(Expr::field("id"), Expr::value("5"))`, is
-evaluated as `id = 5`.
+The [`filter`](struct@cot::db::query::Query#method.filter) method takes a [`filter expression`](enum@cot::db::query::Expr). In the example above, the expression, `Expr::eq(Expr::field("id"), Expr::value("5"))`, is evaluated as `id = 5`.
 
-Cot also provides the [`query!`](macro@cot::db::query) macro which provides a convenient way to write queries in a declarative style without having to manually construct [`Expr`](enum@cot::db::query::Expr) expressions.
-The example above can be rewritten as follows:
+Cot also provides the [`query!`](macro@cot::db::query) macro which provides a convenient way to write queries in a declarative style without having to manually construct [`Expr`](enum@cot::db::query::Expr) expressions. The example above can be rewritten as follows:
 
 ```rust
 use cot::db::{Database};

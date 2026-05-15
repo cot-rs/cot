@@ -173,6 +173,22 @@ pub fn derive_admin_model(input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
+/// ## `field_name`
+/// The `field_name` attribute is used to specify a custom column name for a
+/// field in the database.
+///
+/// ```
+/// use cot::db::{Auto, LimitedString, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(field_name = "full_name")]
+///     name: LimitedString<128>,
+/// }
+/// ```
+///
 /// [`Model`]: trait.Model.html
 /// [`DatabaseField`]: trait.DatabaseField.html
 #[proc_macro_attribute]

@@ -114,6 +114,7 @@ use aide::openapi::{
     QueryStyle, ReferenceOr, RequestBody, StatusCode,
 };
 use cot::common_types::Email;
+#[cfg(feature = "db")]
 use cot::db::{ForeignKey, LimitedString, Model};
 use cot_core::handler::{BoxRequestHandler, RequestHandler, handle_all_parameters};
 /// Derive macro for the [`ApiOperationResponse`] trait.
@@ -211,6 +212,7 @@ use serde_json::Value;
 
 use crate::auth::Auth;
 use crate::common_types::Url;
+#[cfg(feature = "db")]
 use crate::db::Auto;
 use crate::form::Form;
 use crate::json::Json;
@@ -1139,6 +1141,7 @@ where
     }
 }
 
+#[cfg(feature = "db")]
 impl<T: JsonSchema> JsonSchema for Auto<T> {
     fn schema_name() -> Cow<'static, str> {
         format!("Auto_{}", T::schema_name()).into()
@@ -1153,6 +1156,7 @@ impl<T: JsonSchema> JsonSchema for Auto<T> {
     }
 }
 
+#[cfg(feature = "db")]
 impl<const LIMIT: u32> JsonSchema for LimitedString<LIMIT> {
     fn schema_name() -> Cow<'static, str> {
         format!("LimitedString_{LIMIT}").into()
@@ -1172,6 +1176,7 @@ impl<const LIMIT: u32> JsonSchema for LimitedString<LIMIT> {
     }
 }
 
+#[cfg(feature = "db")]
 impl<T: JsonSchema + Model> JsonSchema for ForeignKey<T> {
     fn schema_name() -> Cow<'static, str> {
         format!("ForeignKey_{}", T::schema_name()).into()

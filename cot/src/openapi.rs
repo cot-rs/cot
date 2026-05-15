@@ -1190,7 +1190,7 @@ impl<T: JsonSchema + Model> JsonSchema for ForeignKey<T> {
         Schema::try_from(Value::Object({
             let mut object = ::serde_json::Map::new();
             let _ = object.insert(("type").into(), ::serde_json::to_value("integer").unwrap());
-            let _ = object.insert(("format").into(), ::serde_json::to_value("int64").unwrap());
+            let _ = object.insert(("format").into(), ::serde_json::to_value("int").unwrap());
             object
         }))
         .expect("invalid schema for ForeignKey")
@@ -1692,48 +1692,74 @@ mod tests {
     }
 
     #[test]
-    fn json_schema_for_custom_types() {
-        #[derive(Debug, Clone, PartialEq, schemars::JsonSchema)]
-        #[model]
-        struct TestModel {
-            #[model(primary_key)]
-            id: Auto<i32>,
-            limited_str: LimitedString<10>,
-            email: Email,
-            url: Url,
-        }
-
+    fn json_schema_for_auto() {
         let mut generator = SchemaGenerator::default();
 
         let schema = <Auto<i32>>::json_schema(&mut generator);
         let value = serde_json::to_value(&schema).unwrap();
         assert_eq!(value["type"], "integer");
         assert_eq!(<Auto<i32>>::schema_name(), "Auto_int32");
+        assert_eq!(<Auto<i32>>::schema_id(), "Auto<int32>");
+    }
+
+    #[test]
+    fn json_schema_for_limited_string() {
+        let mut generator = SchemaGenerator::default();
 
         let schema = <LimitedString<10>>::json_schema(&mut generator);
         let value = serde_json::to_value(&schema).unwrap();
         assert_eq!(value["type"], "string");
         assert_eq!(<LimitedString<10>>::schema_name(), "LimitedString_10");
+        assert_eq!(<LimitedString<10>>::schema_id(), "LimitedString<10>");
+    }
+
+    #[test]
+    fn json_schema_for_foreign_key() {
+        #[derive(Debug, Clone, PartialEq, schemars::JsonSchema)]
+        #[model]
+        struct TestModel {
+            #[model(primary_key)]
+            id: Auto<i32>,
+        }
+
+        let mut generator = SchemaGenerator::default();
 
         let schema = <ForeignKey<TestModel>>::json_schema(&mut generator);
+
         let value = serde_json::to_value(&schema).unwrap();
         assert_eq!(value["type"], "integer");
-        assert_eq!(value["format"], "int64");
+        assert_eq!(value["format"], "int");
         assert_eq!(
             <ForeignKey<TestModel>>::schema_name(),
             "ForeignKey_TestModel"
         );
+        assert_eq!(
+            <ForeignKey<TestModel>>::schema_id(),
+            format!("ForeignKey<{}>", TestModel::schema_id())
+        );
+    }
+
+    #[test]
+    fn json_schema_for_email() {
+        let mut generator = SchemaGenerator::default();
 
         let schema = Email::json_schema(&mut generator);
         let value = serde_json::to_value(&schema).unwrap();
         assert_eq!(value["type"], "string");
         assert_eq!(value["format"], "email");
         assert_eq!(Email::schema_name(), "Email");
+        assert_eq!(Email::schema_id(), "Email");
+    }
+
+    #[test]
+    fn json_schema_for_url() {
+        let mut generator = SchemaGenerator::default();
 
         let schema = Url::json_schema(&mut generator);
         let value = serde_json::to_value(&schema).unwrap();
         assert_eq!(value["type"], "string");
         assert_eq!(value["format"], "uri");
         assert_eq!(Url::schema_name(), "Url");
+        assert_eq!(Url::schema_id(), "Url");
     }
 }

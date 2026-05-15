@@ -2073,7 +2073,7 @@ impl<T: Display> Display for Auto<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Fixed(value) => Display::fmt(value, f),
-            Self::Auto => panic!("Auto values cannot be displayed"),
+            Self::Auto => write!(f, "Auto"),
         }
     }
 }
@@ -2085,7 +2085,7 @@ impl<T: Serialize> Serialize for Auto<T> {
     {
         match self {
             Self::Fixed(value) => value.serialize(serializer),
-            Self::Auto => panic!("Auto values cannot be serialized"),
+            Self::Auto => panic!("Auto::Auto values cannot be serialized"),
         }
     }
 }
@@ -2387,5 +2387,38 @@ mod tests {
     fn db_field_value_expect_panic() {
         let auto_value = DbFieldValue::Auto;
         let _ = auto_value.expect_value("expected a value");
+    }
+
+    #[test]
+    fn auto_serialize_fixed() {
+        let auto = Auto::fixed(42i32);
+        let serialized = serde_json::to_string(&auto).unwrap();
+        assert_eq!(serialized, "42");
+    }
+
+    #[test]
+    #[should_panic(expected = "Auto::Auto values cannot be serialized")]
+    fn auto_serialize_auto() {
+        let auto = Auto::<i32>::Auto;
+        let _ = serde_json::to_string(&auto).unwrap();
+    }
+
+    #[test]
+    fn auto_deserialize_fixed() {
+        let deserialized: Auto<i32> = serde_json::from_str("42").unwrap();
+        assert_eq!(deserialized, Auto::fixed(42));
+    }
+
+    #[test]
+    fn auto_deserialize_auto() {
+        let deserialized: std::result::Result<Auto<i32>, serde_json::Error> =
+            serde_json::from_str("null");
+        assert!(deserialized.is_err());
+    }
+
+    #[test]
+    fn auto_display() {
+        assert_eq!(Auto::fixed(42).to_string(), "42");
+        assert_eq!(Auto::<i32>::Auto.to_string(), "Auto");
     }
 }

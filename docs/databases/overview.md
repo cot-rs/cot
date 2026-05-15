@@ -130,7 +130,6 @@ pub struct Post {
     id: Auto<i64>,
     new_type: NewType,
 }
-
 ```
 
 ## Relationships
@@ -216,7 +215,6 @@ impl Project for MyProject {
         )
     }
 }
-
 ```
 
 ## Summary

@@ -105,6 +105,7 @@
 #[cfg(feature = "swagger-ui")]
 pub mod swagger_ui;
 
+use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
@@ -112,6 +113,8 @@ use aide::openapi::{
     MediaType, Operation, Parameter, ParameterData, ParameterSchemaOrContent, PathItem, PathStyle,
     QueryStyle, ReferenceOr, RequestBody, StatusCode,
 };
+use cot::common_types::Email;
+use cot::db::{ForeignKey, LimitedString, Model};
 use cot_core::handler::{BoxRequestHandler, RequestHandler, handle_all_parameters};
 /// Derive macro for the [`ApiOperationResponse`] trait.
 ///
@@ -207,6 +210,8 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde_json::Value;
 
 use crate::auth::Auth;
+use crate::common_types::Url;
+use crate::db::Auto;
 use crate::form::Form;
 use crate::json::Json;
 use crate::request::extractors::{FromRequest, FromRequestHead, Path, RequestForm, UrlQuery};
@@ -1134,10 +1139,104 @@ where
     }
 }
 
+impl<T: JsonSchema> JsonSchema for Auto<T> {
+    fn schema_name() -> Cow<'static, str> {
+        format!("Auto_{}", T::schema_name()).into()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        format!("Auto<{}>", T::schema_id()).into()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        T::json_schema(generator)
+    }
+}
+
+impl<const LIMIT: u32> JsonSchema for LimitedString<LIMIT> {
+    fn schema_name() -> Cow<'static, str> {
+        format!("LimitedString_{LIMIT}").into()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        format!("LimitedString<{LIMIT}>").into()
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
+        Schema::try_from(Value::Object({
+            let mut object = ::serde_json::Map::new();
+            let _ = object.insert(("type").into(), ::serde_json::to_value("string").unwrap());
+            object
+        }))
+        .expect("invalid schema for LimitedString")
+    }
+}
+
+impl<T: JsonSchema + Model> JsonSchema for ForeignKey<T> {
+    fn schema_name() -> Cow<'static, str> {
+        format!("ForeignKey_{}", T::schema_name()).into()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        format!("ForeignKey<{}>", T::schema_id()).into()
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
+        Schema::try_from(Value::Object({
+            let mut object = ::serde_json::Map::new();
+            let _ = object.insert(("type").into(), ::serde_json::to_value("integer").unwrap());
+            let _ = object.insert(("format").into(), ::serde_json::to_value("int64").unwrap());
+            object
+        }))
+        .expect("invalid schema for ForeignKey")
+    }
+}
+
+impl JsonSchema for Email {
+    fn schema_name() -> Cow<'static, str> {
+        "Email".into()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        "Email".into()
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
+        Schema::try_from(Value::Object({
+            let mut object = ::serde_json::Map::new();
+            let _ = object.insert(("type").into(), ::serde_json::to_value("string").unwrap());
+            let _ = object.insert(("format").into(), ::serde_json::to_value("email").unwrap());
+            object
+        }))
+        .expect("invalid schema for Email")
+    }
+}
+
+impl JsonSchema for Url {
+    fn schema_name() -> Cow<'static, str> {
+        "Url".into()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        "Url".into()
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
+        Schema::try_from(Value::Object({
+            let mut object = ::serde_json::Map::new();
+            let _ = object.insert(("type").into(), ::serde_json::to_value("string").unwrap());
+            let _ = object.insert(("format").into(), ::serde_json::to_value("uri").unwrap());
+            object
+        }))
+        .expect("invalid schema for Url")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use aide::openapi::{Operation, Parameter};
-    use schemars::SchemaGenerator;
+    use cot_macros::model;
+    use schemars::{JsonSchema, SchemaGenerator};
     use serde::{Deserialize, Serialize};
 
     use super::*;
@@ -1585,5 +1684,51 @@ mod tests {
         let (status_code_2, response_2) = &responses[1];
         assert_eq!(status_code_2, &Some(StatusCode::Code(400)));
         assert_eq!(response_2.description, "Bad Request");
+    }
+
+    #[test]
+    fn json_schema_for_custom_types() {
+        #[derive(Debug, Clone, PartialEq, schemars::JsonSchema)]
+        #[model]
+        struct TestModel {
+            #[model(primary_key)]
+            id: Auto<i32>,
+            limited_str: LimitedString<10>,
+            email: Email,
+            url: Url,
+        }
+
+        let mut generator = SchemaGenerator::default();
+
+        let schema = <Auto<i32>>::json_schema(&mut generator);
+        let value = serde_json::to_value(&schema).unwrap();
+        assert_eq!(value["type"], "integer");
+        assert_eq!(<Auto<i32>>::schema_name(), "Auto_int32");
+
+        let schema = <LimitedString<10>>::json_schema(&mut generator);
+        let value = serde_json::to_value(&schema).unwrap();
+        assert_eq!(value["type"], "string");
+        assert_eq!(<LimitedString<10>>::schema_name(), "LimitedString_10");
+
+        let schema = <ForeignKey<TestModel>>::json_schema(&mut generator);
+        let value = serde_json::to_value(&schema).unwrap();
+        assert_eq!(value["type"], "integer");
+        assert_eq!(value["format"], "int64");
+        assert_eq!(
+            <ForeignKey<TestModel>>::schema_name(),
+            "ForeignKey_TestModel"
+        );
+
+        let schema = Email::json_schema(&mut generator);
+        let value = serde_json::to_value(&schema).unwrap();
+        assert_eq!(value["type"], "string");
+        assert_eq!(value["format"], "email");
+        assert_eq!(Email::schema_name(), "Email");
+
+        let schema = Url::json_schema(&mut generator);
+        let value = serde_json::to_value(&schema).unwrap();
+        assert_eq!(value["type"], "string");
+        assert_eq!(value["format"], "uri");
+        assert_eq!(Url::schema_name(), "Url");
     }
 }

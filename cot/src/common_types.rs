@@ -16,6 +16,7 @@ use cot::db::impl_postgres::PostgresValueRef;
 use cot::db::impl_sqlite::SqliteValueRef;
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[cfg(feature = "db")]
@@ -181,7 +182,7 @@ impl From<String> for Password {
 /// let url_string = url.into_string();
 /// assert_eq!(url_string, "https://example.com/");
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Url(url::Url);
 
 impl Url {
@@ -417,7 +418,7 @@ impl DatabaseField for Url {
 /// // Convert using TryFrom
 /// let email = Email::try_from("user@example.com").unwrap();
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Email(EmailAddress);
 
 impl Email {

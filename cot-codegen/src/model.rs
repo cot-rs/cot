@@ -146,6 +146,7 @@ pub struct FieldOpts {
     pub ty: syn::Type,
     pub primary_key: darling::util::Flag,
     pub unique: darling::util::Flag,
+    pub field_name: Option<String>,
 }
 
 impl FieldOpts {
@@ -205,11 +206,13 @@ impl FieldOpts {
         symbol_resolver: &SymbolResolver,
         self_reference: Option<&String>,
     ) -> Result<Field, syn::Error> {
-        let name = self
-            .ident
-            .clone()
-            .expect("Only named struct fields are supported");
-        let column_name = name.unraw().to_string();
+        let name = self.ident.clone().expect("Only structs are supported");
+
+        let column_name = if let Some(specified_field_name) = &self.field_name {
+            specified_field_name.clone()
+        } else {
+            name.unraw().to_string()
+        };
 
         let (auto_value, foreign_key) = (
             self.find_type("cot::db::Auto", symbol_resolver).is_some(),
@@ -493,6 +496,20 @@ mod tests {
     }
 
     #[test]
+    fn field_opts_specified_field_name() {
+        let input: syn::Field = parse_quote! {
+            #[model(field_name="test_field")]
+            test: String
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let field = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"TestModel".to_string()))
+            .unwrap();
+        assert_eq!(field.name.to_string(), "test");
+        assert_eq!(field.column_name, "test_field");
+    }
+
+    #[test]
     fn find_type_resolved() {
         let input: syn::Type =
             parse_quote! { ::my_crate::MyContainer<'a, Vec<std::string::String>> };
@@ -516,6 +533,7 @@ mod tests {
             ty: parse_quote! { MyContainer<std::string::String> },
             primary_key: darling::util::Flag::default(),
             unique: darling::util::Flag::default(),
+            field_name: None,
         };
 
         assert!(opts.find_type("my_crate::MyContainer", &resolver).is_some());

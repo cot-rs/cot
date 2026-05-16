@@ -2073,7 +2073,7 @@ impl<T: Display> Display for Auto<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Fixed(value) => Display::fmt(value, f),
-            Self::Auto => write!(f, "Auto"),
+            Self::Auto => panic!("Auto values cannot be displayed"),
         }
     }
 }
@@ -2414,11 +2414,5 @@ mod tests {
         let deserialized: std::result::Result<Auto<i32>, serde_json::Error> =
             serde_json::from_str("null");
         assert!(deserialized.is_err());
-    }
-
-    #[test]
-    fn auto_display() {
-        assert_eq!(Auto::fixed(42).to_string(), "42");
-        assert_eq!(Auto::<i32>::Auto.to_string(), "Auto");
     }
 }

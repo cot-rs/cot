@@ -1169,7 +1169,16 @@ impl<const LIMIT: u32> JsonSchema for LimitedString<LIMIT> {
     fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
         Schema::try_from(Value::Object({
             let mut object = ::serde_json::Map::new();
-            let _ = object.insert(("type").into(), ::serde_json::to_value("string").unwrap());
+            let _ = object.insert(
+                ("type").into(),
+                ::serde_json::to_value("string")
+                    .expect("failed to serialize type for LimitedString schema"),
+            );
+            let _ = object.insert(
+                ("maxLength").into(),
+                ::serde_json::to_value(LIMIT)
+                    .expect("failed to serialize maxLength for LimitedString schema"),
+            );
             object
         }))
         .expect("invalid schema for LimitedString")
@@ -1177,7 +1186,10 @@ impl<const LIMIT: u32> JsonSchema for LimitedString<LIMIT> {
 }
 
 #[cfg(feature = "db")]
-impl<T: JsonSchema + Model> JsonSchema for ForeignKey<T> {
+impl<T: JsonSchema + Model> JsonSchema for ForeignKey<T>
+where
+    T::PrimaryKey: JsonSchema,
+{
     fn schema_name() -> Cow<'static, str> {
         format!("ForeignKey_{}", T::schema_name()).into()
     }
@@ -1186,14 +1198,15 @@ impl<T: JsonSchema + Model> JsonSchema for ForeignKey<T> {
         format!("ForeignKey<{}>", T::schema_id()).into()
     }
 
-    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
-        Schema::try_from(Value::Object({
-            let mut object = ::serde_json::Map::new();
-            let _ = object.insert(("type").into(), ::serde_json::to_value("integer").unwrap());
-            let _ = object.insert(("format").into(), ::serde_json::to_value("int").unwrap());
-            object
-        }))
-        .expect("invalid schema for ForeignKey")
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        let mut schema = T::PrimaryKey::json_schema(generator);
+        if let Some(obj) = schema.as_object_mut() {
+            let _ = obj.insert(
+                ("description").into(),
+                Value::String(format!("Primary key for {}", T::schema_name())),
+            );
+        }
+        schema
     }
 }
 
@@ -1208,9 +1221,15 @@ impl JsonSchema for Email {
 
     fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
         Schema::try_from(Value::Object({
-            let mut object = ::serde_json::Map::new();
-            let _ = object.insert(("type").into(), ::serde_json::to_value("string").unwrap());
-            let _ = object.insert(("format").into(), ::serde_json::to_value("email").unwrap());
+            let mut object = serde_json::Map::new();
+            let _ = object.insert(
+                ("type").into(),
+                serde_json::to_value("string").expect("failed to serialize type for Email schema"),
+            );
+            let _ = object.insert(
+                ("format").into(),
+                serde_json::to_value("email").expect("failed to serialize format for Email schema"),
+            );
             object
         }))
         .expect("invalid schema for Email")
@@ -1228,9 +1247,15 @@ impl JsonSchema for Url {
 
     fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
         Schema::try_from(Value::Object({
-            let mut object = ::serde_json::Map::new();
-            let _ = object.insert(("type").into(), ::serde_json::to_value("string").unwrap());
-            let _ = object.insert(("format").into(), ::serde_json::to_value("uri").unwrap());
+            let mut object = serde_json::Map::new();
+            let _ = object.insert(
+                ("type").into(),
+                serde_json::to_value("string").expect("failed to serialize type for Url schema"),
+            );
+            let _ = object.insert(
+                ("format").into(),
+                serde_json::to_value("uri").expect("failed to serialize format for Url schema"),
+            );
             object
         }))
         .expect("invalid schema for Url")
@@ -1709,6 +1734,7 @@ mod tests {
         let schema = <LimitedString<10>>::json_schema(&mut generator);
         let value = serde_json::to_value(&schema).unwrap();
         assert_eq!(value["type"], "string");
+        assert_eq!(value["maxLength"], 10);
         assert_eq!(<LimitedString<10>>::schema_name(), "LimitedString_10");
         assert_eq!(<LimitedString<10>>::schema_id(), "LimitedString<10>");
     }
@@ -1728,7 +1754,8 @@ mod tests {
 
         let value = serde_json::to_value(&schema).unwrap();
         assert_eq!(value["type"], "integer");
-        assert_eq!(value["format"], "int");
+        assert_eq!(value["format"], "int32");
+        assert_eq!(value["description"], "Primary key for TestModel");
         assert_eq!(
             <ForeignKey<TestModel>>::schema_name(),
             "ForeignKey_TestModel"

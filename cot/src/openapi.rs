@@ -1172,12 +1172,11 @@ impl<const LIMIT: u32> JsonSchema for LimitedString<LIMIT> {
             let _ = object.insert(
                 ("type").into(),
                 ::serde_json::to_value("string")
-                    .expect("failed to serialize type for LimitedString schema"),
+                    .expect("serializing a fixed value should never fail"),
             );
             let _ = object.insert(
                 ("maxLength").into(),
-                ::serde_json::to_value(LIMIT)
-                    .expect("failed to serialize maxLength for LimitedString schema"),
+                ::serde_json::to_value(LIMIT).expect("serializing a fixed value should not fail"),
             );
             object
         }))
@@ -1224,11 +1223,11 @@ impl JsonSchema for Email {
             let mut object = serde_json::Map::new();
             let _ = object.insert(
                 ("type").into(),
-                serde_json::to_value("string").expect("failed to serialize type for Email schema"),
+                serde_json::to_value("string").expect("serializing a fixed value should not fail"),
             );
             let _ = object.insert(
                 ("format").into(),
-                serde_json::to_value("email").expect("failed to serialize format for Email schema"),
+                serde_json::to_value("email").expect("serializing a fixed value should not fail"),
             );
             object
         }))
@@ -1250,11 +1249,11 @@ impl JsonSchema for Url {
             let mut object = serde_json::Map::new();
             let _ = object.insert(
                 ("type").into(),
-                serde_json::to_value("string").expect("failed to serialize type for Url schema"),
+                serde_json::to_value("string").expect("serializing a fixed value should not fail"),
             );
             let _ = object.insert(
                 ("format").into(),
-                serde_json::to_value("uri").expect("failed to serialize format for Url schema"),
+                serde_json::to_value("uri").expect("serializing a fixed value should not fail"),
             );
             object
         }))

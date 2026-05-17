@@ -2085,7 +2085,9 @@ impl<T: Serialize> Serialize for Auto<T> {
     {
         match self {
             Self::Fixed(value) => value.serialize(serializer),
-            Self::Auto => panic!("Auto::Auto values cannot be serialized"),
+            Self::Auto => Err(serde::ser::Error::custom(
+                "Auto::Auto values cannot be serialized",
+            )),
         }
     }
 }
@@ -2397,10 +2399,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Auto::Auto values cannot be serialized")]
     fn auto_serialize_auto() {
         let auto = Auto::<i32>::Auto;
-        let _ = serde_json::to_string(&auto).unwrap();
+        let value = serde_json::to_string(&auto);
+        assert!(value.is_err());
     }
 
     #[test]

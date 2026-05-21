@@ -39,6 +39,7 @@ pub struct DatabaseUser {
     #[model(unique)]
     username: LimitedString<MAX_USERNAME_LENGTH>,
     password: PasswordHash,
+    is_active: bool,
 }
 
 /// An error that occurs when creating a user.
@@ -61,6 +62,7 @@ impl DatabaseUser {
             id,
             username,
             password: PasswordHash::from_password(password),
+            is_active: true,
         }
     }
 
@@ -111,6 +113,43 @@ impl DatabaseUser {
         user.insert(db).await.map_err(AuthError::backend_error)?;
 
         Ok(user)
+    }
+
+    /// Sets whether the user is active.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::auth::User;
+    /// use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
+    /// use cot::common_types::Password;
+    /// use cot::db::{Database, Model};
+    /// use cot::html::Html;
+    ///
+    /// async fn view(db: Database) -> cot::Result<Html> {
+    ///     let mut user =
+    ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
+    ///             .await?;
+    ///     user.set_is_active(false);
+    ///     user.save(&db).await?;
+    ///
+    ///     assert!(!user.is_active());
+    ///
+    ///     Ok(Html::new("is_active changed!"))
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// #     use cot::test::{TestDatabase, TestRequestBuilder};
+    /// #     let mut test_database = TestDatabase::new_sqlite().await?;
+    /// #     test_database.with_auth().run_migrations().await;
+    /// #     view(test_database.database()).await?;
+    /// #     test_database.cleanup().await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn set_is_active(&mut self, is_active: bool) {
+        self.is_active = is_active;
     }
 
     /// Retrieves a user by their integer ID. It returns [`None`] if the user
@@ -353,7 +392,7 @@ impl User for DatabaseUser {
     }
 
     fn is_active(&self) -> bool {
-        true
+        self.is_active
     }
 
     fn is_authenticated(&self) -> bool {
@@ -607,6 +646,20 @@ mod tests {
                 .session_auth_hash(&SecretKey::new(b"supersecretkey"))
                 .is_some()
         );
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn database_user_inactive() {
+        let mut user = DatabaseUser::new(
+            Auto::fixed(1),
+            LimitedString::new("testuser").unwrap(),
+            &Password::new("password123"),
+        );
+        user.set_is_active(false);
+
+        let user_ref: &dyn User = &user;
+        assert!(!user_ref.is_active());
     }
 
     #[cot::test]

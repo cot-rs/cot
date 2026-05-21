@@ -120,12 +120,33 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUser;
-    /// # use cot::common_types::Password;
-    /// # use cot::db::{Auto, LimitedString};
+    /// use cot::auth::User;
+    /// use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
+    /// use cot::common_types::Password;
+    /// use cot::db::{Database, Model};
+    /// use cot::html::Html;
     ///
-    /// # let mut user = DatabaseUser::new(Auto::fixed(1), LimitedString::new("user").unwrap(), &Password::new("password"));
-    /// user.set_is_active(false);
+    /// async fn view(db: Database) -> cot::Result<Html> {
+    ///     let mut user =
+    ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
+    ///             .await?;
+    ///     user.set_is_active(false);
+    ///     user.save(&db).await?;
+    ///
+    ///     assert!(!user.is_active());
+    ///
+    ///     Ok(Html::new("is_active changed!"))
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// #     use cot::test::{TestDatabase, TestRequestBuilder};
+    /// #     let mut test_database = TestDatabase::new_sqlite().await?;
+    /// #     test_database.with_auth().run_migrations().await;
+    /// #     view(test_database.database()).await?;
+    /// #     test_database.cleanup().await?;
+    /// #     Ok(())
+    /// # }
     /// ```
     pub fn set_is_active(&mut self, is_active: bool) {
         self.is_active = is_active;

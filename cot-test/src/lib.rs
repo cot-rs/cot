@@ -217,17 +217,17 @@ fn main() {{
         }
 
         let static_dir = self.path.join("static");
-        fs::create_dir_all(static_dir.join("css")).ok();
-        fs::create_dir_all(static_dir.join("images")).ok();
-        fs::write(static_dir.join("css/main.css"), "").ok();
-        fs::write(static_dir.join("images/logo.png"), "").ok();
+        fs::create_dir_all(static_dir.join("css"))?;
+        fs::create_dir_all(static_dir.join("images"))?;
+        fs::write(static_dir.join("css/main.css"), "")?;
+        fs::write(static_dir.join("images/logo.png"), "")?;
 
         Ok(())
     }
 
     fn run_cargo_check(&self) -> Result<(), Failed> {
         let target_dir = self.temp_dir.join("doc_test_target");
-        fs::create_dir_all(&target_dir).ok();
+        fs::create_dir_all(&target_dir)?;
 
         let output = cot_cli::test_utils::project_cargo(&self.path)
             .arg("check")

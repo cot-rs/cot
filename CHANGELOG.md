@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/cot-rs/cot/compare/cot-v0.6.0...cot-v0.7.0) - 2026-05-21
+
+[View diff on diff.rs](https://diff.rs/cot/0.6.0/cot/0.7.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Implement `Serialize`, `Deserialize`, and `JsonSchema` implementations for cot internal types ([#575](https://github.com/cot-rs/cot/pull/575)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Implement `From<DbFieldValue>` for Non primitive types ([#562](https://github.com/cot-rs/cot/pull/562)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Derive `Ord` and `PartialOrd` for `Auto` ([#544](https://github.com/cot-rs/cot/pull/544)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Allow accessing extra config ([#518](https://github.com/cot-rs/cot/pull/518)) (by [@m4tx](https://github.com/m4tx))
+
+### Fixes
+
+- Non-ASCII URLs can be properly routed now ([#561](https://github.com/cot-rs/cot/pull/561)) (by [@m4tx](https://github.com/m4tx))
+- Place correct contributing guide link ([#557](https://github.com/cot-rs/cot/pull/557)) (by [@kingazm](https://github.com/kingazm))
+
+### Other
+
+- Add index route to JSON example ([#572](https://github.com/cot-rs/cot/pull/572)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add DeepWiki badge ([#568](https://github.com/cot-rs/cot/pull/568)) (by [@seqre](https://github.com/seqre))
+- Fix clippy errors ([#560](https://github.com/cot-rs/cot/pull/560)) (by [@m4tx](https://github.com/m4tx))
+- Add query macro docs ([#543](https://github.com/cot-rs/cot/pull/543)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- *(deps)* Remove chumsky ([#538](https://github.com/cot-rs/cot/pull/538)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Use `grass_compiler` directly ([#537](https://github.com/cot-rs/cot/pull/537)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump fake from 4.4.0 to 5.1.0 ([#533](https://github.com/cot-rs/cot/pull/533)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+
 ## [0.6.0](https://github.com/cot-rs/cot/compare/cot-v0.5.0...cot-v0.6.0) - 2026-03-18
 
 [View diff on diff.rs](https://diff.rs/cot/0.5.0/cot/0.6.0/Cargo.toml)

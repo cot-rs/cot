@@ -293,10 +293,15 @@ impl From<tower_sessions::session::Error> for Error {
 
 #[cfg(test)]
 mod tests {
+    use derive_more::with_trait::Debug;
     use insta::assert_snapshot;
     use serde::ser::Error as _;
 
     use super::*;
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("outer error")]
+    struct OuterError(#[source] std::io::Error);
 
     #[test]
     fn error_new() {
@@ -396,10 +401,6 @@ mod tests {
         ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
     )]
     fn error_debug_printing() {
-        #[derive(::core::fmt::Debug, thiserror::Error)]
-        #[error("outer error")]
-        struct OuterError(#[source] std::io::Error);
-
         let err = Error::internal("root error");
         assert_snapshot!(format!("{err:?}"), @"root error");
 
@@ -418,17 +419,67 @@ mod tests {
            0: inner io error
         "###);
 
-        let err = Error::with_status(
-            OuterError(std::io::Error::other("inner io error")),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        );
+        let err = Error::internal(OuterError(std::io::Error::other("inner io error")));
         assert_snapshot!(format!("{err:?}"), @r###"
         outer error
 
         caused by:
            0: inner io error
         "###);
+    }
 
-        assert_snapshot!(format!("{err}"), @"outer error");
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+    )]
+    fn error_debug_printing_chain() {
+        #[derive(Debug, thiserror::Error)]
+        #[error("wrapper error")]
+        struct WrapperError(#[source] Error);
+
+        let err = Error::internal(OuterError(std::io::Error::other("inner io error")));
+        let err = Error::internal(WrapperError(err));
+
+        assert_snapshot!(format!("{err:?}"), @"
+        wrapper error
+
+        caused by:
+           0: outer error
+           1: outer error
+           2: inner io error
+        ");
+    }
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+    )]
+    fn error_debug_printing_alternate() {
+        let err = Error::with_status(
+            OuterError(std::io::Error::other("inner io error")),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        );
+        assert_snapshot!(format!("{err:#?}"), @r#"
+        ErrorImpl {
+            inner: WithStatusCode(
+                ErrorImpl {
+                    inner: OuterError(
+                        Custom {
+                            kind: Other,
+                            error: "inner io error",
+                        },
+                    ),
+                    status_code: Some(
+                        500,
+                    ),
+                    ..
+                },
+            ),
+            status_code: None,
+            ..
+        }
+        "#);
     }
 }

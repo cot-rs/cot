@@ -101,11 +101,7 @@ impl DatabaseUser {
         username: T,
         password: U,
     ) -> Result<Self> {
-        let username = username.into();
-        let username_length = username.len();
-        let username = LimitedString::<MAX_USERNAME_LENGTH>::new(username).map_err(|_| {
-            AuthError::backend_error(CreateUserError::UsernameTooLong(username_length))
-        })?;
+        let username = Self::convert_username(username)?;
 
         let mut user = Self::new(Auto::auto(), username, &password.into());
         user.insert(db).await.map_err(AuthError::backend_error)?;
@@ -113,10 +109,25 @@ impl DatabaseUser {
         Ok(user)
     }
 
+    fn convert_username<T: Into<String>>(
+        username: T,
+    ) -> Result<LimitedString<MAX_USERNAME_LENGTH>> {
+        let username = username.into();
+        let username_length = username.len();
+        let username = LimitedString::<MAX_USERNAME_LENGTH>::new(username).map_err(|_| {
+            AuthError::backend_error(CreateUserError::UsernameTooLong(username_length))
+        })?;
+        Ok(username)
+    }
+
     /// Sets the username of the user.
     ///
     /// Remember to call [`save()`][cot::db::Model::save] after calling this
     /// function - otherwise, the username will never be saved to the database.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the user could not be saved.
     ///
     /// # Example
     ///
@@ -130,7 +141,7 @@ impl DatabaseUser {
     ///     let mut user =
     ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
     ///             .await?;
-    ///     user.set_username(LimitedString::new("new_username").unwrap());
+    ///     user.set_username("new_username")?;
     ///     user.save(&db).await?;
     ///
     ///     assert_eq!(user.username(), "new_username");
@@ -148,8 +159,9 @@ impl DatabaseUser {
     /// #     Ok(())
     /// # }
     /// ```
-    pub fn set_username(&mut self, username: LimitedString<MAX_USERNAME_LENGTH>) {
-        self.username = username;
+    pub fn set_username(&mut self, username: impl Into<String>) -> Result<()> {
+        self.username = Self::convert_username(username)?;
+        Ok(())
     }
 
     /// Sets the password of the user.

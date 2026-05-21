@@ -1,5 +1,7 @@
 use darling::{FromDeriveInput, FromField, FromMeta};
 use heck::ToSnakeCase;
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 use syn::ext::IdentExt;
 use syn::spanned::Spanned;
 
@@ -139,6 +141,72 @@ impl ModelOpts {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, FromMeta)]
+pub struct ForeignKeyArgs {
+    #[darling(default)]
+    pub on_delete: ForeignKeyOnDeletePolicy,
+    #[darling(default)]
+    pub on_update: ForeignKeyOnUpdatePolicy,
+}
+
+#[derive(Debug, Clone, Copy, Default, FromMeta, PartialEq, Eq, Hash)]
+pub enum ForeignKeyOnDeletePolicy {
+    #[default]
+    Restrict,
+    Cascade,
+    SetNone,
+    NoAction,
+}
+
+impl ToTokens for ForeignKeyOnDeletePolicy {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let variant = match self {
+            ForeignKeyOnDeletePolicy::Restrict => {
+                quote! {::cot::db::ForeignKeyOnDeletePolicy::Restrict}
+            }
+            ForeignKeyOnDeletePolicy::Cascade => {
+                quote! {::cot::db::ForeignKeyOnDeletePolicy::Cascade}
+            }
+            ForeignKeyOnDeletePolicy::SetNone => {
+                quote! {::cot::db::ForeignKeyOnDeletePolicy::SetNone}
+            }
+            ForeignKeyOnDeletePolicy::NoAction => {
+                quote! {::cot::db::ForeignKeyOnDeletePolicy::NoAction}
+            }
+        };
+        variant.to_tokens(tokens);
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, FromMeta, PartialEq, Eq, Hash)]
+pub enum ForeignKeyOnUpdatePolicy {
+    Restrict,
+    #[default]
+    Cascade,
+    SetNone,
+    NoAction,
+}
+
+impl ToTokens for ForeignKeyOnUpdatePolicy {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let variant = match self {
+            ForeignKeyOnUpdatePolicy::Restrict => {
+                quote! {::cot::db::ForeignKeyOnUpdatePolicy::Restrict}
+            }
+            ForeignKeyOnUpdatePolicy::Cascade => {
+                quote! {::cot::db::ForeignKeyOnUpdatePolicy::Cascade}
+            }
+            ForeignKeyOnUpdatePolicy::SetNone => {
+                quote! {::cot::db::ForeignKeyOnUpdatePolicy::SetNone}
+            }
+            ForeignKeyOnUpdatePolicy::NoAction => {
+                quote! {::cot::db::ForeignKeyOnUpdatePolicy::NoAction}
+            }
+        };
+        variant.to_tokens(tokens);
+    }
+}
+
 #[derive(Debug, Clone, FromField)]
 #[darling(attributes(model))]
 pub struct FieldOpts {
@@ -147,6 +215,7 @@ pub struct FieldOpts {
     pub primary_key: darling::util::Flag,
     pub unique: darling::util::Flag,
     pub field_name: Option<String>,
+    pub foreign_key: Option<ForeignKeyArgs>,
 }
 
 impl FieldOpts {
@@ -195,6 +264,11 @@ impl FieldOpts {
         })
     }
 
+    fn find_foreign_key_type(&self, symbol_resolver: &SymbolResolver) -> Option<syn::Type> {
+        self.find_type("cot::db::ForeignKey", symbol_resolver)
+            .or_else(|| self.find_type("ForeignKey", symbol_resolver))
+    }
+
     /// Convert the field options into a field.
     ///
     /// # Panics
@@ -214,12 +288,25 @@ impl FieldOpts {
             name.unraw().to_string()
         };
 
-        let (auto_value, foreign_key) = (
-            self.find_type("cot::db::Auto", symbol_resolver).is_some(),
-            self.find_type("cot::db::ForeignKey", symbol_resolver)
-                .map(ForeignKeySpec::try_from)
-                .transpose()?,
-        );
+        let auto_value = self.find_type("cot::db::Auto", symbol_resolver).is_some();
+        let foreign_key_ty = self.find_foreign_key_type(symbol_resolver);
+
+        if self.foreign_key.is_some() && foreign_key_ty.is_none() {
+            return Err(syn::Error::new(
+                self.ident.span(),
+                "`#[model(foreign_key(...))]` can only be used on `ForeignKey<T>` fields",
+            ));
+        }
+        let foreign_key = foreign_key_ty
+            .map(ForeignKeySpec::try_from)
+            .transpose()?
+            .map(|mut fk| {
+                let args = self.foreign_key.unwrap_or_default();
+                fk.set_on_delete(args.on_delete);
+                fk.set_on_update(args.on_update);
+                fk
+            });
+
         let is_primary_key = self.primary_key.is_present();
         let mut resolved_ty = self.ty.clone();
         symbol_resolver.resolve(&mut resolved_ty, self_reference);
@@ -273,6 +360,19 @@ pub struct Field {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ForeignKeySpec {
     pub to_model: syn::Type,
+    pub on_delete: Option<ForeignKeyOnDeletePolicy>,
+    pub on_update: Option<ForeignKeyOnUpdatePolicy>,
+}
+
+impl ForeignKeySpec {
+    pub fn set_on_delete(&mut self, on_delete: ForeignKeyOnDeletePolicy) -> &mut Self {
+        self.on_delete = Some(on_delete);
+        self
+    }
+    pub fn set_on_update(&mut self, on_update: ForeignKeyOnUpdatePolicy) -> &mut Self {
+        self.on_update = Some(on_update);
+        self
+    }
 }
 
 impl TryFrom<syn::Type> for ForeignKeySpec {
@@ -307,6 +407,8 @@ impl TryFrom<syn::Type> for ForeignKeySpec {
         if let syn::GenericArgument::Type(ty) = inner {
             Ok(Self {
                 to_model: ty.clone(),
+                on_delete: None,
+                on_update: None,
             })
         } else {
             Err(syn::Error::new(
@@ -534,6 +636,7 @@ mod tests {
             primary_key: darling::util::Flag::default(),
             unique: darling::util::Flag::default(),
             field_name: None,
+            foreign_key: None,
         };
 
         assert!(opts.find_type("my_crate::MyContainer", &resolver).is_some());

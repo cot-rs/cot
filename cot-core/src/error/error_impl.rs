@@ -441,7 +441,9 @@ mod tests {
         #[error("wrapper error")]
         struct WrapperError(#[source] OuterError);
 
-        let err = Error::internal(WrapperError(OuterError(std::io::Error::other("inner io error"))));
+        let err = Error::internal(WrapperError(OuterError(std::io::Error::other(
+            "inner io error",
+        ))));
 
         assert_snapshot!(format!("{err:?}"), @"
         wrapper error

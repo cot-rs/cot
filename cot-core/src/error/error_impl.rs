@@ -186,7 +186,10 @@ impl Debug for Error {
                 writeln!(f, "caused by:")?;
                 let mut source = Some(source);
                 let mut i = 0;
-                while let Some(e) = source {
+                while let Some(mut e) = source {
+                    if let Some(ekurwa) = e.downcast_ref::<Self>() {
+                        e = ekurwa.inner();
+                    }
                     writeln!(f, "{i:4}: {e}")?;
 
                     source = e.source();
@@ -436,18 +439,16 @@ mod tests {
     fn error_debug_printing_chain() {
         #[derive(Debug, thiserror::Error)]
         #[error("wrapper error")]
-        struct WrapperError(#[source] Error);
+        struct WrapperError(#[source] OuterError);
 
-        let err = Error::internal(OuterError(std::io::Error::other("inner io error")));
-        let err = Error::internal(WrapperError(err));
+        let err = Error::internal(WrapperError(OuterError(std::io::Error::other("inner io error"))));
 
         assert_snapshot!(format!("{err:?}"), @"
         wrapper error
 
         caused by:
            0: outer error
-           1: outer error
-           2: inner io error
+           1: inner io error
         ");
     }
 

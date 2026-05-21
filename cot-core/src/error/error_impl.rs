@@ -186,10 +186,7 @@ impl Debug for Error {
                 writeln!(f, "caused by:")?;
                 let mut source = Some(source);
                 let mut i = 0;
-                while let Some(mut e) = source {
-                    if let Some(ekurwa) = e.downcast_ref::<Self>() {
-                        e = ekurwa.inner();
-                    }
+                while let Some(e) = source {
                     writeln!(f, "{i:4}: {e}")?;
 
                     source = e.source();

@@ -174,7 +174,7 @@ impl SessionStore for RedisStore {
         for _ in 0..=MAX_COLLISION_RETRIES {
             let key = session_record.id.to_string();
             let set_ok: bool = conn
-                .set_options(key, &data, options)
+                .set_options(key, &data, options.clone())
                 .await
                 .map_err(|err| RedisStoreError::Command(Box::new(err)))?;
             if set_ok {

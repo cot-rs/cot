@@ -1,6 +1,6 @@
 [package]
 name = "cot_core"
-version = "0.5.0"
+version = "0.6.0"
 description = "The Rust web framework for lazy developers - framework core."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true
@@ -29,7 +29,8 @@ http-body-util.workspace = true
 http-body.workspace = true
 http.workspace = true
 indexmap.workspace = true
-serde.workspace = true
+schemars = { workspace = true, optional = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 serde_html_form = { workspace = true, features = ["de", "std"] }
 serde_json.workspace = true
 serde_path_to_error.workspace = true
@@ -40,10 +41,13 @@ tower.workspace = true
 
 [dev-dependencies]
 async-stream.workspace = true
-cot = { workspace = true, features = ["test"] }
+# Specifying path directly to avoid circular dependencies on publishing cot and cot-core.
+# When publishing, path dependencies are dropped, removing the cycle.
+cot = { path = "../cot", features = ["test"] }
 futures.workspace = true
 tokio.workspace = true
 
 [features]
 default = []
 json = []
+schemars = ["dep:schemars"]

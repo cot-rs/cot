@@ -1,6 +1,6 @@
 [package]
 name = "cot"
-version = "0.5.0"
+version = "0.6.0"
 description = "The Rust web framework for lazy developers."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true
@@ -20,24 +20,22 @@ aide = { workspace = true, optional = true }
 askama = { workspace = true, features = ["std"] }
 async-trait.workspace = true
 axum = { workspace = true, features = ["http1", "tokio"] }
+blake3.workspace = true
 bytes.workspace = true
 chrono = { workspace = true, features = ["alloc", "serde", "clock"] }
 chrono-tz.workspace = true
-chumsky = { workspace = true, optional = true }
 clap.workspace = true
 cot_core.workspace = true
 cot_macros.workspace = true
 deadpool-redis = { workspace = true, features = ["tokio-comp", "rt_tokio_1"], optional = true }
 derive_builder.workspace = true
 derive_more = { workspace = true, features = ["debug", "deref", "display", "from"] }
-digest.workspace = true
 email_address.workspace = true
 fake = { workspace = true, optional = true, features = ["derive", "chrono"] }
 form_urlencoded.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
 hex.workspace = true
-hmac.workspace = true
 http-body-util.workspace = true
 http.workspace = true
 humantime.workspace = true
@@ -50,12 +48,11 @@ multer.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
 pin-project-lite.workspace = true
 redis = { workspace = true, features = ["aio", "tokio-comp"], optional = true }
-schemars = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true, features = ["derive"] }
 sea-query = { workspace = true, optional = true }
 sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
-sha2.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
@@ -83,7 +80,7 @@ trybuild.workspace = true
 
 [build-dependencies]
 ahash.workspace = true
-grass.workspace = true
+grass_compiler.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
@@ -91,11 +88,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-machete]
 ignored = [
-    # Used indirectly by `grass`, but it doesn't work with the latest versions of Rust if minimal dependency versions
-    # are used
+    # Used indirectly by `grass_compiler`, but it doesn't work with the latest versions of Rust if minimal dependency
+    # versions are used
     "ahash",
-    # Used by `lettre`, but it causes dependency issues if minimal dependency versions are used
-    "chumsky",
     # Used by `lettre`, but it causes dependency issues if minimal dependency versions are used
     "idna",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly
@@ -107,13 +102,13 @@ default = ["sqlite", "postgres", "mysql", "json"]
 full = ["default", "fake", "live-reload", "test", "cache", "redis", "email"]
 fake = ["dep:fake"]
 db = ["dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
-email = ["dep:lettre", "dep:chumsky", "dep:idna"]
+email = ["dep:lettre", "dep:idna"]
 sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
 postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres", "sqlx/postgres"]
 mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
 redis = ["cache", "dep:deadpool-redis", "dep:redis", "json"]
 json = ["dep:serde_json", "cot_core/json"]
-openapi = ["json", "dep:aide", "dep:schemars"]
+openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
 cache = ["json"]

@@ -34,7 +34,7 @@ use crate::utils::chrono::DateTimeWithOffsetAdapter;
 ///
 /// This is all the project-specific configuration data that can (and makes
 /// sense to) be expressed in a TOML configuration file.
-#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[derive(Debug, Clone, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -271,6 +271,40 @@ pub struct ProjectConfig {
     /// ```
     #[cfg(feature = "email")]
     pub email: EmailConfig,
+    /// All the config that was not recognized.
+    ///
+    /// This is useful for parsing project-specific config that is not part of
+    /// any of the predefined fields in `ProjectConfig`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use serde::Deserialize;
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [my_cot_project]
+    /// foo = "bar"
+    /// "#,
+    /// )?;
+    ///
+    /// #[derive(Deserialize)]
+    /// struct MyCotProjectConfig {
+    ///     foo: String,
+    /// }
+    ///
+    /// let my_config: MyCotProjectConfig = config
+    ///     .extra
+    ///     .get("my_cot_project")
+    ///     .ok_or("could not find the project config")?
+    ///     .clone()
+    ///     .try_into()?;
+    /// assert_eq!(my_config.foo, "bar");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[serde(flatten)]
+    pub extra: toml::Table,
 }
 
 const fn default_debug() -> bool {
@@ -381,6 +415,7 @@ impl ProjectConfigBuilder {
             middlewares: self.middlewares.clone().unwrap_or_default(),
             #[cfg(feature = "email")]
             email: self.email.clone().unwrap_or_default(),
+            extra: toml::Table::default(),
         }
     }
 }
@@ -1543,7 +1578,7 @@ impl From<Expiry> for tower_sessions::Expiry {
             Expiry::OnSessionEnd => Self::OnSessionEnd,
             Expiry::OnInactivity(duration) => {
                 Self::OnInactivity(time::Duration::try_from(duration).unwrap_or_else(|e| {
-                    panic!("could not convert {duration:?} into a valid time::Duration: {e:?}",)
+                    panic!("could not convert {duration:?} into a valid time::Duration: {e:?}")
                 }))
             }
             Expiry::AtDateTime(time) => {
@@ -3115,5 +3150,30 @@ mod tests {
         let u2 = EmailUrl::from(s.to_string());
         assert_eq!(u1, u2);
         assert_eq!(u1.as_str(), s);
+    }
+
+    #[test]
+    fn config_extra_can_be_accessed() {
+        #[derive(Deserialize)]
+        struct CustomConfig {
+            foo: String,
+        }
+
+        let config = ProjectConfig::from_toml(
+            r#"
+        [custom_config]
+        foo = "bar"
+        "#,
+        )
+        .unwrap();
+
+        let my_config: CustomConfig = config
+            .extra
+            .get("custom_config")
+            .unwrap()
+            .clone()
+            .try_into()
+            .unwrap();
+        assert_eq!(my_config.foo, "bar");
     }
 }

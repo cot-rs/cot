@@ -113,6 +113,44 @@ impl DatabaseUser {
         Ok(user)
     }
 
+    /// Sets the username of the user.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::auth::db::DatabaseUser;
+    /// use cot::db::LimitedString;
+    /// # use cot::common_types::Password;
+    /// # use cot::db::Auto;
+    ///
+    /// # let mut user = DatabaseUser::new(Auto::fixed(1), LimitedString::new("oldname").unwrap(), &Password::new("password"));
+    /// user.set_username(LimitedString::new("newname").unwrap());
+    ///
+    /// use cot::auth::User;
+    /// assert_eq!(User::username(&user).unwrap(), "newname");
+    /// ```
+    pub fn set_username(&mut self, username: LimitedString<MAX_USERNAME_LENGTH>) {
+        self.username = username;
+    }
+
+    /// Sets the password of the user.
+    ///
+    /// The password will be automatically hashed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::auth::db::DatabaseUser;
+    /// use cot::common_types::Password;
+    /// # use cot::db::{Auto, LimitedString};
+    ///
+    /// # let mut user = DatabaseUser::new(Auto::fixed(1), LimitedString::new("user").unwrap(), &Password::new("oldpassword"));
+    /// user.set_password(&Password::new("newpassword"));
+    /// ```
+    pub fn set_password(&mut self, password: &Password) {
+        self.password = PasswordHash::from_password(password);
+    }
+
     /// Retrieves a user by their integer ID. It returns [`None`] if the user
     /// does not exist.
     ///

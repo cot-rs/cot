@@ -831,12 +831,23 @@ impl MigrationOperationGenerator {
                 &migration_field.name, app_model.model.name
             ),
         );
-        Some(DynOperation::AlterField {
+
+        let op = DynOperation::AlterField {
             table_name: app_model.model.table_name.clone(),
             model_ty: app_model.model.resolved_ty.clone(),
             old_field: Box::new(migration_field.clone()),
             new_field: Box::new(app_field.clone()),
-        })
+        };
+
+        print_status_msg(
+            StatusType::Modified,
+            &format!(
+                "Field '{}' from Model '{}'",
+                &migration_field.name, app_model.model.name
+            ),
+        );
+
+        Some(op)
     }
 
     #[must_use]
@@ -1860,6 +1871,96 @@ mod tests {
         assert!(external_dependencies.contains(&DynDependency::Model {
             model_type: parse_quote!(crate::Table4),
         }));
+    }
+
+    #[test]
+    fn get_foreign_key_dependencies_with_alter_field() {
+        // AlterField where the new field gains a foreign key should produce a
+        // dependency on the referenced model. The old field's foreign key
+        // (if any) is intentionally not tracked here. A `CreateModel` for the
+        // altered table is included so the altered model is not flagged as an
+        // external dependency by `get_foreign_key_dependencies`.
+        let operations = vec![
+            DynOperation::CreateModel {
+                table_name: "table1".to_string(),
+                model_ty: parse_quote!(Table1),
+                fields: vec![],
+            },
+            DynOperation::AlterField {
+                table_name: "table1".to_string(),
+                model_ty: parse_quote!(Table1),
+                old_field: Box::new(Field {
+                    name: format_ident!("field1"),
+                    column_name: "field1".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: None,
+                }),
+                new_field: Box::new(Field {
+                    name: format_ident!("field1"),
+                    column_name: "field1".to_string(),
+                    ty: parse_quote!(ForeignKey<Table2>),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: Some(ForeignKeySpec {
+                        to_model: parse_quote!(crate::Table2),
+                    }),
+                }),
+            },
+        ];
+
+        let external_dependencies = GeneratedMigration::get_foreign_key_dependencies(&operations);
+        assert_eq!(external_dependencies.len(), 1);
+        assert_eq!(
+            external_dependencies[0],
+            DynDependency::Model {
+                model_type: parse_quote!(crate::Table2),
+            }
+        );
+    }
+
+    #[test]
+    fn get_foreign_key_dependencies_alter_field_no_new_foreign_key() {
+        // If the new field has no foreign key, AlterField should produce no
+        // external dependencies (when the altered table itself is created in
+        // the same migration), even when the old field had one.
+        let operations = vec![
+            DynOperation::CreateModel {
+                table_name: "table1".to_string(),
+                model_ty: parse_quote!(Table1),
+                fields: vec![],
+            },
+            DynOperation::AlterField {
+                table_name: "table1".to_string(),
+                model_ty: parse_quote!(Table1),
+                old_field: Box::new(Field {
+                    name: format_ident!("field1"),
+                    column_name: "field1".to_string(),
+                    ty: parse_quote!(ForeignKey<Table2>),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: Some(ForeignKeySpec {
+                        to_model: parse_quote!(crate::Table2),
+                    }),
+                }),
+                new_field: Box::new(Field {
+                    name: format_ident!("field1"),
+                    column_name: "field1".to_string(),
+                    ty: parse_quote!(i32),
+                    auto_value: false,
+                    primary_key: false,
+                    unique: false,
+                    foreign_key: None,
+                }),
+            },
+        ];
+
+        let external_dependencies = GeneratedMigration::get_foreign_key_dependencies(&operations);
+        assert!(external_dependencies.is_empty());
     }
 
     fn get_test_model() -> ModelInSource {

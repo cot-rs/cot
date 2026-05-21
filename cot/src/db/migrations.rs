@@ -2671,9 +2671,7 @@ mod tests {
                 Identifier::new("name"),
                 <String as DatabaseField>::TYPE,
             ))
-            .new_field(
-                Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE).null(),
-            )
+            .new_field(Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE).null())
             .build();
 
         if let OperationInner::AlterField {
@@ -2722,9 +2720,7 @@ mod tests {
                 Identifier::new("name"),
                 <String as DatabaseField>::TYPE,
             ))
-            .new_field(
-                Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE).null(),
-            )
+            .new_field(Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE).null())
             .build();
 
         let result = alter_operation.forwards(&test_db.database()).await;
@@ -2755,15 +2751,10 @@ mod tests {
                 Identifier::new("name"),
                 <String as DatabaseField>::TYPE,
             ))
-            .new_field(
-                Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE).null(),
-            )
+            .new_field(Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE).null())
             .build();
 
-        alter_operation
-            .forwards(&test_db.database())
-            .await
-            .unwrap();
+        alter_operation.forwards(&test_db.database()).await.unwrap();
 
         let result = alter_operation.backwards(&test_db.database()).await;
         assert!(result.is_ok());

@@ -577,9 +577,15 @@ impl Operation {
             }
             OperationInner::AlterField {
                 table_name,
-                old_field: _,
+                old_field,
                 new_field,
             } => {
+                if old_field.foreign_key.is_some() || new_field.foreign_key.is_some() {
+                    unimplemented!(
+                        "AlterField with foreign key constraints is not yet supported; \
+                         use separate RemoveField / AddField operations instead"
+                    );
+                }
                 let query = sea_query::Table::alter()
                     .table(*table_name)
                     .modify_column(new_field.as_column_def(database))
@@ -662,8 +668,14 @@ impl Operation {
             OperationInner::AlterField {
                 table_name,
                 old_field,
-                new_field: _,
+                new_field,
             } => {
+                if old_field.foreign_key.is_some() || new_field.foreign_key.is_some() {
+                    unimplemented!(
+                        "AlterField with foreign key constraints is not yet supported; \
+                         use separate RemoveField / AddField operations instead"
+                    );
+                }
                 // To reverse an alteration, set the column back to the old definition
                 let query = sea_query::Table::alter()
                     .table(*table_name)
@@ -2810,6 +2822,44 @@ mod tests {
             .cleanup()
             .await
             .expect("failed to clean up MySQL test database");
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "AlterField with foreign key constraints is not yet supported")]
+    async fn test_alter_field_new_fk_forwards_panics() {
+        let database = Database::new("sqlite::memory:").await.unwrap();
+        let operation = Operation::alter_field()
+            .table_name(Identifier::new("testapp__test_model"))
+            .old_field(Field::new(Identifier::new("col"), ColumnType::Integer))
+            .new_field(
+                Field::new(Identifier::new("col"), ColumnType::Integer).foreign_key(
+                    Identifier::new("other_table"),
+                    Identifier::new("id"),
+                    ForeignKeyOnDeletePolicy::Cascade,
+                    ForeignKeyOnUpdatePolicy::Cascade,
+                ),
+            )
+            .build();
+        operation.forwards(&database).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "AlterField with foreign key constraints is not yet supported")]
+    async fn test_alter_field_old_fk_backwards_panics() {
+        let database = Database::new("sqlite::memory:").await.unwrap();
+        let operation = Operation::alter_field()
+            .table_name(Identifier::new("testapp__test_model"))
+            .old_field(
+                Field::new(Identifier::new("col"), ColumnType::Integer).foreign_key(
+                    Identifier::new("other_table"),
+                    Identifier::new("id"),
+                    ForeignKeyOnDeletePolicy::Cascade,
+                    ForeignKeyOnUpdatePolicy::Cascade,
+                ),
+            )
+            .new_field(Field::new(Identifier::new("col"), ColumnType::Integer))
+            .build();
+        operation.backwards(&database).await.unwrap();
     }
 
     #[test]

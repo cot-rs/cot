@@ -17,10 +17,10 @@ fn main() {
     let args = Arguments::from_args();
 
     let mut test_runners: HashMap<(&str, &str), TestRunner> = HashMap::new();
-    test_runners.insert(("rust", DEFAULT_TEST_NAME), test_rust);
+    test_runners.insert(("rust", DEFAULT_TEST_TYPE), test_rust);
     test_runners.insert(("rust", RUST_HAS_MAIN_TEST_TYPE), test_rust);
-    test_runners.insert(("toml", DEFAULT_TEST_NAME), test_toml);
-    test_runners.insert(("html.j2", DEFAULT_TEST_NAME), test_html);
+    test_runners.insert(("toml", DEFAULT_TEST_TYPE), test_toml);
+    test_runners.insert(("html.j2", DEFAULT_TEST_TYPE), test_html);
     TEST_RUNNERS.set(test_runners).unwrap();
 
     let mut trials = Vec::new();
@@ -28,7 +28,7 @@ fn main() {
     let cot_test_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let docs_path = cot_test_path.parent().unwrap().join("docs");
 
-    let md_files = glob::glob(&format!("{}/*.md", docs_path.to_str().unwrap()))
+    let md_files = glob::glob(&format!("{}/**/*.md", docs_path.to_str().unwrap()))
         .expect("failed to glob md files");
 
     for entry in md_files {
@@ -45,7 +45,7 @@ fn main() {
     libtest_mimic::run(&args, trials).exit();
 }
 
-const DEFAULT_TEST_NAME: &str = "default";
+const DEFAULT_TEST_TYPE: &str = "default";
 
 fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
     let arena = Arena::new();
@@ -63,7 +63,7 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
                     if let Some((lang, test_config)) = code_block.info.split_once(',') {
                         (lang, test_config.trim())
                     } else {
-                        (code_block.info.as_str(), DEFAULT_TEST_NAME)
+                        (code_block.info.as_str(), DEFAULT_TEST_TYPE)
                     };
 
                 if let Some(runner) = TEST_RUNNERS.get().unwrap().get(&(lang, test_config)) {

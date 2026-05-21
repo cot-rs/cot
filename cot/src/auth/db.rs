@@ -39,6 +39,7 @@ pub struct DatabaseUser {
     #[model(unique)]
     username: LimitedString<MAX_USERNAME_LENGTH>,
     password: PasswordHash,
+    is_active: bool,
 }
 
 /// An error that occurs when creating a user.
@@ -61,6 +62,7 @@ impl DatabaseUser {
             id,
             username,
             password: PasswordHash::from_password(password),
+            is_active: true,
         }
     }
 
@@ -111,6 +113,22 @@ impl DatabaseUser {
         user.insert(db).await.map_err(AuthError::backend_error)?;
 
         Ok(user)
+    }
+
+    /// Sets whether the user is active.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::auth::db::DatabaseUser;
+    /// # use cot::common_types::Password;
+    /// # use cot::db::{Auto, LimitedString};
+    ///
+    /// # let mut user = DatabaseUser::new(Auto::fixed(1), LimitedString::new("user").unwrap(), &Password::new("password"));
+    /// user.set_is_active(false);
+    /// ```
+    pub fn set_is_active(&mut self, is_active: bool) {
+        self.is_active = is_active;
     }
 
     /// Retrieves a user by their integer ID. It returns [`None`] if the user
@@ -353,7 +371,7 @@ impl User for DatabaseUser {
     }
 
     fn is_active(&self) -> bool {
-        true
+        self.is_active
     }
 
     fn is_authenticated(&self) -> bool {
@@ -607,6 +625,20 @@ mod tests {
                 .session_auth_hash(&SecretKey::new(b"supersecretkey"))
                 .is_some()
         );
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn database_user_inactive() {
+        let mut user = DatabaseUser::new(
+            Auto::fixed(1),
+            LimitedString::new("testuser").unwrap(),
+            &Password::new("password123"),
+        );
+        user.set_is_active(false);
+
+        let user_ref: &dyn User = &user;
+        assert!(!user_ref.is_active());
     }
 
     #[cot::test]

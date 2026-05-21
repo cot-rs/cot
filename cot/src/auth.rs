@@ -54,6 +54,9 @@ pub enum AuthError {
     /// supported.
     #[error("{ERROR_PREFIX} tried to get a user by an unsupported user ID type")]
     UserIdTypeNotSupported,
+    /// The user is inactive and cannot log in.
+    #[error("{ERROR_PREFIX} user is inactive")]
+    UserInactive,
 }
 impl_into_cot_error!(AuthError, UNAUTHORIZED);
 
@@ -890,6 +893,10 @@ impl AuthInner {
     }
 
     async fn login(&self, user: Box<dyn User + Send + Sync + 'static>) -> Result<()> {
+        if !user.is_active() {
+            return Err(AuthError::UserInactive);
+        }
+
         // Mitigate the session fixation attack by changing the session ID:
         // https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#renew-the-session-id-after-any-privilege-level-change
         self.session.cycle_id().await?;
@@ -942,7 +949,9 @@ async fn get_user_with_saved_id(
         return Ok(None);
     };
 
-    if session_auth_hash_valid(&*user, session, secret_key, fallback_secret_keys).await? {
+    if user.is_active()
+        && session_auth_hash_valid(&*user, session, secret_key, fallback_secret_keys).await?
+    {
         Ok(Some(user))
     } else {
         Ok(None)
@@ -1222,6 +1231,7 @@ mod tests {
             let mut mock_user = MockUser::new();
             mock_user.expect_id().return_const(UserId::Int(1));
             mock_user.expect_session_auth_hash().return_const(None);
+            mock_user.expect_is_active().return_const(true);
             mock_user
                 .expect_username()
                 .return_const(Some(Cow::from("mockuser")));
@@ -1262,6 +1272,7 @@ mod tests {
         let mut mock_user = MockUser::new();
         mock_user.expect_id().return_const(UserId::Int(1));
         mock_user.expect_session_auth_hash().return_const(None);
+        mock_user.expect_is_active().return_const(true);
         mock_user
             .expect_username()
             .return_const(Some(Cow::from("mockuser")));
@@ -1286,6 +1297,7 @@ mod tests {
         let mut mock_user = MockUser::new();
         mock_user.expect_id().return_const(UserId::Int(1));
         mock_user.expect_session_auth_hash().return_const(None);
+        mock_user.expect_is_active().return_const(true);
         mock_user
             .expect_username()
             .return_const(Some(Cow::from("mockuser_1")));
@@ -1298,6 +1310,7 @@ mod tests {
         let mut mock_user = MockUser::new();
         mock_user.expect_id().return_const(UserId::Int(2));
         mock_user.expect_session_auth_hash().return_const(None);
+        mock_user.expect_is_active().return_const(true);
         mock_user
             .expect_username()
             .return_const(Some(Cow::from("mockuser_2")));
@@ -1328,6 +1341,43 @@ mod tests {
     }
 
     #[cot::test]
+    async fn logout_on_inactive_user() {
+        let mut request = test_request(|| {
+            let mut mock_user = MockUser::new();
+            mock_user.expect_id().return_const(UserId::Int(1));
+            mock_user.expect_session_auth_hash().return_const(None);
+            mock_user.expect_is_active().return_const(false); // Inactive
+            mock_user
+                .expect_username()
+                .return_const(Some(Cow::from("mockuser")));
+            mock_user
+        });
+
+        Session::from_request(&request)
+            .insert(USER_ID_SESSION_KEY, UserId::Int(1))
+            .await
+            .unwrap();
+        let auth = Auth::from_request(&mut request).await.unwrap();
+
+        let user = auth.user();
+        assert!(!user.is_authenticated());
+        assert_eq!(user.username(), None);
+    }
+
+    #[cot::test]
+    async fn login_inactive_user() {
+        let mut request = test_request(MockUser::new);
+        let auth = Auth::from_request(&mut request).await.unwrap();
+
+        let mut mock_user = MockUser::new();
+        mock_user.expect_id().return_const(UserId::Int(1));
+        mock_user.expect_is_active().return_const(false); // Inactive
+
+        let result = auth.login(Box::new(mock_user)).await;
+        assert!(matches!(result, Err(AuthError::UserInactive)));
+    }
+
+    #[cot::test]
     async fn logout_on_session_hash_change() {
         let session_auth_hash = Arc::new(Mutex::new(SessionAuthHash::new(&[1, 2, 3])));
         let session_auth_hash_clone = Arc::clone(&session_auth_hash);
@@ -1335,6 +1385,7 @@ mod tests {
             let session_auth_hash_clone = Arc::clone(&session_auth_hash_clone);
             let mut mock_user = MockUser::new();
             mock_user.expect_id().return_const(UserId::Int(1));
+            mock_user.expect_is_active().return_const(true);
             mock_user
                 .expect_session_auth_hash()
                 .returning(move |_| Some(session_auth_hash_clone.lock().unwrap().clone()));
@@ -1367,6 +1418,7 @@ mod tests {
         let create_user = move || {
             let mut mock_user = MockUser::new();
             mock_user.expect_id().return_const(UserId::Int(1));
+            mock_user.expect_is_active().return_const(true);
             mock_user
                 .expect_session_auth_hash()
                 .with(eq(SecretKey::new(TEST_KEY_1)))

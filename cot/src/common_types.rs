@@ -17,7 +17,7 @@ use cot::db::impl_sqlite::SqliteValueRef;
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
 #[cfg(not(miri))]
-use secure_string::SecureString;
+use securer_string::SecureString;
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;

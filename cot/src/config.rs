@@ -23,7 +23,7 @@ use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 #[cfg(not(miri))]
-use secure_string::SecureBytes;
+use securer_string::SecureBytes;
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use thiserror::Error;

@@ -1557,6 +1557,63 @@ mod tests {
 
     use super::*;
 
+    fn remove_whitespace<T: AsRef<str>>(s: &T) -> String {
+        s.as_ref().chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    macro_rules! repr_for_foreign_key_operation_test {
+        ($test_name:ident, $on_delete:path, $on_update:path) => {
+            #[test]
+            fn $test_name() {
+                let op = DynOperation::AddField {
+                    table_name: "test_table".to_string(),
+                    model_ty: parse_quote!(TestModel),
+                    field: Box::new(Field {
+                        name: format_ident!("test_field"),
+                        column_name: "test_field".to_string(),
+                        ty: parse_quote!(cot::db::ForeignKey<crate::OtherModel>),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: Some(ForeignKeySpec {
+                            to_model: parse_quote!(crate::OtherModel),
+                            on_delete: Some($on_delete),
+                            on_update: Some($on_update),
+                        }),
+                    }),
+                };
+
+                let tokens = op.repr();
+                let tokens_str = remove_whitespace(&tokens.to_string());
+
+                let expected_str = format!(
+                    r#"
+                ::cot::db::migrations::Field::new(
+                    ::cot::db::Identifier::new("test_field"),
+                    <cot::db::ForeignKey<
+                        crate::OtherModel
+                    > as ::cot::db::DatabaseField>::TYPE,
+                )
+                .set_null(
+                    <cot::db::ForeignKey<
+                        crate::OtherModel
+                    > as ::cot::db::DatabaseField>::NULLABLE
+                )
+                .foreign_key(
+                    <crate::OtherModel as ::cot::db::Model>::TABLE_NAME,
+                    <crate::OtherModel as ::cot::db::Model>::PRIMARY_KEY_NAME,
+                    ::cot::db::{},
+                    ::cot::db::{},
+                )
+                "#,
+                    stringify!($on_delete),
+                    stringify!($on_update),
+                );
+                assert!(tokens_str.contains(&remove_whitespace(&expected_str)));
+            }
+        };
+    }
+
     #[test]
     fn migration_processor_next_migration_name_empty() {
         let migrations = vec![];
@@ -2145,6 +2202,30 @@ mod tests {
             "Should call build() but got: {tokens_str}"
         );
     }
+
+    repr_for_foreign_key_operation_test!(
+        repr_for_foreign_key_operation_cascade_cascade,
+        ForeignKeyOnDeletePolicy::Cascade,
+        ForeignKeyOnUpdatePolicy::Cascade
+    );
+
+    repr_for_foreign_key_operation_test!(
+        repr_for_foreign_key_operation_restrict_restrict,
+        ForeignKeyOnDeletePolicy::Restrict,
+        ForeignKeyOnUpdatePolicy::Restrict
+    );
+    repr_for_foreign_key_operation_test!(
+        repr_for_foreign_key_operation_cascade_noaction,
+        ForeignKeyOnDeletePolicy::Cascade,
+        ForeignKeyOnUpdatePolicy::NoAction
+    );
+
+    repr_for_foreign_key_operation_test!(
+        repr_for_foreign_key_operation_noaction_restrict,
+        ForeignKeyOnDeletePolicy::NoAction,
+        ForeignKeyOnUpdatePolicy::Restrict
+    );
+
     #[test]
     fn generate_operations_with_removed_field() {
         let app_model = get_test_model();

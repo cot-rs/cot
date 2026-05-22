@@ -264,6 +264,32 @@ impl FieldOpts {
         })
     }
 
+    fn resolved_type_name(&self, symbol_resolver: &SymbolResolver) -> Option<String> {
+        let mut ty = self.ty.clone();
+        symbol_resolver.resolve(&mut ty, None);
+
+        let syn::Type::Path(type_path) = ty else {
+            return None;
+        };
+
+        Some(
+            type_path
+                .path
+                .segments
+                .iter()
+                .map(|s| s.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::"),
+        )
+    }
+
+    fn is_option_type(&self, symbol_resolver: &SymbolResolver) -> bool {
+        matches!(
+            self.resolved_type_name(symbol_resolver).as_deref(),
+            Some("Option" | "std::option::Option" | "core::option::Option")
+        )
+    }
+
     fn find_foreign_key_type(&self, symbol_resolver: &SymbolResolver) -> Option<syn::Type> {
         self.find_type("cot::db::ForeignKey", symbol_resolver)
             .or_else(|| self.find_type("ForeignKey", symbol_resolver))
@@ -297,6 +323,7 @@ impl FieldOpts {
                 "`#[model(foreign_key(...))]` can only be used on `ForeignKey<T>` fields",
             ));
         }
+
         let foreign_key = foreign_key_ty
             .map(ForeignKeySpec::try_from)
             .transpose()?
@@ -306,6 +333,24 @@ impl FieldOpts {
                 fk.set_on_update(args.on_update);
                 fk
             });
+
+        // SetNone can only be used with Option types.
+        if let Some(foreign_key) = &foreign_key {
+            let uses_set_none = matches!(
+                foreign_key.on_delete,
+                Some(ForeignKeyOnDeletePolicy::SetNone)
+            ) || matches!(
+                foreign_key.on_update,
+                Some(ForeignKeyOnUpdatePolicy::SetNone)
+            );
+
+            if uses_set_none && !self.is_option_type(symbol_resolver) {
+                return Err(syn::Error::new(
+                    self.ident.span(),
+                    "`set_none` foreign key policy can only be used on `Option<ForeignKey<T>>` fields",
+                ));
+            }
+        }
 
         let is_primary_key = self.primary_key.is_present();
         let mut resolved_ty = self.ty.clone();
@@ -425,6 +470,34 @@ mod tests {
 
     use super::*;
     use crate::symbol_resolver::{SymbolResolver, VisibleSymbol, VisibleSymbolKind};
+
+    macro_rules! assert_foreign_key_policies {
+        (
+            $test_name:ident,
+            $field_ty:ty,
+            on_delete = $on_delete:literal,
+            on_update = $on_update:literal,
+            expected_on_delete = $expected_on_delete:path,
+            expected_on_update = $expected_on_update:path
+        ) => {
+            #[test]
+            fn $test_name() {
+                let input: syn::Field = parse_quote! {
+                    #[model(foreign_key(on_delete = $on_delete, on_update = $on_update))]
+                    foo: $field_ty
+                };
+                let field_opts = FieldOpts::from_field(&input).unwrap();
+                let field = field_opts
+                    .as_field(&SymbolResolver::new(vec![]), Some(&"Bar".to_string()))
+                    .unwrap();
+
+                let foreign_key = field.foreign_key.unwrap();
+                assert_eq!(foreign_key.to_model, parse_quote!(Foo));
+                assert_eq!(foreign_key.on_delete, Some($expected_on_delete));
+                assert_eq!(foreign_key.on_update, Some($expected_on_update));
+            }
+        };
+    }
 
     #[test]
     fn model_args_default() {
@@ -609,6 +682,126 @@ mod tests {
             .unwrap();
         assert_eq!(field.name.to_string(), "test");
         assert_eq!(field.column_name, "test_field");
+    }
+
+    assert_foreign_key_policies!(
+        field_opts_foreign_key_restrict_restrict,
+        ForeignKey<Foo>,
+        on_delete = "restrict",
+        on_update = "restrict",
+        expected_on_delete = ForeignKeyOnDeletePolicy::Restrict,
+        expected_on_update = ForeignKeyOnUpdatePolicy::Restrict
+    );
+
+    assert_foreign_key_policies!(
+        field_opts_foreign_key_cascade_cascade,
+        ForeignKey<Foo>,
+        on_delete = "cascade",
+        on_update = "cascade",
+        expected_on_delete = ForeignKeyOnDeletePolicy::Cascade,
+        expected_on_update = ForeignKeyOnUpdatePolicy::Cascade
+    );
+
+    assert_foreign_key_policies!(
+        field_opts_foreign_key_no_action_restrict,
+        ForeignKey<Foo>,
+        on_delete = "no_action",
+        on_update = "restrict",
+        expected_on_delete = ForeignKeyOnDeletePolicy::NoAction,
+        expected_on_update = ForeignKeyOnUpdatePolicy::Restrict
+    );
+
+    assert_foreign_key_policies!(
+        field_opts_option_foreign_key_set_none_set_none,
+        Option<ForeignKey<Foo>>,
+        on_delete = "set_none",
+        on_update = "set_none",
+        expected_on_delete = ForeignKeyOnDeletePolicy::SetNone,
+        expected_on_update = ForeignKeyOnUpdatePolicy::SetNone
+    );
+
+    #[test]
+    fn field_opts_foreign_key_on_delete_and_on_update_default() {
+        let input: syn::Field = parse_quote! {
+            foo: ForeignKey<Foo>
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let field = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"Bar".to_string()))
+            .unwrap();
+
+        let foreign_key = field.foreign_key.unwrap();
+        assert_eq!(foreign_key.to_model, parse_quote!(Foo));
+        assert_eq!(
+            foreign_key.on_delete,
+            Some(ForeignKeyOnDeletePolicy::Restrict)
+        );
+        assert_eq!(
+            foreign_key.on_update,
+            Some(ForeignKeyOnUpdatePolicy::Cascade)
+        );
+    }
+    #[test]
+    fn field_opts_foreign_key_rejects_non_foreign_key_field() {
+        let input: syn::Field = parse_quote! {
+            #[model(foreign_key(on_delete = "cascade"))]
+            foo: i64
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let err = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"Bar".to_string()))
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "`#[model(foreign_key(...))]` can only be used on `ForeignKey<T>` fields"
+        );
+    }
+
+    #[test]
+    fn field_opts_foreign_key_rejects_set_none_on_required_foreign_key() {
+        let input: syn::Field = parse_quote! {
+            #[model(foreign_key(on_delete = "set_none"))]
+            foo: ForeignKey<Foo>
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let err = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"Bar".to_string()))
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "`set_none` foreign key policy can only be used on `Option<ForeignKey<T>>` fields"
+        );
+    }
+
+    #[test]
+    fn field_opts_option_foreign_key_set_none_with_option_alias() {
+        let input: syn::Field = parse_quote! {
+            #[model(foreign_key(on_delete = "set_none", on_update = "set_none"))]
+            foo: Maybe<ForeignKey<Foo>>
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let resolver = SymbolResolver::new(vec![VisibleSymbol::new(
+            "Maybe",
+            "std::option::Option",
+            VisibleSymbolKind::Use,
+        )]);
+
+        let field = field_opts
+            .as_field(&resolver, Some(&"Bar".to_string()))
+            .unwrap();
+
+        let foreign_key = field.foreign_key.unwrap();
+        assert_eq!(foreign_key.to_model, parse_quote!(Foo));
+        assert_eq!(
+            foreign_key.on_delete,
+            Some(ForeignKeyOnDeletePolicy::SetNone)
+        );
+        assert_eq!(
+            foreign_key.on_update,
+            Some(ForeignKeyOnUpdatePolicy::SetNone)
+        );
     }
 
     #[test]

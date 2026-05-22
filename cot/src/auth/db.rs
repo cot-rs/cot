@@ -101,16 +101,111 @@ impl DatabaseUser {
         username: T,
         password: U,
     ) -> Result<Self> {
-        let username = username.into();
-        let username_length = username.len();
-        let username = LimitedString::<MAX_USERNAME_LENGTH>::new(username).map_err(|_| {
-            AuthError::backend_error(CreateUserError::UsernameTooLong(username_length))
-        })?;
+        let username = Self::convert_username(username)?;
 
         let mut user = Self::new(Auto::auto(), username, &password.into());
         user.insert(db).await.map_err(AuthError::backend_error)?;
 
         Ok(user)
+    }
+
+    fn convert_username<T: Into<String>>(
+        username: T,
+    ) -> Result<LimitedString<MAX_USERNAME_LENGTH>> {
+        let username = username.into();
+        let username_length = username.len();
+        let username = LimitedString::<MAX_USERNAME_LENGTH>::new(username).map_err(|_| {
+            AuthError::backend_error(CreateUserError::UsernameTooLong(username_length))
+        })?;
+        Ok(username)
+    }
+
+    /// Sets the username of the user.
+    ///
+    /// Remember to call [`save()`][cot::db::Model::save] after calling this
+    /// function - otherwise, the username will never be saved to the database.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the user could not be saved.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
+    /// use cot::common_types::Password;
+    /// use cot::db::{Database, LimitedString, Model};
+    /// use cot::html::Html;
+    ///
+    /// async fn view(db: Database) -> cot::Result<Html> {
+    ///     let mut user =
+    ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
+    ///             .await?;
+    ///     user.set_username("new_username")?;
+    ///     user.save(&db).await?;
+    ///
+    ///     assert_eq!(user.username(), "new_username");
+    ///
+    ///     Ok(Html::new("Username changed!"))
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// #     use cot::test::{TestDatabase, TestRequestBuilder};
+    /// #     let mut test_database = TestDatabase::new_sqlite().await?;
+    /// #     test_database.with_auth().run_migrations().await;
+    /// #     view(test_database.database()).await?;
+    /// #     test_database.cleanup().await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn set_username(&mut self, username: impl Into<String>) -> Result<()> {
+        self.username = Self::convert_username(username)?;
+        Ok(())
+    }
+
+    /// Sets the password of the user.
+    ///
+    /// Remember to call [`save()`][cot::db::Model::save] after calling this
+    /// function - otherwise, the password will never be saved to the database.
+    ///
+    /// The password will be automatically hashed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
+    /// use cot::common_types::Password;
+    /// use cot::db::{Database, Model};
+    /// use cot::html::Html;
+    ///
+    /// async fn view(db: Database) -> cot::Result<Html> {
+    ///     let mut user =
+    ///         DatabaseUser::create_user(&db, "testuser".to_string(), &Password::new("password123"))
+    ///             .await?;
+    ///     user.set_password(&Password::new("new_password"));
+    ///     user.save(&db).await?;
+    ///
+    ///     let credentials =
+    ///         DatabaseUserCredentials::new(String::from("testuser"), Password::new("new_password"));
+    ///     let authenticated = DatabaseUser::authenticate(&db, &credentials).await?;
+    ///     assert!(authenticated.is_some());
+    ///
+    ///     Ok(Html::new("Password changed!"))
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// #     use cot::test::{TestDatabase, TestRequestBuilder};
+    /// #     let mut test_database = TestDatabase::new_sqlite().await?;
+    /// #     test_database.with_auth().run_migrations().await;
+    /// #     view(test_database.database()).await?;
+    /// #     test_database.cleanup().await?;
+    /// #     Ok(())
+    /// # }
+    /// ```
+    pub fn set_password(&mut self, password: &Password) {
+        self.password = PasswordHash::from_password(password);
     }
 
     /// Retrieves a user by their integer ID. It returns [`None`] if the user

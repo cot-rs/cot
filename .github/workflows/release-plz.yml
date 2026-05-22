@@ -16,7 +16,7 @@ jobs:
       id-token: write
     steps:
       - name: Generate GitHub token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         id: generate-token
         with:
           app-id: ${{ secrets.COTBOT_APP_ID }}
@@ -31,9 +31,9 @@ jobs:
         uses: release-plz/action@v0.5
         with:
           command: release
+          config: .cargo/release-plz.toml
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
-
   release-plz-pr:
     if: ${{ github.repository_owner == 'cot-rs' }}
     name: Release-plz PR
@@ -46,7 +46,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Generate GitHub token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         id: generate-token
         with:
           app-id: ${{ secrets.COTBOT_APP_ID }}
@@ -61,5 +61,6 @@ jobs:
         uses: release-plz/action@v0.5
         with:
           command: release-pr
+          config: .cargo/release-plz.toml
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}

@@ -1,0 +1,5 @@
+services:
+  web:
+    image: ghcr.io/cot-rs/cot-site:master
+    container_name: cot_site
+    restart: unless-stopped

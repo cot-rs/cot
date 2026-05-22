@@ -3660,9 +3660,9 @@ dependencies = [
 
 [[package]]
 name = "securer-string"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4edeb1ced12a195136c31341b32b0734e7f77d004cc4ad260053c4d4bb50a4be"
+checksum = "c796cd4a543edb87ad599e495048c5c7f433614c19ae009f5050b24381715efb"
 dependencies = [
  "libc",
  "subtle",

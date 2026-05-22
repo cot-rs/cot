@@ -1006,6 +1006,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "indexmap",
+ "insta",
  "schemars",
  "serde",
  "serde_html_form",

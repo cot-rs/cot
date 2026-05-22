@@ -22,10 +22,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
-#[cfg(not(miri))]
 use securer_string::SecureBytes;
 use serde::{Deserialize, Serialize};
-use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 #[cfg(feature = "email")]
@@ -2134,20 +2132,9 @@ impl Default for EmailConfig {
 /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
 /// ```
 #[repr(transparent)]
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq)]
 #[serde(from = "String")]
-#[cfg(not(miri))]
 pub struct SecretKey(SecureBytes);
-
-/// A secret key - simplified version for Miri testing.
-///
-/// When running under Miri, we use a simple Box<[u8]> wrapper instead of
-/// SecureBytes to avoid the mlock system call that Miri doesn't support.
-#[repr(transparent)]
-#[derive(Clone, Deserialize, Debug)]
-#[serde(from = "String")]
-#[cfg(miri)]
-pub struct SecretKey(Box<[u8]>);
 
 impl Serialize for SecretKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -2170,16 +2157,8 @@ impl SecretKey {
     /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
     /// ```
     #[must_use]
-    #[cfg(not(miri))]
     pub fn new(hash: &[u8]) -> Self {
         Self(SecureBytes::new(hash.to_vec()))
-    }
-
-    /// Create a new [`SecretKey`] from a byte array - Miri version.
-    #[must_use]
-    #[cfg(miri)]
-    pub fn new(hash: &[u8]) -> Self {
-        Self(Box::from(hash))
     }
 
     /// Get the byte array stored in the [`SecretKey`].
@@ -2193,16 +2172,8 @@ impl SecretKey {
     /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
     /// ```
     #[must_use]
-    #[cfg(not(miri))]
     pub fn as_bytes(&self) -> &[u8] {
         self.0.unsecure()
-    }
-
-    /// Get the byte array stored in the [`SecretKey`] - Miri version.
-    #[must_use]
-    #[cfg(miri)]
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
     }
 
     /// Consume the [`SecretKey`] and return the byte array stored in it.
@@ -2216,17 +2187,20 @@ impl SecretKey {
     /// assert_eq!(key.into_bytes(), Box::from([1, 2, 3]));
     /// ```
     #[must_use]
-    #[cfg(not(miri))]
     pub fn into_bytes(self) -> Box<[u8]> {
         self.0.unsecure().to_vec().into_boxed_slice()
     }
+}
 
-    /// Consume the [`SecretKey`] and return the byte array stored in it - Miri
-    /// version.
-    #[must_use]
-    #[cfg(miri)]
-    pub fn into_bytes(self) -> Box<[u8]> {
-        self.0
+impl Debug for SecretKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SecretKey").finish_non_exhaustive()
+    }
+}
+
+impl Default for SecretKey {
+    fn default() -> Self {
+        Self::new(&[])
     }
 }
 
@@ -2245,27 +2219,6 @@ impl From<String> for SecretKey {
 impl From<&str> for SecretKey {
     fn from(value: &str) -> Self {
         Self::new(value.as_bytes())
-    }
-}
-
-impl Eq for SecretKey {}
-
-impl Debug for SecretKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write in single line, regardless whether alternate mode was used or not
-        write!(f, "SecretKey(\"**********\")")
-    }
-}
-
-impl PartialEq for SecretKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_bytes().ct_eq(other.as_bytes()).into()
-    }
-}
-
-impl Default for SecretKey {
-    fn default() -> Self {
-        Self::new(&[])
     }
 }
 

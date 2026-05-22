@@ -16,10 +16,8 @@ use cot::db::impl_postgres::PostgresValueRef;
 use cot::db::impl_sqlite::SqliteValueRef;
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
-#[cfg(not(miri))]
 use securer_string::SecureString;
 use serde::{Deserialize, Serialize};
-use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 #[cfg(feature = "db")]
@@ -73,30 +71,9 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 /// let another_password = Password::new("pass");
 /// assert_eq!(password, another_password);
 /// ```
-#[derive(Clone, Debug)]
-#[cfg(not(miri))]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Password(SecureString);
 
-impl PartialEq for Password {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_str()
-            .as_bytes()
-            .ct_eq(other.as_str().as_bytes())
-            .into()
-    }
-}
-
-impl Eq for Password {}
-
-/// A password - simplified version for Miri testing.
-///
-/// When running under Miri, we use a simple String wrapper instead of
-/// SecureString to avoid the mlock system call that Miri doesn't support.
-#[derive(Clone)]
-#[cfg(miri)]
-pub struct Password(String);
-
-#[cfg(not(miri))]
 impl Password {
     /// Creates a new password object.
     ///
@@ -143,24 +120,9 @@ impl Password {
     }
 }
 
-#[cfg(miri)]
-impl Password {
-    /// Creates a new password object - Miri version.
-    #[must_use]
-    pub fn new<T: Into<String>>(password: T) -> Self {
-        Self(password.into())
-    }
-
-    /// Returns the password as a string - Miri version.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Consumes the object and returns the password as a string - Miri version.
-    #[must_use]
-    pub fn into_string(self) -> String {
-        self.0
+impl Debug for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Password").finish_non_exhaustive()
     }
 }
 
@@ -179,13 +141,6 @@ impl From<&str> for Password {
 impl From<String> for Password {
     fn from(password: String) -> Self {
         Self::new(password)
-    }
-}
-
-#[cfg(miri)]
-impl Debug for Password {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Password(***SECRET***)")
     }
 }
 
@@ -881,7 +836,7 @@ mod tests {
     #[test]
     fn password_debug() {
         let password = Password::new("password");
-        assert_eq!(format!("{password:?}"), "Password(***SECRET***)");
+        assert_eq!(format!("{password:?}"), "Password(..)");
     }
 
     #[test]

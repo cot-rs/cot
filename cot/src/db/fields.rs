@@ -300,6 +300,35 @@ impl<const LIMIT: u32> ToDbValue for Option<LimitedString<LIMIT>> {
     }
 }
 
+impl<const LIMIT: u32> FromDbValue for Option<LimitedString<LIMIT>> {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> Result<Self> {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(LimitedString::new))?
+            .transpose()
+            .map_err(DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> Result<Self> {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(LimitedString::new))?
+            .transpose()
+            .map_err(DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> Result<Self> {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(LimitedString::new))?
+            .transpose()
+            .map_err(DatabaseError::value_decode)
+    }
+}
+
 impl<T: Model + Send + Sync> DatabaseField for ForeignKey<T> {
     const NULLABLE: bool = T::PrimaryKey::NULLABLE;
     const TYPE: ColumnType = T::PrimaryKey::TYPE;

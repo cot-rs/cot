@@ -45,6 +45,7 @@ async-stream.workspace = true
 # When publishing, path dependencies are dropped, removing the cycle.
 cot = { path = "../cot", features = ["test"] }
 futures.workspace = true
+insta.workspace = true
 tokio.workspace = true
 
 [features]

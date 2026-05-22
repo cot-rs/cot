@@ -188,6 +188,7 @@ use sea_query::{
     ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
 };
 use sea_query_binder::{SqlxBinder, SqlxValues};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sqlx::{Type, TypeInfo};
 use thiserror::Error;
 use tracing::{Instrument, Level, span, trace};
@@ -2077,6 +2078,29 @@ impl<T: Display> Display for Auto<T> {
     }
 }
 
+impl<T: Serialize> Serialize for Auto<T> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Fixed(value) => value.serialize(serializer),
+            Self::Auto => Err(serde::ser::Error::custom(
+                "Auto::Auto values cannot be serialized",
+            )),
+        }
+    }
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Auto<T> {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self::Fixed)
+    }
+}
+
 /// A wrapper over a string that has a limited length.
 ///
 /// This type is used to represent a string that has a limited length in the
@@ -2100,7 +2124,9 @@ impl<T: Display> Display for Auto<T> {
 /// let limited_string = LimitedString::<5>::new("too long");
 /// assert!(limited_string.is_err());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display, Serialize, Deserialize,
+)]
 pub struct LimitedString<const LIMIT: u32>(String);
 
 impl<const LIMIT: u32> PartialEq<&str> for LimitedString<LIMIT> {
@@ -2363,5 +2389,32 @@ mod tests {
     fn db_field_value_expect_panic() {
         let auto_value = DbFieldValue::Auto;
         let _ = auto_value.expect_value("expected a value");
+    }
+
+    #[test]
+    fn auto_serialize_fixed() {
+        let auto = Auto::fixed(42i32);
+        let serialized = serde_json::to_string(&auto).unwrap();
+        assert_eq!(serialized, "42");
+    }
+
+    #[test]
+    fn auto_serialize_auto() {
+        let auto = Auto::<i32>::Auto;
+        let value = serde_json::to_string(&auto);
+        assert!(value.is_err());
+    }
+
+    #[test]
+    fn auto_deserialize_fixed() {
+        let deserialized: Auto<i32> = serde_json::from_str("42").unwrap();
+        assert_eq!(deserialized, Auto::fixed(42));
+    }
+
+    #[test]
+    fn auto_deserialize_auto() {
+        let deserialized: std::result::Result<Auto<i32>, serde_json::Error> =
+            serde_json::from_str("null");
+        assert!(deserialized.is_err());
     }
 }

@@ -229,6 +229,12 @@ use cot_core::error::impl_into_cot_error;
 /// ```
 /// use cot::db::{Auto, ForeignKey, model};
 ///
+/// # #[model]
+/// # struct User {
+/// #    #[model(primary_key)]
+/// #    id: Auto<i32>,
+/// # }
+///
 /// #[model]
 /// struct Post {
 ///     #[model(primary_key)]
@@ -243,7 +249,11 @@ use cot_core::error::impl_into_cot_error;
 ///
 /// ```
 /// use cot::db::{Auto, ForeignKey, model};
-///
+/// # #[model]
+/// # struct User {
+/// #    #[model(primary_key)]
+/// #    id: Auto<i32>,
+/// # }
 /// #[model]
 /// struct Post {
 ///     #[model(primary_key)]

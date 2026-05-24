@@ -174,12 +174,13 @@ use cot_core::error::impl_into_cot_error;
 /// The `foreign_key` attribute configures the referential integrity behavior
 /// of a [`ForeignKey`] field. It accepts two optional parameters:
 ///
-/// * `on_delete` — behavior when the referenced row is deleted.
-///   Defaults to `"restrict"`.
-/// * `on_update` — behavior when the referenced row is updated.
-///   Defaults to `"cascade"`.
+/// * `on_delete` — behavior when the referenced row is deleted. Defaults to
+///   `"restrict"`.
+/// * `on_update` — behavior when the referenced row is updated. Defaults to
+///   `"cascade"`.
 ///
-/// > **Note:** The `foreign_key` attribute is only valid on [`ForeignKey`] fields. Using it
+/// > **Note:** The `foreign_key` attribute is only valid on [`ForeignKey`]
+/// > fields. Using it
 /// > on any other field type will result in a compile error.
 ///
 ///
@@ -213,8 +214,8 @@ use cot_core::error::impl_into_cot_error;
 /// * `restrict`: Prevents the delete or update of a referenced row if any
 ///   referencing rows exist.
 ///
-/// * `no_action`: Similar to `restrict`, but the referential integrity check
-///   is deferred until the end of the transaction, depending on the database.
+/// * `no_action`: Similar to `restrict`, but the referential integrity check is
+///   deferred until the end of the transaction, depending on the database.
 ///
 /// * `set_none`: Sets the foreign key column to `NULL` when the referenced row
 ///   is deleted or updated. Requires the field to be of type

@@ -281,7 +281,7 @@ jobs:
           tool: cargo-crap
 
       - name: Run cargo-crap
-        run: cargo crap --lcov lcov/lcov.info --workspace --fail-above
+        run: cargo crap --lcov lcov/lcov.info --workspace --fail-above --format github
 
   rustfmt:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository

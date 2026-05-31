@@ -9,7 +9,7 @@ use comrak::{Arena, parse_document};
 use cot_test::{RUST_HAS_MAIN_TEST_TYPE, TestConfig, TestLanguage, get_test_project};
 use libtest_mimic::{Arguments, Failed, Trial};
 
-type TestRunner = fn(&str, &str) -> Result<(), Failed>;
+type TestRunner = fn(&str) -> Result<(), Failed>;
 
 static TEST_RUNNERS: OnceLock<HashMap<(TestLanguage, TestConfig), TestRunner>> = OnceLock::new();
 
@@ -17,8 +17,11 @@ fn main() {
     let args = Arguments::from_args();
 
     let mut test_runners: HashMap<(TestLanguage, TestConfig), TestRunner> = HashMap::new();
-    test_runners.insert((TestLanguage::Rust, TestConfig::Default), test_rust);
-    test_runners.insert((TestLanguage::Rust, TestConfig::HasMain), test_rust);
+    test_runners.insert((TestLanguage::Rust, TestConfig::Default), test_rust_default);
+    test_runners.insert(
+        (TestLanguage::Rust, TestConfig::HasMain),
+        test_rust_with_main,
+    );
     test_runners.insert((TestLanguage::Toml, TestConfig::Default), test_toml);
     test_runners.insert(
         (TestLanguage::AskamaTemplate, TestConfig::Default),
@@ -65,18 +68,19 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
                 let (lang, test_config) =
                     if let Some((lang, test_config)) = code_block.info.split_once(',') {
                         (
-                            TestLanguage::try_from(lang).unwrap(),
-                            TestConfig::try_from(test_config.trim()).unwrap(),
+                            TestLanguage::try_from(lang),
+                            TestConfig::try_from(test_config.trim()).expect("unknown test config"),
                         )
                     } else {
                         (
-                            TestLanguage::try_from(code_block.info.as_str()).unwrap(),
+                            TestLanguage::try_from(code_block.info.as_str()),
                             TestConfig::Default,
                         )
                     };
+                let lang = lang.expect("unknown language");
 
                 if let Some(runner) = TEST_RUNNERS.get().unwrap().get(&(lang, test_config)) {
-                    let literal = if lang == "rust" {
+                    let literal = if lang == TestLanguage::Rust {
                         clean_code(&code_block.literal)
                     } else {
                         code_block.literal.clone()
@@ -85,10 +89,11 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
                     let line = node_data.sourcepos.start.line;
                     let runner = *runner;
                     let file_name = file_name.to_string();
-                    let test_config = test_config.to_string();
                     trials.push(Trial::test(
-                        format!("{file_name}; line {line}; {lang},{test_config}"),
-                        move || runner(&literal, &test_config),
+                        format!(
+                            "{file_name}; line {line}; language {lang:?}; config {test_config:?}"
+                        ),
+                        move || runner(&literal),
                     ));
                 }
             }
@@ -115,19 +120,27 @@ fn get_temp_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
 }
 
-fn test_rust(code: &str, test_type: &str) -> Result<(), Failed> {
-    let project = get_test_project(get_temp_dir());
-    project.check_rust(code, test_type)
+fn test_rust_default(code: &str) -> Result<(), Failed> {
+    test_rust(code, TestConfig::Default)
 }
 
-fn test_toml(code: &str, _test_type: &str) -> Result<(), Failed> {
+fn test_rust_with_main(code: &str) -> Result<(), Failed> {
+    test_rust(code, TestConfig::HasMain)
+}
+
+fn test_rust(code: &str, test_config: TestConfig) -> Result<(), Failed> {
+    let project = get_test_project(get_temp_dir());
+    project.check_rust(code, test_config)
+}
+
+fn test_toml(code: &str) -> Result<(), Failed> {
     cot::config::ProjectConfig::from_toml(code)
         .map_err(|e| Failed::from(format!("could not parse the config: {e}")))?;
 
     Ok(())
 }
 
-fn test_html(code: &str, _test_type: &str) -> Result<(), Failed> {
+fn test_html(code: &str) -> Result<(), Failed> {
     let project = get_test_project(get_temp_dir());
     project.check_html(code)
 }

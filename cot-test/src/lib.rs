@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use cot_cli::new_project::{CotSource, new_project};
-use derive_more::Error;
 use libtest_mimic::Failed;
+use thiserror::Error;
 
 pub const COMMON_IMPORTS: &[&str] = &[
     "cot::db::*",
@@ -106,7 +106,7 @@ impl DocTestProject {
     /// # Panics
     ///
     /// Panics if it fails to write the code to a file.
-    pub fn check_rust(&self, code: &str, test_type: &str) -> Result<(), Failed> {
+    pub fn check_rust(&self, code: &str, test_config: TestConfig) -> Result<(), Failed> {
         self.cleanup_project()?;
 
         let mut preamble = String::new();
@@ -137,9 +137,10 @@ impl DocTestProject {
             }
         }
 
-        let final_code = match test_type {
-            RUST_HAS_MAIN_TEST_TYPE => code.to_string(),
-            _ => Self::wrap_in_main(&preamble, code),
+        let final_code = match test_config {
+            TestConfig::HasMain => code.to_string(),
+            TestConfig::Default => Self::wrap_in_main(&preamble, code),
+            TestConfig::Ignore => panic!("invalid test_config"),
         };
 
         let main_rs_path = self.path.join("src/main.rs");
@@ -261,11 +262,13 @@ pub fn get_test_project(temp_dir: PathBuf) -> MutexGuard<'static, DocTestProject
         .expect("failed to lock test project")
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum TestLanguage {
     Rust,
     Toml,
     AskamaTemplate,
+    Bash,
+    Html,
 }
 
 impl TryFrom<&str> for TestLanguage {
@@ -276,6 +279,8 @@ impl TryFrom<&str> for TestLanguage {
             "rust" => Ok(Self::Rust),
             "toml" => Ok(Self::Toml),
             "html.j2" => Ok(Self::AskamaTemplate),
+            "bash" => Ok(Self::Bash),
+            "html" => Ok(Self::Html),
             _ => Err(TestLanguageFromStringError(value.to_string())),
         }
     }
@@ -283,12 +288,13 @@ impl TryFrom<&str> for TestLanguage {
 
 #[derive(Debug, Error)]
 #[error("unknown test language: {0}")]
-struct TestLanguageFromStringError(String);
+pub struct TestLanguageFromStringError(String);
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum TestConfig {
     Default,
     HasMain,
+    Ignore,
 }
 
 impl TryFrom<&str> for TestConfig {
@@ -298,6 +304,7 @@ impl TryFrom<&str> for TestConfig {
         match value {
             "default" => Ok(Self::Default),
             "has_main" => Ok(Self::HasMain),
+            "ignore" => Ok(Self::Ignore),
             _ => Err(TestConfigFromStringError(value.to_string())),
         }
     }
@@ -305,4 +312,4 @@ impl TryFrom<&str> for TestConfig {
 
 #[derive(Debug, Error)]
 #[error("unknown test language: {0}")]
-struct TestConfigFromStringError(String);
+pub struct TestConfigFromStringError(String);

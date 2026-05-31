@@ -17,6 +17,7 @@ cot-cli = { workspace = true, features = ["test_utils"] }
 cot.workspace = true
 glob.workspace = true
 libtest-mimic.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

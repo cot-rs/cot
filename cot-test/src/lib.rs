@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use cot_cli::new_project::{CotSource, new_project};
+use derive_more::Error;
 use libtest_mimic::Failed;
 
 pub const COMMON_IMPORTS: &[&str] = &[
@@ -259,3 +260,49 @@ pub fn get_test_project(temp_dir: PathBuf) -> MutexGuard<'static, DocTestProject
         .lock()
         .expect("failed to lock test project")
 }
+
+#[derive(Debug, Copy, Clone)]
+pub enum TestLanguage {
+    Rust,
+    Toml,
+    AskamaTemplate,
+}
+
+impl TryFrom<&str> for TestLanguage {
+    type Error = TestLanguageFromStringError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "rust" => Ok(Self::Rust),
+            "toml" => Ok(Self::Toml),
+            "html.j2" => Ok(Self::AskamaTemplate),
+            _ => Err(TestLanguageFromStringError(value.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("unknown test language: {0}")]
+struct TestLanguageFromStringError(String);
+
+#[derive(Debug, Copy, Clone)]
+pub enum TestConfig {
+    Default,
+    HasMain,
+}
+
+impl TryFrom<&str> for TestConfig {
+    type Error = TestConfigFromStringError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "default" => Ok(Self::Default),
+            "has_main" => Ok(Self::HasMain),
+            _ => Err(TestConfigFromStringError(value.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("unknown test language: {0}")]
+struct TestConfigFromStringError(String);

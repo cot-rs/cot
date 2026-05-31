@@ -1009,6 +1009,7 @@ dependencies = [
  "cot-cli",
  "glob",
  "libtest-mimic",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

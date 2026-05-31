@@ -6,21 +6,24 @@ use std::sync::OnceLock;
 use comrak::arena_tree::NodeEdge;
 use comrak::nodes::NodeValue;
 use comrak::{Arena, parse_document};
-use cot_test::{RUST_HAS_MAIN_TEST_TYPE, get_test_project};
+use cot_test::{RUST_HAS_MAIN_TEST_TYPE, TestConfig, TestLanguage, get_test_project};
 use libtest_mimic::{Arguments, Failed, Trial};
 
 type TestRunner = fn(&str, &str) -> Result<(), Failed>;
 
-static TEST_RUNNERS: OnceLock<HashMap<(&str, &str), TestRunner>> = OnceLock::new();
+static TEST_RUNNERS: OnceLock<HashMap<(TestLanguage, TestConfig), TestRunner>> = OnceLock::new();
 
 fn main() {
     let args = Arguments::from_args();
 
-    let mut test_runners: HashMap<(&str, &str), TestRunner> = HashMap::new();
-    test_runners.insert(("rust", DEFAULT_TEST_TYPE), test_rust);
-    test_runners.insert(("rust", RUST_HAS_MAIN_TEST_TYPE), test_rust);
-    test_runners.insert(("toml", DEFAULT_TEST_TYPE), test_toml);
-    test_runners.insert(("html.j2", DEFAULT_TEST_TYPE), test_html);
+    let mut test_runners: HashMap<(TestLanguage, TestConfig), TestRunner> = HashMap::new();
+    test_runners.insert((TestLanguage::Rust, TestConfig::Default), test_rust);
+    test_runners.insert((TestLanguage::Rust, TestConfig::HasMain), test_rust);
+    test_runners.insert((TestLanguage::Toml, TestConfig::Default), test_toml);
+    test_runners.insert(
+        (TestLanguage::AskamaTemplate, TestConfig::Default),
+        test_html,
+    );
     TEST_RUNNERS.set(test_runners).unwrap();
 
     let mut trials = Vec::new();
@@ -61,9 +64,15 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
             if let NodeValue::CodeBlock(code_block) = &node_data.value {
                 let (lang, test_config) =
                     if let Some((lang, test_config)) = code_block.info.split_once(',') {
-                        (lang, test_config.trim())
+                        (
+                            TestLanguage::try_from(lang).unwrap(),
+                            TestConfig::try_from(test_config.trim()).unwrap(),
+                        )
                     } else {
-                        (code_block.info.as_str(), DEFAULT_TEST_TYPE)
+                        (
+                            TestLanguage::try_from(code_block.info.as_str()).unwrap(),
+                            TestConfig::Default,
+                        )
                     };
 
                 if let Some(runner) = TEST_RUNNERS.get().unwrap().get(&(lang, test_config)) {

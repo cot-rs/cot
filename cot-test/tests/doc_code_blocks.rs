@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use comrak::arena_tree::NodeEdge;
 use comrak::nodes::NodeValue;
 use comrak::{Arena, parse_document};
-use cot_test::{RUST_HAS_MAIN_TEST_TYPE, TestConfig, TestLanguage, get_test_project};
+use cot_test::{TestConfig, TestLanguage, get_test_project};
 use libtest_mimic::{Arguments, Failed, Trial};
 
 type TestRunner = fn(&str) -> Result<(), Failed>;
@@ -50,8 +50,6 @@ fn main() {
 
     libtest_mimic::run(&args, trials).exit();
 }
-
-const DEFAULT_TEST_TYPE: &str = "default";
 
 fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
     let arena = Arena::new();

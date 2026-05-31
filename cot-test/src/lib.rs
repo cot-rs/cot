@@ -40,8 +40,6 @@ pub const COMMON_IMPORTS: &[&str] = &[
 const HTML_MAIN_RS: &str = include_str!("../templates/html_main.rs");
 const BASE_HTML: &str = include_str!("../templates/base.html");
 
-pub const RUST_HAS_MAIN_TEST_TYPE: &str = "has_main";
-
 #[derive(Debug)]
 pub struct DocTestProject {
     path: PathBuf,

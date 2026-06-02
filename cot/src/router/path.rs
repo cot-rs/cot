@@ -86,6 +86,22 @@ impl PathMatcher {
                 (Some('/') | None, State::Param { start }) => {
                     panic!("Unclosed parameter: `{}`", &path_pattern[start..index]);
                 }
+                (Some('*'), State::Literal { start } ) => {
+                    let literal_name = &path_pattern[start..index];
+                    let param_name = &path_pattern[index..].trim();
+                    let next_char = char_iter.peek().map(|(_, ch)| *ch).unwrap_or_default();
+                    if next_char.is_none() {
+                        panic!("Wildcard must be named: `{}`", path_pattern);
+                    }
+                    if param_name.contains("/") {
+                        panic!("Wildcard must be last: `{}`", param_name);
+                    }
+                    parts.push(PathPart::Literal(literal_name.to_string()));
+                    parts.push(PathPart::Param {
+                        name: (*param_name).to_string(),
+                    });
+                    break;
+                }
                 _ => {}
             }
         }
@@ -125,6 +141,10 @@ impl PathMatcher {
                         return None;
                     }
                     current_path = &current_path[s.len()..];
+                }
+                PathPart::Param { name } if name.starts_with('*') => {
+                    params.push(PathParam::new(name, current_path));
+                    current_path = "";
                 }
                 PathPart::Param { name } => {
                     let next_slash = current_path.find('/');

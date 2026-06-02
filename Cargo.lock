@@ -912,7 +912,7 @@ dependencies = [
  "reqwest",
  "rustversion",
  "schemars",
- "sea-query",
+ "sea-query 1.0.1",
  "sea-query-binder",
  "serde",
  "serde_json",
@@ -3646,13 +3646,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sea-query"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d190cfb3bcceb8a8d7d04dee5a0c77f60c7627979cdcb47fdcb8934f009badf"
+
+[[package]]
 name = "sea-query-binder"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0019f47430f7995af63deda77e238c17323359af241233ec768aba1faea7608"
 dependencies = [
  "chrono",
- "sea-query",
+ "sea-query 0.32.7",
  "sqlx",
 ]
 

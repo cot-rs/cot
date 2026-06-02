@@ -86,7 +86,7 @@ impl PathMatcher {
                 (Some('/') | None, State::Param { start }) => {
                     panic!("Unclosed parameter: `{}`", &path_pattern[start..index]);
                 }
-                (Some('*'), State::Literal { start } ) => {
+                (Some('*'), State::Literal { start }) => {
                     let literal_name = &path_pattern[start..index];
                     let param_name = &path_pattern[index..].trim();
                     let next_char = char_iter.peek().map(|(_, ch)| *ch).unwrap_or_default();
@@ -564,10 +564,7 @@ mod tests {
         let path_parser = PathMatcher::new("/users/rand/*path");
         assert_eq!(
             path_parser.capture("/users/rand/foo"),
-            Some(CaptureResult::new(
-                vec![PathParam::new("*path", "foo")],
-                ""
-            ))
+            Some(CaptureResult::new(vec![PathParam::new("*path", "foo")], ""))
         );
     }
 
@@ -603,7 +600,10 @@ mod tests {
         let path_parser = PathMatcher::new("/users/{id}/*path");
         assert_eq!(
             path_parser.capture("/users/42/foo"),
-            Some(CaptureResult::new(vec![PathParam::new("id", "42"), PathParam::new("*path", "foo")], ""))
+            Some(CaptureResult::new(
+                vec![PathParam::new("id", "42"), PathParam::new("*path", "foo")],
+                ""
+            ))
         );
     }
 

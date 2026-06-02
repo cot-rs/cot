@@ -546,4 +546,76 @@ mod tests {
         let params = ReverseParamMap::new();
         assert_eq!(path_parser.reverse(&params).unwrap(), "/café/test");
     }
+
+    #[test]
+    fn path_parser_wildcard_root() {
+        let path_parser = PathMatcher::new("/*path");
+        assert_eq!(
+            path_parser.capture("/foo/bar"),
+            Some(CaptureResult::new(
+                vec![PathParam::new("*path", "foo/bar")],
+                ""
+            ))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_single_segment() {
+        let path_parser = PathMatcher::new("/users/rand/*path");
+        assert_eq!(
+            path_parser.capture("/users/rand/foo"),
+            Some(CaptureResult::new(
+                vec![PathParam::new("*path", "foo")],
+                ""
+            ))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_multi_segment() {
+        let path_parser = PathMatcher::new("/users/rand/*path");
+        assert_eq!(
+            path_parser.capture("/users/rand/foo/bar"),
+            Some(CaptureResult::new(
+                vec![PathParam::new("*path", "foo/bar")],
+                ""
+            ))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_no_match() {
+        let path_parser = PathMatcher::new("/prefix/*path");
+        assert_eq!(path_parser.capture("/other/foo"), None);
+    }
+
+    #[test]
+    fn path_parser_wildcard_empty() {
+        let path_parser = PathMatcher::new("/users/rand/*path");
+        assert_eq!(
+            path_parser.capture("/users/rand/"),
+            Some(CaptureResult::new(vec![PathParam::new("*path", "")], ""))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_with_param() {
+        let path_parser = PathMatcher::new("/users/{id}/*path");
+        assert_eq!(
+            path_parser.capture("/users/42/foo"),
+            Some(CaptureResult::new(vec![PathParam::new("id", "42"), PathParam::new("*path", "foo")], ""))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Wildcard must be last: `*path/extra`")]
+    fn path_parser_wildcard_with_trailing_literal() {
+        let _ = PathMatcher::new("/*path/extra");
+    }
+
+    #[test]
+    #[should_panic(expected = "Wildcard must be named: `users/rand/*`")]
+    fn path_parser_with_no_wildcard_name() {
+        let _ = PathMatcher::new("users/rand/*");
+    }
 }

@@ -4,18 +4,21 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use crate::{Bootstrapper, Error, Result};
 use async_trait::async_trait;
 pub use clap;
 use clap::{Arg, ArgMatches, Command, value_parser};
+use cot::db::migrations::{MigrationEngine, SyncDynMigration};
+use cot::project::BootstrappedProject;
 use derive_more::Debug;
-
-use crate::{Bootstrapper, Error, Result};
 
 const CONFIG_PARAM: &str = "config";
 const COLLECT_STATIC_SUBCOMMAND: &str = "collect-static";
 const CHECK_SUBCOMMAND: &str = "check";
 const LISTEN_PARAM: &str = "listen";
 const COLLECT_STATIC_DIR_PARAM: &str = "dir";
+const MIGRATION_GROUP_SUBCOMMAND: &str = "migration";
+const MIGRATION_ROLLBACK_SUBCOMMAND: &str = "rollback";
 
 /// A central point for configuring the default Command Line Interface (CLI) for
 /// Cot-powered projects.
@@ -90,6 +93,12 @@ impl Cli {
         let mut cli = Self { command, tasks };
         cli.add_task(Check);
         cli.add_task(CollectStatic);
+
+        let mut migration_group =
+            CliTaskGroup::new("migration").about("Database migration commands");
+        migration_group.add_task(MigrationRollback);
+
+        cli.add_task(migration_group);
 
         cli
     }
@@ -385,6 +394,142 @@ impl CliTask for Check {
     ) -> Result<()> {
         bootstrapper.boot().await?;
         println!("Success verifying the configuration");
+        Ok(())
+    }
+}
+
+/// A group of related sub-tasks under a single parent subcommand.
+///
+/// Usage:
+/// ```
+/// let mut migration = CliTaskGroup::new("migration")
+///     .about("Database migration commands");
+/// migration.add_task(MigrationRollback);
+/// migration.add_task(MigrationSquash);
+/// cli.add_task(migration);
+/// ```
+pub struct CliTaskGroup {
+    name: String,
+    about: String,
+    tasks: HashMap<String, Box<dyn CliTask + Send + 'static>>,
+}
+
+impl CliTaskGroup {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            about: String::new(),
+            tasks: HashMap::new(),
+        }
+    }
+
+    pub fn about(mut self, about: impl Into<String>) -> Self {
+        self.about = about.into();
+        self
+    }
+
+    pub fn add_task<C: CliTask + Send + 'static>(&mut self, task: C) {
+        let subcommand = task.subcommand();
+        let name = subcommand.get_name().to_owned();
+
+        assert!(
+            !self.tasks.contains_key(&name),
+            "Task with name {name} already exists in group '{}'",
+            self.name
+        );
+
+        self.tasks.insert(name, Box::new(task));
+    }
+}
+
+#[async_trait(?Send)]
+impl CliTask for CliTaskGroup {
+    fn subcommand(&self) -> Command {
+        let name = self.name.clone();
+        let mut cmd = Command::new(name);
+
+        if !self.about.is_empty() {
+            cmd = cmd.about(self.about.clone());
+        }
+
+        cmd = cmd.subcommand_required(true).arg_required_else_help(true);
+        for task in self.tasks.values() {
+            cmd = cmd.subcommand(task.subcommand());
+        }
+        cmd
+    }
+
+    async fn execute(
+        &mut self,
+        matches: &ArgMatches,
+        bootstrapper: Bootstrapper<WithConfig>,
+    ) -> Result<()> {
+        let (sub_name, sub_matches) = matches
+            .subcommand()
+            .expect("subcommand_required(true) ensures one is present");
+
+        self.tasks
+            .get_mut(sub_name)
+            .expect("clap only matches registered subcommands")
+            .execute(sub_matches, bootstrapper)
+            .await
+    }
+}
+
+struct MigrationRollback;
+
+#[async_trait(?Send)]
+impl CliTask for MigrationRollback {
+    fn subcommand(&self) -> Command {
+        Command::new(MIGRATION_ROLLBACK_SUBCOMMAND)
+            .about("Rollback migrations up to the specified migration file")
+            .arg(
+                Arg::new("file")
+                    .help("The migration filename to roll back to (e.g. 0001_create_users)")
+                    .value_name("FILE")
+                    .required(true),
+            )
+    }
+
+    async fn execute(
+        &mut self,
+        matches: &ArgMatches,
+        bootstrapper: Bootstrapper<WithConfig>,
+    ) -> Result<()> {
+        let file = matches
+            .get_one::<String>("file")
+            .expect("required argument");
+
+        let bootstrapper = bootstrapper
+            .with_apps()
+            .with_database()
+            .await?
+            .with_cache()
+            .await?
+            .boot()
+            .await?;
+
+        // migrations are currently tied to crates, so we use the crate name as the app name.
+        // TODO: cli command should take an explicit crate name as arg when workspaces are supported.
+        let crate_name = bootstrapper.project().cli_metadata().name;
+
+        let BootstrappedProject {
+            mut context,
+            mut handler,
+            mut error_handler,
+        } = bootstrapper.finish();
+
+        #[cfg(feature = "db")]
+        {
+            let mut migrations: Vec<Box<SyncDynMigration>> = Vec::new();
+            for app in context.apps() {
+                migrations.extend(app.migrations());
+            }
+            let migration_engine = MigrationEngine::new(migrations)?;
+            migration_engine
+                .rollback(context.database(), file, crate_name)
+                .await?;
+        }
         Ok(())
     }
 }

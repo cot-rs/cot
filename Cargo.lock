@@ -1675,6 +1675,8 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "cot",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

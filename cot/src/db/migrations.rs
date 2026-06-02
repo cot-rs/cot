@@ -2,12 +2,13 @@
 
 mod sorter;
 
+pub use cot_macros::migration_op;
+use sea_query::{ColumnDef, StringLen};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
-
-pub use cot_macros::migration_op;
-use sea_query::{ColumnDef, StringLen};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tracing::{Level, info};
 
@@ -215,6 +216,92 @@ impl MigrationEngine {
         Ok(())
     }
 
+    pub async fn rollback(&self, database: &Database, file: &str, app_name: &str) -> Result<()> {
+        let rollback_plan = self.rollback_plan(file, app_name)?;
+
+        for migration in rollback_plan {
+            if !Self::is_migration_applied(database, migration).await? {
+                continue;
+            }
+
+            let span = tracing::span!(
+                Level::TRACE,
+                "rollback_migration",
+                app_name = migration.app_name(),
+                migration_name = migration.name()
+            );
+            let _enter = span.enter();
+
+            info!(
+                "Rolling back migration {} for app {}",
+                migration.name(),
+                migration.app_name()
+            );
+
+            for operation in migration.operations().iter().rev() {
+                operation.backwards(database).await?;
+            }
+
+            Self::unapply_migration(database, migration).await?;
+        }
+
+        Ok(())
+    }
+
+    fn rollback_plan<'a>(
+        &'a self,
+        file: &str,
+        app_name: &str,
+    ) -> Result<Vec<&'a MigrationWrapper>> {
+        let target_index = self
+            .migrations
+            .iter()
+            .position(|migration| {
+                migration.app_name() == app_name
+                    && resolve_migration_file_name(migration.name()).contains(&file)
+            })
+            .ok_or_else(|| {
+                MigrationEngineError::Custom(format!(
+                    "Migration with file name {file} not found for app {app_name}"
+                ))
+            })?;
+
+        let mut rollback_indices = HashSet::new();
+        // seed all possible migration files in the same app that are dependent on the target migration
+        rollback_indices.extend(
+            self.migrations
+                .iter()
+                .enumerate()
+                .filter(|(index, migration)| {
+                    *index > target_index && migration.app_name() == app_name
+                })
+                .map(|(index, _)| index),
+        );
+
+        let graph = MigrationSorter::generate_graph(&self.migrations).map_err(|e| {
+            MigrationEngineError::Custom(format!("Failed to generate migration graph: {}", e))
+        })?;
+        let mut queue = rollback_indices.iter().copied().collect::<VecDeque<_>>();
+        // go through every migration dependent on the target migration and add any dependencies to the queue.
+        // This is also useful in cases where a migration is depended on by migrations in other apps. In this case,
+        // we need to make sure that we also roll back the migrations in other apps.
+        while let Some(index) = queue.pop_front() {
+            for &dependent_index in graph.get_edges(index) {
+                if rollback_indices.insert(dependent_index) {
+                    queue.push_back(dependent_index);
+                }
+            }
+        }
+
+        Ok(self
+            .migrations
+            .iter()
+            .enumerate()
+            .rev()
+            .filter_map(|(index, migration)| rollback_indices.contains(&index).then_some(migration))
+            .collect())
+    }
+
     async fn is_migration_applied(
         database: &Database,
         migration: &MigrationWrapper,
@@ -241,6 +328,22 @@ impl MigrationEngine {
         database.insert(&mut applied_migration).await?;
         Ok(())
     }
+
+    async fn unapply_migration(database: &Database, migration: &MigrationWrapper) -> Result<()> {
+        query!(AppliedMigration, $app == migration.app_name() && $name == migration.name())
+            .delete(database)
+            .await?;
+        Ok(())
+    }
+}
+
+fn resolve_migration_file_name(file_name: &str) -> Vec<&str> {
+    let mut names = vec![file_name];
+    let migration_number = file_name.split('_').nth(1);
+    if let Some(migration_number) = migration_number {
+        names.push(migration_number);
+    }
+    names
 }
 
 /// A migration operation that can be run forwards or backwards.

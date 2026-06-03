@@ -99,6 +99,10 @@ impl PathMatcher {
                         !param_name.contains('/'),
                         "Wildcard must be last: `{param_name}`"
                     );
+                    assert!(
+                        Self::is_param_name_valid(&param_name[1..]),
+                        "Invalid parameter name: `{param_name}`"
+                    );
 
                     parts.push(PathPart::Literal(literal_name.to_string()));
                     parts.push(PathPart::Param {
@@ -621,5 +625,21 @@ mod tests {
     #[should_panic(expected = "Wildcard must be named: `users/rand/*`")]
     fn path_parser_with_no_wildcard_name() {
         let _ = PathMatcher::new("users/rand/*");
+    }
+
+    #[test]
+    fn path_parser_with_wildcard_name_contains_number_and_strings() {
+        let _ = PathMatcher::new("users/rand/*path123");
+    }
+
+    #[test]
+    fn path_parser_with_wildcard_name_starts_with_underscore() {
+        let _ = PathMatcher::new("users/rand/*_path");
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid parameter name: `*42`")]
+    fn path_parser_with_wildcard_name_starts_with_numbers() {
+        let _ = PathMatcher::new("users/rand/*42");
     }
 }

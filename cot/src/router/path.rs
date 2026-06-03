@@ -90,12 +90,10 @@ impl PathMatcher {
                     let literal_name = &path_pattern[start..index];
                     let param_name = &path_pattern[index..].trim();
                     let next_char = char_iter.peek().map(|(_, ch)| *ch).unwrap_or_default();
-                    if next_char.is_none() {
-                        panic!("Wildcard must be named: `{}`", path_pattern);
-                    }
-                    if param_name.contains("/") {
-                        panic!("Wildcard must be last: `{}`", param_name);
-                    }
+
+                    assert!(next_char.is_some(), "Wildcard must be named: `{path_pattern}`");
+                    assert!(!param_name.contains('/'), "Wildcard must be last: `{param_name}`");
+
                     parts.push(PathPart::Literal(literal_name.to_string()));
                     parts.push(PathPart::Param {
                         name: (*param_name).to_string(),

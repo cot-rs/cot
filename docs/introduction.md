@@ -171,6 +171,25 @@ fn router(&self) -> Router {
 
 Now, when you visit [`localhost:8000/hello/John/Smith/`](http://localhost:8000/hello/John), you should see `Hello, John Smith!` displayed on the page!
 
+cot also has wildcards to match all sub path in a segment:
+
+```rust
+async fn wildcard_path(Path(path): Path<(String, String)>) -> cot::Result<Html> {
+    Ok(Html::new(format!("Passed path: {path}")))
+}
+
+// inside `impl App`:
+
+fn router(&self) -> Router {
+    Router::with_urls([
+        // ...
+        Route::with_handler_and_name("/wildcard/*path", wildcard_path, "wildcard_path"),
+    ])
+}
+```
+
+In this case, it matches `/wildcard/`, `/wildcard/foo`, `/wildcard/foo/bar` and so on.
+
 ## Project structure
 
 ### App

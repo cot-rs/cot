@@ -335,7 +335,10 @@ impl MigrationEngine {
         Ok(())
     }
 
-    async fn mark_migration_unapplied(database: &Database, migration: &MigrationWrapper) -> Result<()> {
+    async fn mark_migration_unapplied(
+        database: &Database,
+        migration: &MigrationWrapper,
+    ) -> Result<()> {
         query!(AppliedMigration, $app == migration.app_name() && $name == migration.name())
             .delete(database)
             .await?;

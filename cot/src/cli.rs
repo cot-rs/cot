@@ -437,13 +437,24 @@ impl CliTask for Check {
 ///     }
 /// }
 /// ```
+#[derive(Debug)]
 pub struct CliTaskGroup {
     name: String,
     about: String,
+    #[debug("..")]
     tasks: HashMap<String, Box<dyn CliTask + Send + 'static>>,
 }
 
 impl CliTaskGroup {
+    /// Create a subcommand group.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::cli::CliTaskGroup;
+    ///
+    /// let group = CliTaskGroup::new("command");
+    /// ```
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -452,11 +463,63 @@ impl CliTaskGroup {
         }
     }
 
+    /// Sets the description of the group, which is displayed in the help message
+    /// for the group's subcommands.
+    ///
+    /// # Example
+    /// ```
+    /// let group = CliTaskGroup::new("command")
+    ///     .about("This is a description for the command group");
+    /// ```
+    #[must_use]
     pub fn about(mut self, about: impl Into<String>) -> Self {
         self.about = about.into();
         self
     }
 
+    /// Adds a new task to the subcommand group.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a task with the same name has already been registered.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use async_trait::async_trait;
+    /// use clap::{ArgMatches, Command};
+    /// use cot::cli::{Cli, CliTask};
+    /// use cot::project::WithConfig;
+    /// use cot::{Bootstrapper, Project};
+    ///
+    /// struct Frobnicate;
+    ///
+    /// #[async_trait(?Send)]
+    /// impl CliTask for Frobnicate {
+    ///     fn subcommand(&self) -> Command {
+    ///         Command::new("frobnicate")
+    ///     }
+    ///
+    ///     async fn execute(
+    ///         &mut self,
+    ///         _matches: &ArgMatches,
+    ///         _bootstrapper: Bootstrapper<WithConfig>,
+    ///     ) -> cot::Result<()> {
+    ///         println!("Frobnicating...");
+    ///
+    ///         Ok(())
+    ///     }
+    /// }
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {
+    ///     fn register_tasks(&self, cli: &mut Cli) {
+    ///         group_command = CliTaskGroup::new("foo").about("Foo related commands");
+    ///         group_command.add_task(Frobnicate)
+    ///         cli.add_task(group_command);
+    ///     }
+    /// }
+    /// ```
     pub fn add_task<C: CliTask + Send + 'static>(&mut self, task: C) {
         let subcommand = task.subcommand();
         let name = subcommand.get_name().to_owned();

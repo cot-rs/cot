@@ -215,9 +215,16 @@ impl MigrationEngine {
         Ok(())
     }
 
-    /// Rollback necessary migrations up until the specified migration in an app.
+    /// Roll back necessary migrations up until the specified migration in an app.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if there is an error while interacting with the database or if
+    /// there is an error while generating the migration graph or if there is an error
+    /// while unapplying a migration.
     pub async fn rollback(&self, database: &Database, file: &str, app_name: &str) -> Result<()> {
+        info!("Rolling back migrations");
+
         let rollback_plan = self.rollback_plan(file, app_name)?;
 
         for migration in rollback_plan {
@@ -243,7 +250,7 @@ impl MigrationEngine {
                 operation.backwards(database).await?;
             }
 
-            Self::unapply_migration(database, migration).await?;
+            Self::mark_migration_unapplied(database, migration).await?;
         }
 
         Ok(())
@@ -281,7 +288,7 @@ impl MigrationEngine {
         );
 
         let graph = MigrationSorter::generate_graph(&self.migrations).map_err(|e| {
-            MigrationEngineError::Custom(format!("Failed to generate migration graph: {}", e))
+            MigrationEngineError::Custom(format!("Failed to generate migration graph: {e}"))
         })?;
         let mut queue = rollback_indices.iter().copied().collect::<VecDeque<_>>();
         while let Some(index) = queue.pop_front() {
@@ -328,7 +335,7 @@ impl MigrationEngine {
         Ok(())
     }
 
-    async fn unapply_migration(database: &Database, migration: &MigrationWrapper) -> Result<()> {
+    async fn mark_migration_unapplied(database: &Database, migration: &MigrationWrapper) -> Result<()> {
         query!(AppliedMigration, $app == migration.app_name() && $name == migration.name())
             .delete(database)
             .await?;
@@ -2335,7 +2342,7 @@ mod tests {
         assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", true).await;
         assert_migration_applied(test_db.database(), "rollback_app2", "m_0001_initial", true).await;
 
-        // rollback every migration in the rollback_mixed app except the initial
+        // rollback every migration in the rollback_app1 app except the initial
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await

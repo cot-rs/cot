@@ -797,7 +797,6 @@ mod tests {
         static TASK_CALLED: AtomicBool = AtomicBool::new(false);
         TASK_CALLED.store(false, Ordering::SeqCst);
 
-
         let mut group = CliTaskGroup::new("group");
         group.add_task(NestedTask);
         let matches = group.subcommand().get_matches_from(["group", "nested"]);

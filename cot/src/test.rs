@@ -649,6 +649,44 @@ impl TestRequestBuilder {
         self
     }
 
+    /// Add a cache to the request builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::{TestCache, TestRequestBuilder};
+    ///
+    /// let test_cache = TestCache::new_memory();
+    /// let request = TestRequestBuilder::get("/")
+    ///     .cache(test_cache.cache())
+    ///     .build();
+    /// ```
+    #[cfg(feature = "cache")]
+    pub fn cache(&mut self, cache: Cache) -> &mut Self {
+        self.cache = Some(cache);
+        self
+    }
+
+    /// Add an email backend to the request builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::email::Email;
+    /// use cot::email::transport::console::Console;
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// let test_email_backend = Email::new(Console::new());
+    /// let request = TestRequestBuilder::get("/")
+    ///     .email(test_email_backend)
+    ///     .build();
+    /// ```
+    #[cfg(feature = "email")]
+    pub fn email(&mut self, email: Email) -> &mut Self {
+        self.email = Some(email);
+        self
+    }
+
     /// Add form data to the request builder.
     ///
     /// # Examples

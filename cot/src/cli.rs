@@ -95,7 +95,7 @@ impl Cli {
         cli.add_task(CollectStatic);
 
         let mut migration_group =
-            CliTaskGroup::new("migration").about("Database migration commands");
+            CliTaskGroup::new(MIGRATION_GROUP_SUBCOMMAND).about("Database migration commands");
         migration_group.add_task(MigrationRollback);
 
         cli.add_task(migration_group);
@@ -400,13 +400,42 @@ impl CliTask for Check {
 
 /// A group of related sub-tasks under a single parent subcommand.
 ///
-/// Usage:
+/// # Examples
+///
 /// ```
-/// let mut migration = CliTaskGroup::new("migration")
-///     .about("Database migration commands");
-/// migration.add_task(MigrationRollback);
-/// migration.add_task(MigrationSquash);
-/// cli.add_task(migration);
+/// use async_trait::async_trait;
+/// use clap::{ArgMatches, Command};
+/// use cot::cli::{Cli, CliTask};
+/// use cot::project::WithConfig;
+/// use cot::{Bootstrapper, Project};
+///
+/// struct Frobnicate;
+///
+/// #[async_trait(?Send)]
+/// impl CliTask for Frobnicate {
+///     fn subcommand(&self) -> Command {
+///         Command::new("frobnicate")
+///     }
+///
+///     async fn execute(
+///         &mut self,
+///         _matches: &ArgMatches,
+///         _bootstrapper: Bootstrapper<WithConfig>,
+///     ) -> cot::Result<()> {
+///         println!("Frobnicating...");
+///
+///         Ok(())
+///     }
+/// }
+///
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn register_tasks(&self, cli: &mut Cli) {
+///         group_command = CliTaskGroup::new("foo").about("Foo related commands");
+///         group_command.add_task(Frobnicate)
+///         cli.add_task(group_command);
+///     }
+/// }
 /// ```
 pub struct CliTaskGroup {
     name: String,
@@ -466,11 +495,11 @@ impl CliTask for CliTaskGroup {
     ) -> Result<()> {
         let (sub_name, sub_matches) = matches
             .subcommand()
-            .expect("subcommand_required(true) ensures one is present");
+            .expect("subcommand should be present since subcommand_required is true");
 
         self.tasks
             .get_mut(sub_name)
-            .expect("clap only matches registered subcommands")
+            .expect("command should be registered")
             .execute(sub_matches, bootstrapper)
             .await
     }
@@ -514,9 +543,9 @@ impl CliTask for MigrationRollback {
         let crate_name = bootstrapper.project().cli_metadata().name;
 
         let BootstrappedProject {
-            mut context,
-            mut handler,
-            mut error_handler,
+            context,
+            handler: _,
+            error_handler: _,
         } = bootstrapper.finish();
 
         #[cfg(feature = "db")]
@@ -559,10 +588,113 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+    #[cfg(feature = "db")]
+    use crate::config::DatabaseConfig;
     use crate::config::ProjectConfig;
+    #[cfg(feature = "db")]
+    use crate::db::migrations::{
+        Field, Migration, MigrationDependency, Operation, wrap_migrations,
+    };
+    #[cfg(feature = "db")]
+    use crate::db::{Auto, Database, DatabaseField, Identifier, query};
     use crate::project::RegisterAppsContext;
     use crate::static_files::StaticFile;
     use crate::{App, AppBuilder};
+
+    #[cfg(feature = "db")]
+    struct CliRollbackInitial;
+
+    #[cfg(feature = "db")]
+    impl Migration for CliRollbackInitial {
+        const APP_NAME: &'static str = "cli_rollback_app";
+        const MIGRATION_NAME: &'static str = "m_0001_initial";
+        const DEPENDENCIES: &'static [MigrationDependency] = &[];
+        const OPERATIONS: &'static [Operation] = &[Operation::create_model()
+            .table_name(Identifier::new("cli_rollback_app__initial"))
+            .fields(&[
+                Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+                    .primary_key()
+                    .auto(),
+            ])
+            .build()];
+    }
+
+    #[cfg(feature = "db")]
+    struct CliRollbackSecond;
+
+    #[cfg(feature = "db")]
+    impl Migration for CliRollbackSecond {
+        const APP_NAME: &'static str = "cli_rollback_app";
+        const MIGRATION_NAME: &'static str = "m_0002_second";
+        const DEPENDENCIES: &'static [MigrationDependency] = &[MigrationDependency::migration(
+            "cli_rollback_app",
+            "m_0001_initial",
+        )];
+        const OPERATIONS: &'static [Operation] = &[Operation::create_model()
+            .table_name(Identifier::new("cli_rollback_app__second"))
+            .fields(&[
+                Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+                    .primary_key()
+                    .auto(),
+            ])
+            .build()];
+    }
+
+    #[cfg(feature = "db")]
+    struct CliRollbackApp;
+
+    #[cfg(feature = "db")]
+    impl App for CliRollbackApp {
+        fn name(&self) -> &'static str {
+            "cli_rollback_app"
+        }
+
+        fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+            #[expect(trivial_casts)]
+            wrap_migrations(&[
+                &CliRollbackInitial as &SyncDynMigration,
+                &CliRollbackSecond as &SyncDynMigration,
+            ])
+        }
+    }
+
+    #[cfg(feature = "db")]
+    struct CliRollbackProject;
+
+    #[cfg(feature = "db")]
+    impl crate::Project for CliRollbackProject {
+        fn cli_metadata(&self) -> CliMetadata {
+            CliMetadata {
+                name: "cli_rollback_app",
+                version: "0.0.0",
+                authors: "",
+                description: "",
+            }
+        }
+
+        fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+            apps.register(CliRollbackApp);
+        }
+    }
+
+    #[cfg(feature = "db")]
+    #[derive(::std::fmt::Debug)]
+    #[crate::db::model(table_name = "cot__migrations", model_type = "internal")]
+    struct CliAppliedMigration {
+        #[model(primary_key)]
+        id: Auto<i32>,
+        app: String,
+        name: String,
+        applied: chrono::DateTime<chrono::FixedOffset>,
+    }
+
+    #[cfg(feature = "db")]
+    async fn cli_migration_applied(database: &Database, app: &str, name: &str) -> bool {
+        query!(CliAppliedMigration, $app == app && $name == name)
+            .exists(database)
+            .await
+            .unwrap()
+    }
 
     #[test]
     fn cli_new() {
@@ -622,6 +754,61 @@ mod tests {
     }
 
     #[test]
+    fn cli_new_includes_migration_rollback_group() {
+        let cli = Cli::new();
+
+        let migration_group = cli
+            .command
+            .get_subcommands()
+            .find(|command| command.get_name() == MIGRATION_GROUP_SUBCOMMAND)
+            .expect("migration group is registered");
+
+        assert!(
+            migration_group
+                .get_subcommands()
+                .any(|command| command.get_name() == MIGRATION_ROLLBACK_SUBCOMMAND)
+        );
+    }
+
+    #[cot::test]
+    async fn cli_task_group_dispatches_nested_task() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        struct NestedTask;
+        #[async_trait(?Send)]
+        impl CliTask for NestedTask {
+            fn subcommand(&self) -> Command {
+                Command::new("nested")
+            }
+
+            async fn execute(
+                &mut self,
+                _matches: &ArgMatches,
+                _bootstrapper: Bootstrapper<WithConfig>,
+            ) -> Result<()> {
+                TASK_CALLED.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+
+        struct TestProject;
+        impl crate::Project for TestProject {}
+
+        static TASK_CALLED: AtomicBool = AtomicBool::new(false);
+        TASK_CALLED.store(false, Ordering::SeqCst);
+
+
+        let mut group = CliTaskGroup::new("group");
+        group.add_task(NestedTask);
+        let matches = group.subcommand().get_matches_from(["group", "nested"]);
+        let bootstrapper = Bootstrapper::new(TestProject).with_config(ProjectConfig::default());
+
+        group.execute(&matches, bootstrapper).await.unwrap();
+
+        assert!(TASK_CALLED.load(Ordering::SeqCst));
+    }
+
+    #[test]
     fn run_server_subcommand() {
         let matches = RunServer
             .subcommand()
@@ -667,6 +854,46 @@ mod tests {
 
         assert!(result.is_ok());
         assert!(temp_path.join("test.txt").exists());
+    }
+
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    #[cfg(feature = "db")]
+    async fn migration_rollback_execute_rolls_back_project_app() {
+        let temp_dir = tempdir().unwrap();
+        let db_path = temp_dir.path().join("rollback.sqlite");
+        std::fs::File::create(&db_path).unwrap();
+        let db_url = format!("sqlite://{}", db_path.display());
+
+        let setup_database = Database::new(db_url.clone()).await.unwrap();
+        let setup_engine = MigrationEngine::new(CliRollbackApp.migrations()).unwrap();
+        setup_engine.run(&setup_database).await.unwrap();
+        assert!(cli_migration_applied(&setup_database, "cli_rollback_app", "m_0001_initial").await);
+        assert!(cli_migration_applied(&setup_database, "cli_rollback_app", "m_0002_second").await);
+        drop(setup_engine);
+        drop(setup_database);
+
+        let config = ProjectConfig::builder()
+            .database(DatabaseConfig::builder().url(db_url.clone()).build())
+            .build();
+        let mut rollback = MigrationRollback;
+        let matches = MigrationRollback
+            .subcommand()
+            .get_matches_from(["rollback", "0001"]);
+        let bootstrapper = Bootstrapper::new(CliRollbackProject).with_config(config);
+
+        rollback.execute(&matches, bootstrapper).await.unwrap();
+
+        let verify_database = Database::new(db_url).await.unwrap();
+        assert!(
+            cli_migration_applied(&verify_database, "cli_rollback_app", "m_0001_initial").await
+        );
+        assert!(
+            !cli_migration_applied(&verify_database, "cli_rollback_app", "m_0002_second").await
+        );
     }
 
     #[cot::test]

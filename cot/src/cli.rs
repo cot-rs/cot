@@ -405,7 +405,7 @@ impl CliTask for Check {
 /// ```
 /// use async_trait::async_trait;
 /// use clap::{ArgMatches, Command};
-/// use cot::cli::{Cli, CliTask};
+/// use cot::cli::{Cli, CliTask, CliTaskGroup};
 /// use cot::project::WithConfig;
 /// use cot::{Bootstrapper, Project};
 ///
@@ -431,8 +431,8 @@ impl CliTask for Check {
 /// struct MyProject;
 /// impl Project for MyProject {
 ///     fn register_tasks(&self, cli: &mut Cli) {
-///         group_command = CliTaskGroup::new("foo").about("Foo related commands");
-///         group_command.add_task(Frobnicate)
+///         let mut group_command = CliTaskGroup::new("foo").about("Foo related commands");
+///         group_command.add_task(Frobnicate);
 ///         cli.add_task(group_command);
 ///     }
 /// }
@@ -468,6 +468,8 @@ impl CliTaskGroup {
     ///
     /// # Example
     /// ```
+    /// use cot::cli::CliTaskGroup;
+    ///
     /// let group = CliTaskGroup::new("command")
     ///     .about("This is a description for the command group");
     /// ```
@@ -488,7 +490,7 @@ impl CliTaskGroup {
     /// ```
     /// use async_trait::async_trait;
     /// use clap::{ArgMatches, Command};
-    /// use cot::cli::{Cli, CliTask};
+    /// use cot::cli::{Cli, CliTask, CliTaskGroup};
     /// use cot::project::WithConfig;
     /// use cot::{Bootstrapper, Project};
     ///
@@ -514,8 +516,8 @@ impl CliTaskGroup {
     /// struct MyProject;
     /// impl Project for MyProject {
     ///     fn register_tasks(&self, cli: &mut Cli) {
-    ///         group_command = CliTaskGroup::new("foo").about("Foo related commands");
-    ///         group_command.add_task(Frobnicate)
+    ///         let mut group_command = CliTaskGroup::new("foo").about("Foo related commands");
+    ///         group_command.add_task(Frobnicate);
     ///         cli.add_task(group_command);
     ///     }
     /// }

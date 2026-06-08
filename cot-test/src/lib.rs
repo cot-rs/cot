@@ -80,7 +80,7 @@ impl DocTestProject {
         );
         cargo_toml.push_str("serde = { version = \"1\", features = [\"derive\"] }\n");
         cargo_toml.push_str("schemars = \"0.9\"\n");
-        cargo_toml.push_str("askama = \"0.15\"\n");
+        cargo_toml.push_str("askama = { version = \"0.16\", features = [\"std\"] }\n");
         cargo_toml.push_str("async-trait = \"0.1\"\n");
 
         // Add empty workspace info to prevent Cargo from trying to build the entire

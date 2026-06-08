@@ -2,6 +2,7 @@
 name = "cot-test"
 description = "Internal crate containing various integrations tests and test utilities."
 version = "0.1.0"
+publish = false
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

@@ -4,13 +4,15 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::{Bootstrapper, Error, Result};
 use async_trait::async_trait;
 pub use clap;
 use clap::{Arg, ArgMatches, Command, value_parser};
+#[cfg(feature = "db")]
 use cot::db::migrations::{MigrationEngine, SyncDynMigration};
 use cot::project::BootstrappedProject;
 use derive_more::Debug;
+
+use crate::{Bootstrapper, Error, Result};
 
 const CONFIG_PARAM: &str = "config";
 const COLLECT_STATIC_SUBCOMMAND: &str = "collect-static";
@@ -463,15 +465,14 @@ impl CliTaskGroup {
         }
     }
 
-    /// Sets the description of the group, which is displayed in the help message
-    /// for the group's subcommands.
+    /// Sets the description of the group, which is displayed in the help
+    /// message for the group's subcommands.
     ///
     /// # Example
     /// ```
     /// use cot::cli::CliTaskGroup;
     ///
-    /// let group = CliTaskGroup::new("command")
-    ///     .about("This is a description for the command group");
+    /// let group = CliTaskGroup::new("command").about("This is a description for the command group");
     /// ```
     #[must_use]
     pub fn about(mut self, about: impl Into<String>) -> Self {
@@ -603,8 +604,9 @@ impl CliTask for MigrationRollback {
             .boot()
             .await?;
 
-        // migrations are currently tied to crates, so we use the crate name as the app name.
-        // TODO: cli command should take an explicit crate name as arg when workspaces are supported.
+        // migrations are currently tied to crates, so we use the crate name as the app
+        // name. TODO: cli command should take an explicit crate name as arg
+        // when workspaces are supported.
         let crate_name = bootstrapper.project().cli_metadata().name;
 
         let BootstrappedProject {
@@ -653,113 +655,10 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
-    #[cfg(feature = "db")]
-    use crate::config::DatabaseConfig;
     use crate::config::ProjectConfig;
-    #[cfg(feature = "db")]
-    use crate::db::migrations::{
-        Field, Migration, MigrationDependency, Operation, wrap_migrations,
-    };
-    #[cfg(feature = "db")]
-    use crate::db::{Auto, Database, DatabaseField, Identifier, query};
     use crate::project::RegisterAppsContext;
     use crate::static_files::StaticFile;
     use crate::{App, AppBuilder};
-
-    #[cfg(feature = "db")]
-    struct CliRollbackInitial;
-
-    #[cfg(feature = "db")]
-    impl Migration for CliRollbackInitial {
-        const APP_NAME: &'static str = "cli_rollback_app";
-        const MIGRATION_NAME: &'static str = "m_0001_initial";
-        const DEPENDENCIES: &'static [MigrationDependency] = &[];
-        const OPERATIONS: &'static [Operation] = &[Operation::create_model()
-            .table_name(Identifier::new("cli_rollback_app__initial"))
-            .fields(&[
-                Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
-                    .primary_key()
-                    .auto(),
-            ])
-            .build()];
-    }
-
-    #[cfg(feature = "db")]
-    struct CliRollbackSecond;
-
-    #[cfg(feature = "db")]
-    impl Migration for CliRollbackSecond {
-        const APP_NAME: &'static str = "cli_rollback_app";
-        const MIGRATION_NAME: &'static str = "m_0002_second";
-        const DEPENDENCIES: &'static [MigrationDependency] = &[MigrationDependency::migration(
-            "cli_rollback_app",
-            "m_0001_initial",
-        )];
-        const OPERATIONS: &'static [Operation] = &[Operation::create_model()
-            .table_name(Identifier::new("cli_rollback_app__second"))
-            .fields(&[
-                Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
-                    .primary_key()
-                    .auto(),
-            ])
-            .build()];
-    }
-
-    #[cfg(feature = "db")]
-    struct CliRollbackApp;
-
-    #[cfg(feature = "db")]
-    impl App for CliRollbackApp {
-        fn name(&self) -> &'static str {
-            "cli_rollback_app"
-        }
-
-        fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
-            #[expect(trivial_casts)]
-            wrap_migrations(&[
-                &CliRollbackInitial as &SyncDynMigration,
-                &CliRollbackSecond as &SyncDynMigration,
-            ])
-        }
-    }
-
-    #[cfg(feature = "db")]
-    struct CliRollbackProject;
-
-    #[cfg(feature = "db")]
-    impl crate::Project for CliRollbackProject {
-        fn cli_metadata(&self) -> CliMetadata {
-            CliMetadata {
-                name: "cli_rollback_app",
-                version: "0.0.0",
-                authors: "",
-                description: "",
-            }
-        }
-
-        fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
-            apps.register(CliRollbackApp);
-        }
-    }
-
-    #[cfg(feature = "db")]
-    #[derive(::std::fmt::Debug)]
-    #[crate::db::model(table_name = "cot__migrations", model_type = "internal")]
-    struct CliAppliedMigration {
-        #[model(primary_key)]
-        id: Auto<i32>,
-        app: String,
-        name: String,
-        applied: chrono::DateTime<chrono::FixedOffset>,
-    }
-
-    #[cfg(feature = "db")]
-    async fn cli_migration_applied(database: &Database, app: &str, name: &str) -> bool {
-        query!(CliAppliedMigration, $app == app && $name == name)
-            .exists(database)
-            .await
-            .unwrap()
-    }
 
     #[test]
     fn cli_new() {

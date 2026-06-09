@@ -2,12 +2,13 @@
 
 mod sorter;
 
-pub use cot_macros::migration_op;
-use sea_query::{ColumnDef, StringLen};
 use std::collections::{HashSet, VecDeque};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
+
+pub use cot_macros::migration_op;
+use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::{Level, info};
 
@@ -215,13 +216,14 @@ impl MigrationEngine {
         Ok(())
     }
 
-    /// Roll back necessary migrations up until the specified migration in an app.
+    /// Roll back necessary migrations up until the specified migration in an
+    /// app.
     ///
     /// # Errors
     ///
-    /// Returns an error if there is an error while interacting with the database or if
-    /// there is an error while generating the migration graph or if there is an error
-    /// while unapplying a migration.
+    /// Returns an error if there is an error while interacting with the
+    /// database or if there is an error while generating the migration
+    /// graph or if there is an error while unapplying a migration.
     pub async fn rollback(&self, database: &Database, file: &str, app_name: &str) -> Result<()> {
         info!("Rolling back migrations");
 
@@ -2138,8 +2140,10 @@ mod tests {
     use sea_query::ColumnSpec;
 
     use super::*;
+    use crate::App;
+    use crate::auth::db::DatabaseUserApp;
     use crate::db::{ColumnType, DatabaseField, Identifier};
-    use crate::{App, auth::db::DatabaseUserApp, session::db::SessionApp};
+    use crate::session::db::SessionApp;
 
     struct TestMigration;
 
@@ -2384,7 +2388,8 @@ mod tests {
         .await;
         assert_migration_applied(test_db.database(), "rollback_app2", "m_0001_initial", true).await;
 
-        // rollback everything except the initial migration in the source/independent app
+        // rollback everything except the initial migration in the source/independent
+        // app
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await

@@ -2329,7 +2329,7 @@ mod tests {
     }
 
     #[cot_macros::dbtest]
-    async fn test_migration_engine_rollback_preserves_unrelated_apps(test_db: &mut TestDatabase) {
+    async fn test_migration_rollback_unrelated_apps(test_db: &mut TestDatabase) {
         let mut migrations = DatabaseUserApp::new().migrations();
         // combine migrations from multiple apps/crates
         #[expect(trivial_casts)]

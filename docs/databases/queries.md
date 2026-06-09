@@ -10,7 +10,7 @@ For the rest of this guide, we'll use the following models which show a simple e
 
 ```rust
 use cot::db::ForeignKey;
-use cot::{db, Auto, LimitedString};
+use cot::db::{Auto, LimitedString};
 use cot::common_types::Email;
 
 #[model]
@@ -54,14 +54,16 @@ In the example below, we create a new `Customer` instance and save it to the dat
 use cot::db::{Auto, Database};
 use cot::common_types::Email;
 
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: Email, full_name: LimitedString<128>, is_verified: bool }
 async fn create_customer(db: Database) -> cot::Result<()> {
     let mut customer = Customer {
         id: Auto::default(),
-        email: Email::from_str("jondoe@example.com").unwrap(),
+        email: Email::new("jondoe@example.com").unwrap(),
         full_name: LimitedString::new("Jon Doe").unwrap(),
         is_verified: false,
     };
-    customer.insert(db).await?;
+    customer.insert(&db).await?;
+#   Ok(())
 }
 ```
 
@@ -72,23 +74,25 @@ The example below shows an attempt to insert a new `Customer` instance with the 
 use cot::db::{Auto, Database};
 use cot::common_types::Email;
 
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: Email, full_name: LimitedString<128>, is_verified: bool }
 async fn create_customer(db: Database) -> cot::Result<()> {
     let mut customer1 = Customer {
         id: Auto::fixed(1),
-        email: Email::from_str("doejon@example.com").unwrap(),
+        email: Email::new("doejon@example.com").unwrap(),
         full_name: LimitedString::new("Jon Doe").unwrap(),
         is_verified: false,
     };
-    customer1.insert(db).await?;
+    customer1.insert(&db).await?;
 
     // This will fail with a UniqueViolation error.
     let mut customer2 = Customer {
         id: Auto::fixed(1),
-        email: Email::from_str("jondoe@example.com").unwrap(),
+        email: Email::new("jondoe@example.com").unwrap(),
         full_name: LimitedString::new("Jon Doe").unwrap(),
         is_verified: false,
     };
-    customer2.insert(db).await?;
+    customer2.insert(&db).await?;
+#   Ok(())
 }
 ```
 
@@ -102,23 +106,25 @@ The example below shows how to create multiple `Customer` instances.
 use cot::db::{Auto, Database};
 use cot::common_types::Email;
 
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: Email, full_name: LimitedString<128>, is_verified: bool }
 async fn create_customers(db: Database) -> cot::Result<()> {
     let mut customers = vec![
         Customer {
             id: Auto::default(),
-            email: Email::from_str("janedoe@example.com").unwrap(),
+            email: Email::new("janedoe@example.com").unwrap(),
             full_name: LimitedString::new("Jane Doe").unwrap(),
             is_verified: false,
         },
         Customer {
             id: Auto::default(),
-            email: Email::from_str("jondoe@example.com").unwrap(),
+            email: Email::new("jondoe@example.com").unwrap(),
             full_name: LimitedString::new("Jon Doe").unwrap(),
             is_verified: false,
         },
     ];
 
-    Customer::bulk_insert(db, &mut customers).await?;
+    Customer::bulk_insert(&db, &mut customers).await?;
+#   Ok(())
 }
 ```
 
@@ -131,8 +137,12 @@ Cot provides the [`update`](trait@cot::db::Model#method.update) method to update
 The example below shows how to update the `full_name` field of a `Customer` instance.
 
 ```rust
-customer.full_name = "Jane Doe".into();
+# #[model] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+# async fn foo(db: &Database, mut customer: Customer) -> cot::Result<()> {
+customer.full_name = LimitedString::new("Jane Doe").unwrap();
 customer.update(db).await?;
+# Ok(())
+# }
 ```
 
 ## Creating or Updating an object
@@ -140,21 +150,23 @@ Cot provides the [`save`](trait@cot::db::Model#method.save) method to create a n
 In the example below, we create a Customer instance if it doesnt exist and then update it's verified status.
 
 ```rust
-use cot::db::{Auto, Database, LimitedString};
+use cot::db::{Auto, Database};
 use cot::common_types::Email;
 
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: Email, full_name: LimitedString<128>, is_verified: bool }
 async fn save_customer(db: Database) -> cot::Result<()> {
     let mut customer = Customer {
         id: Auto::default(),
-        email: Email::from_str("jondoe@example.com").unwrap(),
+        email: Email::new("jondoe@example.com").unwrap(),
         full_name: LimitedString::new("Jon Doe").unwrap(),
         is_verified: false,
     };
-    customer.save(db).await?;
+    customer.save(&db).await?;
 
     // update the customer's verified status
     customer.is_verified = true;
-    customer.save(db).await?;
+    customer.save(&db).await?;
+#   Ok(())
 }
 ```
 
@@ -169,24 +181,27 @@ This is the most common variant, which lets you associate a model instance direc
 use cot::db::{Auto, Database};
 use cot::common_types::Email;
 
+# #[model] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: Email, full_name: LimitedString<128>, is_verified: bool }
+# #[model] struct Product { #[model(primary_key)] id: Auto<i64>, #[model(unique)] sku: LimitedString<64>, name: LimitedString<255>, price_cents: i64, stock: i32, is_available: bool }
+# #[model] struct Order { #[model(primary_key)] id: Auto<i64>, customer: ForeignKey<Customer>, product: ForeignKey<Product>, quantity: i32, is_fulfilled: bool }
 async fn save_order(db: Database) -> cot::Result<()> {
     let mut customer = Customer {
         id: Auto::default(),
-        email: Email::from_str("jondoe@example.com").unwrap(),
+        email: Email::new("jondoe@example.com").unwrap(),
         full_name: LimitedString::new("Jon Doe").unwrap(),
         is_verified: false,
     };
-    customer.save(db).await?;
+    customer.save(&db).await?;
 
     let mut product = Product {
         id: Auto::default(),
-        sku: "ABC123".into(),
-        name: "Product 1".into(),
+        sku: LimitedString::new("ABC123").unwrap(),
+        name: LimitedString::new("Product 1").unwrap(),
         price_cents: 1000,
         stock: 10,
         is_available: true,
     };
-    product.save(db).await?;
+    product.save(&db).await?;
 
     let mut order = Order {
         id: Auto::default(),
@@ -195,7 +210,8 @@ async fn save_order(db: Database) -> cot::Result<()> {
         quantity: 1,
         is_fulfilled: false,
     };
-    order.save(db).await?;
+    order.save(&db).await?;
+#   Ok(())
 }
 ```
 
@@ -206,6 +222,9 @@ The example below saves an `Order` referencing existing `Customer` and `Product`
 ```rust
 use cot::db::{Auto, Database};
 
+# #[model] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+# #[model] struct Product { #[model(primary_key)] id: Auto<i64>, #[model(unique)] sku: LimitedString<64>, name: LimitedString<255>, price_cents: i64, stock: i32, is_available: bool }
+# #[model] struct Order { #[model(primary_key)] id: Auto<i64>, customer: ForeignKey<Customer>, product: ForeignKey<Product>, quantity: i32, is_fulfilled: bool }
 async fn save_order(db: Database) -> cot::Result<()> {
     let mut order = Order {
         id: Auto::default(),
@@ -214,7 +233,8 @@ async fn save_order(db: Database) -> cot::Result<()> {
         quantity: 1,
         is_fulfilled: false,
     };
-    order.save(db).await?;
+    order.save(&db).await?;
+#   Ok(())
 }
 ```
 
@@ -226,11 +246,12 @@ The macro takes two arguments: the model to query as the first argument, and a f
 
 ```rust
 use cot::db::Database;
-use cot::query;
 
-async fn get_customer(db: Database) -> cot::Result {
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn get_customer(db: Database) -> cot::Result<()> {
     let customer = query!(Customer, $id==5).get(&db).await?;
     println!("Customer: {:?}", customer);
+#   Ok(())
 }
 ```
 The [`query!`](macro@cot::db::query) macro returns a [`Query`](struct@cot::db::query::Query) object, on which you can call terminal methods (such as [`get`](struct@cot::db::query::Query#method.get) which returns the first matching result, and [`all`](struct@cot::db::query::Query#method.all) which returns all matching results) to retrieve the final results.
@@ -241,10 +262,13 @@ You may prefer this approach when you need more control over how expressions are
 
 ```rust
 use cot::db::Database;
+use cot::db::query::Expr;
 
-async fn get_customer(db: Database) -> cot::Result {
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn get_customer(db: Database) -> cot::Result<()> {
     let customer = Customer::objects().filter(Expr::eq(Expr::field("id"), Expr::value("5"))).get(&db).await?;
     println!("Customer: {:?}", customer);
+#   Ok(())
 }
 ```
 
@@ -255,10 +279,13 @@ One way to retrieve all objects of a model is to call the [`all`](struct@cot::db
 
 ```rust
 use cot::db::Database;
+use cot::db::query::Expr;
 
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn get_all_customers(db: Database) -> cot::Result<()> {
-    let customers = Customer::objects().filter(Expr::gt(Expr::field("id"), Expr::value("5"))).all(db).await?;
+    let customers = Customer::objects().filter(Expr::gt(Expr::field("id"), Expr::value("5"))).all(&db).await?;
     println!("Customers: {:?}", customers);
+#   Ok(())
 }
 ```
 
@@ -269,12 +296,15 @@ The [`filter`](struct@cot::db::query::Query#method.filter) method returns a new 
 
 ```rust
 use cot::db::Database;
+use cot::db::query::Expr;
 
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn get_customers(db: Database) -> cot::Result<()> {
     let customers = Customer::objects()
         .filter(Expr::gt(Expr::field("id"), Expr::value("5")))
-        .filter(Expr::eq(Expr::field("full_name"), Expr::value("Jon Doe"))).all(db).await?;
+        .filter(Expr::eq(Expr::field("full_name"), Expr::value("Jon Doe"))).all(&db).await?;
     println!("Customers: {:?}", customers);
+#   Ok(())
 }
 ```
 
@@ -289,10 +319,11 @@ The [`delete`](struct@cot::db::query::Query#method.delete) method can be used to
 
 ```rust
 use cot::db::Database;
-use cot::query;
 
+# #[model] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn delete_customer(db: Database) -> cot::Result<()> {
     query!(Customer, $id==5).delete(&db).await?;
+#   Ok(())
 }
 ```
 

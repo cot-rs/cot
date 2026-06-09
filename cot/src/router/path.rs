@@ -553,4 +553,49 @@ mod tests {
         let params = ReverseParamMap::new();
         assert_eq!(path_parser.reverse(&params).unwrap(), "/café/test");
     }
+
+    #[test]
+    fn path_parser_wildcard_root() {
+        let path_parser = PathMatcher::new("/{*path}");
+        assert_eq!(
+            path_parser.capture("/foo/bar"),
+            Some(CaptureResult::new(
+                vec![PathParam::new("path", "foo/bar")],
+                ""
+            ))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_single_segment() {
+        let path_parser = PathMatcher::new("/users/rand/{*path}");
+        assert_eq!(
+            path_parser.capture("/users/rand/foo"),
+            Some(CaptureResult::new(vec![PathParam::new("path", "foo")], ""))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_multi_segment() {
+        let path_parser = PathMatcher::new("/users/rand/{*path}");
+        assert_eq!(
+            path_parser.capture("/users/rand/foo/bar"),
+            Some(CaptureResult::new(
+                vec![PathParam::new("path", "foo/bar")],
+                ""
+            ))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_no_match() {
+        let path_parser = PathMatcher::new("/prefix/{*path}");
+        assert_eq!(path_parser.capture("/other/foo"), None);
+    }
+
+    #[test]
+    fn path_parser_wildcard_empty_not_allowed() {
+        let path_parser = PathMatcher::new("/users/rand/{*path}");
+        assert_eq!(path_parser.capture("/users/rand/"), None);
+    }
 }

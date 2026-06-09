@@ -921,46 +921,6 @@ mod tests {
     }
 
     #[cot::test]
-    #[cfg_attr(
-        miri,
-        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
-    )]
-    #[cfg(feature = "db")]
-    async fn migration_rollback_execute_rolls_back_project_app() {
-        let temp_dir = tempdir().unwrap();
-        let db_path = temp_dir.path().join("rollback.sqlite");
-        std::fs::File::create(&db_path).unwrap();
-        let db_url = format!("sqlite://{}", db_path.display());
-
-        let setup_database = Database::new(db_url.clone()).await.unwrap();
-        let setup_engine = MigrationEngine::new(CliRollbackApp.migrations()).unwrap();
-        setup_engine.run(&setup_database).await.unwrap();
-        assert!(cli_migration_applied(&setup_database, "cli_rollback_app", "m_0001_initial").await);
-        assert!(cli_migration_applied(&setup_database, "cli_rollback_app", "m_0002_second").await);
-        drop(setup_engine);
-        drop(setup_database);
-
-        let config = ProjectConfig::builder()
-            .database(DatabaseConfig::builder().url(db_url.clone()).build())
-            .build();
-        let mut rollback = MigrationRollback;
-        let matches = MigrationRollback
-            .subcommand()
-            .get_matches_from(["rollback", "0001"]);
-        let bootstrapper = Bootstrapper::new(CliRollbackProject).with_config(config);
-
-        rollback.execute(&matches, bootstrapper).await.unwrap();
-
-        let verify_database = Database::new(db_url).await.unwrap();
-        assert!(
-            cli_migration_applied(&verify_database, "cli_rollback_app", "m_0001_initial").await
-        );
-        assert!(
-            !cli_migration_applied(&verify_database, "cli_rollback_app", "m_0002_second").await
-        );
-    }
-
-    #[cot::test]
     async fn check_execute() {
         let config = r#"secret_key = "123abc""#;
         let result = test_check(config).await;

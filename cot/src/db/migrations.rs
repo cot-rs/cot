@@ -260,7 +260,7 @@ impl MigrationEngine {
 
     fn rollback_plan<'a>(
         &'a self,
-        file: &str,
+        file_name: &str,
         app_name: &str,
     ) -> Result<Vec<&'a MigrationWrapper>> {
         let target_index = self
@@ -268,11 +268,11 @@ impl MigrationEngine {
             .iter()
             .position(|migration| {
                 migration.app_name() == app_name
-                    && resolve_migration_file_name(migration.name()).contains(&file)
+                    && resolve_migration_file_names(migration.name()).contains(&file_name)
             })
             .ok_or_else(|| {
                 MigrationEngineError::Custom(format!(
-                    "Migration with file name {file} not found for app {app_name}"
+                    "Migration with file name {file_name} not found for app {app_name}"
                 ))
             })?;
 
@@ -296,6 +296,8 @@ impl MigrationEngine {
         while let Some(index) = queue.pop_front() {
             for &dependent_index in graph.get_edges(index) {
                 if rollback_indices.insert(dependent_index) {
+                    // we found a migration that depends on the one we're rolling back, so let's
+                    // add it to the queue which we will later traverse its dependents as well.
                     queue.push_back(dependent_index);
                 }
             }
@@ -348,7 +350,12 @@ impl MigrationEngine {
     }
 }
 
-fn resolve_migration_file_name(file_name: &str) -> Vec<&str> {
+/// Resolves the possible migration names that can be used to refer to a
+/// migration file. For example, for a migration file named `m_0001_initial`,
+/// this function will return both `m_0001_initial` and `0001`. This allows
+/// users to refer to migrations using either the full file name or just the
+/// migration number when rolling back migrations.
+fn resolve_migration_file_names(file_name: &str) -> Vec<&str> {
     let mut names = vec![file_name];
     let migration_number = file_name.split('_').nth(1);
     if let Some(migration_number) = migration_number {
@@ -2357,7 +2364,7 @@ mod tests {
 
         // the initial migration should stay applied
         assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", true).await;
-        // everything else in the rollback_mixed app should be unapplied
+        // everything else in the rollback_app1 app should be unapplied
         assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", false).await;
         // migrations from other apps should remain unaffected
         assert_migration_applied(test_db.database(), "cot", "m_0001_initial", true).await;

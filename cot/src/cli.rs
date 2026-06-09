@@ -580,7 +580,7 @@ impl CliTask for MigrationRollback {
             .about("Rollback migrations up to the specified migration file")
             .arg(
                 Arg::new("file")
-                    .help("The migration filename to roll back to (e.g. 0001_create_users)")
+                    .help("The migration filename to roll back to (e.g. 0001_initial or 0001)")
                     .value_name("FILE")
                     .required(true),
             )
@@ -605,8 +605,9 @@ impl CliTask for MigrationRollback {
             .await?;
 
         // migrations are currently tied to crates, so we use the crate name as the app
-        // name. TODO: cli command should take an explicit crate name as arg
-        // when workspaces are supported.
+        // name.
+        // TODO: cli command should take an explicit crate name as arg when workspaces
+        // are supported.
         let crate_name = bootstrapper.project().cli_metadata().name;
 
         let BootstrappedProject {

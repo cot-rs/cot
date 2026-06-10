@@ -228,10 +228,10 @@ The `{% match %}` tag matches a value against a set of Rust patterns. Use `{% wh
 #### Example
 
 ```html.j2
-{% match user.role %}
+{% match user.role.as_deref() %}
     {% when Some with ("admin") %}
         Welcome, admin!
-    {% when Some %}
+    {% when Some with (_val) %}
         Welcome, user!
     {% when None %}
 {% endmatch %}
@@ -329,8 +329,8 @@ When rendered, it will display the `title` from the `Item` struct.
 By default, Askama escapes all output to protect against XSS attacks. Special characters are replaced with their HTML entities. If you’re certain your data is safe and want to bypass escaping, you can implement the `HtmlSafe` marker trait.
 
 ```rust
-use askama::filters::HtmlSafe;
-
+# struct Item;
+# impl Display for Item { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) } }
 impl HtmlSafe for Item {}
 ```
 
@@ -339,6 +339,7 @@ Be very cautious when marking output as safe; you are responsible for ensuring t
 To simplify generating safe HTML in Rust, Cot provides the [`HtmlTag`](struct@cot::html::HtmlTag) type. It automatically applies escaping where necessary.
 
 ```rust
+# struct Item { title: String }
 impl Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("text");

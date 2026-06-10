@@ -1,7 +1,10 @@
+use std::ffi::OsString;
+use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::CommandFactory;
+use cot::metadata::CommandMeta;
 
 use crate::args::{
     Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, MigrationNewArgs,
@@ -11,6 +14,7 @@ use crate::migration_generator::{
     MigrationGeneratorOptions, create_new_migration, list_migrations, make_migrations,
 };
 use crate::new_project::{CotSource, new_project};
+use crate::project::ProjectBinary;
 
 pub fn handle_new_project(
     ProjectNewArgs { path, name, source }: ProjectNewArgs,
@@ -93,6 +97,86 @@ pub fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> any
     generate_completions(shell, &mut std::io::stdout());
 
     Ok(())
+}
+
+pub fn handle_external(
+    args: Vec<OsString>,
+    project: Option<ProjectBinary>,
+    _release: bool,
+) -> anyhow::Result<()> {
+    let subcmd = args[0].to_string_lossy();
+
+    let Some(proj) = project else {
+        anyhow::bail!(
+            "Unknown command `{subcmd}` and no project binary was found in target/.\n\
+             Hint: run `cargo build` first, or `cargo build --release` with --release."
+        );
+    };
+
+    let known = proj
+        .metadata
+        .commands
+        .iter()
+        .any(|c| c.name == subcmd.as_ref() || c.aliases.iter().any(|a| a == subcmd.as_ref()));
+
+    if !known {
+        anyhow::bail!(
+            "Unknown command `{subcmd}`.\n\
+             Run `cot --help` to see all available commands."
+        );
+    }
+
+    exec(proj, args)
+}
+
+fn exec(proj: ProjectBinary, args: Vec<OsString>) -> anyhow::Result<()> {
+    #[cfg(unix)]
+    {
+        let err = std::process::Command::new(&proj.path).args(&args).exec();
+        anyhow::bail!("Failed to exec {}: {err}", proj.path.display());
+    }
+
+    #[cfg(not(unix))]
+    {
+        let status = std::process::Command::new(&proj.path)
+            .args(&args)
+            .status()?;
+        std::process::exit(status.code().unwrap_or(1));
+    }
+}
+
+/// Build a fresh [`clap::Command`] and inject the project's subcommands into
+/// it before printing.
+pub fn handle_combined_help(project: Option<&ProjectBinary>) -> anyhow::Result<()> {
+    let mut cmd = Cli::command();
+
+    if let Some(proj) = project {
+        for meta_cmd in &proj.metadata.commands {
+            cmd = cmd.subcommand(build_clap_subcommand(meta_cmd));
+        }
+    }
+
+    cmd.print_long_help()?;
+    println!();
+    Ok(())
+}
+
+fn build_clap_subcommand(meta: &CommandMeta) -> clap::Command {
+    let mut cmd = clap::Command::new(&meta.name);
+
+    if let Some(about) = &meta.about {
+        cmd = cmd.about(about.clone());
+    }
+
+    for alias in &meta.aliases {
+        cmd = cmd.visible_alias(alias.clone());
+    }
+
+    for sub in &meta.subcommands {
+        cmd = cmd.subcommand(build_clap_subcommand(sub));
+    }
+
+    cmd
 }
 
 fn generate_completions(shell: clap_complete::Shell, writer: &mut impl std::io::Write) {

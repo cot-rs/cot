@@ -987,6 +987,8 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rand 0.10.1",
+ "serde",
+ "serde_json",
  "syn",
  "tempfile",
  "tracing",

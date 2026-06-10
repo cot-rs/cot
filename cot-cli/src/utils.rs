@@ -258,6 +258,10 @@ impl WorkspaceManager {
         self.package_manifests.get(package_name)
     }
 
+    pub(crate) fn get_workspace_root(&self) -> &Path {
+        self.workspace_root.as_path()
+    }
+
     #[cfg(test)]
     pub(crate) fn get_package_manager_by_path(
         &self,
@@ -295,7 +299,7 @@ impl PackageManager {
         path.to_owned()
     }
 
-    #[cfg(test)]
+    // #[cfg(test)]
     pub(crate) fn get_manifest(&self) -> &Manifest {
         &self.manifest
     }

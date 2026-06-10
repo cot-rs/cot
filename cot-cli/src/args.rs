@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
@@ -11,6 +12,11 @@ use clap_verbosity_flag::Verbosity;
     long_about = None
 )]
 pub struct Cli {
+    #[arg(long, global = true)]
+    release: bool,
+    /// Package to use, in case you're running this in a workspace
+    #[arg(short = 'p', long, global = true, value_name = "PACKAGE")]
+    pub package: Option<String>,
     #[command(flatten)]
     pub verbose: Verbosity,
     #[command(subcommand)]
@@ -29,6 +35,9 @@ pub enum Commands {
     /// Manage Cot CLI
     #[command(subcommand)]
     Cli(CliCommands),
+
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 #[derive(Debug, Args)]
@@ -118,4 +127,20 @@ pub struct ManpagesArgs {
 pub struct CompletionsArgs {
     /// Shell to generate completions for
     pub shell: clap_complete::Shell,
+}
+
+/// Pulls `-p <name>` / `--package <name>` / `--package=<name>` out of raw
+/// argv, before clap has parsed anything. Needed because `project::load`
+/// must run before `Cli::parse()` for the `--help` interception path.
+pub fn extract_package_arg(raw: &[String]) -> Option<String> {
+    let mut iter = raw.iter();
+    while let Some(arg) = iter.next() {
+        if let Some(value) = arg.strip_prefix("--package=") {
+            return Some(value.to_string());
+        }
+        if arg == "--package" || arg == "-p" {
+            return iter.next().cloned();
+        }
+    }
+    None
 }

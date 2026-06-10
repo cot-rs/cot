@@ -1,11 +1,22 @@
 #![allow(unreachable_pub)] // triggers false positives because we have both a binary and library
 
 use clap::Parser;
-use cot_cli::args::{Cli, CliCommands, Commands, MigrationCommands};
-use cot_cli::handlers;
+use cot_cli::args::{Cli, CliCommands, Commands, MigrationCommands, extract_package_arg};
+use cot_cli::{handlers, project};
 use tracing_subscriber::util::SubscriberInitExt;
 
 fn main() -> anyhow::Result<()> {
+    let raw: Vec<String> = std::env::args().collect();
+    let release = raw.iter().any(|a| a == "--release");
+    let package = extract_package_arg(&raw);
+
+    let project = project::load(&std::env::current_dir()?, release, package.as_deref())?;
+
+    if matches!(raw.as_slice(), [_, flag] if flag == "--help" || flag == "-h") {
+        handlers::handle_combined_help(project.as_ref())?;
+        return Ok(());
+    }
+
     let cli = Cli::parse();
 
     tracing_subscriber::fmt()
@@ -27,5 +38,6 @@ fn main() -> anyhow::Result<()> {
             MigrationCommands::Make(args) => handlers::handle_migration_make(args),
             MigrationCommands::New(args) => handlers::handle_migration_new(args),
         },
+        Commands::External(args) => handlers::handle_external(args, project, release),
     }
 }

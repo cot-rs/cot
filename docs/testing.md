@@ -7,6 +7,7 @@ Cot includes various built-in utilities to help you test your application. This 
 ## Why Test at All?
 
 Testing is a critical part of any application development process. By writing and running tests, you can:
+
 1. **Ensure Code Reliability** – Tests catch bugs and regressions before they reach production, increasing overall stability and confidence in your application.
 2. **Document Your Code** – Tests serve as living documentation. They show how different parts of your application are supposed to work and can act as examples for future maintainers.
 3. **Facilitate Refactoring** – With a robust test suite, you can safely modify or refactor your code. If something breaks, your tests will let you know right away.
@@ -21,10 +22,12 @@ By employing Cot's testing utilities, you'll be able to verify that each piece o
 Cot provides several built-in utilities located in the [`cot::test` module](cot::test) to help you create and run tests for your application.
 
 Typical Rust projects keep their tests in:
+
 - A dedicated `tests/` directory (for integration tests).
 - A `mod tests` section in your source files (for unit tests).
 
 You can run all your tests by executing:
+
 ```bash
 cargo test
 ```
@@ -59,7 +62,7 @@ let request = TestRequestBuilder::post("/")
 
 // Add JSON data
 let request = TestRequestBuilder::post("/")
-    .json(&your_data)
+    .json(&[("key", "value")])
     .build();
 ```
 
@@ -79,18 +82,19 @@ Integration tests check how multiple parts of your application work together. Co
 The [`Client`](struct@cot::test::Client) struct lets you create a temporary instance of your Cot application and perform HTTP requests against it:
 
 ```rust
-let project = CotProject::builder()
-    .register_app_with_views(MyApp, "/app")
-    .build().await?;
+# struct MyProject;
+# impl Project for MyProject {
+#     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) { todo!() }
+# }
 
 // Create a new test client
-let mut client = Client::new(project);
+let mut client = Client::new(MyProject).await;
 
 // Make GET requests
 let response = client.get("/").await?;
 
 // Make custom requests
-let request = http::Request::get("/").body(Body::empty())?;
+let request = http::Request::get("/").body(Body::empty()).unwrap();
 let response = client.request(request).await?;
 ```
 
@@ -149,6 +153,7 @@ test_db.cleanup().await?;
    test_db.with_auth().run_migrations().await;
    let request = TestRequestBuilder::get("/")
        .with_db_auth(test_db.database())
+       .await
        .build();
    ```
    This ensures that your tests have all necessary schema and authentication information set up.

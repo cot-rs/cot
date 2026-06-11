@@ -299,7 +299,6 @@ impl PackageManager {
         path.to_owned()
     }
 
-    // #[cfg(test)]
     pub(crate) fn get_manifest(&self) -> &Manifest {
         &self.manifest
     }

@@ -5,7 +5,6 @@ pub const METADATA_FLAG: &str = "--metadata";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMetadata {
-    // pub version: u32,
     pub binary_name: String,
     pub commands: Vec<CommandMeta>,
 }

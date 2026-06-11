@@ -197,6 +197,7 @@ fn router(&self) -> Router {
         Route::with_handler_and_name("/wildcard/{*path}", wildcard_path, "wildcard_path"),
     ])
 }
+#   fn name(&self) -> &str { todo!() }
 # }
 ```
 

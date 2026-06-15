@@ -26,4 +26,5 @@ allow = [
     "Unicode-3.0",
     "Unicode-DFS-2016",
     "Zlib",
+    "BSD-2-Clause",
 ]

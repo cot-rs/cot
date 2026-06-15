@@ -1,5 +1,6 @@
 use darling::{FromDeriveInput, FromField, FromMeta};
 use heck::ToSnakeCase;
+use syn::ext::IdentExt;
 use syn::spanned::Spanned;
 
 use crate::symbol_resolver::SymbolResolver;
@@ -77,7 +78,7 @@ impl ModelOpts {
             .map(as_field)
             .collect::<Result<Vec<_>, _>>()?;
 
-        let mut original_name = self.ident.to_string();
+        let mut original_name = self.ident.unraw().to_string();
         if args.model_type == ModelType::Migration {
             original_name = original_name
                 .strip_prefix("_")
@@ -92,7 +93,7 @@ impl ModelOpts {
         let table_name = if let Some(table_name) = &args.table_name {
             table_name.clone()
         } else {
-            original_name.clone().to_snake_case()
+            original_name.to_snake_case()
         };
 
         let primary_key_field = self.get_primary_key_field(&fields)?;
@@ -145,6 +146,7 @@ pub struct FieldOpts {
     pub ty: syn::Type,
     pub primary_key: darling::util::Flag,
     pub unique: darling::util::Flag,
+    pub field_name: Option<String>,
 }
 
 impl FieldOpts {
@@ -204,8 +206,13 @@ impl FieldOpts {
         symbol_resolver: &SymbolResolver,
         self_reference: Option<&String>,
     ) -> Result<Field, syn::Error> {
-        let name = self.ident.as_ref().unwrap();
-        let column_name = name.to_string();
+        let name = self.ident.clone().expect("Only structs are supported");
+
+        let column_name = if let Some(specified_field_name) = &self.field_name {
+            specified_field_name.clone()
+        } else {
+            name.unraw().to_string()
+        };
 
         let (auto_value, foreign_key) = (
             self.find_type("cot::db::Auto", symbol_resolver).is_some(),
@@ -364,6 +371,23 @@ mod tests {
     }
 
     #[test]
+    fn model_opts_raw_name() {
+        let input: syn::DeriveInput = parse_quote! {
+            struct r#abstract {
+                #[model(primary_key)]
+                id: i32,
+                name: String,
+            }
+        };
+        let opts = ModelOpts::new_from_derive_input(&input).unwrap();
+        let model = opts
+            .as_model(&ModelArgs::default(), &SymbolResolver::new(vec![]))
+            .unwrap();
+        assert_eq!(model.name.to_string(), "r#abstract");
+        assert_eq!(model.table_name, "abstract");
+    }
+
+    #[test]
     fn model_opts_as_model_migration() {
         let input: syn::DeriveInput = parse_quote! {
             #[model(model_type = "migration")]
@@ -459,6 +483,33 @@ mod tests {
     }
 
     #[test]
+    fn field_opts_raw_name() {
+        let input: syn::Field = parse_quote! {
+            r#abstract: String
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let field = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"TestModel".to_string()))
+            .unwrap();
+        assert_eq!(field.name.to_string(), "r#abstract");
+        assert_eq!(field.column_name, "abstract");
+    }
+
+    #[test]
+    fn field_opts_specified_field_name() {
+        let input: syn::Field = parse_quote! {
+            #[model(field_name="test_field")]
+            test: String
+        };
+        let field_opts = FieldOpts::from_field(&input).unwrap();
+        let field = field_opts
+            .as_field(&SymbolResolver::new(vec![]), Some(&"TestModel".to_string()))
+            .unwrap();
+        assert_eq!(field.name.to_string(), "test");
+        assert_eq!(field.column_name, "test_field");
+    }
+
+    #[test]
     fn find_type_resolved() {
         let input: syn::Type =
             parse_quote! { ::my_crate::MyContainer<'a, Vec<std::string::String>> };
@@ -482,6 +533,7 @@ mod tests {
             ty: parse_quote! { MyContainer<std::string::String> },
             primary_key: darling::util::Flag::default(),
             unique: darling::util::Flag::default(),
+            field_name: None,
         };
 
         assert!(opts.find_type("my_crate::MyContainer", &resolver).is_some());

@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a new feature or improvement for Cot
+type: feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping shape Cot! Before opening a feature request, consider starting a [discussion](https://github.com/cot-rs/cot/discussions/new/choose) or joining our [Discord server](https://discord.cot.rs/) to get early feedback.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem are you trying to solve? Help us understand the motivation before jumping to solutions.
+      placeholder: |
+        Currently, I have to do X every time I want to Y, which is tedious because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe what you'd like Cot to support. Include API sketches or code examples if possible.
+      placeholder: |
+        Cot could provide a `#[derive(Foo)]` macro that automatically...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you consider, and why aren't they sufficient?
+
+  - type: textarea
+    id: drawbacks
+    attributes:
+      label: Drawbacks
+      description: Are there any downsides or trade-offs to your proposed solution?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other relevant information, links to prior art, or related issues.

@@ -37,7 +37,7 @@ use crate::error::NotFound;
 use crate::request::{PathParams, Request, RequestExt, RequestHead};
 use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
-use crate::{Error, Result};
+use crate::{Error, ProjectContext, Result};
 
 pub mod method;
 pub mod path;
@@ -989,6 +989,21 @@ impl Debug for RouteInner {
                 f.debug_tuple("ApiHandler").field(&"handler(...)").finish()
             }
         }
+    }
+}
+
+impl From<&ProjectContext> for Urls {
+    fn from(ctx: &ProjectContext) -> Self {
+        Self {
+            app_name: None,
+            router: Arc::clone(ctx.router()),
+        }
+    }
+}
+
+impl From<&mut ProjectContext> for Urls {
+    fn from(ctx: &mut ProjectContext) -> Self {
+        Self::from(&*ctx)
     }
 }
 

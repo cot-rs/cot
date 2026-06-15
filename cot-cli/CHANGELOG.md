@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.5.0...cot-cli-v0.6.0) - 2026-03-18
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.5.0/cot-cli/0.6.0/Cargo.toml)
+
+### New features
+
+- *(orm)* Support custom migrations ([#455](https://github.com/cot-rs/cot/pull/455)) (by [@m4tx](https://github.com/m4tx))
+- *(orm)* Add support for raw (`r#`) model and field names ([#485](https://github.com/cot-rs/cot/pull/485)) (by [@m4tx](https://github.com/m4tx))
+
+### Other
+
+- Various tiny doc fixes ([#450](https://github.com/cot-rs/cot/pull/450)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump deps ([#476](https://github.com/cot-rs/cot/pull/476)) (by [@m4tx](https://github.com/m4tx))
+- Update README to remove production warning ([#478](https://github.com/cot-rs/cot/pull/478)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump all deps ([#498](https://github.com/cot-rs/cot/pull/498)) (by [@m4tx](https://github.com/m4tx))
+- Add docs-site with locally-sourced docs ([#510](https://github.com/cot-rs/cot/pull/510)) (by [@m4tx](https://github.com/m4tx))
+- Improve repository configuration ([#511](https://github.com/cot-rs/cot/pull/511)) (by [@seqre](https://github.com/seqre))
+
 ## [0.5.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.4.0...cot-cli-v0.5.0) - 2026-01-21
 
 [View diff on diff.rs](https://diff.rs/cot-cli/0.4.0/cot-cli/0.5.0/Cargo.toml)

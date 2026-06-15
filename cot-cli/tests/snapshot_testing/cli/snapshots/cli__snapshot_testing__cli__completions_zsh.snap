@@ -66,7 +66,7 @@ _arguments "${_arguments_options[@]}" : \
 '(-v --verbose)*--quiet[Decrease logging verbosity]' \
 '-h[Print help]' \
 '--help[Print help]' \
-":: :_cot__migration_commands" \
+":: :_cot__subcmd__migration_commands" \
 "*::: :->migration" \
 && ret=0
 
@@ -115,7 +115,7 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (help)
 _arguments "${_arguments_options[@]}" : \
-":: :_cot__migration__help_commands" \
+":: :_cot__subcmd__migration__subcmd__help_commands" \
 "*::: :->help" \
 && ret=0
 
@@ -157,7 +157,7 @@ _arguments "${_arguments_options[@]}" : \
 '(-v --verbose)*--quiet[Decrease logging verbosity]' \
 '-h[Print help]' \
 '--help[Print help]' \
-":: :_cot__cli_commands" \
+":: :_cot__subcmd__cli_commands" \
 "*::: :->cli" \
 && ret=0
 
@@ -194,7 +194,7 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (help)
 _arguments "${_arguments_options[@]}" : \
-":: :_cot__cli__help_commands" \
+":: :_cot__subcmd__cli__subcmd__help_commands" \
 "*::: :->help" \
 && ret=0
 
@@ -226,7 +226,7 @@ esac
 ;;
 (help)
 _arguments "${_arguments_options[@]}" : \
-":: :_cot__help_commands" \
+":: :_cot__subcmd__help_commands" \
 "*::: :->help" \
 && ret=0
 
@@ -242,7 +242,7 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (migration)
 _arguments "${_arguments_options[@]}" : \
-":: :_cot__help__migration_commands" \
+":: :_cot__subcmd__help__subcmd__migration_commands" \
 "*::: :->migration" \
 && ret=0
 
@@ -270,7 +270,7 @@ esac
 ;;
 (cli)
 _arguments "${_arguments_options[@]}" : \
-":: :_cot__help__cli_commands" \
+":: :_cot__subcmd__help__subcmd__cli_commands" \
 "*::: :->cli" \
 && ret=0
 
@@ -315,8 +315,8 @@ _cot_commands() {
     )
     _describe -t commands 'cot commands' commands "$@"
 }
-(( $+functions[_cot__cli_commands] )) ||
-_cot__cli_commands() {
+(( $+functions[_cot__subcmd__cli_commands] )) ||
+_cot__subcmd__cli_commands() {
     local commands; commands=(
 'manpages:Generate manpages for the Cot CLI' \
 'completions:Generate completions for the Cot CLI' \
@@ -324,13 +324,13 @@ _cot__cli_commands() {
     )
     _describe -t commands 'cot cli commands' commands "$@"
 }
-(( $+functions[_cot__cli__completions_commands] )) ||
-_cot__cli__completions_commands() {
+(( $+functions[_cot__subcmd__cli__subcmd__completions_commands] )) ||
+_cot__subcmd__cli__subcmd__completions_commands() {
     local commands; commands=()
     _describe -t commands 'cot cli completions commands' commands "$@"
 }
-(( $+functions[_cot__cli__help_commands] )) ||
-_cot__cli__help_commands() {
+(( $+functions[_cot__subcmd__cli__subcmd__help_commands] )) ||
+_cot__subcmd__cli__subcmd__help_commands() {
     local commands; commands=(
 'manpages:Generate manpages for the Cot CLI' \
 'completions:Generate completions for the Cot CLI' \
@@ -338,28 +338,28 @@ _cot__cli__help_commands() {
     )
     _describe -t commands 'cot cli help commands' commands "$@"
 }
-(( $+functions[_cot__cli__help__completions_commands] )) ||
-_cot__cli__help__completions_commands() {
+(( $+functions[_cot__subcmd__cli__subcmd__help__subcmd__completions_commands] )) ||
+_cot__subcmd__cli__subcmd__help__subcmd__completions_commands() {
     local commands; commands=()
     _describe -t commands 'cot cli help completions commands' commands "$@"
 }
-(( $+functions[_cot__cli__help__help_commands] )) ||
-_cot__cli__help__help_commands() {
+(( $+functions[_cot__subcmd__cli__subcmd__help__subcmd__help_commands] )) ||
+_cot__subcmd__cli__subcmd__help__subcmd__help_commands() {
     local commands; commands=()
     _describe -t commands 'cot cli help help commands' commands "$@"
 }
-(( $+functions[_cot__cli__help__manpages_commands] )) ||
-_cot__cli__help__manpages_commands() {
+(( $+functions[_cot__subcmd__cli__subcmd__help__subcmd__manpages_commands] )) ||
+_cot__subcmd__cli__subcmd__help__subcmd__manpages_commands() {
     local commands; commands=()
     _describe -t commands 'cot cli help manpages commands' commands "$@"
 }
-(( $+functions[_cot__cli__manpages_commands] )) ||
-_cot__cli__manpages_commands() {
+(( $+functions[_cot__subcmd__cli__subcmd__manpages_commands] )) ||
+_cot__subcmd__cli__subcmd__manpages_commands() {
     local commands; commands=()
     _describe -t commands 'cot cli manpages commands' commands "$@"
 }
-(( $+functions[_cot__help_commands] )) ||
-_cot__help_commands() {
+(( $+functions[_cot__subcmd__help_commands] )) ||
+_cot__subcmd__help_commands() {
     local commands; commands=(
 'new:Create a new Cot project' \
 'migration:Manage migrations for a Cot project' \
@@ -368,31 +368,31 @@ _cot__help_commands() {
     )
     _describe -t commands 'cot help commands' commands "$@"
 }
-(( $+functions[_cot__help__cli_commands] )) ||
-_cot__help__cli_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__cli_commands] )) ||
+_cot__subcmd__help__subcmd__cli_commands() {
     local commands; commands=(
 'manpages:Generate manpages for the Cot CLI' \
 'completions:Generate completions for the Cot CLI' \
     )
     _describe -t commands 'cot help cli commands' commands "$@"
 }
-(( $+functions[_cot__help__cli__completions_commands] )) ||
-_cot__help__cli__completions_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__cli__subcmd__completions_commands] )) ||
+_cot__subcmd__help__subcmd__cli__subcmd__completions_commands() {
     local commands; commands=()
     _describe -t commands 'cot help cli completions commands' commands "$@"
 }
-(( $+functions[_cot__help__cli__manpages_commands] )) ||
-_cot__help__cli__manpages_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__cli__subcmd__manpages_commands] )) ||
+_cot__subcmd__help__subcmd__cli__subcmd__manpages_commands() {
     local commands; commands=()
     _describe -t commands 'cot help cli manpages commands' commands "$@"
 }
-(( $+functions[_cot__help__help_commands] )) ||
-_cot__help__help_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__help_commands] )) ||
+_cot__subcmd__help__subcmd__help_commands() {
     local commands; commands=()
     _describe -t commands 'cot help help commands' commands "$@"
 }
-(( $+functions[_cot__help__migration_commands] )) ||
-_cot__help__migration_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__migration_commands] )) ||
+_cot__subcmd__help__subcmd__migration_commands() {
     local commands; commands=(
 'list:List all migrations for a Cot project' \
 'make:Generate migrations for a Cot project' \
@@ -400,28 +400,28 @@ _cot__help__migration_commands() {
     )
     _describe -t commands 'cot help migration commands' commands "$@"
 }
-(( $+functions[_cot__help__migration__list_commands] )) ||
-_cot__help__migration__list_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__migration__subcmd__list_commands] )) ||
+_cot__subcmd__help__subcmd__migration__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'cot help migration list commands' commands "$@"
 }
-(( $+functions[_cot__help__migration__make_commands] )) ||
-_cot__help__migration__make_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__migration__subcmd__make_commands] )) ||
+_cot__subcmd__help__subcmd__migration__subcmd__make_commands() {
     local commands; commands=()
     _describe -t commands 'cot help migration make commands' commands "$@"
 }
-(( $+functions[_cot__help__migration__new_commands] )) ||
-_cot__help__migration__new_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__migration__subcmd__new_commands] )) ||
+_cot__subcmd__help__subcmd__migration__subcmd__new_commands() {
     local commands; commands=()
     _describe -t commands 'cot help migration new commands' commands "$@"
 }
-(( $+functions[_cot__help__new_commands] )) ||
-_cot__help__new_commands() {
+(( $+functions[_cot__subcmd__help__subcmd__new_commands] )) ||
+_cot__subcmd__help__subcmd__new_commands() {
     local commands; commands=()
     _describe -t commands 'cot help new commands' commands "$@"
 }
-(( $+functions[_cot__migration_commands] )) ||
-_cot__migration_commands() {
+(( $+functions[_cot__subcmd__migration_commands] )) ||
+_cot__subcmd__migration_commands() {
     local commands; commands=(
 'list:List all migrations for a Cot project' \
 'make:Generate migrations for a Cot project' \
@@ -430,8 +430,8 @@ _cot__migration_commands() {
     )
     _describe -t commands 'cot migration commands' commands "$@"
 }
-(( $+functions[_cot__migration__help_commands] )) ||
-_cot__migration__help_commands() {
+(( $+functions[_cot__subcmd__migration__subcmd__help_commands] )) ||
+_cot__subcmd__migration__subcmd__help_commands() {
     local commands; commands=(
 'list:List all migrations for a Cot project' \
 'make:Generate migrations for a Cot project' \
@@ -440,43 +440,43 @@ _cot__migration__help_commands() {
     )
     _describe -t commands 'cot migration help commands' commands "$@"
 }
-(( $+functions[_cot__migration__help__help_commands] )) ||
-_cot__migration__help__help_commands() {
+(( $+functions[_cot__subcmd__migration__subcmd__help__subcmd__help_commands] )) ||
+_cot__subcmd__migration__subcmd__help__subcmd__help_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration help help commands' commands "$@"
 }
-(( $+functions[_cot__migration__help__list_commands] )) ||
-_cot__migration__help__list_commands() {
+(( $+functions[_cot__subcmd__migration__subcmd__help__subcmd__list_commands] )) ||
+_cot__subcmd__migration__subcmd__help__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration help list commands' commands "$@"
 }
-(( $+functions[_cot__migration__help__make_commands] )) ||
-_cot__migration__help__make_commands() {
+(( $+functions[_cot__subcmd__migration__subcmd__help__subcmd__make_commands] )) ||
+_cot__subcmd__migration__subcmd__help__subcmd__make_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration help make commands' commands "$@"
 }
-(( $+functions[_cot__migration__help__new_commands] )) ||
-_cot__migration__help__new_commands() {
+(( $+functions[_cot__subcmd__migration__subcmd__help__subcmd__new_commands] )) ||
+_cot__subcmd__migration__subcmd__help__subcmd__new_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration help new commands' commands "$@"
 }
-(( $+functions[_cot__migration__list_commands] )) ||
-_cot__migration__list_commands() {
+(( $+functions[_cot__subcmd__migration__subcmd__list_commands] )) ||
+_cot__subcmd__migration__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration list commands' commands "$@"
 }
-(( $+functions[_cot__migration__make_commands] )) ||
-_cot__migration__make_commands() {
+(( $+functions[_cot__subcmd__migration__subcmd__make_commands] )) ||
+_cot__subcmd__migration__subcmd__make_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration make commands' commands "$@"
 }
-(( $+functions[_cot__migration__new_commands] )) ||
-_cot__migration__new_commands() {
+(( $+functions[_cot__subcmd__migration__subcmd__new_commands] )) ||
+_cot__subcmd__migration__subcmd__new_commands() {
     local commands; commands=()
     _describe -t commands 'cot migration new commands' commands "$@"
 }
-(( $+functions[_cot__new_commands] )) ||
-_cot__new_commands() {
+(( $+functions[_cot__subcmd__new_commands] )) ||
+_cot__subcmd__new_commands() {
     local commands; commands=()
     _describe -t commands 'cot new commands' commands "$@"
 }

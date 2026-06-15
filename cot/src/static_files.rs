@@ -13,7 +13,6 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use cot_core::error::impl_into_cot_error;
-use digest::Digest;
 use futures_core::ready;
 use http::{Request, header};
 use pin_project_lite::pin_project;
@@ -128,7 +127,7 @@ impl StaticFiles {
 
     #[must_use]
     fn file_hash(file: &StaticFile) -> String {
-        hex::encode(&sha2::Sha256::digest(&file.content).as_slice()[0..6])
+        hex::encode(&blake3::hash(file.content.as_ref()).as_slice()[0..6])
     }
 
     #[must_use]

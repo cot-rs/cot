@@ -73,3 +73,8 @@ alias ti := test-ignored
 
 test-ignored:
     cargo nextest run --all-features --run-ignored only
+
+alias td := test-docs
+
+test-docs:
+    cargo nextest run -p cot-test

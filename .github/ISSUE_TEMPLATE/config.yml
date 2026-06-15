@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question or share feedback
+    url: https://github.com/cot-rs/cot/discussions/new/choose
+    about: Use GitHub Discussions for questions, ideas, or general feedback.
+  - name: Chat with us on Discord
+    url: https://discord.cot.rs/
+    about: Join our Discord server for real-time discussion and help.

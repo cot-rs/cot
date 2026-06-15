@@ -89,10 +89,9 @@ impl Client {
     /// }
     /// ```
     #[must_use]
-    #[expect(clippy::future_not_send)] // used in the test code
     pub async fn new<P>(project: P) -> Self
     where
-        P: Project + 'static,
+        P: Project + Send + 'static,
     {
         let config = project.config("test").expect("Could not get test config");
         let bootstrapper = Bootstrapper::new(project)
@@ -644,6 +643,44 @@ impl TestRequestBuilder {
             .expect("Failed to create Auth"),
         );
 
+        self
+    }
+
+    /// Add a cache to the request builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::{TestCache, TestRequestBuilder};
+    ///
+    /// let test_cache = TestCache::new_memory();
+    /// let request = TestRequestBuilder::get("/")
+    ///     .cache(test_cache.cache())
+    ///     .build();
+    /// ```
+    #[cfg(feature = "cache")]
+    pub fn cache(&mut self, cache: Cache) -> &mut Self {
+        self.cache = Some(cache);
+        self
+    }
+
+    /// Add an email backend to the request builder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::email::Email;
+    /// use cot::email::transport::console::Console;
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// let test_email_backend = Email::new(Console::new());
+    /// let request = TestRequestBuilder::get("/")
+    ///     .email(test_email_backend)
+    ///     .build();
+    /// ```
+    #[cfg(feature = "email")]
+    pub fn email(&mut self, email: Email) -> &mut Self {
+        self.email = Some(email);
         self
     }
 
@@ -1411,7 +1448,7 @@ pub struct TestServerBuilder<T> {
     project: T,
 }
 
-impl<T: Project + 'static> TestServerBuilder<T> {
+impl<T: Project + Send + 'static> TestServerBuilder<T> {
     /// Create a new test server.
     ///
     /// # Examples
@@ -1505,7 +1542,7 @@ pub struct TestServer<T> {
     project: PhantomData<fn() -> T>,
 }
 
-impl<T: Project + 'static> TestServer<T> {
+impl<T: Project + Send + 'static> TestServer<T> {
     async fn start(project: T) -> Self {
         let tcp_listener = TcpListener::bind("0.0.0.0:0")
             .await
@@ -1728,7 +1765,7 @@ enum TestServerWithWebDriverImpl {
     External { web_driver_url: String },
 }
 
-impl<T: Project + 'static> TestServerWithWebDriver<T> {
+impl<T: Project + Send + 'static> TestServerWithWebDriver<T> {
     /// Creates a new `TestServerWithWebDriver` instance.
     ///
     /// This will start a new WebDriver container (using `testcontainers`)

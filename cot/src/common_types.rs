@@ -16,6 +16,7 @@ use cot::db::impl_postgres::PostgresValueRef;
 use cot::db::impl_sqlite::SqliteValueRef;
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[cfg(feature = "db")]
@@ -181,7 +182,7 @@ impl From<String> for Password {
 /// let url_string = url.into_string();
 /// assert_eq!(url_string, "https://example.com/");
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Url(url::Url);
 
 impl Url {
@@ -394,6 +395,52 @@ impl FromDbValue for Url {
 }
 
 #[cfg(feature = "db")]
+impl FromDbValue for Option<Url> {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for Option<Url> {
+    fn to_db_value(&self) -> DbValue {
+        self.clone().map(Url::into_string).into()
+    }
+}
+
+#[cfg(feature = "db")]
 impl DatabaseField for Url {
     const TYPE: ColumnType = ColumnType::Text;
 }
@@ -417,7 +464,7 @@ impl DatabaseField for Url {
 /// // Convert using TryFrom
 /// let email = Email::try_from("user@example.com").unwrap();
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Email(EmailAddress);
 
 impl Email {
@@ -680,6 +727,52 @@ impl FromDbValue for Email {
         Self: Sized,
     {
         Email::new(value.get::<String>()?).map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for Option<Email> {
+    fn to_db_value(&self) -> DbValue {
+        self.clone().map(|email| email.email()).into()
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for Option<Email> {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
     }
 }
 

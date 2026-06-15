@@ -169,7 +169,6 @@ mod tests {
         test_live_reload_from_context(false).await;
     }
 
-    #[expect(clippy::future_not_send, reason = "test function using Bootstrapper")]
     async fn test_live_reload_from_context(enabled: bool) {
         struct TestProject;
         impl Project for TestProject {}

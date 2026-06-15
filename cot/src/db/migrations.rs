@@ -268,7 +268,7 @@ impl MigrationEngine {
             .iter()
             .position(|migration| {
                 migration.app_name() == app_name
-                    && resolve_migration_file_names(migration.name()).contains(&file_name)
+                    && expand_migration_file_name(migration.name()).contains(&file_name)
             })
             .ok_or_else(|| {
                 MigrationEngineError::Custom(format!(
@@ -355,7 +355,7 @@ impl MigrationEngine {
 /// this function will return both `m_0001_initial` and `0001`. This allows
 /// users to refer to migrations using either the full file name or just the
 /// migration number when rolling back migrations.
-fn resolve_migration_file_names(file_name: &str) -> Vec<&str> {
+fn expand_migration_file_name(file_name: &str) -> Vec<&str> {
     let mut names = vec![file_name];
     let migration_number = file_name.split('_').nth(1);
     if let Some(migration_number) = migration_number {

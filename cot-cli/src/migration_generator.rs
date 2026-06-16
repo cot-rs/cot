@@ -1325,8 +1325,13 @@ impl Repr for Field {
         let column_name = &self.column_name;
         let ty = &self.ty;
         let mut tokens = quote! {
-            ::cot::db::migrations::Field::new(::cot::db::Identifier::new(#column_name), <#ty as ::cot::db::DatabaseField>::TYPE)
+            ::cot::db::migrations::Field::new(
+                ::cot::db::Identifier::new(#column_name),
+                <#ty as ::cot::db::DatabaseField>::TYPE,
+            )
+            .set_null(<#ty as ::cot::db::DatabaseField>::NULLABLE)
         };
+
         if self.auto_value {
             tokens = quote! { #tokens.auto() }
         }
@@ -1335,17 +1340,18 @@ impl Repr for Field {
         }
         if let Some(fk_spec) = self.foreign_key.clone() {
             let to_model = &fk_spec.to_model;
+            let on_delete = fk_spec.on_delete.unwrap_or_default();
+            let on_update = fk_spec.on_update.unwrap_or_default();
 
             tokens = quote! {
                 #tokens.foreign_key(
                     <#to_model as ::cot::db::Model>::TABLE_NAME,
                     <#to_model as ::cot::db::Model>::PRIMARY_KEY_NAME,
-                    ::cot::db::ForeignKeyOnDeletePolicy::Restrict,
-                    ::cot::db::ForeignKeyOnUpdatePolicy::Restrict,
+                    #on_delete,
+                    #on_update,
                 )
             }
         }
-        tokens = quote! { #tokens.set_null(<#ty as ::cot::db::DatabaseField>::NULLABLE) };
         if self.unique {
             tokens = quote! { #tokens.unique() }
         }
@@ -1547,9 +1553,66 @@ impl Error for ParsingError {}
 
 #[cfg(test)]
 mod tests {
-    use cot_codegen::model::ForeignKeySpec;
+    use cot_codegen::model::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy, ForeignKeySpec};
 
     use super::*;
+
+    fn remove_whitespace<T: AsRef<str>>(s: &T) -> String {
+        s.as_ref().chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    macro_rules! repr_for_foreign_key_operation_test {
+        ($test_name:ident, $on_delete:path, $on_update:path) => {
+            #[test]
+            fn $test_name() {
+                let op = DynOperation::AddField {
+                    table_name: "test_table".to_string(),
+                    model_ty: parse_quote!(TestModel),
+                    field: Box::new(Field {
+                        name: format_ident!("test_field"),
+                        column_name: "test_field".to_string(),
+                        ty: parse_quote!(cot::db::ForeignKey<crate::OtherModel>),
+                        auto_value: false,
+                        primary_key: false,
+                        unique: false,
+                        foreign_key: Some(ForeignKeySpec {
+                            to_model: parse_quote!(crate::OtherModel),
+                            on_delete: Some($on_delete),
+                            on_update: Some($on_update),
+                        }),
+                    }),
+                };
+
+                let tokens = op.repr();
+                let tokens_str = remove_whitespace(&tokens.to_string());
+
+                let expected_str = format!(
+                    r#"
+                ::cot::db::migrations::Field::new(
+                    ::cot::db::Identifier::new("test_field"),
+                    <cot::db::ForeignKey<
+                        crate::OtherModel
+                    > as ::cot::db::DatabaseField>::TYPE,
+                )
+                .set_null(
+                    <cot::db::ForeignKey<
+                        crate::OtherModel
+                    > as ::cot::db::DatabaseField>::NULLABLE
+                )
+                .foreign_key(
+                    <crate::OtherModel as ::cot::db::Model>::TABLE_NAME,
+                    <crate::OtherModel as ::cot::db::Model>::PRIMARY_KEY_NAME,
+                    ::cot::db::{},
+                    ::cot::db::{},
+                )
+                "#,
+                    stringify!($on_delete),
+                    stringify!($on_update),
+                );
+                assert!(tokens_str.contains(&remove_whitespace(&expected_str)));
+            }
+        };
+    }
 
     #[test]
     fn migration_processor_next_migration_name_empty() {
@@ -1639,6 +1702,8 @@ mod tests {
                     unique: false,
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(Table1),
+                        on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                        on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                     }),
                 }),
             },
@@ -1679,6 +1744,8 @@ mod tests {
                     unique: false,
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(Table2),
+                        on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                        on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                     }),
                 }],
             },
@@ -1694,6 +1761,8 @@ mod tests {
                     unique: false,
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(Table1),
+                        on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                        on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                     }),
                 }],
             },
@@ -1741,6 +1810,8 @@ mod tests {
                 unique: false,
                 foreign_key: Some(ForeignKeySpec {
                     to_model: parse_quote!(Table2),
+                    on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                    on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                 }),
             }],
         };
@@ -1796,6 +1867,8 @@ mod tests {
                 unique: false,
                 foreign_key: Some(ForeignKeySpec {
                     to_model: parse_quote!(crate::Table2),
+                    on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                    on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                 }),
             }],
         }];
@@ -1825,6 +1898,8 @@ mod tests {
                     unique: false,
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(my_crate::Table2),
+                        on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                        on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                     }),
                 }],
             },
@@ -1840,6 +1915,8 @@ mod tests {
                     unique: false,
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(crate::Table4),
+                        on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                        on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                     }),
                 }],
             },
@@ -2125,6 +2202,30 @@ mod tests {
             "Should call build() but got: {tokens_str}"
         );
     }
+
+    repr_for_foreign_key_operation_test!(
+        repr_for_foreign_key_operation_cascade_cascade,
+        ForeignKeyOnDeletePolicy::Cascade,
+        ForeignKeyOnUpdatePolicy::Cascade
+    );
+
+    repr_for_foreign_key_operation_test!(
+        repr_for_foreign_key_operation_restrict_restrict,
+        ForeignKeyOnDeletePolicy::Restrict,
+        ForeignKeyOnUpdatePolicy::Restrict
+    );
+    repr_for_foreign_key_operation_test!(
+        repr_for_foreign_key_operation_cascade_noaction,
+        ForeignKeyOnDeletePolicy::Cascade,
+        ForeignKeyOnUpdatePolicy::NoAction
+    );
+
+    repr_for_foreign_key_operation_test!(
+        repr_for_foreign_key_operation_noaction_restrict,
+        ForeignKeyOnDeletePolicy::NoAction,
+        ForeignKeyOnUpdatePolicy::Restrict
+    );
+
     #[test]
     fn generate_operations_with_removed_field() {
         let app_model = get_test_model();

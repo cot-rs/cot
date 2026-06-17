@@ -77,7 +77,7 @@ impl PathMatcher {
                     if let Some(wildcard_name) = param_name.strip_prefix('*') {
                         assert!(
                             Self::is_param_name_valid(wildcard_name),
-                            "Invalid parameter name: `{wildcard_name}`"
+                            "Invalid wildcard parameter name: `{wildcard_name}`"
                         );
 
                         let next_char = char_iter.peek().map(|(_, ch)| *ch).unwrap_or_default();

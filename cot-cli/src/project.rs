@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::{CargoTomlManager, PackageManager, WorkspaceManager};
 
+const RELEASE_PROFILE: &str = "release";
+const DEBUG_PROFILE: &str = "debug";
+
 #[derive(Serialize, Deserialize)]
 struct Cache {
     binary_mtime_secs: u64,
@@ -50,7 +53,11 @@ pub fn load(
     let project_dir = package_manager.get_package_path();
     let binary_name = resolve_binary_name(package_manager)?;
     let target_dir = resolve_target_dir(&target_dir_root);
-    let profile = if release { "release" } else { "debug" };
+    let profile = if release {
+        RELEASE_PROFILE
+    } else {
+        DEBUG_PROFILE
+    };
 
     #[cfg(target_os = "windows")]
     let binary_name = format!("{binary_name}.exe");
@@ -62,12 +69,10 @@ pub fn load(
     }
 
     let cache_path = project_dir.join(CACHE_FILE_NAME);
-    let metadata = load_or_refresh_metadata(&binary_path, &cache_path).with_context(|| {
-        format!(
-            "unable to load metadata from binary `{}`",
-            binary_path.display()
-        )
-    })?;
+    let metadata = load_or_refresh_metadata(&binary_path, &cache_path).context(format!(
+        "unable to load metadata from binary `{}`",
+        binary_path.display()
+    ))?;
 
     Ok(Some(ProjectBinary {
         path: binary_path,
@@ -190,17 +195,31 @@ fn load_or_refresh_metadata(
         .with_context(|| format!("Failed to spawn {}", binary_path.display()))?;
 
     if !output.status.success() {
-        bail!(
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        let mut msg = format!(
             "Binary `{}` exited with status {} when queried for metadata.",
             binary_path.display(),
             output.status,
         );
+
+        if !stderr.trim().is_empty() {
+            msg.push_str(&format!("\n\nstderr:\n{}", stderr.trim()));
+        }
+
+        if !stdout.trim().is_empty() {
+            msg.push_str(&format!("\n\nstdout:\n{}", stdout.trim()));
+        }
+        bail!(msg);
     }
 
     let metadata: ProjectMetadata = serde_json::from_slice(&output.stdout).with_context(|| {
+        let raw = String::from_utf8_lossy(&output.stdout);
         format!(
-            "Binary `{}` returned invalid JSON for {METADATA_FLAG}",
-            binary_path.display()
+            "Binary `{}` returned invalid JSON for {METADATA_FLAG}.\n\nGot:\n{}",
+            binary_path.display(),
+            raw.trim(),
         )
     })?;
 

@@ -1,18 +1,41 @@
 #![allow(unreachable_pub)] // triggers false positives because we have both a binary and library
 
 use clap::Parser;
-use cot_cli::args::{Cli, CliCommands, Commands, MigrationCommands, extract_package_arg};
+use cot_cli::args::{
+    Cli, CliCommands, Commands, HELP_LONG_FLAG, HELP_SHORT_FLAG, MigrationCommands,
+    PACKAGE_LONG_FLAG, PACKAGE_SHORT_FLAG, RELEASE_FLAG, extract_package_arg,
+};
 use cot_cli::{handlers, project};
 use tracing_subscriber::util::SubscriberInitExt;
 
+fn is_top_level_help(args: &[String]) -> bool {
+    if !args
+        .iter()
+        .any(|a| a == HELP_LONG_FLAG || a == HELP_SHORT_FLAG)
+    {
+        return false;
+    }
+
+    let mut rest = args.iter().skip(1).peekable();
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            HELP_LONG_FLAG | HELP_SHORT_FLAG | RELEASE_FLAG => {}
+            PACKAGE_SHORT_FLAG | PACKAGE_LONG_FLAG => {
+                rest.next();
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
 fn main() -> anyhow::Result<()> {
     let raw: Vec<String> = std::env::args().collect();
-    let release = raw.iter().any(|a| a == "--release");
+    let release = raw.iter().any(|a| a == RELEASE_FLAG);
     let package = extract_package_arg(&raw);
-
     let project = project::load(&std::env::current_dir()?, release, package.as_deref())?;
 
-    if matches!(raw.as_slice(), [_, flag] if flag == "--help" || flag == "-h") {
+    if is_top_level_help(&raw) {
         handlers::handle_combined_help(project.as_ref())?;
         return Ok(());
     }

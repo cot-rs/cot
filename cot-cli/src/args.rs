@@ -4,6 +4,12 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 
+pub const PACKAGE_LONG_FLAG: &str = "--package";
+pub const PACKAGE_SHORT_FLAG: &str = "-p";
+pub const RELEASE_FLAG: &str = "--release";
+pub const HELP_LONG_FLAG: &str = "--help";
+pub const HELP_SHORT_FLAG: &str = "-h";
+
 #[derive(Debug, Parser)]
 #[command(
     name = "cot",
@@ -135,10 +141,10 @@ pub struct CompletionsArgs {
 pub fn extract_package_arg(raw: &[String]) -> Option<String> {
     let mut iter = raw.iter();
     while let Some(arg) = iter.next() {
-        if let Some(value) = arg.strip_prefix("--package=") {
+        if let Some(value) = arg.strip_prefix(&format!("{PACKAGE_LONG_FLAG}=")) {
             return Some(value.to_string());
         }
-        if arg == "--package" || arg == "-p" {
+        if arg == PACKAGE_LONG_FLAG || arg == PACKAGE_SHORT_FLAG {
             return iter.next().cloned();
         }
     }

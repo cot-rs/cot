@@ -1269,6 +1269,7 @@ impl TestDatabase {
         self.database.close().await?;
         match &self.kind {
             TestDatabaseKind::Sqlite => {}
+            #[cfg(feature = "postgres")]
             TestDatabaseKind::Postgres {
                 db_url, db_name, ..
             } => {
@@ -1286,6 +1287,7 @@ impl TestDatabase {
                 database.raw(&format!("DROP DATABASE {db_name}")).await?;
                 database.close().await?;
             }
+            #[cfg(feature = "mysql")]
             TestDatabaseKind::MySql {
                 db_url, db_name, ..
             } => {

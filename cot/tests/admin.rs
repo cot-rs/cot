@@ -163,7 +163,7 @@ async fn login_with(
     Ok(())
 }
 
-async fn create_webdriver<P: Project + 'static>(
+async fn create_webdriver<P: Project + Send + 'static>(
     server: TestServer<P>,
 ) -> Result<(Client, TestServerWithWebDriver<P>), Box<dyn Error>> {
     let server_with_web_driver = TestServerWithWebDriver::new(server).await?;

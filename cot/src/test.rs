@@ -7,12 +7,15 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-#[cfg(feature = "cache")]
-use cot::config::CacheUrl;
 use cot_core::handler::BoxedHandler;
 use cot_core::impl_into_cot_error;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};
+#[cfg(feature = "mysql")]
+use testcontainers_modules::mariadb::Mariadb;
+#[cfg(feature = "postgres")]
+use testcontainers_modules::postgres::Postgres;
+#[cfg(feature = "redis")]
 use testcontainers_modules::redis::Redis;
 use thiserror::Error;
 use tokio::net::TcpListener;
@@ -27,6 +30,8 @@ use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 use crate::cache::Cache;
 #[cfg(feature = "cache")]
 use crate::cache::store::memory::Memory;
+#[cfg(feature = "cache")]
+use crate::config::CacheUrl;
 use crate::config::ProjectConfig;
 #[cfg(feature = "cache")]
 use crate::config::Timeout;
@@ -983,12 +988,11 @@ impl TestDatabase {
     /// # Ok(())
     /// # }
     /// ```
+    #[cfg(feature = "postgres")]
     pub async fn new_postgres(test_name: &str) -> Result<Self> {
         let (db_url, container) = if let Ok(db_url) = std::env::var("POSTGRES_URL") {
             (db_url, None)
         } else {
-            use testcontainers_modules::postgres::Postgres;
-
             const POSTGRES_PORT: u16 = 5432;
 
             let container = Postgres::default()
@@ -1074,12 +1078,11 @@ impl TestDatabase {
     /// # Ok(())
     /// # }
     /// ```
+    #[cfg(feature = "mysql")]
     pub async fn new_mysql(test_name: &str) -> Result<Self> {
         let (db_url, container) = if let Ok(db_url) = std::env::var("MYSQL_URL") {
             (db_url, None)
         } else {
-            use testcontainers_modules::mariadb::Mariadb;
-
             const MYSQL_PORT: u16 = 3306;
 
             let container = Mariadb::default()
@@ -1315,12 +1318,12 @@ enum TestDatabaseKind {
     Postgres {
         db_url: String,
         db_name: String,
-        _container: Option<Box<ContainerAsync<testcontainers_modules::postgres::Postgres>>>,
+        _container: Option<Box<ContainerAsync<Postgres>>>,
     },
     MySql {
         db_url: String,
         db_name: String,
-        _container: Option<Box<ContainerAsync<testcontainers_modules::mariadb::Mariadb>>>,
+        _container: Option<Box<ContainerAsync<Mariadb>>>,
     },
 }
 
@@ -1988,8 +1991,6 @@ impl TestCache {
 
 #[cfg(feature = "redis")]
 pub(crate) async fn run_redis_container() -> Result<(ContainerAsync<Redis>, String)> {
-    use testcontainers_modules::redis::Redis;
-
     const REDIS_PORT: u16 = 6379;
 
     let container = Redis::default()

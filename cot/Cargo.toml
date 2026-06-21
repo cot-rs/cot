@@ -41,6 +41,7 @@ http.workspace = true
 humantime.workspace = true
 idna = { workspace = true, optional = true }
 indexmap.workspace = true
+is_terminal_polyfill.workspace = true
 lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"], optional = true }
 mime.workspace = true
 mime_guess.workspace = true
@@ -95,6 +96,8 @@ ignored = [
     "idna",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly
     "time",
+    # used indirectly by `clap`, but it causes dependency issues if minimal dependency versions are used
+    "is_terminal_polyfill",
 ]
 
 [features]

@@ -114,7 +114,7 @@ mod tests {
         let db_value = dt.to_db_value();
 
         match db_value {
-            DbValue::ChronoDateTimeWithTimeZone(Some(v)) => assert_eq!(*v, dt),
+            DbValue::ChronoDateTimeWithTimeZone(Some(v)) => assert_eq!(v, dt),
             _ => panic!("Expected DbValue::ChronoDateTimeWithTimeZone, got {db_value:?}"),
         }
     }
@@ -125,7 +125,7 @@ mod tests {
         let db_value = dt.to_db_value();
 
         match db_value {
-            DbValue::ChronoDateTimeUtc(Some(v)) => assert_eq!(*v, dt),
+            DbValue::ChronoDateTimeUtc(Some(v)) => assert_eq!(v, dt),
             _ => panic!("Expected DbValue::ChronoDateTimeUtc, got {db_value:?}"),
         }
     }
@@ -137,7 +137,7 @@ mod tests {
         let none_dt: Option<DateTime<FixedOffset>> = None;
 
         match some_dt.to_db_value() {
-            DbValue::ChronoDateTimeWithTimeZone(Some(v)) => assert_eq!(*v, dt),
+            DbValue::ChronoDateTimeWithTimeZone(Some(v)) => assert_eq!(v, dt),
             _ => panic!(
                 "Expected DbValue::ChronoDateTimeWithTimeZone(Some), got {:?}",
                 some_dt.to_db_value()
@@ -154,7 +154,7 @@ mod tests {
         let none_dt_utc: Option<DateTime<Utc>> = None;
 
         match some_dt_utc.to_db_value() {
-            DbValue::ChronoDateTimeUtc(Some(v)) => assert_eq!(*v, dt_utc),
+            DbValue::ChronoDateTimeUtc(Some(v)) => assert_eq!(v, dt_utc),
             _ => panic!(
                 "Expected DbValue::ChronoDateTimeUtc(Some), got {:?}",
                 some_dt_utc.to_db_value()

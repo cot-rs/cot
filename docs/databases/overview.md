@@ -164,12 +164,17 @@ When you define a foreign key relationship, Cot will automatically create a fore
 When you retrieve a model that has a foreign key relationship, Cot will not automatically fetch the related model and populate the foreign key field with the corresponding value. Instead, you need to explicitly fetch the related model using the `get` method of the `ForeignKey` object. Here's an example of how you can fetch the related user for a link:
 
 ```rust
+# #[model] struct User { #[model(primary_key)] id: Auto<i32> }
+# #[model] struct Link { #[model(primary_key)] id: Auto<i32>, slug: LimitedString<32>, user: ForeignKey<User> }
+# async fn foo(db: &Database) -> cot::Result<()> {
 let mut link = query!(Link, $slug == LimitedString::new("cot").unwrap())
     .get(db)
     .await?
     .expect("Link not found");
 
 let user = link.user.get(db).await?;
+# Ok(())
+# }
 ```
 
 ## Database Configuration
@@ -181,10 +186,10 @@ Configure your database connection in the configuration files inside your `confi
 url = "sqlite://db.sqlite3?mode=rwc"
 
 # Or PostgreSQL
-url = "postgresql://user:password@localhost/dbname"
+# url = "postgresql://user:password@localhost/dbname"
 
 # Or MySQL
-url = "mysql://user:password@localhost/dbname"
+# url = "mysql://user:password@localhost/dbname"
 ```
 
 Cot tries to be as consistent as possible when it comes to the database engine you are using. This means that you can use SQLite for development and testing, and then switch to PostgreSQL or MySQL for production without changing your code. The only thing you need to do is to change the [`url`](struct@cot::config::DatabaseConfig#structfield.url) value in the configuration file!
@@ -198,12 +203,12 @@ As an alternative to setting the database configuration in the `TOML` file, you 
 Note that when you do this, the config values from the `TOML` file will be entirely ignored. Here's an example of how you can do that:
 
 ```rust
-use cot::config::DatabaseConfig;
+use cot::config::{DatabaseConfig, ProjectConfig};
 
 struct MyProject;
 
 impl Project for MyProject {
-    fn config(&self) -> cot::Result<ProjectConfig> {
+    fn config(&self, config_name: &str) -> cot::Result<ProjectConfig> {
         Ok(
             ProjectConfig::builder()
                 .database(

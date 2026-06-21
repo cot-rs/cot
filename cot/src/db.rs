@@ -22,12 +22,253 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use cot_core::error::impl_into_cot_error;
+/// Implement the [`Model`] trait for a struct.
+///
+/// This macro will generate an implementation of the [`Model`] trait for the
+/// given named struct. Note that all the fields of the struct **must**
+/// implement the [`DatabaseField`] trait.
+///
+/// # Model Attributes
+/// Cot provides a number of attributes that can be used on a struct to specify
+/// how it should be treated by the migration engine and other parts of Cot.
+/// These attributes are specified using the `#[model(...)]` attribute on the
+/// struct.
+///
+/// ## `model_type`
+/// The model type can be specified using the `model_type` parameter. The model
+/// type can be one of the following:
+///
+/// * `application` (default): The model represents an actual table in a
+///   normally running instance of the application.
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model(model_type = "application")]
+/// // This is equivalent to:
+/// // #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+/// * `migration`: The model represents a table that is used for migrations. The
+///   model name must be prefixed with an underscore. You shouldn't ever need to
+///   use this type; the migration engine will generate the migration model
+///   types for you.
+///
+///   Migration models have two major uses. First, they ensure that the
+///   migration engine knows what state the model was in at the time the last
+///   migration was generated. This allows the engine to automatically detect
+///   the changes and generate the necessary migration code. Second, they allow
+///   custom code in migrations: you might want the migration to fill in some
+///   data, for example. After the migration has been created, though, the model
+///   might have changed. If you tried to use the application model in the
+///   migration code (which always represents the latest state of the model), it
+///   might not match the actual database schema at the time the migration is
+///   applied. You can use the migration model to ensure that your custom code
+///   operates exactly on the schema that is present at the time the migration
+///   is applied.
+///
+/// ```
+/// // In a migration file
+/// use cot::db::{Auto, model};
+///
+/// #[model(model_type = "migration")]
+/// struct _User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+/// * `internal`: The model represents a table that is used internally by Cot
+///   (e.g. the `cot__migrations` table, storing which migrations have been
+///   applied). They are ignored by the migration generator and should never be
+///   used outside Cot code.
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model(model_type = "internal")]
+/// struct CotMigrations {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     app: String,
+///     name: String,
+/// }
+/// ```
+///
+/// ## `table_name`
+/// By default, the table name is the same as the struct name, converted to
+/// snake case. You can specify a custom table name using the `table_name`
+/// parameter:
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model(table_name = "users")]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+///
+/// # Field Attributes
+/// In addition to the struct-level attributes, you can also specify field-level
+/// attributes using the `#[model(...)]` attribute, which is used to specify
+/// field-level constraints and properties.
+///
+/// ## `primary_key`
+/// The `primary_key` attribute is used to specify that a field is the primary
+/// key of the model. This attribute is required and must be used on exactly one
+/// field of the struct.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+///
+/// ## `unique`
+/// The `unique` attribute is used to specify that a field must be unique across
+/// all rows in the database. This will create a unique constraint on the
+/// corresponding column in the database.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(unique)]
+///     username: String,
+/// }
+/// ```
+///
+/// ## `field_name`
+/// The `field_name` attribute is used to provide a specific name for the field
+/// in the created database table to which the Rust field is mapped to. This
+/// allows, in the following example, to map the `name` parameter to the
+/// `username` column in the database.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(field_name = "username")]
+///     name: String,
+/// }
+/// ```
+///
+/// ## `foreign_key`
+///
+/// The `foreign_key` attribute configures the referential integrity behavior
+/// of a [`ForeignKey`] field. It accepts two optional parameters:
+///
+/// * `on_delete` — behavior when the referenced row is deleted. Defaults to
+///   `"restrict"`.
+/// * `on_update` — behavior when the referenced row is updated. Defaults to
+///   `"cascade"`.
+///
+/// > **Note:** The `foreign_key` attribute is only valid on [`ForeignKey`]
+/// > fields. Using it
+/// > on any other field type will result in a compile error.
+///
+///
+/// ### Basic Usage
+///
+/// ```
+/// use cot::db::{Auto, ForeignKey, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+/// }
+///
+/// #[model]
+/// struct Post {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(foreign_key(on_delete = "cascade", on_update = "cascade"))]
+///     user_id: ForeignKey<User>,
+/// }
+/// ```
+///
+/// ### Supported Policies
+///
+/// Both `on_delete` and `on_update` accept the following values:
+///
+/// * `cascade`: Automatically propagates the delete or update to all
+///   referencing rows.
+///
+/// * `restrict`: Prevents the delete or update of a referenced row if any
+///   referencing rows exist.
+///
+/// * `no_action`: Similar to `restrict`, but the referential integrity check is
+///   deferred until the end of the transaction, depending on the database.
+///
+/// * `set_none`: Sets the foreign key column to `NULL` when the referenced row
+///   is deleted or updated. Requires the field to be of type
+///   `Option<ForeignKey<T>>`.
+///
+/// ### Examples
+///
+/// **Cascade deletes, restrict updates** — deleting a `User` cascades to all
+/// their `Post`s, but updating a `User`'s primary key is prevented if posts
+/// exist:
+///
+/// ```
+/// use cot::db::{Auto, ForeignKey, model};
+///
+/// # #[model]
+/// # struct User {
+/// #    #[model(primary_key)]
+/// #    id: Auto<i32>,
+/// # }
+///
+/// #[model]
+/// struct Post {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(foreign_key(on_delete = "cascade", on_update = "restrict"))]
+///     user_id: ForeignKey<User>,
+/// }
+/// ```
+///
+/// **Set none on delete** — when a `User` is deleted, `author_id` is set to
+/// `NULL` rather than deleting the `Post`. Note the required `Option` wrapper:
+///
+/// ```
+/// use cot::db::{Auto, ForeignKey, model};
+/// # #[model]
+/// # struct User {
+/// #    #[model(primary_key)]
+/// #    id: Auto<i32>,
+/// # }
+/// #[model]
+/// struct Post {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(foreign_key(on_delete = "set_none", on_update = "no_action"))]
+///     author_id: Option<ForeignKey<User>>,
+/// }
+/// ```
 pub use cot_macros::model;
 /// A convenient macro that allows you to write queries in a declarative
 /// fashion.
 ///
 /// `query!` parses a query expression and lowers it into a
-/// [`Query`](cot::db::query::Query) builder. The resulting query is still lazy:
+/// [`Query`] builder. The resulting query is still lazy:
 /// it is only executed when you call a terminal query method such as
 /// [`Query::get`](cot::db::query::Query::get) or
 /// [`Query::all`](cot::db::query::Query::all).

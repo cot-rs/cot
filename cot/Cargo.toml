@@ -53,6 +53,7 @@ sea-query = { workspace = true, optional = true }
 sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
+serde_repr = { workspace = true, optional = true }
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
@@ -97,6 +98,8 @@ ignored = [
     "idna",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly
     "time",
+    # Used indirectly by `testcontainers`, but it causes dependency issues if minimal dependency versions are used
+    "serde_repr",
 ]
 
 [features]
@@ -114,7 +117,7 @@ openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
 cache = ["json"]
-test = ["dep:testcontainers", "dep:testcontainers-modules"]
+test = ["dep:testcontainers", "dep:testcontainers-modules", "dep:serde_repr"]
 
 [lib]
 bench = false

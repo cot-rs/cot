@@ -1233,6 +1233,7 @@ dependencies = [
  "sea-query-binder",
  "serde",
  "serde_json",
+ "serde_repr",
  "serde_urlencoded",
  "sqlx",
  "subtle",

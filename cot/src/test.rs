@@ -1005,7 +1005,6 @@ impl TestDatabase {
                 .map_err(|e| {
                     TestcontainersError::new("failed to get PostgreSQL container port", e)
                 })?;
-            let host_port: u16 = host_port;
             (
                 format!("postgresql://postgres:postgres@localhost:{host_port}"),
                 Some(Box::new(container)),
@@ -1093,7 +1092,6 @@ impl TestDatabase {
                 .get_host_port_ipv4(MYSQL_PORT)
                 .await
                 .map_err(|e| TestcontainersError::new("failed to get MariaDB container port", e))?;
-            let host_port: u16 = host_port;
             (
                 format!("mysql://root:@localhost:{host_port}"),
                 Some(Box::new(container)),

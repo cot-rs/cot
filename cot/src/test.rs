@@ -1313,11 +1313,13 @@ impl std::ops::Deref for TestDatabase {
 #[derive(Debug)]
 enum TestDatabaseKind {
     Sqlite,
+    #[cfg(feature = "postgres")]
     Postgres {
         db_url: String,
         db_name: String,
         _container: Option<Box<ContainerAsync<Postgres>>>,
     },
+    #[cfg(feature = "mysql")]
     MySql {
         db_url: String,
         db_name: String,

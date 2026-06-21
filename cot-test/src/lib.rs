@@ -79,7 +79,7 @@ impl DocTestProject {
             "features = [\"full\", \"openapi\", \"swagger-ui\"]",
         );
         cargo_toml.push_str("serde = { version = \"1\", features = [\"derive\"] }\n");
-        cargo_toml.push_str("schemars = \"0.9\"\n");
+        cargo_toml.push_str("schemars = \"1\"\n");
         cargo_toml.push_str("askama = { version = \"0.16\", features = [\"std\"] }\n");
         cargo_toml.push_str("async-trait = \"0.1\"\n");
 

@@ -596,8 +596,7 @@ impl Timeout {
 
 impl Default for Timeout {
     fn default() -> Self {
-        // expire after 5 mins.
-        Self::After(Duration::from_secs(300))
+        Self::After(Duration::from_mins(5))
     }
 }
 
@@ -2540,7 +2539,7 @@ mod tests {
         );
         assert_eq!(
             config.static_files.cache_timeout,
-            Some(Duration::from_secs(3600))
+            Some(Duration::from_hours(1))
         );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
@@ -2623,7 +2622,7 @@ mod tests {
         let expiry_opts = [
             (
                 "2h",
-                Expiry::OnInactivity(Duration::from_secs(7200)),
+                Expiry::OnInactivity(Duration::from_hours(2)),
                 tower_sessions::Expiry::OnInactivity(time::Duration::seconds(7200)),
             ),
             (
@@ -2853,10 +2852,7 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 5);
-        assert_eq!(
-            config.cache.timeout,
-            Timeout::After(Duration::from_secs(60))
-        );
+        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_mins(1)));
         assert_eq!(config.cache.prefix, Some("v1".to_string()));
         assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
     }
@@ -2902,10 +2898,7 @@ mod tests {
             let config = ProjectConfig::from_toml(toml_content).unwrap();
 
             assert_eq!(config.cache.max_retries, 10);
-            assert_eq!(
-                config.cache.timeout,
-                Timeout::After(Duration::from_secs(120))
-            );
+            assert_eq!(config.cache.timeout, Timeout::After(Duration::from_mins(2)));
             assert_eq!(config.cache.prefix, None);
 
             if let CacheStoreTypeConfig::Redis { url, pool_size } = config.cache.store.store_type {
@@ -3027,7 +3020,7 @@ mod tests {
         let offset = FixedOffset::east_opt(3600).unwrap();
         let insertion_time: DateTime<FixedOffset> =
             (Utc::now() - chrono::Duration::hours(1)).with_timezone(&offset);
-        let timeout = Timeout::After(Duration::from_secs(60)); // 1 minute
+        let timeout = Timeout::After(Duration::from_mins(1));
         assert!(timeout.is_expired(Some(insertion_time)));
     }
 
@@ -3037,14 +3030,14 @@ mod tests {
         let offset = FixedOffset::east_opt(-2 * 3600).unwrap();
         let insertion_time: DateTime<FixedOffset> =
             (Utc::now() - chrono::Duration::seconds(10)).with_timezone(&offset);
-        let timeout = Timeout::After(Duration::from_secs(60));
+        let timeout = Timeout::After(Duration::from_mins(1));
         assert!(!timeout.is_expired(Some(insertion_time)));
     }
 
     #[test]
     #[should_panic(expected = "insertion_time is required for Timeout::After expiry check")]
     fn after_is_expired_panics_with_no_insertion_time() {
-        let timeout = Timeout::After(Duration::from_secs(60));
+        let timeout = Timeout::After(Duration::from_mins(1));
         let _ = timeout.is_expired(None);
     }
 

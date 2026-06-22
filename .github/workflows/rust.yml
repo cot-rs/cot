@@ -398,7 +398,8 @@ jobs:
         run: cargo miri setup
 
       - name: Miri test
-        run: cargo miri nextest run --no-fail-fast --all-features
+        # Guide code-block tests spawn Cargo, which Miri cannot execute.
+        run: cargo miri nextest run --no-fail-fast --all-features -E 'not binary(=doc_code_blocks)'
         env:
           MIRIFLAGS: -Zmiri-disable-isolation
 

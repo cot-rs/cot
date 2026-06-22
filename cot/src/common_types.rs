@@ -42,23 +42,31 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///
 /// ## Password Comparison
 ///
-/// When comparing passwords, there are two recommended approaches:
+/// When comparing passwords, there are two approaches, with different security
+/// properties:
 ///
-/// 1. The most secure approach is to use
+/// 1. **Hash-based verification (recommended).** Use
 ///    [`PasswordHash::from_password`](crate::auth::PasswordHash::from_password)
-///    to create a hash from one password, and then use
-///    [`PasswordHash::verify`](crate::auth::PasswordHash::verify) to compare it
-///    with the other password. This method uses constant-time equality
-///    comparison, which protects against timing attacks.
+///    to derive a hash from one password, and then
+///    [`PasswordHash::verify`](crate::auth::PasswordHash::verify) to check the
+///    other password against that hash. The constant-time comparison happens on
+///    the *hashes*, which are fixed-length, so it reveals nothing about the
+///    passwords themselves — not even their length. On top of that, the hashing
+///    function is deliberately slow and salted, which both defeats timing
+///    attacks and means the stored value is useless to an attacker who obtains
+///    it. This is the only approach suitable for authenticating against a
+///    persisted password.
 ///
-/// 2. An alternative is to compare 2 instances of the [`Password`] type
-///    directly because this password struct implements the [`PartialEq`] trait
-///    which also uses constant-time comparison. Comparing 2 instances of the
-///    [`Password`] type is less secure than using [`PasswordHash::verify`], but
-///    may be acceptable in certain legitimate use cases where the security
-///    tradeoff is understood, e.g., when you're creating a user registration
-///    form with the "retype your password" field, in this case this approach
-///    might save on hashing costs.
+/// 2. **Direct comparison.** Comparing two [`Password`] instances with
+///    [`PartialEq`] also uses a constant-time comparison, so it does not leak
+///    *which* characters differ. However, it operates on the raw passwords
+///    rather than fixed-length hashes, so the comparison can still leak the
+///    *length* of the password through timing, and it performs no expensive
+///    key derivation. Use this only when both values are already in memory and
+///    neither is a stored credential — for example, checking that the password
+///    and the "retype your password" field of a registration form match. It
+///    avoids the cost of hashing in that case, but must never be used to verify
+///    a password against one loaded from storage.
 ///
 /// # Examples
 ///

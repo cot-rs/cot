@@ -949,9 +949,8 @@ dependencies = [
  "rustversion",
  "schemars",
  "sea-query",
- "sea-query-binder",
- "securer-string",
  "sea-query-sqlx",
+ "securer-string",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -3649,9 +3648,9 @@ dependencies = [
 
 [[package]]
 name = "securer-string"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c796cd4a543edb87ad599e495048c5c7f433614c19ae009f5050b24381715efb"
+checksum = "f5639ae7dad6b48a14450ec0383c6edd45d569b5cc22d3d7a9b838115c4d5bc5"
 dependencies = [
  "libc",
  "subtle",

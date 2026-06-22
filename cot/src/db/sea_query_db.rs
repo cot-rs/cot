@@ -72,7 +72,8 @@ macro_rules! impl_sea_query_db_backend {
                 let sql = statement.build($query_builder);
                 tracing::debug!("Schema modification: {}", sql);
 
-                self.execute_sqlx(sqlx::query(&sql)).await
+                self.execute_sqlx(sqlx::query(sqlx::AssertSqlSafe(sql)))
+                    .await
             }
 
             pub(super) async fn raw_with(
@@ -88,7 +89,7 @@ macro_rules! impl_sea_query_db_backend {
                 sqlx_statement: sqlx::query::Query<'a, $sqlx_db_ty, A>,
             ) -> crate::db::Result<crate::db::StatementResult>
             where
-                A: 'a + sqlx::IntoArguments<'a, $sqlx_db_ty>,
+                A: 'a + sqlx::IntoArguments<$sqlx_db_ty>,
             {
                 let result = sqlx_statement
                     .execute(&self.db_connection)
@@ -119,7 +120,7 @@ macro_rules! impl_sea_query_db_backend {
                 Self::prepare_values(&mut values);
                 tracing::debug!("Query: `{}` (values: {:?})", sql, values);
 
-                sqlx::query_with(sql, values)
+                sqlx::query_with(sqlx::AssertSqlSafe(sql), values)
             }
         }
 

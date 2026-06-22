@@ -27,7 +27,7 @@ macro_rules! impl_sea_query_db_backend {
                 Ok(())
             }
 
-            pub(super) async fn fetch_option<T: sea_query_binder::SqlxBinder + Send + Sync>(
+            pub(super) async fn fetch_option<T: sea_query_sqlx::SqlxBinder + Send + Sync>(
                 &self,
                 statement: &T,
             ) -> crate::db::Result<Option<$row_name>> {
@@ -40,7 +40,7 @@ macro_rules! impl_sea_query_db_backend {
                 Ok(row.map($row_name::new))
             }
 
-            pub(super) async fn fetch_all<T: sea_query_binder::SqlxBinder + Send + Sync>(
+            pub(super) async fn fetch_all<T: sea_query_sqlx::SqlxBinder + Send + Sync>(
                 &self,
                 statement: &T,
             ) -> crate::db::Result<Vec<$row_name>> {
@@ -55,7 +55,7 @@ macro_rules! impl_sea_query_db_backend {
                 Ok(result)
             }
 
-            pub(super) async fn execute_statement<T: sea_query_binder::SqlxBinder + Send + Sync>(
+            pub(super) async fn execute_statement<T: sea_query_sqlx::SqlxBinder + Send + Sync>(
                 &self,
                 statement: &T,
             ) -> crate::db::Result<crate::db::StatementResult> {
@@ -72,13 +72,14 @@ macro_rules! impl_sea_query_db_backend {
                 let sql = statement.build($query_builder);
                 tracing::debug!("Schema modification: {}", sql);
 
-                self.execute_sqlx(sqlx::query(&sql)).await
+                self.execute_sqlx(sqlx::query(sqlx::AssertSqlSafe(sql)))
+                    .await
             }
 
             pub(super) async fn raw_with(
                 &self,
                 sql: &str,
-                values: sea_query_binder::SqlxValues,
+                values: sea_query_sqlx::SqlxValues,
             ) -> crate::db::Result<crate::db::StatementResult> {
                 self.execute_sqlx(Self::sqlx_query_with(sql, values)).await
             }
@@ -88,7 +89,7 @@ macro_rules! impl_sea_query_db_backend {
                 sqlx_statement: sqlx::query::Query<'a, $sqlx_db_ty, A>,
             ) -> crate::db::Result<crate::db::StatementResult>
             where
-                A: 'a + sqlx::IntoArguments<'a, $sqlx_db_ty>,
+                A: 'a + sqlx::IntoArguments<$sqlx_db_ty>,
             {
                 let result = sqlx_statement
                     .execute(&self.db_connection)
@@ -103,9 +104,9 @@ macro_rules! impl_sea_query_db_backend {
                 Ok(result)
             }
 
-            fn build_sql<T>(statement: &T) -> (String, sea_query_binder::SqlxValues)
+            fn build_sql<T>(statement: &T) -> (String, sea_query_sqlx::SqlxValues)
             where
-                T: sea_query_binder::SqlxBinder + Send + Sync,
+                T: sea_query_sqlx::SqlxBinder + Send + Sync,
             {
                 let (sql, values) = statement.build_sqlx($query_builder);
 
@@ -114,12 +115,12 @@ macro_rules! impl_sea_query_db_backend {
 
             fn sqlx_query_with(
                 sql: &str,
-                mut values: sea_query_binder::SqlxValues,
-            ) -> sqlx::query::Query<'_, $sqlx_db_ty, sea_query_binder::SqlxValues> {
+                mut values: sea_query_sqlx::SqlxValues,
+            ) -> sqlx::query::Query<'_, $sqlx_db_ty, sea_query_sqlx::SqlxValues> {
                 Self::prepare_values(&mut values);
                 tracing::debug!("Query: `{}` (values: {:?})", sql, values);
 
-                sqlx::query_with(sql, values)
+                sqlx::query_with(sqlx::AssertSqlSafe(sql), values)
             }
         }
 

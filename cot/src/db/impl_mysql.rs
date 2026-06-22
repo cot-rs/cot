@@ -11,7 +11,7 @@ impl DatabaseMySql {
         Ok(())
     }
 
-    fn prepare_values(_values: &mut sea_query_binder::SqlxValues) {
+    fn prepare_values(_values: &mut sea_query_sqlx::SqlxValues) {
         // No changes are needed for MySQL
     }
 

@@ -2038,7 +2038,7 @@ impl<S: BootstrapPhase<Database = Option<Database>>> ProjectContext<S> {
     #[track_caller]
     pub fn database(&self) -> &Database {
         self.try_database().expect(
-            "Database missing. Did you forget to add the database when configuring CotProject?",
+            "Database missing. Did you forget to add the database when configuring cot::Project?",
         )
     }
 }

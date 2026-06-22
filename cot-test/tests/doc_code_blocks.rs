@@ -14,6 +14,11 @@ type TestRunner = fn(&str) -> Result<(), Failed>;
 static TEST_RUNNERS: OnceLock<HashMap<(TestLanguage, TestConfig), TestRunner>> = OnceLock::new();
 
 fn main() {
+    // These tests spawn Cargo, which Miri cannot execute.
+    if cfg!(miri) {
+        return;
+    }
+
     let args = Arguments::from_args();
 
     let mut test_runners: HashMap<(TestLanguage, TestConfig), TestRunner> = HashMap::new();

@@ -18,7 +18,8 @@ Arguments:
   <SHELL>  Shell to generate completions for [possible values: bash, elvish, fish, powershell, zsh]
 
 Options:
-      --release
+      --release            Use target/release instead of target/debug when looking for the project
+                           binary
   -p, --package <PACKAGE>  Package to use, in case you're running this in a workspace
   -v, --verbose...         Increase logging verbosity
   -q, --quiet...           Decrease logging verbosity

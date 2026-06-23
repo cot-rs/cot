@@ -20,7 +20,8 @@ Commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-      --release
+      --release            Use target/release instead of target/debug when looking for the project
+                           binary
   -p, --package <PACKAGE>  Package to use, in case you're running this in a workspace
   -v, --verbose...         Increase logging verbosity
   -q, --quiet...           Decrease logging verbosity

@@ -18,6 +18,8 @@ pub const HELP_SHORT_FLAG: &str = "-h";
     long_about = None
 )]
 pub struct Cli {
+    /// Use target/release instead of target/debug when looking for the project
+    /// binary
     #[arg(long, global = true)]
     release: bool,
     /// Package to use, in case you're running this in a workspace

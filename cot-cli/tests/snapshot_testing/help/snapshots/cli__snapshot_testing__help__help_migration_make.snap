@@ -19,7 +19,8 @@ Arguments:
 
 Options:
       --app-name <APP_NAME>      Name of the app to use in the migration [default: crate name]
-      --release
+      --release                  Use target/release instead of target/debug when looking for the
+                                 project binary
       --output-dir <OUTPUT_DIR>  Directory to write the migrations to [default: the migrations/
                                  directory in the crate's src/ directory]
   -p, --package <PACKAGE>        Package to use, in case you're running this in a workspace

@@ -20,7 +20,7 @@ Commands:
 
 Options:
       --release
-
+          Use target/release instead of target/debug when looking for the project binary
 
   -p, --package <PACKAGE>
           Package to use, in case you're running this in a workspace
@@ -36,5 +36,6 @@ Options:
 
   -V, --version
           Print version
+
 
 ----- stderr -----

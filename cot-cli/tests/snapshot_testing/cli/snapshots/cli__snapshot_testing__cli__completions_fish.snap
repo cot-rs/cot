@@ -37,7 +37,7 @@ function __fish_cot_using_subcommand
 end
 
 complete -c cot -n "__fish_cot_needs_command" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
-complete -c cot -n "__fish_cot_needs_command" -l release
+complete -c cot -n "__fish_cot_needs_command" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_needs_command" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_needs_command" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_needs_command" -s h -l help -d 'Print help'
@@ -50,12 +50,12 @@ complete -c cot -n "__fish_cot_using_subcommand new" -l name -d 'Set the resulti
 complete -c cot -n "__fish_cot_using_subcommand new" -l cot-path -d 'Use `cot` from the specified path instead of a published crate' -r -F
 complete -c cot -n "__fish_cot_using_subcommand new" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
 complete -c cot -n "__fish_cot_using_subcommand new" -l use-git -d 'Use the latest `cot` version from git instead of a published crate'
-complete -c cot -n "__fish_cot_using_subcommand new" -l release
+complete -c cot -n "__fish_cot_using_subcommand new" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_using_subcommand new" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand new" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand new" -s h -l help -d 'Print help'
 complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_subcommand_from list make new help" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
-complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_subcommand_from list make new help" -l release
+complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_subcommand_from list make new help" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_subcommand_from list make new help" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_subcommand_from list make new help" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_subcommand_from list make new help" -s h -l help -d 'Print help'
@@ -64,20 +64,20 @@ complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_s
 complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_subcommand_from list make new help" -f -a "new" -d 'Create a new empty migration'
 complete -c cot -n "__fish_cot_using_subcommand migration; and not __fish_seen_subcommand_from list make new help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
-complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -l release
+complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l app-name -d 'Name of the app to use in the migration [default: crate name]' -r
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l output-dir -d 'Directory to write the migrations to [default: the migrations/ directory in the crate\'s src/ directory]' -r -F
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
-complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l release
+complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from make" -s h -l help -d 'Print help'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from new" -l app-name -d 'Name of the app to use in the migration (default: crate name)' -r
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from new" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
-complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from new" -l release
+complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from new" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from new" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from new" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from new" -s h -l help -d 'Print help'
@@ -86,7 +86,7 @@ complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subco
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from help" -f -a "new" -d 'Create a new empty migration'
 complete -c cot -n "__fish_cot_using_subcommand migration; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c cot -n "__fish_cot_using_subcommand cli; and not __fish_seen_subcommand_from manpages completions help" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
-complete -c cot -n "__fish_cot_using_subcommand cli; and not __fish_seen_subcommand_from manpages completions help" -l release
+complete -c cot -n "__fish_cot_using_subcommand cli; and not __fish_seen_subcommand_from manpages completions help" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_using_subcommand cli; and not __fish_seen_subcommand_from manpages completions help" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand cli; and not __fish_seen_subcommand_from manpages completions help" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand cli; and not __fish_seen_subcommand_from manpages completions help" -s h -l help -d 'Print help'
@@ -96,12 +96,12 @@ complete -c cot -n "__fish_cot_using_subcommand cli; and not __fish_seen_subcomm
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from manpages" -s o -l output-dir -d 'Directory to write the manpages to [default: current directory]' -r -F
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from manpages" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from manpages" -s c -l create -d 'Create the directory if it doesn\'t exist'
-complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from manpages" -l release
+complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from manpages" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from manpages" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from manpages" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from manpages" -s h -l help -d 'Print help'
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from completions" -s p -l package -d 'Package to use, in case you\'re running this in a workspace' -r
-complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from completions" -l release
+complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from completions" -l release -d 'Use target/release instead of target/debug when looking for the project binary'
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from completions" -s v -l verbose -d 'Increase logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from completions" -s q -l quiet -d 'Decrease logging verbosity'
 complete -c cot -n "__fish_cot_using_subcommand cli; and __fish_seen_subcommand_from completions" -s h -l help -d 'Print help'

@@ -150,3 +150,54 @@ pub fn extract_package_arg(raw: &[String]) -> Option<String> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(raw: &[&str]) -> Vec<String> {
+        raw.iter().map(|arg| (*arg).to_string()).collect()
+    }
+
+    #[test]
+    fn extract_package_arg_long_with_separate_value() {
+        let raw = args(&["cot", "--release", "--package", "blog", "check"]);
+
+        assert_eq!(extract_package_arg(&raw), Some("blog".to_string()));
+    }
+
+    #[test]
+    fn extract_package_arg_long_with_equals_value() {
+        let raw = args(&["cot", "--package=blog", "check"]);
+
+        assert_eq!(extract_package_arg(&raw), Some("blog".to_string()));
+    }
+
+    #[test]
+    fn extract_package_arg_short_with_value() {
+        let raw = args(&["cot", "-p", "blog", "check"]);
+
+        assert_eq!(extract_package_arg(&raw), Some("blog".to_string()));
+    }
+
+    #[test]
+    fn extract_package_arg_returns_first_package_flag() {
+        let raw = args(&["cot", "-p", "first", "--package", "second", "check"]);
+
+        assert_eq!(extract_package_arg(&raw), Some("first".to_string()));
+    }
+
+    #[test]
+    fn extract_package_arg_missing_value_returns_none() {
+        let raw = args(&["cot", "check", "-p"]);
+
+        assert_eq!(extract_package_arg(&raw), None);
+    }
+
+    #[test]
+    fn extract_package_arg_absent_returns_none() {
+        let raw = args(&["cot", "--release", "check"]);
+
+        assert_eq!(extract_package_arg(&raw), None);
+    }
+}

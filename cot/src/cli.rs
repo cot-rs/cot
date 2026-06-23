@@ -175,6 +175,7 @@ impl Cli {
         self.tasks.insert(Some(name), Box::new(task));
     }
 
+    /// Returns the underlying clap command definition.
     pub fn command(&self) -> &Command {
         &self.command
     }

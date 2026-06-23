@@ -19,6 +19,7 @@ struct Cache {
 
 const CACHE_FILE_NAME: &str = ".command-cache.json";
 
+#[derive(Debug)]
 pub struct ProjectBinary {
     pub path: PathBuf,
     pub metadata: ProjectMetadata,
@@ -68,6 +69,10 @@ pub fn load(
         return Ok(None);
     }
 
+    if is_current_executable(&binary_path) {
+        return Ok(None);
+    }
+
     let cache_path = project_dir.join(CACHE_FILE_NAME);
     let metadata = load_or_refresh_metadata(&binary_path, &cache_path).context(format!(
         "unable to load metadata from binary `{}`",
@@ -78,6 +83,21 @@ pub fn load(
         path: binary_path,
         metadata,
     }))
+}
+
+fn is_current_executable(binary_path: &Path) -> bool {
+    let Ok(current_exe) = std::env::current_exe() else {
+        return false;
+    };
+
+    let Ok(binary_path) = binary_path.canonicalize() else {
+        return false;
+    };
+    let Ok(current_exe) = current_exe.canonicalize() else {
+        return false;
+    };
+
+    binary_path == current_exe
 }
 
 fn resolve_workspace_package<'a>(
@@ -248,4 +268,372 @@ fn write_cache(cache_path: &Path, cache: &Cache) -> anyhow::Result<()> {
     }
     std::fs::write(cache_path, serde_json::to_string(cache)?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    use cot::metadata::CommandMeta;
+    use tempfile::TempDir;
+
+    use super::*;
+
+    fn write_package_manifest(package_dir: &Path, package_name: &str, extra: &str) {
+        fs::create_dir_all(package_dir).unwrap();
+        fs::write(
+            package_dir.join("Cargo.toml"),
+            format!(
+                r#"[package]
+name = "{package_name}"
+version = "0.1.0"
+edition = "2024"
+
+{extra}"#
+            ),
+        )
+        .unwrap();
+    }
+
+    fn write_workspace_manifest(workspace_dir: &Path, members: &[&str]) {
+        fs::write(
+            workspace_dir.join("Cargo.toml"),
+            format!(
+                "[workspace]\nresolver = \"3\"\nmembers = [{}]\n",
+                members
+                    .iter()
+                    .map(|member| format!("\"{member}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        )
+        .unwrap();
+    }
+
+    fn command(name: &str) -> CommandMeta {
+        CommandMeta {
+            name: name.to_string(),
+            about: None,
+            aliases: vec![],
+            subcommands: vec![],
+        }
+    }
+
+    fn metadata(binary_name: &str, command_names: &[&str]) -> ProjectMetadata {
+        ProjectMetadata {
+            binary_name: binary_name.to_string(),
+            commands: command_names.iter().map(|name| command(name)).collect(),
+        }
+    }
+
+    #[cfg(unix)]
+    fn write_metadata_script(path: &Path, metadata: &ProjectMetadata) {
+        let json = serde_json::to_string(metadata).unwrap();
+        write_shell_script(path, &format!("printf '%s\\n' '{json}'\n"));
+    }
+
+    #[cfg(unix)]
+    fn write_shell_script(path: &Path, body: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, format!("#!/bin/sh\n{body}")).unwrap();
+        let mut permissions = fs::metadata(path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).unwrap();
+    }
+
+    #[test]
+    fn load_returns_none_without_cargo_manifest() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let result = load(temp_dir.path(), false, None).unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn load_errors_when_start_path_does_not_exist() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let result = load(&temp_dir.path().join("missing"), false, None);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("path does not exist")
+        );
+    }
+
+    #[test]
+    fn load_returns_none_when_expected_binary_is_missing() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(temp_dir.path(), "demo", "");
+
+        let result = load(temp_dir.path(), false, None).unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn load_reads_debug_binary_metadata_and_writes_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(temp_dir.path(), "demo", "");
+        let binary_path = temp_dir.path().join("target/debug/demo");
+        write_metadata_script(&binary_path, &metadata("demo", &["serve"]));
+
+        let project = load(temp_dir.path(), false, None).unwrap().unwrap();
+
+        assert_eq!(project.path, binary_path);
+        assert_eq!(project.metadata.binary_name, "demo");
+        assert_eq!(project.metadata.commands[0].name, "serve");
+        assert!(temp_dir.path().join(CACHE_FILE_NAME).exists());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn load_uses_release_profile_when_requested() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(temp_dir.path(), "demo", "");
+        let binary_path = temp_dir.path().join("target/release/demo");
+        write_metadata_script(&binary_path, &metadata("demo", &["serve"]));
+
+        let project = load(temp_dir.path(), true, None).unwrap().unwrap();
+
+        assert_eq!(project.path, binary_path);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn load_uses_single_named_bin_target() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(
+            temp_dir.path(),
+            "demo",
+            r#"[[bin]]
+name = "server"
+path = "src/server.rs"
+"#,
+        );
+        let binary_path = temp_dir.path().join("target/debug/server");
+        write_metadata_script(&binary_path, &metadata("server", &["serve"]));
+
+        let project = load(temp_dir.path(), false, None).unwrap().unwrap();
+
+        assert_eq!(project.path, binary_path);
+        assert_eq!(project.metadata.binary_name, "server");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn load_uses_metadata_binary_override_before_bin_targets() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(
+            temp_dir.path(),
+            "demo",
+            r#"[package.metadata.cot]
+binary = "api"
+
+[[bin]]
+name = "api"
+path = "src/api.rs"
+
+[[bin]]
+name = "worker"
+path = "src/worker.rs"
+"#,
+        );
+        let binary_path = temp_dir.path().join("target/debug/api");
+        write_metadata_script(&binary_path, &metadata("api", &["serve"]));
+
+        let project = load(temp_dir.path(), false, None).unwrap().unwrap();
+
+        assert_eq!(project.path, binary_path);
+        assert_eq!(project.metadata.binary_name, "api");
+    }
+
+    #[test]
+    fn load_errors_on_multiple_bin_targets_without_override() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(
+            temp_dir.path(),
+            "demo",
+            r#"[[bin]]
+name = "api"
+path = "src/api.rs"
+
+[[bin]]
+name = "worker"
+path = "src/worker.rs"
+"#,
+        );
+
+        let result = load(temp_dir.path(), false, None);
+
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("multiple [[bin]] targets"));
+        assert!(message.contains("[package.metadata.cot]"));
+    }
+
+    #[test]
+    fn workspace_root_requires_package_when_ambiguous() {
+        let temp_dir = TempDir::new().unwrap();
+        write_workspace_manifest(temp_dir.path(), &["api", "web"]);
+        write_package_manifest(&temp_dir.path().join("api"), "api", "");
+        write_package_manifest(&temp_dir.path().join("web"), "web", "");
+
+        let result = load(temp_dir.path(), false, None);
+
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("multiple packages found"));
+        assert!(message.contains("api"));
+        assert!(message.contains("web"));
+    }
+
+    #[test]
+    fn workspace_package_flag_must_match_member() {
+        let temp_dir = TempDir::new().unwrap();
+        write_workspace_manifest(temp_dir.path(), &["api", "web"]);
+        write_package_manifest(&temp_dir.path().join("api"), "api", "");
+        write_package_manifest(&temp_dir.path().join("web"), "web", "");
+
+        let result = load(temp_dir.path(), false, Some("missing"));
+
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("package `missing` not found"));
+        assert!(message.contains("api"));
+        assert!(message.contains("web"));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn workspace_root_uses_selected_package_and_workspace_target_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        write_workspace_manifest(temp_dir.path(), &["api", "web"]);
+        write_package_manifest(&temp_dir.path().join("api"), "api", "");
+        write_package_manifest(&temp_dir.path().join("web"), "web", "");
+        let binary_path = temp_dir.path().join("target/debug/api");
+        write_metadata_script(&binary_path, &metadata("api", &["check"]));
+
+        let project = load(temp_dir.path(), false, Some("api")).unwrap().unwrap();
+
+        assert_eq!(project.path, binary_path);
+        assert!(temp_dir.path().join("api").join(CACHE_FILE_NAME).exists());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn workspace_member_directory_uses_current_package_without_flag() {
+        let temp_dir = TempDir::new().unwrap();
+        write_workspace_manifest(temp_dir.path(), &["api", "web"]);
+        write_package_manifest(&temp_dir.path().join("api"), "api", "");
+        write_package_manifest(&temp_dir.path().join("web"), "web", "");
+        let binary_path = temp_dir.path().join("target/debug/web");
+        write_metadata_script(&binary_path, &metadata("web", &["check"]));
+
+        let project = load(&temp_dir.path().join("web"), false, None)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(project.path, binary_path);
+        assert_eq!(project.metadata.binary_name, "web");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn load_reuses_valid_cache_without_spawning_binary() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(temp_dir.path(), "demo", "");
+        let binary_path = temp_dir.path().join("target/debug/demo");
+        write_shell_script(
+            &binary_path,
+            "echo 'binary should not be queried' >&2\nexit 42\n",
+        );
+        let cache = Cache {
+            binary_mtime_secs: mtime_secs(&binary_path).unwrap(),
+            metadata: metadata("demo", &["cached"]),
+        };
+        write_cache(&temp_dir.path().join(CACHE_FILE_NAME), &cache).unwrap();
+
+        let project = load(temp_dir.path(), false, None).unwrap().unwrap();
+
+        assert_eq!(project.metadata.commands[0].name, "cached");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn load_refreshes_stale_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(temp_dir.path(), "demo", "");
+        let binary_path = temp_dir.path().join("target/debug/demo");
+        write_metadata_script(&binary_path, &metadata("demo", &["fresh"]));
+        let cache = Cache {
+            binary_mtime_secs: 0,
+            metadata: metadata("demo", &["stale"]),
+        };
+        write_cache(&temp_dir.path().join(CACHE_FILE_NAME), &cache).unwrap();
+
+        let project = load(temp_dir.path(), false, None).unwrap().unwrap();
+
+        assert_eq!(project.metadata.commands[0].name, "fresh");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn load_reports_metadata_command_failure_with_output() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(temp_dir.path(), "demo", "");
+        let binary_path = temp_dir.path().join("target/debug/demo");
+        write_shell_script(
+            &binary_path,
+            "echo stdout message\necho stderr message >&2\nexit 42\n",
+        );
+
+        let result = load(temp_dir.path(), false, None);
+
+        assert!(result.is_err());
+        let message = format!("{:#}", result.unwrap_err());
+        assert!(message.contains("unable to load metadata"));
+        assert!(message.contains("exited with status"));
+        assert!(message.contains("stdout message"));
+        assert!(message.contains("stderr message"));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn load_reports_invalid_metadata_json() {
+        let temp_dir = TempDir::new().unwrap();
+        write_package_manifest(temp_dir.path(), "demo", "");
+        let binary_path = temp_dir.path().join("target/debug/demo");
+        write_shell_script(&binary_path, "echo 'not json'\n");
+
+        let result = load(temp_dir.path(), false, None);
+
+        assert!(result.is_err());
+        let message = format!("{:#}", result.unwrap_err());
+        assert!(message.contains(METADATA_FLAG));
+        assert!(message.contains("not json"));
+    }
+
+    #[test]
+    fn current_executable_matches_current_process() {
+        let current_exe = std::env::current_exe().unwrap();
+
+        assert!(is_current_executable(&current_exe));
+    }
+
+    #[test]
+    fn current_executable_does_not_match_missing_path() {
+        let missing = std::env::temp_dir().join("cot-cli-missing-test-binary");
+
+        assert!(!is_current_executable(&missing));
+    }
 }

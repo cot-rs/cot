@@ -21,7 +21,12 @@ fn is_top_level_help(args: &[String]) -> bool {
         match arg.as_str() {
             HELP_LONG_FLAG | HELP_SHORT_FLAG | RELEASE_FLAG => {}
             PACKAGE_SHORT_FLAG | PACKAGE_LONG_FLAG => {
-                rest.next();
+                let Some(value) = rest.next() else {
+                    return false;
+                };
+                if value.starts_with('-') {
+                    return false;
+                }
             }
             _ => return false,
         }
@@ -33,9 +38,9 @@ fn main() -> anyhow::Result<()> {
     let raw: Vec<String> = std::env::args().collect();
     let release = raw.iter().any(|a| a == RELEASE_FLAG);
     let package = extract_package_arg(&raw);
-    let project = project::load(&std::env::current_dir()?, release, package.as_deref())?;
 
     if is_top_level_help(&raw) {
+        let project = project::load(&std::env::current_dir()?, release, package.as_deref())?;
         handlers::handle_combined_help(project.as_ref())?;
         return Ok(());
     }
@@ -61,6 +66,52 @@ fn main() -> anyhow::Result<()> {
             MigrationCommands::Make(args) => handlers::handle_migration_make(args),
             MigrationCommands::New(args) => handlers::handle_migration_new(args),
         },
-        Commands::External(args) => handlers::handle_external(args, project, release),
+        Commands::External(args) => {
+            let project = project::load(&std::env::current_dir()?, release, package.as_deref())?;
+            handlers::handle_external(args, project, release)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(raw: &[&str]) -> Vec<String> {
+        raw.iter().map(|arg| (*arg).to_string()).collect()
+    }
+
+    #[test]
+    fn top_level_help_accepts_only_global_flags() {
+        assert!(is_top_level_help(&args(&["cot", "--help"])));
+        assert!(is_top_level_help(&args(&["cot", "-h"])));
+        assert!(is_top_level_help(&args(&[
+            "cot",
+            "--release",
+            "-p",
+            "blog",
+            "--help"
+        ])));
+        assert!(is_top_level_help(&args(&[
+            "cot",
+            "--package",
+            "blog",
+            "-h",
+            "--release"
+        ])));
+    }
+
+    #[test]
+    fn top_level_help_rejects_subcommands_and_non_help_invocations() {
+        assert!(!is_top_level_help(&args(&["cot"])));
+        assert!(!is_top_level_help(&args(&["cot", "migration", "--help"])));
+        assert!(!is_top_level_help(&args(&["cot", "serve", "-h"])));
+        assert!(!is_top_level_help(&args(&["cot", "--version"])));
+    }
+
+    #[test]
+    fn top_level_help_treats_missing_package_value_as_not_top_level_help() {
+        assert!(!is_top_level_help(&args(&["cot", "-p", "--help"])));
+        assert!(!is_top_level_help(&args(&["cot", "--package", "-h"])));
     }
 }

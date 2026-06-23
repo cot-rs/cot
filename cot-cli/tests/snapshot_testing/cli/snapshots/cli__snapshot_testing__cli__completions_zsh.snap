@@ -27,6 +27,9 @@ _cot() {
 
     local context curcontext="$curcontext" state line
     _arguments "${_arguments_options[@]}" : \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -48,7 +51,10 @@ _cot() {
 _arguments "${_arguments_options[@]}" : \
 '--name=[Set the resulting crate name \[default\: the directory name\]]:NAME:_default' \
 '--cot-path=[Use \`cot\` from the specified path instead of a published crate]:COT_PATH:_files' \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--use-git[Use the latest \`cot\` version from git instead of a published crate]' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -60,6 +66,9 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (migration)
 _arguments "${_arguments_options[@]}" : \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -78,6 +87,9 @@ _arguments "${_arguments_options[@]}" : \
         case $line[1] in
             (list)
 _arguments "${_arguments_options[@]}" : \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -91,6 +103,9 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--app-name=[Name of the app to use in the migration \[default\: crate name\]]:APP_NAME:_default' \
 '--output-dir=[Directory to write the migrations to \[default\: the migrations/ directory in the crate'\''s src/ directory\]]:OUTPUT_DIR:_files' \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -103,6 +118,9 @@ _arguments "${_arguments_options[@]}" : \
 (new)
 _arguments "${_arguments_options[@]}" : \
 '--app-name=[Name of the app to use in the migration (default\: crate name)]:APP_NAME:_default' \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -151,6 +169,9 @@ esac
 ;;
 (cli)
 _arguments "${_arguments_options[@]}" : \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -171,8 +192,11 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '-o+[Directory to write the manpages to \[default\: current directory\]]:OUTPUT_DIR:_files' \
 '--output-dir=[Directory to write the manpages to \[default\: current directory\]]:OUTPUT_DIR:_files' \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '-c[Create the directory if it doesn'\''t exist]' \
 '--create[Create the directory if it doesn'\''t exist]' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -183,6 +207,9 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (completions)
 _arguments "${_arguments_options[@]}" : \
+'-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
+'--release[]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \

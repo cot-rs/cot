@@ -18,10 +18,12 @@ Arguments:
 
 Options:
       --name <NAME>          Set the resulting crate name [default: the directory name]
-  -v, --verbose...           Increase logging verbosity
-  -q, --quiet...             Decrease logging verbosity
+      --release
+  -p, --package <PACKAGE>    Package to use, in case you're running this in a workspace
       --use-git              Use the latest `cot` version from git instead of a published crate
       --cot-path <COT_PATH>  Use `cot` from the specified path instead of a published crate
+  -v, --verbose...           Increase logging verbosity
+  -q, --quiet...             Decrease logging verbosity
   -h, --help                 Print help
 
 ----- stderr -----

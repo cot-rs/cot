@@ -33,6 +33,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
 
     $completions = @(switch ($command) {
         'cot' {
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
@@ -50,7 +53,10 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
         'cot;new' {
             [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Set the resulting crate name [default: the directory name]')
             [CompletionResult]::new('--cot-path', '--cot-path', [CompletionResultType]::ParameterName, 'Use `cot` from the specified path instead of a published crate')
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
             [CompletionResult]::new('--use-git', '--use-git', [CompletionResultType]::ParameterName, 'Use the latest `cot` version from git instead of a published crate')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
@@ -60,6 +66,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;migration' {
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
@@ -73,6 +82,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;migration;list' {
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
@@ -84,6 +96,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
         'cot;migration;make' {
             [CompletionResult]::new('--app-name', '--app-name', [CompletionResultType]::ParameterName, 'Name of the app to use in the migration [default: crate name]')
             [CompletionResult]::new('--output-dir', '--output-dir', [CompletionResultType]::ParameterName, 'Directory to write the migrations to [default: the migrations/ directory in the crate''s src/ directory]')
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
@@ -94,6 +109,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
         }
         'cot;migration;new' {
             [CompletionResult]::new('--app-name', '--app-name', [CompletionResultType]::ParameterName, 'Name of the app to use in the migration (default: crate name)')
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
@@ -122,6 +140,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;cli' {
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
@@ -136,8 +157,11 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
         'cot;cli;manpages' {
             [CompletionResult]::new('-o', '-o', [CompletionResultType]::ParameterName, 'Directory to write the manpages to [default: current directory]')
             [CompletionResult]::new('--output-dir', '--output-dir', [CompletionResultType]::ParameterName, 'Directory to write the manpages to [default: current directory]')
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
             [CompletionResult]::new('-c', '-c', [CompletionResultType]::ParameterName, 'Create the directory if it doesn''t exist')
             [CompletionResult]::new('--create', '--create', [CompletionResultType]::ParameterName, 'Create the directory if it doesn''t exist')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
@@ -147,6 +171,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;cli;completions' {
+            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
+            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'release')
             [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')

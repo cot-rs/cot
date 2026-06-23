@@ -19,9 +19,11 @@ Arguments:
 
 Options:
       --app-name <APP_NAME>      Name of the app to use in the migration [default: crate name]
-  -v, --verbose...               Increase logging verbosity
+      --release
       --output-dir <OUTPUT_DIR>  Directory to write the migrations to [default: the migrations/
                                  directory in the crate's src/ directory]
+  -p, --package <PACKAGE>        Package to use, in case you're running this in a workspace
+  -v, --verbose...               Increase logging verbosity
   -q, --quiet...                 Decrease logging verbosity
   -h, --help                     Print help
 

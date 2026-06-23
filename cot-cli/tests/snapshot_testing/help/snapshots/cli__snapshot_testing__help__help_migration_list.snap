@@ -18,8 +18,10 @@ Arguments:
   [PATH]  Path to the crate directory to list migrations for [default: current directory]
 
 Options:
-  -v, --verbose...  Increase logging verbosity
-  -q, --quiet...    Decrease logging verbosity
-  -h, --help        Print help
+      --release
+  -p, --package <PACKAGE>  Package to use, in case you're running this in a workspace
+  -v, --verbose...         Increase logging verbosity
+  -q, --quiet...           Decrease logging verbosity
+  -h, --help               Print help
 
 ----- stderr -----

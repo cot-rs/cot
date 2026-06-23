@@ -140,7 +140,7 @@ fn exec(proj: &ProjectBinary, args: &[OsString]) -> anyhow::Result<()> {
     #[cfg(not(unix))]
     {
         let status = std::process::Command::new(&proj.path)
-            .args(&args)
+            .args(args)
             .status()?;
         std::process::exit(status.code().unwrap_or(1));
     }

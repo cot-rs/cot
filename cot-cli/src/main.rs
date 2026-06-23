@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
         },
         Commands::External(args) => {
             let project = project::load(&std::env::current_dir()?, release, package.as_deref())?;
-            handlers::handle_external(args, project, release)
+            handlers::handle_external(&args, project, release)
         }
     }
 }

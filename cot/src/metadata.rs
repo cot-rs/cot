@@ -43,8 +43,8 @@ pub fn extract(cmd: &Command) -> ProjectMetadata {
 fn extract_command(cmd: &Command) -> CommandMeta {
     CommandMeta {
         name: cmd.get_name().to_string(),
-        about: cmd.get_about().map(|s| s.to_string()),
-        aliases: cmd.get_all_aliases().map(|s| s.to_string()).collect(),
+        about: cmd.get_about().map(ToString::to_string),
+        aliases: cmd.get_all_aliases().map(ToString::to_string).collect(),
         subcommands: cmd
             .get_subcommands()
             .filter(|subcmd| !subcmd.is_hide_set())

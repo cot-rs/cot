@@ -100,7 +100,7 @@ pub fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> any
 }
 
 pub fn handle_external(
-    args: Vec<OsString>,
+    args: &[OsString],
     project: Option<ProjectBinary>,
     _release: bool,
 ) -> anyhow::Result<()> {
@@ -126,13 +126,13 @@ pub fn handle_external(
         );
     }
 
-    exec(proj, args)
+    exec(&proj, args)
 }
 
-fn exec(proj: ProjectBinary, args: Vec<OsString>) -> anyhow::Result<()> {
+fn exec(proj: &ProjectBinary, args: &[OsString]) -> anyhow::Result<()> {
     #[cfg(unix)]
     {
-        let err = std::process::Command::new(&proj.path).args(&args).exec();
+        let err = std::process::Command::new(&proj.path).args(args).exec();
         anyhow::bail!("Failed to exec {}: {err}", proj.path.display());
     }
 
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn external_command_without_project_reports_build_hint() {
-        let result = handle_external(vec![OsString::from("serve")], None, false);
+        let result = handle_external(&[OsString::from("serve")], None, false);
 
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
@@ -296,7 +296,7 @@ mod tests {
             },
         };
 
-        let result = handle_external(vec![OsString::from("foo")], Some(project), false);
+        let result = handle_external(&[OsString::from("foo")], Some(project), false);
 
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();

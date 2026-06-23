@@ -138,6 +138,7 @@ pub struct CompletionsArgs {
 /// Pulls `-p <name>` / `--package <name>` / `--package=<name>` out of raw
 /// argv, before clap has parsed anything. Needed because `project::load`
 /// must run before `Cli::parse()` for the `--help` interception path.
+#[must_use]
 pub fn extract_package_arg(raw: &[String]) -> Option<String> {
     let mut iter = raw.iter();
     while let Some(arg) = iter.next() {

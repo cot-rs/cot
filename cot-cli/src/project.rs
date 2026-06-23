@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -32,8 +33,8 @@ pub struct ProjectBinary {
 
 /// Find and load the project binary and its metadata.
 ///
-/// `package` corresponds to `cot -p <PACKAGE> ...` or `--package <PACKAGE>`,
-/// mirroring `cargo`'s flag. It's required when run from a workspace root
+/// `package` corresponds to `cot -p <PACKAGE> ...` or `--package <PACKAGE>`.
+/// It's required when run from a workspace root
 /// (or any directory that doesn't unambiguously belong to one package) and
 /// the workspace has more than one member.
 pub fn load(
@@ -146,24 +147,21 @@ fn available_packages(wm: &WorkspaceManager) -> String {
 
 /// Resolve the binary name for a package:
 ///
-/// 1. `[package.metadata.cot] binary = "..."` — explicit override, useful when
-///    a crate has multiple `[[bin]]` targets
-/// 2. A single `[[bin]]` entry — use its name
-/// 3. Fall back to the package name (cargo's default when there's no explicit
-///    `[[bin]]` and `src/main.rs` exists)
+/// 1. If the package has a `[package.metadata.cot.binary]` entry (typically as
+///    a result of disambiguating multiple binaries), use that.
+/// 2. If the package has a single `[[bin]]` target, use that.
+/// 3. Otherwise, use the package name.
 fn resolve_binary_name(package_manager: &PackageManager) -> anyhow::Result<String> {
     let manifest: &Manifest = package_manager.get_manifest();
 
-    if let Some(package) = &manifest.package {
-        if let Some(metadata) = &package.metadata {
-            if let Some(name) = metadata
-                .get("cot")
-                .and_then(|c| c.get("binary"))
-                .and_then(|b| b.as_str())
-            {
-                return Ok(name.to_string());
-            }
-        }
+    if let Some(package) = &manifest.package
+        && let Some(metadata) = &package.metadata
+        && let Some(name) = metadata
+            .get("cot")
+            .and_then(|c| c.get("binary"))
+            .and_then(|b| b.as_str())
+    {
+        return Ok(name.to_string());
     }
 
     let named_bins: Vec<&str> = manifest
@@ -213,12 +211,11 @@ fn load_or_refresh_metadata(
 ) -> anyhow::Result<ProjectMetadata> {
     let current_mtime_secs = mtime_secs(binary_path)?;
 
-    if let Ok(bytes) = std::fs::read(cache_path) {
-        if let Ok(cache) = serde_json::from_slice::<Cache>(&bytes) {
-            if cache.binary_mtime_secs == current_mtime_secs {
-                return Ok(cache.metadata);
-            }
-        }
+    if let Ok(bytes) = std::fs::read(cache_path)
+        && let Ok(cache) = serde_json::from_slice::<Cache>(&bytes)
+        && cache.binary_mtime_secs == current_mtime_secs
+    {
+        return Ok(cache.metadata);
     }
 
     let output = std::process::Command::new(binary_path)
@@ -237,11 +234,11 @@ fn load_or_refresh_metadata(
         );
 
         if !stderr.trim().is_empty() {
-            msg.push_str(&format!("\n\nstderr:\n{}", stderr.trim()));
+            let _ = write!(msg, "\n\nstderr:\n{}", stderr.trim());
         }
 
         if !stdout.trim().is_empty() {
-            msg.push_str(&format!("\n\nstdout:\n{}", stdout.trim()));
+            let _ = write!(msg, "\n\nstdout:\n{}", stdout.trim());
         }
         bail!(msg);
     }

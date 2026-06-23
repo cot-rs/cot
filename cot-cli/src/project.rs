@@ -17,7 +17,12 @@ struct Cache {
     metadata: ProjectMetadata,
 }
 
-const CACHE_FILE_NAME: &str = ".command-cache.json";
+const COT_DIR_NAME: &str = ".cot";
+const CACHE_FILE_NAME: &str = "command-cache.json";
+
+fn command_cache_path(project_dir: &Path) -> PathBuf {
+    project_dir.join(COT_DIR_NAME).join(CACHE_FILE_NAME)
+}
 
 #[derive(Debug)]
 pub struct ProjectBinary {
@@ -69,11 +74,18 @@ pub fn load(
         return Ok(None);
     }
 
+    // When `cot` command is run from the same directory/package as the binary
+    // (typically the `cot-cli` package), or any workspace package whose binary
+    // resolves to the current executable, the discovered project binary can be the
+    // CLI itself. Do not query it for the project metadata: `--metadata` is
+    // handled by Cot application binaries, not by the `cot` proxy CLI.
+    // Treat this as "no project binary found" so the help output and command
+    // dispatch do not recurse into, or fail on, the current running CLI.
     if is_current_executable(&binary_path) {
         return Ok(None);
     }
 
-    let cache_path = project_dir.join(CACHE_FILE_NAME);
+    let cache_path = command_cache_path(project_dir);
     let metadata = load_or_refresh_metadata(&binary_path, &cache_path).context(format!(
         "unable to load metadata from binary `{}`",
         binary_path.display()
@@ -118,7 +130,7 @@ fn resolve_workspace_package<'a>(
     }
 
     bail!(
-        "multiple packages found in the workspace; specify which one to use with `-p <PACKAGE>`.\n\
+        "multiple packages found in the workspace; specify which one to use with `-p <PACKAGE>`.\n\n\
          Available packages: {}",
         available_packages(wm)
     )
@@ -392,7 +404,7 @@ edition = "2024"
         assert_eq!(project.path, binary_path);
         assert_eq!(project.metadata.binary_name, "demo");
         assert_eq!(project.metadata.commands[0].name, "serve");
-        assert!(temp_dir.path().join(CACHE_FILE_NAME).exists());
+        assert!(command_cache_path(temp_dir.path()).exists());
     }
 
     #[test]
@@ -526,7 +538,7 @@ path = "src/worker.rs"
         let project = load(temp_dir.path(), false, Some("api")).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
-        assert!(temp_dir.path().join("api").join(CACHE_FILE_NAME).exists());
+        assert!(temp_dir.path().join("api").exists());
     }
 
     #[test]
@@ -561,7 +573,7 @@ path = "src/worker.rs"
             binary_mtime_secs: mtime_secs(&binary_path).unwrap(),
             metadata: metadata("demo", &["cached"]),
         };
-        write_cache(&temp_dir.path().join(CACHE_FILE_NAME), &cache).unwrap();
+        write_cache(&command_cache_path(temp_dir.path()), &cache).unwrap();
 
         let project = load(temp_dir.path(), false, None).unwrap().unwrap();
 
@@ -579,7 +591,7 @@ path = "src/worker.rs"
             binary_mtime_secs: 0,
             metadata: metadata("demo", &["stale"]),
         };
-        write_cache(&temp_dir.path().join(CACHE_FILE_NAME), &cache).unwrap();
+        write_cache(&command_cache_path(temp_dir.path()), &cache).unwrap();
 
         let project = load(temp_dir.path(), false, None).unwrap().unwrap();
 

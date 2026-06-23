@@ -61,8 +61,8 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///    [`PartialEq`] also uses a constant-time comparison, so it does not leak
 ///    *which* characters differ. However, it operates on the raw passwords
 ///    rather than fixed-length hashes, so the comparison can still leak the
-///    *length* of the password through timing, and it performs no expensive
-///    key derivation. Use this only when both values are already in memory and
+///    *length* of the password through timing, and it performs no expensive key
+///    derivation. Use this only when both values are already in memory and
 ///    neither is a stored credential — for example, checking that the password
 ///    and the "retype your password" field of a registration form match. It
 ///    avoids the cost of hashing in that case, but must never be used to verify

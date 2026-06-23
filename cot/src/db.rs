@@ -15,7 +15,7 @@ pub mod query;
 mod relations;
 mod sea_query_db;
 
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -426,9 +426,10 @@ use mockall::automock;
 use query::Query;
 pub use relations::{ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use sea_query::{
-    ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
+    ColumnRef, ExprTrait, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder,
+    SimpleExpr,
 };
-use sea_query_binder::{SqlxBinder, SqlxValues};
+use sea_query_sqlx::{SqlxBinder, SqlxValues};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sqlx::{Type, TypeInfo};
 use thiserror::Error;
@@ -789,13 +790,13 @@ impl From<&'static str> for Identifier {
 }
 
 impl Iden for Identifier {
-    fn unquoted(&self, s: &mut dyn Write) {
-        s.write_str(self.as_str()).unwrap();
+    fn unquoted(&self) -> &str {
+        self.as_str()
     }
 }
 impl Iden for &Identifier {
-    fn unquoted(&self, s: &mut dyn Write) {
-        s.write_str(self.as_str()).unwrap();
+    fn unquoted(&self) -> &str {
+        self.as_str()
     }
 }
 

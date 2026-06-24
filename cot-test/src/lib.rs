@@ -77,7 +77,7 @@ impl DocTestProject {
 
         let mut additional_deps = String::new();
         additional_deps.push_str("serde = { version = \"1\", features = [\"derive\"] }\n");
-        additional_deps.push_str("schemars = \"0.9\"\n");
+        additional_deps.push_str("schemars = \"1\"\n");
         additional_deps.push_str("askama = { version = \"0.16\", features = [\"std\"] }\n");
         additional_deps.push_str("async-trait = \"0.1\"\n");
 

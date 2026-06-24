@@ -87,12 +87,21 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
                     let line = node_data.sourcepos.start.line;
                     let runner = *runner;
                     let file_name = file_name.to_string();
-                    trials.push(Trial::test(
-                        format!(
-                            "{file_name}; line {line}; language {lang:?}; config {test_config:?}"
-                        ),
-                        move || runner(&literal),
-                    ));
+
+                    // Rust and Askama tests invoke `cargo check`, which spawns a subprocess via
+                    // `pidfd_spawnp` - an operation Miri doesn't support.
+                    let needs_subprocess =
+                        matches!(lang, TestLanguage::Rust | TestLanguage::AskamaTemplate);
+
+                    trials.push(
+                        Trial::test(
+                            format!(
+                                "{file_name}; line {line}; language {lang:?}; config {test_config:?}"
+                            ),
+                            move || runner(&literal),
+                        )
+                        .with_ignored_flag(cfg!(miri) && needs_subprocess),
+                    );
                 }
             }
         }

@@ -41,6 +41,7 @@ http.workspace = true
 humantime.workspace = true
 idna = { workspace = true, optional = true }
 indexmap.workspace = true
+is_terminal_polyfill.workspace = true
 lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"], optional = true }
 mime.workspace = true
 mime_guess.workspace = true
@@ -50,7 +51,7 @@ pin-project-lite.workspace = true
 redis = { workspace = true, features = ["aio", "tokio-comp"], optional = true }
 schemars = { workspace = true, optional = true, features = ["derive"] }
 sea-query = { workspace = true, optional = true }
-sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"], optional = true }
+sea-query-sqlx = { workspace = true, features = ["with-chrono"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 serde_repr = { workspace = true, optional = true }
@@ -100,17 +101,19 @@ ignored = [
     "time",
     # Used indirectly by `testcontainers`, but it causes dependency issues if minimal dependency versions are used
     "serde_repr",
+    # used indirectly by `clap`, but it causes dependency issues if minimal dependency versions are used
+    "is_terminal_polyfill",
 ]
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
 full = ["default", "fake", "live-reload", "cache", "redis", "email"]
 fake = ["dep:fake"]
-db = ["dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
+db = ["dep:sea-query", "dep:sea-query-sqlx", "dep:sqlx"]
 email = ["dep:lettre", "dep:idna"]
-sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
-postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres", "sqlx/postgres"]
-mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
+sqlite = ["db", "sea-query/backend-sqlite", "sea-query-sqlx/sqlx-sqlite", "sqlx/sqlite"]
+postgres = ["db", "sea-query/backend-postgres", "sea-query-sqlx/sqlx-postgres", "sqlx/postgres"]
+mysql = ["db", "sea-query/backend-mysql", "sea-query-sqlx/sqlx-mysql", "sqlx/mysql"]
 redis = ["cache", "dep:deadpool-redis", "dep:redis", "json"]
 json = ["dep:serde_json", "cot_core/json"]
 openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]

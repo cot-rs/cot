@@ -54,10 +54,13 @@ sea-query = { workspace = true, optional = true }
 sea-query-sqlx = { workspace = true, features = ["with-chrono"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
+serde_repr = { workspace = true, optional = true }
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
 thiserror.workspace = true
+testcontainers = { workspace = true, optional = true, features = ["host-port-exposure"] }
+testcontainers-modules = { workspace = true, optional = true, features = ["postgres", "mariadb", "redis", "selenium"] }
 time.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs", "io-util"] }
 toml = { workspace = true, features = ["parse", "serde"] }
@@ -96,13 +99,15 @@ ignored = [
     "idna",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly
     "time",
+    # Used indirectly by `testcontainers`, but it causes dependency issues if minimal dependency versions are used
+    "serde_repr",
     # used indirectly by `clap`, but it causes dependency issues if minimal dependency versions are used
     "is_terminal_polyfill",
 ]
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
-full = ["default", "fake", "live-reload", "test", "cache", "redis", "email"]
+full = ["default", "fake", "live-reload", "cache", "redis", "email"]
 fake = ["dep:fake"]
 db = ["dep:sea-query", "dep:sea-query-sqlx", "dep:sqlx"]
 email = ["dep:lettre", "dep:idna"]
@@ -115,7 +120,7 @@ openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
 cache = ["json"]
-test = []
+test = ["dep:testcontainers", "dep:testcontainers-modules", "dep:serde_repr"]
 
 [lib]
 bench = false

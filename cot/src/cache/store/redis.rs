@@ -236,25 +236,27 @@ impl CacheStore for Redis {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
     use std::time::Duration;
 
     use serde_json::json;
+    use testcontainers::ContainerAsync;
 
     use super::*;
     use crate::config::Timeout;
+    use crate::test::run_redis_container;
 
-    async fn make_store(db: &str) -> Redis {
-        let redis_url =
-            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/".to_string());
-        let mut url = CacheUrl::from(redis_url);
-        url.inner_mut().set_path(db);
+    async fn make_store() -> (ContainerAsync<testcontainers_modules::redis::Redis>, Redis) {
+        let (container, url) = run_redis_container()
+            .await
+            .expect("failed to run redis container");
+
+        let url = CacheUrl::from(url);
         let store = Redis::new(&url, 16).expect("failed to create redis store");
         store
             .get_connection()
             .await
             .expect("failed to get redis connection");
-        store
+        (container, store)
     }
 
     #[cot::test]
@@ -264,9 +266,9 @@ mod tests {
     }
 
     #[cot::test]
-    #[ignore = "requires a running redis instance"]
+    #[ignore = "requires external Redis service"]
     async fn test_insert_and_get() {
-        let store = make_store("1").await;
+        let (_container, store) = make_store().await;
         let key = "test_key".to_string();
         let value = json!({"data": 123});
 
@@ -279,9 +281,9 @@ mod tests {
     }
 
     #[cot::test]
-    #[ignore = "requires a running redis instance"]
+    #[ignore = "requires external Redis service"]
     async fn test_get_after_expiry() {
-        let store = make_store("1").await;
+        let (_container, store) = make_store().await;
         let key = "temp_key__".to_string();
         let value = json!({"data": "temporary"});
         let short_timeout = Timeout::After(Duration::from_secs(1));
@@ -295,9 +297,9 @@ mod tests {
     }
 
     #[cot::test]
-    #[ignore = "requires a running redis instance"]
+    #[ignore = "requires external Redis service"]
     async fn test_insert_with_expiry_types() {
-        let store = make_store("1").await;
+        let (_container, store) = make_store().await;
 
         macro_rules! run_expiry {
             ($idx:expr, $timeout:expr) => {
@@ -335,9 +337,9 @@ mod tests {
     }
 
     #[cot::test]
-    #[ignore = "requires a running redis instance"]
+    #[ignore = "requires external Redis service"]
     async fn test_remove() {
-        let store = make_store("1").await;
+        let (_container, store) = make_store().await;
         let key = "test_key_remove".to_string();
         let value = json!({"data": 123});
         store
@@ -350,9 +352,9 @@ mod tests {
     }
 
     #[cot::test]
-    #[ignore = "requires a running redis instance"]
+    #[ignore = "requires external Redis service"]
     async fn test_clear() {
-        let store = make_store("2").await;
+        let (_container, store) = make_store().await;
         store
             .insert("key1".to_string(), json!(1), Timeout::default())
             .await
@@ -367,9 +369,9 @@ mod tests {
     }
 
     #[cot::test]
-    #[ignore = "requires a running redis instance"]
+    #[ignore = "requires external Redis service"]
     async fn test_contains_key() {
-        let store = make_store("1").await;
+        let (_container, store) = make_store().await;
         let key = "test_key".to_string();
         let value = json!({"data": 123});
         store
@@ -382,9 +384,9 @@ mod tests {
     }
 
     #[cot::test]
-    #[ignore = "requires a running redis instance"]
+    #[ignore = "requires external Redis service"]
     async fn test_approx_size() {
-        let store = make_store("3").await;
+        let (_container, store) = make_store().await;
         store.clear().await.unwrap();
         store
             .insert("key1".to_string(), json!(1), Timeout::default())

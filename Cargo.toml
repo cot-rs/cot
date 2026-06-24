@@ -137,6 +137,7 @@ serde = "1"
 serde_html_form = { version = "0.4", default-features = false }
 serde_json = "1"
 serde_path_to_error = "0.1.20"
+serde_repr = "0.1.20"
 serde_urlencoded = "0.7"
 sqlx = { version = "0.9", default-features = false }
 subtle = { version = "2", default-features = false }
@@ -144,6 +145,8 @@ swagger-ui-redist = { version = "0.1" }
 syn = { version = "2", default-features = false }
 sync_wrapper = "1"
 tempfile = "3"
+testcontainers = { version = "0.27", default-features = false }
+testcontainers-modules = { version = "0.15", default-features = false }
 thiserror = "2"
 time = { version = "0.3.46", default-features = false }
 tokio = { version = "1.52", default-features = false }

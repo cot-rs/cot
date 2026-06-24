@@ -74,14 +74,21 @@ impl DocTestProject {
         let cargo_toml_path = project_path.join("Cargo.toml");
         let mut cargo_toml =
             fs::read_to_string(&cargo_toml_path).expect("failed to read Cargo.toml");
+
+        let mut additional_deps = String::new();
+        additional_deps.push_str("serde = { version = \"1\", features = [\"derive\"] }\n");
+        additional_deps.push_str("schemars = \"1\"\n");
+        additional_deps.push_str("askama = { version = \"0.16\", features = [\"std\"] }\n");
+        additional_deps.push_str("async-trait = \"0.1\"\n");
+
         cargo_toml = cargo_toml.replace(
             "features = [\"full\"]",
-            "features = [\"full\", \"openapi\", \"swagger-ui\"]",
+            "features = [\"full\", \"openapi\", \"swagger-ui\", \"test\"]",
         );
-        cargo_toml.push_str("serde = { version = \"1\", features = [\"derive\"] }\n");
-        cargo_toml.push_str("schemars = \"1\"\n");
-        cargo_toml.push_str("askama = { version = \"0.16\", features = [\"std\"] }\n");
-        cargo_toml.push_str("async-trait = \"0.1\"\n");
+        cargo_toml = cargo_toml.replace(
+            "[dependencies]",
+            &format!("[dependencies]\n{additional_deps}"),
+        );
 
         // Add empty workspace info to prevent Cargo from trying to build the entire
         // workspace when running tests

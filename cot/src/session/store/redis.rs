@@ -234,20 +234,25 @@ impl SessionStore for RedisStore {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::{env, io};
+    use std::io;
 
+    use cot::test::run_redis_container;
+    use testcontainers::ContainerAsync;
+    use testcontainers_modules::redis::Redis;
     use time::{Duration, OffsetDateTime};
     use tower_sessions::session::{Id, Record};
 
     use super::*;
     use crate::config::CacheUrl;
-    async fn make_store() -> RedisStore {
-        let redis_url =
-            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-        let url = CacheUrl::from(redis_url);
+    async fn make_store() -> (ContainerAsync<Redis>, RedisStore) {
+        let (container, url) = run_redis_container()
+            .await
+            .expect("failed to run redis container");
+
+        let url = CacheUrl::from(url);
         let store = RedisStore::new(&url).expect("failed to create RedisStore");
         store.get_connection().await.expect("get_connection failed");
-        store
+        (container, store)
     }
 
     fn make_record() -> Record {
@@ -261,7 +266,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_create_and_load() {
-        let store = make_store().await;
+        let (_container, store) = make_store().await;
         let mut rec = make_record();
 
         store.create(&mut rec).await.expect("create failed");
@@ -272,7 +277,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_save_overwrites() {
-        let store = make_store().await;
+        let (_container, store) = make_store().await;
         let mut rec = make_record();
         store.create(&mut rec).await.unwrap();
 
@@ -287,7 +292,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_save_creates_if_missing() {
-        let store = make_store().await;
+        let (_container, store) = make_store().await;
         let rec = make_record();
 
         store.save(&rec).await.expect("save failed");
@@ -299,7 +304,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_delete() {
-        let store = make_store().await;
+        let (_container, store) = make_store().await;
         let mut rec = make_record();
         store.create(&mut rec).await.unwrap();
 
@@ -313,7 +318,7 @@ mod tests {
     #[cot::test]
     #[ignore = "requires external Redis service"]
     async fn test_create_id_collision() {
-        let store = make_store().await;
+        let (_container, store) = make_store().await;
         let expiry = OffsetDateTime::now_utc() + Duration::minutes(30);
 
         let mut r1 = Record {

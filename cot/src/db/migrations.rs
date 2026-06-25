@@ -2148,7 +2148,6 @@ const CREATE_APPLIED_MIGRATIONS_MIGRATION: Operation = Operation::create_model()
 #[cfg(test)]
 mod tests {
     use cot::test::TestDatabase;
-    use sea_query::ColumnSpec;
 
     use super::*;
     use crate::App;
@@ -2611,15 +2610,6 @@ mod tests {
         assert_eq!(migration.operations().len(), 1);
     }
 
-    macro_rules! has_spec {
-        ($column_def:expr, $spec:pat) => {
-            $column_def
-                .get_column_spec()
-                .iter()
-                .any(|spec| matches!(spec, $spec))
-        };
-    }
-
     #[test]
     fn test_field_to_column_def() {
         let field = Field::new(Identifier::new("id"), ColumnType::Integer)
@@ -2639,10 +2629,11 @@ mod tests {
             column_def.get_column_type(),
             Some(&sea_query::ColumnType::Integer)
         );
-        assert!(has_spec!(column_def, ColumnSpec::PrimaryKey));
-        assert!(has_spec!(column_def, ColumnSpec::AutoIncrement));
-        assert!(has_spec!(column_def, ColumnSpec::Null));
-        assert!(has_spec!(column_def, ColumnSpec::UniqueKey));
+        let spec = column_def.get_column_spec();
+        assert!(spec.primary_key);
+        assert!(spec.auto_increment);
+        assert_eq!(spec.nullable, Some(true));
+        assert!(spec.unique);
     }
 
     #[test]
@@ -2660,10 +2651,11 @@ mod tests {
             column_def.get_column_type(),
             Some(&sea_query::ColumnType::Text)
         );
-        assert!(!has_spec!(column_def, ColumnSpec::PrimaryKey));
-        assert!(!has_spec!(column_def, ColumnSpec::AutoIncrement));
-        assert!(!has_spec!(column_def, ColumnSpec::Null));
-        assert!(!has_spec!(column_def, ColumnSpec::UniqueKey));
+        let spec = column_def.get_column_spec();
+        assert!(!spec.primary_key);
+        assert!(!spec.auto_increment);
+        assert_ne!(spec.nullable, Some(true));
+        assert!(!spec.unique);
     }
 
     #[test]

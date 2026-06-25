@@ -21,7 +21,7 @@ To use OpenAPI features in Cot, you need to enable the [`openapi`](feature@opena
 ```toml
 [dependencies]
 cot = { version = "...", features = ["openapi", "swagger-ui"] }
-schemars = "0.9" # Required for JSON Schema generation
+schemars = "1" # Required for JSON Schema generation
 ```
 
 The [`schemars`](https://docs.rs/schemars/latest/schemars/) crate is necessary for creating JSON Schema definitions for your request and response types.

@@ -1,5 +1,7 @@
 //! `DatabaseField` implementations for common types.
 
+use bytes::Bytes;
+
 #[cfg(feature = "mysql")]
 use crate::db::impl_mysql::MySqlValueRef;
 #[cfg(feature = "postgres")]
@@ -243,6 +245,8 @@ impl_db_field!(
 );
 impl_db_field!(String, Text);
 impl_db_field!(Vec<u8>, Blob);
+
+impl_db_field!(Bytes, Blob, with Vec<u8>);
 
 impl ToDbValue for &str {
     fn to_db_value(&self) -> DbValue {

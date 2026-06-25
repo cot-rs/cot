@@ -75,13 +75,11 @@ pub fn load(
         return Ok(None);
     }
 
-    // When `cot` command is run from the same directory/package as the binary
-    // (typically the `cot-cli` package), or any workspace package whose binary
-    // resolves to the current executable, the discovered project binary can be the
-    // CLI itself. Do not query it for the project metadata: `--metadata` is
-    // handled by Cot application binaries, not by the `cot` proxy CLI.
-    // Treat this as "no project binary found" so the help output and command
-    // dispatch do not recurse into, or fail on, the current running CLI.
+    // Guard against the `cot` CLI resolving to itself. This can happen when
+    // running from within the `cot-cli` package or a workspace package whose
+    // binary is the current executable. Querying it for `--metadata` would
+    // either recurse or fail: only cot application binaries implement that
+    // flag, not the CLI proxy.
     if is_current_executable(&binary_path) {
         return Ok(None);
     }
@@ -149,7 +147,8 @@ fn available_packages(wm: &WorkspaceManager) -> String {
 ///
 /// 1. If the package has a `[package.metadata.cot.binary]` entry (typically as
 ///    a result of disambiguating multiple binaries), use that.
-/// 2. If the package has a single `[[bin]]` target, use that.
+/// 2. If the package has a single `[[bin]]` explicitly in `Cargo.toml`, use
+///    that.
 /// 3. Otherwise, use the package name.
 fn resolve_binary_name(package_manager: &PackageManager) -> anyhow::Result<String> {
     let manifest: &Manifest = package_manager.get_manifest();

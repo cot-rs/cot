@@ -96,12 +96,14 @@ impl Cli {
         cli.add_task(Check);
         cli.add_task(CollectStatic);
 
-        let mut migration_group =
-            CliTaskGroup::new(MIGRATION_GROUP_SUBCOMMAND).about("Database migration commands");
-        migration_group.add_task(MigrationRollback);
+        #[cfg(feature = "db")]
+        {
+            let mut migration_group =
+                CliTaskGroup::new(MIGRATION_GROUP_SUBCOMMAND).about("Database migration commands");
+            migration_group.add_task(MigrationRollback);
 
-        cli.add_task(migration_group);
-
+            cli.add_task(migration_group);
+        }
         cli
     }
 
@@ -571,6 +573,7 @@ impl CliTask for CliTaskGroup {
     }
 }
 
+#[cfg(feature = "db")]
 struct MigrationRollback;
 
 #[async_trait(?Send)]
@@ -592,14 +595,12 @@ impl CliTask for MigrationRollback {
         bootstrapper: Bootstrapper<WithConfig>,
     ) -> Result<()> {
         let file = matches
-            .get_one::<String>("file")
+            .get_one::<String>("migration_name")
             .expect("required argument");
 
         let bootstrapper = bootstrapper
             .with_apps()
             .with_database()
-            .await?
-            .with_cache()
             .await?
             .boot()
             .await?;

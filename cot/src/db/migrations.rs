@@ -8,6 +8,7 @@ use std::fmt::{Debug, Formatter};
 use std::future::Future;
 
 pub use cot_macros::migration_op;
+use fake::locales::Data;
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::{Level, info};
@@ -226,6 +227,7 @@ impl MigrationEngine {
     /// graph or if there is an error while unapplying a migration.
     pub async fn rollback(&self, database: &Database, file: &str, app_name: &str) -> Result<()> {
         info!("Rolling back migrations");
+        // TODO: use a DB transaction here
 
         let rollback_plan = self.rollback_plan(file, app_name)?;
 
@@ -252,7 +254,9 @@ impl MigrationEngine {
                 operation.backwards(database).await?;
             }
 
-            Self::mark_migration_unapplied(database, migration).await?;
+            if Self::is_migration_applied(database, migration).await? {
+                Self::mark_migration_unapplied(database, migration).await?;
+            }
         }
 
         Ok(())

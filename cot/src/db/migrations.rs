@@ -8,7 +8,6 @@ use std::fmt::{Debug, Formatter};
 use std::future::Future;
 
 pub use cot_macros::migration_op;
-use fake::locales::Data;
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::{Level, info};

@@ -199,6 +199,66 @@ impl PathMatcher {
             PathPart::Param { name } | PathPart::Wildcard { name } => Some(name.as_str()),
         })
     }
+
+    pub(crate) fn token_weights(&self) -> Vec<u8> {
+        let mut weights = Vec::with_capacity(self.parts.len());
+        for part in &self.parts {
+            match part {
+                PathPart::Literal(s) => {
+                    for _ in 0..s.split('/').filter(|s| !s.is_empty()).count() {
+                        weights.push(0);
+                    }
+                }
+                PathPart::Param { .. } => weights.push(1),
+                PathPart::Wildcard { .. } => weights.push(2),
+            }
+        }
+        weights
+    }
+}
+
+pub(crate) fn compare_weights(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
+    let max_len = std::cmp::max(a.len(), b.len());
+    let mut score: isize = 0;
+    let mut lexical_order_a = String::with_capacity(a.len());
+    let mut lexical_order_b = String::with_capacity(b.len());
+
+    for i in 0..max_len {
+        let (wa, wb) = match (a.get(i), b.get(i)) {
+            (None, _) => return std::cmp::Ordering::Less,
+            (_, None) => return std::cmp::Ordering::Greater,
+            (Some(&w), Some(&v)) => (w, v),
+        };
+        lexical_order_a.push(char::from_digit(wa as u32, 10).unwrap());
+        lexical_order_b.push(char::from_digit(wb as u32, 10).unwrap());
+
+        if wa == 2 && wb == 2 {
+            return lexical_order_a.cmp(&lexical_order_b);
+        }
+        if wa == 2 {
+            return std::cmp::Ordering::Greater;
+        }
+        if wb == 2 {
+            return std::cmp::Ordering::Less;
+        }
+        if wa != wb {
+            if wa < wb {
+                score += 1;
+            } else {
+                score -= 1;
+            }
+        }
+    }
+
+    if score != 0 {
+        return if score > 0 {
+            std::cmp::Ordering::Less
+        } else {
+            std::cmp::Ordering::Greater
+        };
+    }
+
+    lexical_order_a.cmp(&lexical_order_b)
 }
 
 impl Display for PathMatcher {

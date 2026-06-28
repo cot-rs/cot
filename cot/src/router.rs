@@ -36,7 +36,7 @@ use tracing::debug;
 use crate::error::NotFound;
 use crate::request::{PathParams, Request, RequestExt, RequestHead};
 use crate::response::Response;
-use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
+use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap, compare_weights};
 use crate::{Error, ProjectContext, Result};
 
 pub mod method;
@@ -102,7 +102,9 @@ impl Router {
     /// ```
     #[must_use]
     pub fn with_urls<T: Into<Vec<Route>>>(urls: T) -> Self {
-        let urls = urls.into();
+        let mut urls = urls.into();
+        urls.sort_by(|a, b| compare_weights(&a.url.token_weights(), &b.url.token_weights()));
+
         let mut names = HashMap::new();
 
         for url in &urls {

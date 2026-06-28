@@ -598,4 +598,10 @@ mod tests {
         let path_parser = PathMatcher::new("/users/rand/{*path}");
         assert_eq!(path_parser.capture("/users/rand/"), None);
     }
+
+    #[test]
+    #[should_panic(expected = "Wildcard must be the last part of the path: `/users/{*rest}/`")]
+    fn path_parser_no_path_allowed_after_wildcard() {
+        let _ = PathMatcher::new("/users/{*rest}/");
+    }
 }

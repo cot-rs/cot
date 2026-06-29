@@ -90,6 +90,7 @@ impl<'a> IntoIterator for &'a List {
 ///
 /// [`autocomplete`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/autocomplete
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum AutoComplete {
     /// Enables autocomplete.
     On,

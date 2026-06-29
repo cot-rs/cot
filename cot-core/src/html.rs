@@ -235,7 +235,6 @@ impl HtmlTag {
             let l = item.as_ref();
             let mut option = HtmlTag::new("option");
             option.attr("value", l);
-            // option.push_str(l);
             options.push(HtmlNode::Tag(option));
         }
 

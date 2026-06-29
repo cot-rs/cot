@@ -15,23 +15,422 @@ pub mod query;
 mod relations;
 mod sea_query_db;
 
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use cot_core::error::impl_into_cot_error;
-pub use cot_macros::{model, query};
+/// Implement the [`Model`] trait for a struct.
+///
+/// This macro will generate an implementation of the [`Model`] trait for the
+/// given named struct. Note that all the fields of the struct **must**
+/// implement the [`DatabaseField`] trait.
+///
+/// # Model Attributes
+/// Cot provides a number of attributes that can be used on a struct to specify
+/// how it should be treated by the migration engine and other parts of Cot.
+/// These attributes are specified using the `#[model(...)]` attribute on the
+/// struct.
+///
+/// ## `model_type`
+/// The model type can be specified using the `model_type` parameter. The model
+/// type can be one of the following:
+///
+/// * `application` (default): The model represents an actual table in a
+///   normally running instance of the application.
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model(model_type = "application")]
+/// // This is equivalent to:
+/// // #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+/// * `migration`: The model represents a table that is used for migrations. The
+///   model name must be prefixed with an underscore. You shouldn't ever need to
+///   use this type; the migration engine will generate the migration model
+///   types for you.
+///
+///   Migration models have two major uses. First, they ensure that the
+///   migration engine knows what state the model was in at the time the last
+///   migration was generated. This allows the engine to automatically detect
+///   the changes and generate the necessary migration code. Second, they allow
+///   custom code in migrations: you might want the migration to fill in some
+///   data, for example. After the migration has been created, though, the model
+///   might have changed. If you tried to use the application model in the
+///   migration code (which always represents the latest state of the model), it
+///   might not match the actual database schema at the time the migration is
+///   applied. You can use the migration model to ensure that your custom code
+///   operates exactly on the schema that is present at the time the migration
+///   is applied.
+///
+/// ```
+/// // In a migration file
+/// use cot::db::{Auto, model};
+///
+/// #[model(model_type = "migration")]
+/// struct _User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+/// * `internal`: The model represents a table that is used internally by Cot
+///   (e.g. the `cot__migrations` table, storing which migrations have been
+///   applied). They are ignored by the migration generator and should never be
+///   used outside Cot code.
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model(model_type = "internal")]
+/// struct CotMigrations {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     app: String,
+///     name: String,
+/// }
+/// ```
+///
+/// ## `table_name`
+/// By default, the table name is the same as the struct name, converted to
+/// snake case. You can specify a custom table name using the `table_name`
+/// parameter:
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model(table_name = "users")]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+///
+/// # Field Attributes
+/// In addition to the struct-level attributes, you can also specify field-level
+/// attributes using the `#[model(...)]` attribute, which is used to specify
+/// field-level constraints and properties.
+///
+/// ## `primary_key`
+/// The `primary_key` attribute is used to specify that a field is the primary
+/// key of the model. This attribute is required and must be used on exactly one
+/// field of the struct.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     username: String,
+/// }
+/// ```
+///
+/// ## `unique`
+/// The `unique` attribute is used to specify that a field must be unique across
+/// all rows in the database. This will create a unique constraint on the
+/// corresponding column in the database.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(unique)]
+///     username: String,
+/// }
+/// ```
+///
+/// ## `field_name`
+/// The `field_name` attribute is used to provide a specific name for the field
+/// in the created database table to which the Rust field is mapped to. This
+/// allows, in the following example, to map the `name` parameter to the
+/// `username` column in the database.
+///
+/// ```
+/// use cot::db::{Auto, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(field_name = "username")]
+///     name: String,
+/// }
+/// ```
+///
+/// ## `foreign_key`
+///
+/// The `foreign_key` attribute configures the referential integrity behavior
+/// of a [`ForeignKey`] field. It accepts two optional parameters:
+///
+/// * `on_delete` — behavior when the referenced row is deleted. Defaults to
+///   `"restrict"`.
+/// * `on_update` — behavior when the referenced row is updated. Defaults to
+///   `"cascade"`.
+///
+/// > **Note:** The `foreign_key` attribute is only valid on [`ForeignKey`]
+/// > fields. Using it
+/// > on any other field type will result in a compile error.
+///
+///
+/// ### Basic Usage
+///
+/// ```
+/// use cot::db::{Auto, ForeignKey, model};
+///
+/// #[model]
+/// struct User {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+/// }
+///
+/// #[model]
+/// struct Post {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(foreign_key(on_delete = "cascade", on_update = "cascade"))]
+///     user_id: ForeignKey<User>,
+/// }
+/// ```
+///
+/// ### Supported Policies
+///
+/// Both `on_delete` and `on_update` accept the following values:
+///
+/// * `cascade`: Automatically propagates the delete or update to all
+///   referencing rows.
+///
+/// * `restrict`: Prevents the delete or update of a referenced row if any
+///   referencing rows exist.
+///
+/// * `no_action`: Similar to `restrict`, but the referential integrity check is
+///   deferred until the end of the transaction, depending on the database.
+///
+/// * `set_none`: Sets the foreign key column to `NULL` when the referenced row
+///   is deleted or updated. Requires the field to be of type
+///   `Option<ForeignKey<T>>`.
+///
+/// ### Examples
+///
+/// **Cascade deletes, restrict updates** — deleting a `User` cascades to all
+/// their `Post`s, but updating a `User`'s primary key is prevented if posts
+/// exist:
+///
+/// ```
+/// use cot::db::{Auto, ForeignKey, model};
+///
+/// # #[model]
+/// # struct User {
+/// #    #[model(primary_key)]
+/// #    id: Auto<i32>,
+/// # }
+///
+/// #[model]
+/// struct Post {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(foreign_key(on_delete = "cascade", on_update = "restrict"))]
+///     user_id: ForeignKey<User>,
+/// }
+/// ```
+///
+/// **Set none on delete** — when a `User` is deleted, `author_id` is set to
+/// `NULL` rather than deleting the `Post`. Note the required `Option` wrapper:
+///
+/// ```
+/// use cot::db::{Auto, ForeignKey, model};
+/// # #[model]
+/// # struct User {
+/// #    #[model(primary_key)]
+/// #    id: Auto<i32>,
+/// # }
+/// #[model]
+/// struct Post {
+///     #[model(primary_key)]
+///     id: Auto<i32>,
+///     #[model(foreign_key(on_delete = "set_none", on_update = "no_action"))]
+///     author_id: Option<ForeignKey<User>>,
+/// }
+/// ```
+pub use cot_macros::model;
+/// A convenient macro that allows you to write queries in a declarative
+/// fashion.
+///
+/// `query!` parses a query expression and lowers it into a
+/// [`Query`] builder. The resulting query is still lazy:
+/// it is only executed when you call a terminal query method such as
+/// [`Query::get`](cot::db::query::Query::get) or
+/// [`Query::all`](cot::db::query::Query::all).
+///
+/// The macro expands roughly to:
+///
+/// ```ignore
+/// <Model as cot::db::Model>::objects().filter(...)
+/// ```
+///
+/// # Query syntax
+///
+/// Query expressions can reference model fields with `$field_name`, combine
+/// conditions with boolean operators, and use comparison and arithmetic
+/// operators.
+///
+/// ```
+/// use cot::db::{Database, model, query};
+///
+/// #[model]
+/// #[derive(Debug, Clone)]
+/// struct Customer {
+///     #[model(primary_key)]
+///     id: i32,
+///     full_name: String,
+///     status: String,
+///     price: i32,
+///     stock: i32,
+///     quantity: i32,
+///     is_active: bool
+/// }
+///
+/// # async fn run(db: Database) -> cot::Result<()> {
+/// let customer = query!(Customer, $id == 5).get(&db).await?;
+/// println!("Customer: {:?}", customer);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// In the example above, `$id` and `$full_name` refer to fields on the
+/// `Customer` model.
+///
+///
+/// ## Field references
+///
+/// Use `$name` to refer to a model field.
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// # }
+/// let _ = query!(Customer, $id == 5);
+/// ```
+///
+/// ## Literal values
+///
+/// Rust literals can be used directly in expressions.
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// #     is_active: bool,
+/// # }
+/// let _ = query!(Customer, $id == 5);
+/// let _ = query!(Customer, $full_name == "Jon Doe");
+/// let _ = query!(Customer, $is_active == true);
+/// ```
+///
+/// ## Comparison operators
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// # }
+/// let _ = query!(Customer, $id == 5);
+/// let _ = query!(Customer, $id != 5);
+/// let _ = query!(Customer, $id < 10);
+/// let _ = query!(Customer, $id <= 10);
+/// let _ = query!(Customer, $id > 5);
+/// let _ = query!(Customer, $id >= 5);
+/// ```
+///
+/// ## Arithmetic operators
+///
+/// Query expressions also support arithmetic over fields and values.
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     price: i32,
+/// #     stock: i32,
+/// #     quantity: i32,
+/// # }
+/// let _ = query!(Customer, $price + 10 > 20);
+/// let _ = query!(Customer, $stock - 1 == 20);
+/// let _ = query!(Customer, $quantity * 2 < 100);
+/// let _ = query!(Customer, $price / 2 != $quantity);
+/// ```
+///
+/// ## Rust-side value expressions
+///
+/// When an expression does not reference a database field, `query!` can treat
+/// it as a Rust value expression. This includes member access, path access, and
+/// function calls.
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     status: String,
+/// # }
+/// struct User {
+///     id: i32,
+/// }
+///
+/// mod constants {
+///     pub const ACTIVE_STATUS: &str = "active";
+/// }
+///
+/// fn next_customer_id() -> i32 {
+///     42
+/// }
+///
+/// let user = User { id: 5 };
+///
+/// let _ = query!(Customer, $id == user.id);
+/// let _ = query!(Customer, $status == constants::ACTIVE_STATUS);
+/// let _ = query!(Customer, $id == next_customer_id());
+/// ```
+pub use cot_macros::query;
 use derive_more::{Debug, Deref, Display};
 #[cfg(test)]
 use mockall::automock;
 use query::Query;
 pub use relations::{ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use sea_query::{
-    ColumnRef, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder, SimpleExpr,
+    ColumnRef, ExprTrait, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder,
+    SimpleExpr,
 };
-use sea_query_binder::{SqlxBinder, SqlxValues};
+use sea_query_sqlx::{SqlxBinder, SqlxValues};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sqlx::{Type, TypeInfo};
 use thiserror::Error;
 use tracing::{Instrument, Level, span, trace};
@@ -391,13 +790,13 @@ impl From<&'static str> for Identifier {
 }
 
 impl Iden for Identifier {
-    fn unquoted(&self, s: &mut dyn Write) {
-        s.write_str(self.as_str()).unwrap();
+    fn unquoted(&self) -> &str {
+        self.as_str()
     }
 }
 impl Iden for &Identifier {
-    fn unquoted(&self, s: &mut dyn Write) {
-        s.write_str(self.as_str()).unwrap();
+    fn unquoted(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -1180,11 +1579,9 @@ impl Database {
             });
         }
 
-        let batch_size = if num_value_fields > 0 {
-            max_params / num_value_fields
-        } else {
-            return Err(DatabaseError::BulkInsertNoValueColumns);
-        };
+        let batch_size = max_params
+            .checked_div(num_value_fields)
+            .ok_or(DatabaseError::BulkInsertNoValueColumns)?;
 
         for chunk in data.chunks_mut(batch_size) {
             self.bulk_insert_chunk(
@@ -1808,7 +2205,7 @@ pub struct RowsNum(pub u64);
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Ord, PartialOrd)]
 pub enum Auto<T> {
     /// A fixed value.
     Fixed(T),
@@ -1923,6 +2320,29 @@ impl<T: Display> Display for Auto<T> {
     }
 }
 
+impl<T: Serialize> Serialize for Auto<T> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Fixed(value) => value.serialize(serializer),
+            Self::Auto => Err(serde::ser::Error::custom(
+                "Auto::Auto values cannot be serialized",
+            )),
+        }
+    }
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Auto<T> {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self::Fixed)
+    }
+}
+
 /// A wrapper over a string that has a limited length.
 ///
 /// This type is used to represent a string that has a limited length in the
@@ -1946,7 +2366,9 @@ impl<T: Display> Display for Auto<T> {
 /// let limited_string = LimitedString::<5>::new("too long");
 /// assert!(limited_string.is_err());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display, Serialize, Deserialize,
+)]
 pub struct LimitedString<const LIMIT: u32>(String);
 
 impl<const LIMIT: u32> PartialEq<&str> for LimitedString<LIMIT> {
@@ -2009,7 +2431,7 @@ impl<const LIMIT: u32> LimitedString<LIMIT> {
 #[cfg(feature = "fake")]
 impl<const LIMIT: u32> fake::Dummy<usize> for LimitedString<LIMIT> {
     fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(len: &usize, rng: &mut R) -> Self {
-        use fake::rand::Rng;
+        use fake::rand::distr::SampleString;
 
         assert!(
             *len <= LIMIT as usize,
@@ -2020,11 +2442,7 @@ impl<const LIMIT: u32> fake::Dummy<usize> for LimitedString<LIMIT> {
             )
         );
 
-        let str: String = rng
-            .sample_iter(&fake::rand::distr::Alphanumeric)
-            .take(*len)
-            .map(char::from)
-            .collect();
+        let str: String = fake::rand::distr::Alphanumeric.sample_string(rng, *len);
         Self::new(str).unwrap()
     }
 }
@@ -2213,5 +2631,32 @@ mod tests {
     fn db_field_value_expect_panic() {
         let auto_value = DbFieldValue::Auto;
         let _ = auto_value.expect_value("expected a value");
+    }
+
+    #[test]
+    fn auto_serialize_fixed() {
+        let auto = Auto::fixed(42i32);
+        let serialized = serde_json::to_string(&auto).unwrap();
+        assert_eq!(serialized, "42");
+    }
+
+    #[test]
+    fn auto_serialize_auto() {
+        let auto = Auto::<i32>::Auto;
+        let value = serde_json::to_string(&auto);
+        assert!(value.is_err());
+    }
+
+    #[test]
+    fn auto_deserialize_fixed() {
+        let deserialized: Auto<i32> = serde_json::from_str("42").unwrap();
+        assert_eq!(deserialized, Auto::fixed(42));
+    }
+
+    #[test]
+    fn auto_deserialize_auto() {
+        let deserialized: std::result::Result<Auto<i32>, serde_json::Error> =
+            serde_json::from_str("null");
+        assert!(deserialized.is_err());
     }
 }

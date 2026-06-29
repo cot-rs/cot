@@ -8,5 +8,5 @@ edition = "2024"
 
 [dependencies]
 cot = { path = "../../cot", features = ["openapi", "swagger-ui"] }
+schemars = "1"
 serde = "1"
-schemars = "0.9"

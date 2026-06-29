@@ -1,6 +1,6 @@
 [package]
 name = "cot"
-version = "0.5.0"
+version = "0.6.0"
 description = "The Rust web framework for lazy developers."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true
@@ -24,7 +24,6 @@ blake3.workspace = true
 bytes.workspace = true
 chrono = { workspace = true, features = ["alloc", "serde", "clock"] }
 chrono-tz.workspace = true
-chumsky = { workspace = true, optional = true }
 clap.workspace = true
 cot_core.workspace = true
 cot_macros.workspace = true
@@ -42,16 +41,18 @@ http.workspace = true
 humantime.workspace = true
 idna = { workspace = true, optional = true }
 indexmap.workspace = true
+is_terminal_polyfill.workspace = true
 lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"], optional = true }
 mime.workspace = true
 mime_guess.workspace = true
 multer.workspace = true
 password-auth = { workspace = true, features = ["std", "argon2"] }
+securer-string.workspace = true
 pin-project-lite.workspace = true
 redis = { workspace = true, features = ["aio", "tokio-comp"], optional = true }
 schemars = { workspace = true, optional = true, features = ["derive"] }
 sea-query = { workspace = true, optional = true }
-sea-query-binder = { workspace = true, features = ["with-chrono", "runtime-tokio"], optional = true }
+sea-query-sqlx = { workspace = true, features = ["with-chrono"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
@@ -81,7 +82,7 @@ trybuild.workspace = true
 
 [build-dependencies]
 ahash.workspace = true
-grass.workspace = true
+grass_compiler.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
@@ -89,26 +90,26 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-machete]
 ignored = [
-    # Used indirectly by `grass`, but it doesn't work with the latest versions of Rust if minimal dependency versions
-    # are used
+    # Used indirectly by `grass_compiler`, but it doesn't work with the latest versions of Rust if minimal dependency
+    # versions are used
     "ahash",
-    # Used by `lettre`, but it causes dependency issues if minimal dependency versions are used
-    "chumsky",
     # Used by `lettre`, but it causes dependency issues if minimal dependency versions are used
     "idna",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly
     "time",
+    # used indirectly by `clap`, but it causes dependency issues if minimal dependency versions are used
+    "is_terminal_polyfill",
 ]
 
 [features]
 default = ["sqlite", "postgres", "mysql", "json"]
 full = ["default", "fake", "live-reload", "test", "cache", "redis", "email"]
 fake = ["dep:fake"]
-db = ["dep:sea-query", "dep:sea-query-binder", "dep:sqlx"]
-email = ["dep:lettre", "dep:chumsky", "dep:idna"]
-sqlite = ["db", "sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite", "sqlx/sqlite"]
-postgres = ["db", "sea-query/backend-postgres", "sea-query-binder/sqlx-postgres", "sqlx/postgres"]
-mysql = ["db", "sea-query/backend-mysql", "sea-query-binder/sqlx-mysql", "sqlx/mysql"]
+db = ["dep:sea-query", "dep:sea-query-sqlx", "dep:sqlx"]
+email = ["dep:lettre", "dep:idna"]
+sqlite = ["db", "sea-query/backend-sqlite", "sea-query-sqlx/sqlx-sqlite", "sqlx/sqlite"]
+postgres = ["db", "sea-query/backend-postgres", "sea-query-sqlx/sqlx-postgres", "sqlx/postgres"]
+mysql = ["db", "sea-query/backend-mysql", "sea-query-sqlx/sqlx-mysql", "sqlx/mysql"]
 redis = ["cache", "dep:deadpool-redis", "dep:redis", "json"]
 json = ["dep:serde_json", "cot_core/json"]
 openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]

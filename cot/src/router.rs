@@ -37,7 +37,7 @@ use crate::error::NotFound;
 use crate::request::{PathParams, Request, RequestExt, RequestHead};
 use crate::response::Response;
 use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
-use crate::{Error, Result};
+use crate::{Error, ProjectContext, Result};
 
 pub mod method;
 pub mod path;
@@ -527,6 +527,9 @@ pub fn split_view_name(view_name: &str) -> (Option<&str>, &str) {
 
 /// A route that can be used to route requests to their respective views.
 ///
+/// Non-empty route paths may omit the leading slash. Cot normalizes them by
+/// prepending `/`, so `"home"` and `"/home"` define the same route.
+///
 /// # Examples
 ///
 /// ```
@@ -562,7 +565,8 @@ impl Route {
     /// #     unimplemented!()
     /// }
     ///
-    /// let route = Route::with_handler("/", home);
+    /// let route = Route::with_handler("home", home);
+    /// assert_eq!(route.url(), "/home");
     /// ```
     #[must_use]
     pub fn with_handler<HandlerParams, H>(url: &str, handler: H) -> Self
@@ -992,6 +996,21 @@ impl Debug for RouteInner {
     }
 }
 
+impl From<&ProjectContext> for Urls {
+    fn from(ctx: &ProjectContext) -> Self {
+        Self {
+            app_name: None,
+            router: Arc::clone(ctx.router()),
+        }
+    }
+}
+
+impl From<&mut ProjectContext> for Urls {
+    fn from(ctx: &mut ProjectContext) -> Self {
+        Self::from(&*ctx)
+    }
+}
+
 /// Get a URL for a view by its registered name and given params and return a
 /// response with a redirect.
 ///
@@ -1113,6 +1132,21 @@ mod tests {
         let router = Router::with_urls(vec![route.clone()]);
         let response = router.route(test_request(), "/test").await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[cot::test]
+    async fn router_route_without_leading_slash() {
+        let route = Route::with_handler_and_name("test", MockHandler, "test");
+        assert_eq!(route.url(), "/test");
+
+        let router = Router::with_urls(vec![route]);
+        let response = router.route(test_request(), "/test").await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let url = router
+            .reverse(None, "test", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/test");
     }
 
     #[cot::test]

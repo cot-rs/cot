@@ -112,7 +112,7 @@ impl App for SwaggerUi {
             Ok::<_, crate::Error>(Html::new(swagger))
         };
 
-        let mut urls = vec![Route::with_handler("/", swagger_handler)];
+        let mut urls = vec![Route::with_handler_and_name("/", swagger_handler, "index")];
         if self.serve_openapi {
             urls.push(Route::with_handler("/openapi.json", openapi_json));
         }

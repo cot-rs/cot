@@ -22,8 +22,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
+use securer_string::SecureBytes;
 use serde::{Deserialize, Serialize};
-use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 #[cfg(feature = "email")]
@@ -34,7 +34,7 @@ use crate::utils::chrono::DateTimeWithOffsetAdapter;
 ///
 /// This is all the project-specific configuration data that can (and makes
 /// sense to) be expressed in a TOML configuration file.
-#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[derive(Debug, Clone, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -271,6 +271,40 @@ pub struct ProjectConfig {
     /// ```
     #[cfg(feature = "email")]
     pub email: EmailConfig,
+    /// All the config that was not recognized.
+    ///
+    /// This is useful for parsing project-specific config that is not part of
+    /// any of the predefined fields in `ProjectConfig`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    /// use serde::Deserialize;
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [my_cot_project]
+    /// foo = "bar"
+    /// "#,
+    /// )?;
+    ///
+    /// #[derive(Deserialize)]
+    /// struct MyCotProjectConfig {
+    ///     foo: String,
+    /// }
+    ///
+    /// let my_config: MyCotProjectConfig = config
+    ///     .extra
+    ///     .get("my_cot_project")
+    ///     .ok_or("could not find the project config")?
+    ///     .clone()
+    ///     .try_into()?;
+    /// assert_eq!(my_config.foo, "bar");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[serde(flatten)]
+    pub extra: toml::Table,
 }
 
 const fn default_debug() -> bool {
@@ -381,6 +415,7 @@ impl ProjectConfigBuilder {
             middlewares: self.middlewares.clone().unwrap_or_default(),
             #[cfg(feature = "email")]
             email: self.email.clone().unwrap_or_default(),
+            extra: toml::Table::default(),
         }
     }
 }
@@ -561,8 +596,7 @@ impl Timeout {
 
 impl Default for Timeout {
     fn default() -> Self {
-        // expire after 5 mins.
-        Self::After(Duration::from_secs(300))
+        Self::After(Duration::from_mins(5))
     }
 }
 
@@ -1543,7 +1577,7 @@ impl From<Expiry> for tower_sessions::Expiry {
             Expiry::OnSessionEnd => Self::OnSessionEnd,
             Expiry::OnInactivity(duration) => {
                 Self::OnInactivity(time::Duration::try_from(duration).unwrap_or_else(|e| {
-                    panic!("could not convert {duration:?} into a valid time::Duration: {e:?}",)
+                    panic!("could not convert {duration:?} into a valid time::Duration: {e:?}")
                 }))
             }
             Expiry::AtDateTime(time) => {
@@ -2081,11 +2115,12 @@ impl Default for EmailConfig {
 ///
 /// # Security
 ///
-/// The implementation of the [`PartialEq`] trait for this type is constant-time
-/// to prevent timing attacks.
+/// The implementation of the [`PartialEq`] trait for this type uses
+/// constant-time comparison to prevent timing attacks.
 ///
-/// The implementation of the [`Debug`] trait for this type hides the secret key
-/// to prevent it from being leaked in logs or other debug output.
+/// The implementation of the [`Debug`] trait for this type is inherited from
+/// [`SecureBytes`], which hides the secret key to prevent it from being leaked
+/// in logs or other debug output.
 ///
 /// # Examples
 ///
@@ -2096,9 +2131,18 @@ impl Default for EmailConfig {
 /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
 /// ```
 #[repr(transparent)]
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq)]
 #[serde(from = "String")]
-pub struct SecretKey(Box<[u8]>);
+pub struct SecretKey(SecureBytes);
+
+impl Serialize for SecretKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.as_bytes())
+    }
+}
 
 impl SecretKey {
     /// Create a new [`SecretKey`] from a byte array.
@@ -2113,7 +2157,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn new(hash: &[u8]) -> Self {
-        Self(Box::from(hash))
+        Self(SecureBytes::new(hash.to_vec()))
     }
 
     /// Get the byte array stored in the [`SecretKey`].
@@ -2128,7 +2172,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.0
+        self.0.unsecure()
     }
 
     /// Consume the [`SecretKey`] and return the byte array stored in it.
@@ -2143,7 +2187,19 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn into_bytes(self) -> Box<[u8]> {
-        self.0
+        self.0.unsecure().to_vec().into_boxed_slice()
+    }
+}
+
+impl Debug for SecretKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SecretKey").finish_non_exhaustive()
+    }
+}
+
+impl Default for SecretKey {
+    fn default() -> Self {
+        Self::new(&[])
     }
 }
 
@@ -2162,27 +2218,6 @@ impl From<String> for SecretKey {
 impl From<&str> for SecretKey {
     fn from(value: &str) -> Self {
         Self::new(value.as_bytes())
-    }
-}
-
-impl PartialEq for SecretKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.ct_eq(&other.0).into()
-    }
-}
-
-impl Eq for SecretKey {}
-
-impl Debug for SecretKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write in single line, regardless whether alternate mode was used or not
-        write!(f, "SecretKey(\"**********\")")
-    }
-}
-
-impl Default for SecretKey {
-    fn default() -> Self {
-        Self::new(&[])
     }
 }
 
@@ -2460,6 +2495,7 @@ impl From<&str> for EmailUrl {
 
 #[cfg(test)]
 mod tests {
+    use serde_json;
     use time::OffsetDateTime;
 
     use super::*;
@@ -2505,7 +2541,7 @@ mod tests {
         );
         assert_eq!(
             config.static_files.cache_timeout,
-            Some(Duration::from_secs(3600))
+            Some(Duration::from_hours(1))
         );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
@@ -2588,7 +2624,7 @@ mod tests {
         let expiry_opts = [
             (
                 "2h",
-                Expiry::OnInactivity(Duration::from_secs(7200)),
+                Expiry::OnInactivity(Duration::from_hours(2)),
                 tower_sessions::Expiry::OnInactivity(time::Duration::seconds(7200)),
             ),
             (
@@ -2729,6 +2765,14 @@ mod tests {
             StaticFilesPathRewriteMode::QueryParam
         );
     }
+
+    #[test]
+    fn secret_key_serialize_json() {
+        let key = SecretKey::from("abc123");
+        let serialized = serde_json::to_string(&key).unwrap();
+        // Should serialize as a byte array
+        assert_eq!(serialized, "[97,98,99,49,50,51]");
+    }
     #[test]
     #[cfg(feature = "redis")]
     fn cache_type_from_str_redis() {
@@ -2818,10 +2862,7 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 5);
-        assert_eq!(
-            config.cache.timeout,
-            Timeout::After(Duration::from_secs(60))
-        );
+        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_mins(1)));
         assert_eq!(config.cache.prefix, Some("v1".to_string()));
         assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
     }
@@ -2867,10 +2908,7 @@ mod tests {
             let config = ProjectConfig::from_toml(toml_content).unwrap();
 
             assert_eq!(config.cache.max_retries, 10);
-            assert_eq!(
-                config.cache.timeout,
-                Timeout::After(Duration::from_secs(120))
-            );
+            assert_eq!(config.cache.timeout, Timeout::After(Duration::from_mins(2)));
             assert_eq!(config.cache.prefix, None);
 
             if let CacheStoreTypeConfig::Redis { url, pool_size } = config.cache.store.store_type {
@@ -2992,7 +3030,7 @@ mod tests {
         let offset = FixedOffset::east_opt(3600).unwrap();
         let insertion_time: DateTime<FixedOffset> =
             (Utc::now() - chrono::Duration::hours(1)).with_timezone(&offset);
-        let timeout = Timeout::After(Duration::from_secs(60)); // 1 minute
+        let timeout = Timeout::After(Duration::from_mins(1));
         assert!(timeout.is_expired(Some(insertion_time)));
     }
 
@@ -3002,14 +3040,14 @@ mod tests {
         let offset = FixedOffset::east_opt(-2 * 3600).unwrap();
         let insertion_time: DateTime<FixedOffset> =
             (Utc::now() - chrono::Duration::seconds(10)).with_timezone(&offset);
-        let timeout = Timeout::After(Duration::from_secs(60));
+        let timeout = Timeout::After(Duration::from_mins(1));
         assert!(!timeout.is_expired(Some(insertion_time)));
     }
 
     #[test]
     #[should_panic(expected = "insertion_time is required for Timeout::After expiry check")]
     fn after_is_expired_panics_with_no_insertion_time() {
-        let timeout = Timeout::After(Duration::from_secs(60));
+        let timeout = Timeout::After(Duration::from_mins(1));
         let _ = timeout.is_expired(None);
     }
 
@@ -3115,5 +3153,30 @@ mod tests {
         let u2 = EmailUrl::from(s.to_string());
         assert_eq!(u1, u2);
         assert_eq!(u1.as_str(), s);
+    }
+
+    #[test]
+    fn config_extra_can_be_accessed() {
+        #[derive(Deserialize)]
+        struct CustomConfig {
+            foo: String,
+        }
+
+        let config = ProjectConfig::from_toml(
+            r#"
+        [custom_config]
+        foo = "bar"
+        "#,
+        )
+        .unwrap();
+
+        let my_config: CustomConfig = config
+            .extra
+            .get("custom_config")
+            .unwrap()
+            .clone()
+            .try_into()
+            .unwrap();
+        assert_eq!(my_config.foo, "bar");
     }
 }

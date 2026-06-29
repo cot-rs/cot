@@ -34,10 +34,6 @@ pub(super) fn query_to_tokens(query: Query) -> TokenStream {
 }
 
 pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream {
-    if let Some(tokens) = expr.as_tokens() {
-        return tokens;
-    }
-
     let crate_name = cot_ident();
     match expr {
         Expr::FieldRef { field_name, .. } => {

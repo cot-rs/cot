@@ -24,6 +24,7 @@ repos:
     hooks:
       - id: yamlfmt
         types_or: [json, yaml]
+        args: ["-conf", ".config/yamlfmt.yml"]
   - repo: local
     hooks:
       - id: fmt
@@ -44,4 +45,4 @@ repos:
       - id: djlint
         name: djLint
         files: \.(html|jinja|j2)$
-        args: ["--reformat", "--lint"]
+        args: ["--configuration", ".config/djlint.toml", "--reformat", "--lint"]

@@ -171,7 +171,31 @@ impl Error {
 
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self.repr, f)
+        // If the alternate (`{:#?}`) formatting has been specified, print out the
+        // `Debug` formatting normally. If not, (which is the case when using
+        // `Result::unwrap()` or `Result::expect()`) pretty print the error.
+        if f.alternate() {
+            Debug::fmt(&self.repr, f)
+        } else {
+            let error = self.inner();
+            Display::fmt(error, f)?;
+
+            if let Some(source) = error.source() {
+                writeln!(f)?;
+                writeln!(f)?;
+                writeln!(f, "caused by:")?;
+                let mut source = Some(source);
+                let mut i = 0;
+                while let Some(e) = source {
+                    writeln!(f, "{i:4}: {e}")?;
+
+                    source = e.source();
+                    i += 1;
+                }
+            }
+
+            Ok(())
+        }
     }
 }
 
@@ -269,9 +293,15 @@ impl From<tower_sessions::session::Error> for Error {
 
 #[cfg(test)]
 mod tests {
+    use derive_more::with_trait::Debug;
+    use insta::assert_snapshot;
     use serde::ser::Error as _;
 
     use super::*;
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("outer error")]
+    struct OuterError(#[source] std::io::Error);
 
     #[test]
     fn error_new() {
@@ -363,5 +393,93 @@ mod tests {
                 .to_string()
                 .contains("error while accessing the session object")
         );
+    }
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+    )]
+    fn error_debug_printing() {
+        let err = Error::internal("root error");
+        assert_snapshot!(format!("{err:?}"), @"root error");
+
+        let err = Error::with_status("root error", StatusCode::BAD_REQUEST);
+        assert_snapshot!(format!("{err:?}"), @"root error");
+
+        let err = Error::wrap(std::io::Error::other("io error"));
+        assert_snapshot!(format!("{err:?}"), @"io error");
+
+        let io_err = std::io::Error::other("inner io error");
+        let err = Error::wrap(OuterError(io_err));
+        assert_snapshot!(format!("{err:?}"), @r###"
+        outer error
+
+        caused by:
+           0: inner io error
+        "###);
+
+        let err = Error::internal(OuterError(std::io::Error::other("inner io error")));
+        assert_snapshot!(format!("{err:?}"), @r###"
+        outer error
+
+        caused by:
+           0: inner io error
+        "###);
+    }
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+    )]
+    fn error_debug_printing_chain() {
+        #[derive(Debug, thiserror::Error)]
+        #[error("wrapper error")]
+        struct WrapperError(#[source] OuterError);
+
+        let err = Error::internal(WrapperError(OuterError(std::io::Error::other(
+            "inner io error",
+        ))));
+
+        assert_snapshot!(format!("{err:?}"), @"
+        wrapper error
+
+        caused by:
+           0: outer error
+           1: inner io error
+        ");
+    }
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+    )]
+    fn error_debug_printing_alternate() {
+        let err = Error::with_status(
+            OuterError(std::io::Error::other("inner io error")),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        );
+        assert_snapshot!(format!("{err:#?}"), @r#"
+        ErrorImpl {
+            inner: WithStatusCode(
+                ErrorImpl {
+                    inner: OuterError(
+                        Custom {
+                            kind: Other,
+                            error: "inner io error",
+                        },
+                    ),
+                    status_code: Some(
+                        500,
+                    ),
+                    ..
+                },
+            ),
+            status_code: None,
+            ..
+        }
+        "#);
     }
 }

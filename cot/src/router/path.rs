@@ -25,22 +25,20 @@ impl PathMatcher {
             Param { start: usize },
         }
 
-        let path_pattern = path_pattern.into();
+        let mut path_pattern = path_pattern.into();
+        if !path_pattern.is_empty() && !path_pattern.starts_with('/') {
+            path_pattern.insert(0, '/');
+        }
 
         let mut parts = Vec::new();
         let mut state = State::Literal { start: 0 };
 
         let mut char_iter = path_pattern
-            .chars()
-            .map(Some)
-            .chain([None])
-            .enumerate()
+            .char_indices()
+            .map(|(i, c)| (i, Some(c)))
+            .chain(std::iter::once((path_pattern.len(), None)))
             .peekable();
-        loop {
-            let Some((index, ch)) = char_iter.next() else {
-                break;
-            };
-
+        while let Some((index, ch)) = char_iter.next() {
             match (ch, state) {
                 (Some('{') | None, State::Literal { start }) => {
                     let literal = &path_pattern[start..index];
@@ -355,6 +353,20 @@ mod tests {
     }
 
     #[test]
+    fn path_parser_adds_missing_leading_slash() {
+        let path_parser = PathMatcher::new("users/{id}");
+        let mut params = ReverseParamMap::new();
+        params.insert("id", "123");
+
+        assert_eq!(
+            path_parser.capture("/users/123"),
+            Some(CaptureResult::new(vec![PathParam::new("id", "123")], ""))
+        );
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/users/123");
+        assert_eq!(path_parser.to_string(), "/users/{id}");
+    }
+
+    #[test]
     fn path_parser_escaped() {
         let path_parser = PathMatcher::new("/users/{{{{{{escaped}}}}}}");
         assert_eq!(
@@ -515,5 +527,20 @@ mod tests {
             path_parser.reverse(&params).unwrap(),
             "/users/123/posts/456"
         );
+    }
+
+    #[test]
+    fn non_ascii_path_pattern() {
+        let path_parser = PathMatcher::new("/café/{id}");
+        let mut params = ReverseParamMap::new();
+        params.insert("id", "123");
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/café/123");
+    }
+
+    #[test]
+    fn non_ascii_path_literal() {
+        let path_parser = PathMatcher::new("/café/test");
+        let params = ReverseParamMap::new();
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/café/test");
     }
 }

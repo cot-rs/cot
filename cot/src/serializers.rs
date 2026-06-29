@@ -149,7 +149,7 @@ mod tests {
             ),
             (
                 Wrapper {
-                    expiry: Expiry::OnInactivity(Duration::from_secs(3600)),
+                    expiry: Expiry::OnInactivity(Duration::from_hours(1)),
                 },
                 r#"{"expiry":"1h"}"#,
             ),
@@ -183,7 +183,7 @@ mod tests {
             ),
             (
                 CacheTimeoutWrapper {
-                    timeout: Timeout::After(Duration::from_secs(3600)),
+                    timeout: Timeout::After(Duration::from_hours(1)),
                 },
                 r#"{"timeout":"1h"}"#,
             ),

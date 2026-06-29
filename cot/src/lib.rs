@@ -185,6 +185,7 @@ pub use cot_macros::test;
 pub use http;
 #[cfg(feature = "openapi")]
 pub use schemars;
+pub use toml;
 
 pub use crate::__private::askama::{Template, filter_fn};
 pub use crate::project::{

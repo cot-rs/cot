@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 pub use clap;
-use clap::{Arg, ArgMatches, Command, value_parser};
+use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
 #[cfg(feature = "db")]
 use cot::db::migrations::{MigrationEngine, SyncDynMigration};
 use cot::project::BootstrappedProject;
@@ -582,10 +582,26 @@ impl CliTask for MigrationRollback {
         Command::new(MIGRATION_ROLLBACK_SUBCOMMAND)
             .about("Rollback migrations up to the specified migration file")
             .arg(
-                Arg::new("file")
-                    .help("The migration filename to roll back to (e.g. 0001_initial or 0001)")
-                    .value_name("FILE")
+                Arg::new("migration_name")
+                    .help(
+                        "The migration name to roll back to (e.g. m_0001_initial, 0001, \
+                         or zero)",
+                    )
+                    .value_name("MIGRATION_NAME")
                     .required(true),
+            )
+            .arg(
+                Arg::new("app")
+                    .long("app")
+                    .help("The name of the app to rollback migrations for")
+                    .value_name("APP")
+                    .required(false),
+            )
+            .arg(
+                Arg::new("dry-run")
+                    .long("dry-run")
+                    .action(ArgAction::SetTrue)
+                    .help("Print the Rollback Plan without changing the database"),
             )
     }
 
@@ -597,6 +613,7 @@ impl CliTask for MigrationRollback {
         let file = matches
             .get_one::<String>("migration_name")
             .expect("required argument");
+        let dry_run = matches.get_flag("dry-run");
 
         let bootstrapper = bootstrapper
             .with_apps()
@@ -605,11 +622,11 @@ impl CliTask for MigrationRollback {
             .boot()
             .await?;
 
-        // migrations are currently tied to crates, so we use the crate name as the app
-        // name.
-        // TODO: cli command should take an explicit crate name as arg when workspaces
-        // are supported.
         let crate_name = bootstrapper.project().cli_metadata().name;
+        let app_name = matches
+            .get_one::<String>("app")
+            .map(String::as_str)
+            .unwrap_or(crate_name);
 
         let BootstrappedProject {
             context,
@@ -624,9 +641,15 @@ impl CliTask for MigrationRollback {
                 migrations.extend(app.migrations());
             }
             let migration_engine = MigrationEngine::new(migrations)?;
-            migration_engine
-                .rollback(context.database(), file, crate_name)
-                .await?;
+            if dry_run {
+                migration_engine
+                    .rollback_dry_run(context.database(), file, app_name, &mut std::io::stderr())
+                    .await?;
+            } else {
+                migration_engine
+                    .rollback(context.database(), file, app_name)
+                    .await?;
+            }
         }
         Ok(())
     }

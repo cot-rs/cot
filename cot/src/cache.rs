@@ -838,7 +838,7 @@ mod tests {
         let cache = Cache::new(
             store,
             Some("myapp".to_string()),
-            Timeout::After(Duration::from_secs(60)),
+            Timeout::After(Duration::from_mins(1)),
         );
 
         cache.insert("user:1", "John Doe").await.unwrap();
@@ -869,7 +869,7 @@ mod tests {
             .insert_expiring(
                 "temp:data",
                 "temporary",
-                Timeout::After(Duration::from_secs(300)),
+                Timeout::After(Duration::from_mins(5)),
             )
             .await
             .unwrap();
@@ -915,7 +915,7 @@ mod tests {
                     call_count += 1;
                     Ok("temporary".to_string())
                 },
-                Timeout::After(Duration::from_secs(300)),
+                Timeout::After(Duration::from_mins(5)),
             )
             .await
             .unwrap();
@@ -927,7 +927,7 @@ mod tests {
                     call_count += 1;
                     Ok("different".to_string())
                 },
-                Timeout::After(Duration::from_secs(300)),
+                Timeout::After(Duration::from_mins(5)),
             )
             .await
             .unwrap();
@@ -975,7 +975,7 @@ mod tests {
                     .build(),
             )
             .prefix("test_redis")
-            .timeout(Timeout::After(Duration::from_secs(60)))
+            .timeout(Timeout::After(Duration::from_mins(1)))
             .build();
 
         let result = Cache::from_config(&config).await;

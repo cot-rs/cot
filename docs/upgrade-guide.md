@@ -19,7 +19,7 @@ Sometimes, though, the changes need to be made in a backwards-incompatible manne
 ### Forms
 
 * **Attribute Rename**: The `opt` attribute parameter in `#[form(...)]` macro has been renamed to `opts`.
-    ```rust
+    ```rust,ignore
     // Before
     #[form(opt(max_length = 100))]
 
@@ -44,8 +44,8 @@ Sometimes, though, the changes need to be made in a backwards-incompatible manne
 
 * "Not Found" handler support has been removed. Instead, there is a single project-global error handler that handles both "Not Found", "Internal Server Error", and other errors that may occur during request processing.
 * The error handler is now almost a regular request handler (meaning you don't have to implement the `ErrorHandler` trait manually) and can access most of the request data, such as request path, method, headers, but also static files, root router URLs, and more.
-  - The main difference between a regular request handler and an error handler is that the error handler may receive an additional argument of type `RequestError`, which contains information about the error that occurred during request processing.
-  - On the other hand, it can **not** receive the request body, as it might have been consumed already.
+    - The main difference between a regular request handler and an error handler is that the error handler may receive an additional argument of type `RequestError`, which contains information about the error that occurred during request processing.
+    - On the other hand, it can **not** receive the request body, as it might have been consumed already.
 * `Project::server_error_handler` method is now called `error_handler` and returns a `DynErrorPageHandler`.
 
 ### Dependencies

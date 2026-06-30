@@ -16,6 +16,8 @@ use cot::db::impl_postgres::PostgresValueRef;
 use cot::db::impl_sqlite::SqliteValueRef;
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
+use securer_string::SecureString;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[cfg(feature = "db")]
@@ -40,21 +42,31 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 ///
 /// ## Password Comparison
 ///
-/// When comparing passwords, there are two recommended approaches:
+/// When comparing passwords, there are two approaches, with different security
+/// properties:
 ///
-/// 1. The most secure approach is to use
+/// 1. **Hash-based verification (recommended).** Use
 ///    [`PasswordHash::from_password`](crate::auth::PasswordHash::from_password)
-///    to create a hash from one password, and then use
-///    [`PasswordHash::verify`](crate::auth::PasswordHash::verify) to compare it
-///    with the other password. This method uses constant-time equality
-///    comparison, which protects against timing attacks.
+///    to derive a hash from one password, and then
+///    [`PasswordHash::verify`](crate::auth::PasswordHash::verify) to check the
+///    other password against that hash. The constant-time comparison happens on
+///    the *hashes*, which are fixed-length, so it reveals nothing about the
+///    passwords themselves — not even their length. On top of that, the hashing
+///    function is deliberately slow and salted, which both defeats timing
+///    attacks and means the stored value is useless to an attacker who obtains
+///    it. This is the only approach suitable for authenticating against a
+///    persisted password.
 ///
-/// 2. An alternative is to use the [`Password::as_str`] method and compare the
-///    strings directly. This approach uses non-constant-time comparison, which
-///    is less secure but may be acceptable in certain legitimate use cases
-///    where the security tradeoff is understood, e.g., when you're creating a
-///    user registration form with the "retype your password" field, where both
-///    passwords come from the same source anyway.
+/// 2. **Direct comparison.** Comparing two [`Password`] instances with
+///    [`PartialEq`] also uses a constant-time comparison, so it does not leak
+///    *which* characters differ. However, it operates on the raw passwords
+///    rather than fixed-length hashes, so the comparison can still leak the
+///    *length* of the password through timing, and it performs no expensive key
+///    derivation. Use this only when both values are already in memory and
+///    neither is a stored credential — for example, checking that the password
+///    and the "retype your password" field of a registration form match. It
+///    avoids the cost of hashing in that case, but must never be used to verify
+///    a password against one loaded from storage.
 ///
 /// # Examples
 ///
@@ -62,16 +74,13 @@ const MAX_EMAIL_LENGTH: u32 = 254;
 /// use cot::common_types::Password;
 ///
 /// let password = Password::new("pass");
-/// assert_eq!(&format!("{:?}", password), "Password(\"**********\")");
+/// assert_eq!(&format!("{:?}", password), "Password(..)");
+///
+/// let another_password = Password::new("pass");
+/// assert_eq!(password, another_password);
 /// ```
-#[derive(Clone)]
-pub struct Password(String);
-
-impl Debug for Password {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Password").field(&"**********").finish()
-    }
-}
+#[derive(Clone, PartialEq, Eq)]
+pub struct Password(SecureString);
 
 impl Password {
     /// Creates a new password object.
@@ -85,7 +94,7 @@ impl Password {
     /// ```
     #[must_use]
     pub fn new<T: Into<String>>(password: T) -> Self {
-        Self(password.into())
+        Self(SecureString::from(password.into()))
     }
 
     /// Returns the password as a string.
@@ -100,7 +109,7 @@ impl Password {
     /// ```
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.0
+        self.0.unsecure()
     }
 
     /// Consumes the object and returns the password as a string.
@@ -115,7 +124,13 @@ impl Password {
     /// ```
     #[must_use]
     pub fn into_string(self) -> String {
-        self.0
+        self.0.into_unsecure()
+    }
+}
+
+impl Debug for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Password").finish_non_exhaustive()
     }
 }
 
@@ -181,7 +196,7 @@ impl From<String> for Password {
 /// let url_string = url.into_string();
 /// assert_eq!(url_string, "https://example.com/");
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Url(url::Url);
 
 impl Url {
@@ -394,6 +409,52 @@ impl FromDbValue for Url {
 }
 
 #[cfg(feature = "db")]
+impl FromDbValue for Option<Url> {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Url::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for Option<Url> {
+    fn to_db_value(&self) -> DbValue {
+        self.clone().map(Url::into_string).into()
+    }
+}
+
+#[cfg(feature = "db")]
 impl DatabaseField for Url {
     const TYPE: ColumnType = ColumnType::Text;
 }
@@ -417,7 +478,7 @@ impl DatabaseField for Url {
 /// // Convert using TryFrom
 /// let email = Email::try_from("user@example.com").unwrap();
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Email(EmailAddress);
 
 impl Email {
@@ -683,6 +744,52 @@ impl FromDbValue for Email {
     }
 }
 
+#[cfg(feature = "db")]
+impl ToDbValue for Option<Email> {
+    fn to_db_value(&self) -> DbValue {
+        self.clone().map(|email| email.email()).into()
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for Option<Email> {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        value
+            .get::<Option<String>>()
+            .map(|opt_str| opt_str.map(Email::new))?
+            .transpose()
+            .map_err(cot::db::DatabaseError::value_decode)
+    }
+}
+
 /// Defines the database field type for `Email`.
 ///
 /// Emails are stored as strings with a maximum length of 254 characters,
@@ -737,7 +844,21 @@ mod tests {
     #[test]
     fn password_debug() {
         let password = Password::new("password");
-        assert_eq!(format!("{password:?}"), "Password(\"**********\")");
+        assert_eq!(format!("{password:?}"), "Password(..)");
+    }
+
+    #[test]
+    fn password_eq() {
+        let password1 = Password::new("password");
+        let password2 = Password::new("password");
+        assert_eq!(password1, password2);
+    }
+
+    #[test]
+    fn password_ne() {
+        let password1 = Password::new("password");
+        let password2 = Password::new("password2");
+        assert_ne!(password1, password2);
     }
 
     #[test]

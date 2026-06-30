@@ -203,6 +203,7 @@ impl PathMatcher {
         })
     }
 
+    #[expect(clippy::same_item_push)]
     pub(crate) fn token_weights(&self) -> Vec<u8> {
         let mut weights = Vec::with_capacity(self.parts.len());
         for part in &self.parts {
@@ -232,8 +233,8 @@ pub(crate) fn compare_weights(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
             (_, None) => return std::cmp::Ordering::Greater,
             (Some(&w), Some(&v)) => (w, v),
         };
-        lexical_order_a.push(char::from_digit(wa as u32, 10).unwrap());
-        lexical_order_b.push(char::from_digit(wb as u32, 10).unwrap());
+        lexical_order_a.push(char::from_digit(u32::from(wa), 10).unwrap());
+        lexical_order_b.push(char::from_digit(u32::from(wb), 10).unwrap());
 
         if wa == 2 && wb == 2 {
             return lexical_order_a.cmp(&lexical_order_b);

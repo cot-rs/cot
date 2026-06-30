@@ -53,6 +53,7 @@ impl FormField for FileField {
 
 /// Custom options for a [`FileField`].
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 pub struct FileFieldOptions {
     /// The accepted file types. Used to set the [`accept` attribute] in the
     /// HTML input element. Each string in the vector represents a file type

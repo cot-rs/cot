@@ -6,7 +6,10 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 pub use clap;
-use clap::{Arg, ArgMatches, Command, value_parser};
+use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
+#[cfg(feature = "db")]
+use cot::db::migrations::{MigrationEngine, SyncDynMigration};
+use cot::project::BootstrappedProject;
 use derive_more::Debug;
 
 use crate::{Bootstrapper, Error, Result};
@@ -16,6 +19,8 @@ const COLLECT_STATIC_SUBCOMMAND: &str = "collect-static";
 const CHECK_SUBCOMMAND: &str = "check";
 const LISTEN_PARAM: &str = "listen";
 const COLLECT_STATIC_DIR_PARAM: &str = "dir";
+const MIGRATION_GROUP_SUBCOMMAND: &str = "migration";
+const MIGRATION_ROLLBACK_SUBCOMMAND: &str = "rollback";
 
 /// A central point for configuring the default Command Line Interface (CLI) for
 /// Cot-powered projects.
@@ -91,6 +96,14 @@ impl Cli {
         cli.add_task(Check);
         cli.add_task(CollectStatic);
 
+        #[cfg(feature = "db")]
+        {
+            let mut migration_group =
+                CliTaskGroup::new(MIGRATION_GROUP_SUBCOMMAND).about("Database migration commands");
+            migration_group.add_task(MigrationRollback);
+
+            cli.add_task(migration_group);
+        }
         cli
     }
 
@@ -389,6 +402,259 @@ impl CliTask for Check {
     }
 }
 
+/// A group of related sub-tasks under a single parent subcommand.
+///
+/// # Examples
+///
+/// ```
+/// use async_trait::async_trait;
+/// use clap::{ArgMatches, Command};
+/// use cot::cli::{Cli, CliTask, CliTaskGroup};
+/// use cot::project::WithConfig;
+/// use cot::{Bootstrapper, Project};
+///
+/// struct Frobnicate;
+///
+/// #[async_trait(?Send)]
+/// impl CliTask for Frobnicate {
+///     fn subcommand(&self) -> Command {
+///         Command::new("frobnicate")
+///     }
+///
+///     async fn execute(
+///         &mut self,
+///         _matches: &ArgMatches,
+///         _bootstrapper: Bootstrapper<WithConfig>,
+///     ) -> cot::Result<()> {
+///         println!("Frobnicating...");
+///
+///         Ok(())
+///     }
+/// }
+///
+/// struct MyProject;
+/// impl Project for MyProject {
+///     fn register_tasks(&self, cli: &mut Cli) {
+///         let mut group_command = CliTaskGroup::new("foo").about("Foo related commands");
+///         group_command.add_task(Frobnicate);
+///         cli.add_task(group_command);
+///     }
+/// }
+/// ```
+#[derive(Debug)]
+pub struct CliTaskGroup {
+    name: String,
+    about: String,
+    #[debug("..")]
+    tasks: HashMap<String, Box<dyn CliTask + Send + 'static>>,
+}
+
+impl CliTaskGroup {
+    /// Create a subcommand group.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::cli::CliTaskGroup;
+    ///
+    /// let group = CliTaskGroup::new("command");
+    /// ```
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            about: String::new(),
+            tasks: HashMap::new(),
+        }
+    }
+
+    /// Sets the description of the group, which is displayed in the help
+    /// message for the group's subcommands.
+    ///
+    /// # Example
+    /// ```
+    /// use cot::cli::CliTaskGroup;
+    ///
+    /// let group = CliTaskGroup::new("command").about("This is a description for the command group");
+    /// ```
+    #[must_use]
+    pub fn about(mut self, about: impl Into<String>) -> Self {
+        self.about = about.into();
+        self
+    }
+
+    /// Adds a new task to the subcommand group.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a task with the same name has already been registered.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use async_trait::async_trait;
+    /// use clap::{ArgMatches, Command};
+    /// use cot::cli::{Cli, CliTask, CliTaskGroup};
+    /// use cot::project::WithConfig;
+    /// use cot::{Bootstrapper, Project};
+    ///
+    /// struct Frobnicate;
+    ///
+    /// #[async_trait(?Send)]
+    /// impl CliTask for Frobnicate {
+    ///     fn subcommand(&self) -> Command {
+    ///         Command::new("frobnicate")
+    ///     }
+    ///
+    ///     async fn execute(
+    ///         &mut self,
+    ///         _matches: &ArgMatches,
+    ///         _bootstrapper: Bootstrapper<WithConfig>,
+    ///     ) -> cot::Result<()> {
+    ///         println!("Frobnicating...");
+    ///
+    ///         Ok(())
+    ///     }
+    /// }
+    ///
+    /// struct MyProject;
+    /// impl Project for MyProject {
+    ///     fn register_tasks(&self, cli: &mut Cli) {
+    ///         let mut group_command = CliTaskGroup::new("foo").about("Foo related commands");
+    ///         group_command.add_task(Frobnicate);
+    ///         cli.add_task(group_command);
+    ///     }
+    /// }
+    /// ```
+    pub fn add_task<C: CliTask + Send + 'static>(&mut self, task: C) {
+        let subcommand = task.subcommand();
+        let name = subcommand.get_name().to_owned();
+
+        assert!(
+            !self.tasks.contains_key(&name),
+            "Task with name {name} already exists in group '{}'",
+            self.name
+        );
+
+        self.tasks.insert(name, Box::new(task));
+    }
+}
+
+#[async_trait(?Send)]
+impl CliTask for CliTaskGroup {
+    fn subcommand(&self) -> Command {
+        let name = self.name.clone();
+        let mut cmd = Command::new(name);
+
+        if !self.about.is_empty() {
+            cmd = cmd.about(self.about.clone());
+        }
+
+        cmd = cmd.subcommand_required(true).arg_required_else_help(true);
+        for task in self.tasks.values() {
+            cmd = cmd.subcommand(task.subcommand());
+        }
+        cmd
+    }
+
+    async fn execute(
+        &mut self,
+        matches: &ArgMatches,
+        bootstrapper: Bootstrapper<WithConfig>,
+    ) -> Result<()> {
+        let (sub_name, sub_matches) = matches
+            .subcommand()
+            .expect("subcommand should be present since subcommand_required is true");
+
+        self.tasks
+            .get_mut(sub_name)
+            .expect("command should be registered")
+            .execute(sub_matches, bootstrapper)
+            .await
+    }
+}
+
+#[cfg(feature = "db")]
+struct MigrationRollback;
+
+#[async_trait(?Send)]
+impl CliTask for MigrationRollback {
+    fn subcommand(&self) -> Command {
+        Command::new(MIGRATION_ROLLBACK_SUBCOMMAND)
+            .about("Rollback migrations up to the specified migration file")
+            .arg(
+                Arg::new("migration_name")
+                    .help(
+                        "The migration name to roll back to (e.g. m_0001_initial, 0001, \
+                         or zero)",
+                    )
+                    .value_name("MIGRATION_NAME")
+                    .required(true),
+            )
+            .arg(
+                Arg::new("app")
+                    .long("app")
+                    .help("The name of the app to rollback migrations for")
+                    .value_name("APP")
+                    .required(false),
+            )
+            .arg(
+                Arg::new("dry-run")
+                    .long("dry-run")
+                    .action(ArgAction::SetTrue)
+                    .help("Print the Rollback Plan without changing the database"),
+            )
+    }
+
+    async fn execute(
+        &mut self,
+        matches: &ArgMatches,
+        bootstrapper: Bootstrapper<WithConfig>,
+    ) -> Result<()> {
+        let file = matches
+            .get_one::<String>("migration_name")
+            .expect("required argument");
+        let dry_run = matches.get_flag("dry-run");
+
+        let bootstrapper = bootstrapper
+            .with_apps()
+            .with_database()
+            .await?
+            .boot()
+            .await?;
+
+        let crate_name = bootstrapper.project().cli_metadata().name;
+        let app_name = matches
+            .get_one::<String>("app")
+            .map(String::as_str)
+            .unwrap_or(crate_name);
+
+        let BootstrappedProject {
+            context,
+            handler: _,
+            error_handler: _,
+        } = bootstrapper.finish();
+
+        #[cfg(feature = "db")]
+        {
+            let mut migrations: Vec<Box<SyncDynMigration>> = Vec::new();
+            for app in context.apps() {
+                migrations.extend(app.migrations());
+            }
+            let migration_engine = MigrationEngine::new(migrations)?;
+            if dry_run {
+                migration_engine
+                    .rollback_dry_run(context.database(), file, app_name, &mut std::io::stderr())
+                    .await?;
+            } else {
+                migration_engine
+                    .rollback(context.database(), file, app_name)
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// A macro to generate a [`CliMetadata`] struct from the Cargo manifest.
 #[macro_export]
 macro_rules! metadata {
@@ -474,6 +740,60 @@ mod tests {
                 .get_subcommands()
                 .any(|sc| sc.get_name() == "my-task")
         );
+    }
+
+    #[test]
+    fn cli_new_includes_migration_rollback_group() {
+        let cli = Cli::new();
+
+        let migration_group = cli
+            .command
+            .get_subcommands()
+            .find(|command| command.get_name() == MIGRATION_GROUP_SUBCOMMAND)
+            .expect("migration group is registered");
+
+        assert!(
+            migration_group
+                .get_subcommands()
+                .any(|command| command.get_name() == MIGRATION_ROLLBACK_SUBCOMMAND)
+        );
+    }
+
+    #[cot::test]
+    async fn cli_task_group_dispatches_nested_task() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        struct NestedTask;
+        #[async_trait(?Send)]
+        impl CliTask for NestedTask {
+            fn subcommand(&self) -> Command {
+                Command::new("nested")
+            }
+
+            async fn execute(
+                &mut self,
+                _matches: &ArgMatches,
+                _bootstrapper: Bootstrapper<WithConfig>,
+            ) -> Result<()> {
+                TASK_CALLED.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+
+        struct TestProject;
+        impl crate::Project for TestProject {}
+
+        static TASK_CALLED: AtomicBool = AtomicBool::new(false);
+        TASK_CALLED.store(false, Ordering::SeqCst);
+
+        let mut group = CliTaskGroup::new("group");
+        group.add_task(NestedTask);
+        let matches = group.subcommand().get_matches_from(["group", "nested"]);
+        let bootstrapper = Bootstrapper::new(TestProject).with_config(ProjectConfig::default());
+
+        group.execute(&matches, bootstrapper).await.unwrap();
+
+        assert!(TASK_CALLED.load(Ordering::SeqCst));
     }
 
     #[test]

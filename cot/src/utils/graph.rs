@@ -40,6 +40,10 @@ impl Graph {
         self.vertex_edges[from].push(to);
     }
 
+    pub(crate) fn get_edges(&self, from: usize) -> &[usize] {
+        &self.vertex_edges[from]
+    }
+
     #[must_use]
     pub(crate) fn vertex_num(&self) -> usize {
         self.vertex_edges.len()

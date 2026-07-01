@@ -117,7 +117,7 @@ lettre = { version = "0.11.22", default-features = false }
 libtest-mimic = "0.8"
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
-mockall = "0.14"
+mockall = "0.15"
 multer = "3"
 password-auth = { version = "1", default-features = false }
 securer-string = "0.1.3"

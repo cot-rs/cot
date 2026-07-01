@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.6.0...cot-cli-v0.7.0) - 2026-07-01
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.6.0/cot-cli/0.7.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Expose `on_delete` and `on_update` fields for ForeignKey field ([#576](https://github.com/cot-rs/cot/pull/576)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+
+### Fixes
+
+- Place correct contributing guide link ([#557](https://github.com/cot-rs/cot/pull/557)) (by [@kingazm](https://github.com/kingazm))
+
+### Other
+
+- *(deps)* Bump the dependencies group across 1 directory with 7 updates ([#602](https://github.com/cot-rs/cot/pull/602)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- *(deps)* Bump all dependencies; bump MSRV to 1.92 ([#592](https://github.com/cot-rs/cot/pull/592)) (by [@m4tx](https://github.com/m4tx))
+- Add DeepWiki badge ([#568](https://github.com/cot-rs/cot/pull/568)) (by [@seqre](https://github.com/seqre))
+- *(deps)* Bump the dependencies group with 11 updates ([#564](https://github.com/cot-rs/cot/pull/564)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- *(deps)* Remove chumsky ([#538](https://github.com/cot-rs/cot/pull/538)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.6.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.5.0...cot-cli-v0.6.0) - 2026-03-18
 
 [View diff on diff.rs](https://diff.rs/cot-cli/0.5.0/cot-cli/0.6.0/Cargo.toml)

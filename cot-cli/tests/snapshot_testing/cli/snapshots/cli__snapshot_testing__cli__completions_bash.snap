@@ -460,7 +460,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration__subcmd__list)
-            opts="-v -q -h --verbose --quiet --help [PATH]"
+            opts="-v -q -h --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -474,7 +474,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration__subcmd__make)
-            opts="-v -q -h --app-name --output-dir --verbose --quiet --help [PATH]"
+            opts="-v -q -h --app-name --output-dir --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -496,7 +496,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration__subcmd__new)
-            opts="-v -q -h --app-name --verbose --quiet --help <NAME> [PATH]"
+            opts="-v -q -h --app-name --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -514,7 +514,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__new)
-            opts="-v -q -h --name --use-git --cot-path --verbose --quiet --help <PATH>"
+            opts="-v -q -h --name --use-git --cot-path --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/cot-rs/cot/compare/cot-v0.6.0...cot-v0.7.0) - 2026-07-01
+
+[View diff on diff.rs](https://diff.rs/cot/0.6.0/cot/0.7.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Expose `on_delete` and `on_update` fields for ForeignKey field ([#576](https://github.com/cot-rs/cot/pull/576)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- [**breaking**] Implement `Serialize`, `Deserialize`, and `JsonSchema` implementations for cot internal types ([#575](https://github.com/cot-rs/cot/pull/575)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Implement DbField for Bytes ([#596](https://github.com/cot-rs/cot/pull/596)) (by [@firas-yangui](https://github.com/firas-yangui))
+- Support custom cache and email in TestRequestBuilder ([#582](https://github.com/cot-rs/cot/pull/582)) (by [@m4tx](https://github.com/m4tx))
+- Add `set_username` and `set_password` to `DatabaseUser` ([#579](https://github.com/cot-rs/cot/pull/579)) (by [@m4tx](https://github.com/m4tx))
+- Implement `From<DbFieldValue>` for Non primitive types ([#562](https://github.com/cot-rs/cot/pull/562)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add tests for guide code snippets ([#552](https://github.com/cot-rs/cot/pull/552)) (by [@m4tx](https://github.com/m4tx))
+- Derive `Ord` and `PartialOrd` for `Auto` ([#544](https://github.com/cot-rs/cot/pull/544)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Allow accessing extra config ([#518](https://github.com/cot-rs/cot/pull/518)) (by [@m4tx](https://github.com/m4tx))
+- Use securer_string for more secure Password and SecretKey ([#328](https://github.com/cot-rs/cot/pull/328)) (by [@eibrahim95](https://github.com/eibrahim95))
+
+### Fixes
+
+- Normalize route paths with a leading slash ([#591](https://github.com/cot-rs/cot/pull/591)) (by [@firas-yangui](https://github.com/firas-yangui))
+- Non-ASCII URLs can be properly routed now ([#561](https://github.com/cot-rs/cot/pull/561)) (by [@m4tx](https://github.com/m4tx))
+- Place correct contributing guide link ([#557](https://github.com/cot-rs/cot/pull/557)) (by [@kingazm](https://github.com/kingazm))
+
+### Other
+
+- *(deps)* Bump all dependencies; bump MSRV to 1.92 ([#592](https://github.com/cot-rs/cot/pull/592)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump sea-query from 0.32.7 to 1.0.1 ([#585](https://github.com/cot-rs/cot/pull/585)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+- Add index route to JSON example ([#572](https://github.com/cot-rs/cot/pull/572)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add DeepWiki badge ([#568](https://github.com/cot-rs/cot/pull/568)) (by [@seqre](https://github.com/seqre))
+- Fix clippy errors ([#560](https://github.com/cot-rs/cot/pull/560)) (by [@m4tx](https://github.com/m4tx))
+- Add query macro docs ([#543](https://github.com/cot-rs/cot/pull/543)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- *(deps)* Remove chumsky ([#538](https://github.com/cot-rs/cot/pull/538)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Use `grass_compiler` directly ([#537](https://github.com/cot-rs/cot/pull/537)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump fake from 4.4.0 to 5.1.0 ([#533](https://github.com/cot-rs/cot/pull/533)) (by [@dependabot[bot]](https://github.com/dependabot[bot]))
+
 ## [0.6.0](https://github.com/cot-rs/cot/compare/cot-v0.5.0...cot-v0.6.0) - 2026-03-18
 
 [View diff on diff.rs](https://diff.rs/cot/0.5.0/cot/0.6.0/Cargo.toml)

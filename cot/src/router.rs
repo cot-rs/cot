@@ -36,7 +36,7 @@ use tracing::debug;
 use crate::error::NotFound;
 use crate::request::{PathParams, Request, RequestExt, RequestHead};
 use crate::response::Response;
-use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
+use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap, compare_weights};
 use crate::{Error, ProjectContext, Result};
 
 pub mod method;
@@ -102,7 +102,9 @@ impl Router {
     /// ```
     #[must_use]
     pub fn with_urls<T: Into<Vec<Route>>>(urls: T) -> Self {
-        let urls = urls.into();
+        let mut urls = urls.into();
+        urls.sort_by(|a, b| compare_weights(&a.url.token_weights(), &b.url.token_weights()));
+
         let mut names = HashMap::new();
 
         for url in &urls {
@@ -1068,6 +1070,14 @@ mod tests {
         }
     }
 
+    struct SelectedHandler;
+
+    impl RequestHandler for SelectedHandler {
+        async fn handle(&self, _request: Request) -> Result<Response> {
+            Html::new("selected").into_response()
+        }
+    }
+
     #[cfg(feature = "openapi")]
     impl crate::openapi::AsApiRoute for MockHandler {
         fn as_api_route(
@@ -1305,5 +1315,130 @@ mod tests {
 
     fn test_request() -> Request {
         TestRequestBuilder::get("/test").build()
+    }
+
+    #[cot::test]
+    async fn prefer_literal_over_wildcard_placeholder() {
+        let router = Router::with_urls(vec![
+            Route::with_handler("/foo/{*path}", MockHandler),
+            Route::with_handler("/foo/{param}", MockHandler),
+            Route::with_handler("/foo/bar", SelectedHandler),
+        ]);
+        let response = router
+            .route(TestRequestBuilder::get("/foo/bar").build(), "/foo/bar")
+            .await
+            .unwrap();
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "selected".as_bytes());
+    }
+
+    #[cot::test]
+    async fn prefer_literal_over_placeholder_wildcard() {
+        let router = Router::with_urls(vec![
+            Route::with_handler("/foo/{prarm}", MockHandler),
+            Route::with_handler("/foo/bar", SelectedHandler),
+            Route::with_handler("/foo/{*path}", MockHandler),
+        ]);
+        let response = router
+            .route(TestRequestBuilder::get("/foo/bar").build(), "/foo/bar")
+            .await
+            .unwrap();
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "selected".as_bytes());
+    }
+
+    #[cot::test]
+    async fn prefer_wildcard_as_last() {
+        let router = Router::with_urls(vec![
+            Route::with_handler("/foo/bar/baz", MockHandler),
+            Route::with_handler("/foo/{param}/baz", MockHandler),
+            Route::with_handler("/foo/{*path}", SelectedHandler),
+        ]);
+        let response = router
+            .route(
+                TestRequestBuilder::get("/foo/bar/boo").build(),
+                "/foo/bar/boo",
+            )
+            .await
+            .unwrap();
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "selected".as_bytes());
+    }
+
+    #[cot::test]
+    async fn prefer_param_over_wildcard() {
+        let router = Router::with_urls(vec![
+            Route::with_handler("/foo/{*path}", MockHandler),
+            Route::with_handler("/foo/{param}", SelectedHandler),
+        ]);
+        let response = router
+            .route(TestRequestBuilder::get("/foo/bar").build(), "/foo/bar")
+            .await
+            .unwrap();
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "selected".as_bytes());
+    }
+
+    #[cot::test]
+    async fn prefer_literal_over_param() {
+        let router = Router::with_urls(vec![
+            Route::with_handler("/foo/{param}", MockHandler),
+            Route::with_handler("/foo/bar", SelectedHandler),
+        ]);
+        let response = router
+            .route(TestRequestBuilder::get("/foo/bar").build(), "/foo/bar")
+            .await
+            .unwrap();
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "selected".as_bytes());
+    }
+
+    #[cot::test]
+    async fn prefer_more_literal_wildcard_over_less_literal_wildcard() {
+        let router = Router::with_urls(vec![
+            Route::with_handler("/foo/{*path}", MockHandler),
+            Route::with_handler("/foo/bar/{*path}", SelectedHandler),
+        ]);
+        let response = router
+            .route(
+                TestRequestBuilder::get("/foo/bar/baz").build(),
+                "/foo/bar/baz",
+            )
+            .await
+            .unwrap();
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "selected".as_bytes());
+    }
+
+    #[cot::test]
+    async fn prefer_sub_router_literal_over_wildcard() {
+        let sub_router = Router::with_urls(vec![
+            Route::with_handler("/{*path}", MockHandler),
+            Route::with_handler("/bar", SelectedHandler),
+        ]);
+        let router = Router::with_urls(vec![Route::with_router("/foo", sub_router)]);
+        let response = router
+            .route(TestRequestBuilder::get("/foo/bar").build(), "/foo/bar")
+            .await
+            .unwrap();
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "selected".as_bytes());
+    }
+
+    #[cot::test]
+    async fn prefer_more_leading_literal_route_on_tie() {
+        let router = Router::with_urls(vec![
+            Route::with_handler("/foo/{param}/baz", MockHandler),
+            Route::with_handler("/foo/bar/{param}", SelectedHandler),
+        ]);
+        let response = router
+            .route(
+                TestRequestBuilder::get("/foo/bar/baz").build(),
+                "/foo/bar/baz",
+            )
+            .await
+            .unwrap();
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "selected".as_bytes());
     }
 }

@@ -23,6 +23,33 @@ impl Parse for Query {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum StringMethod{
+    Contains,
+    StartsWith,
+    EndsWith
+}
+
+impl StringMethod {
+    pub fn from_ident(ident: &syn::Ident) -> Option<Self>{
+        match ident.to_string().as_str() {
+            "contains" => Some(Self::Contains),
+            "starts_with" => Some(Self::StartsWith),
+            "ends_with" => Some(Self::EndsWith),
+            _ => None
+        }
+    }
+
+    pub fn as_ident(&self) -> syn::Ident {
+        match self{
+            Self::Contains => {format_ident!("contains")}
+            Self::StartsWith => {format_ident!("starts_with")}
+            Self::EndsWith => {format_ident!("ends_with")}
+        }
+    }
+}
+
+
 pub(super) fn query_to_tokens(query: Query) -> TokenStream {
     let crate_name = cot_ident();
     let model_name = query.model_name;
@@ -70,15 +97,32 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
             )
             .to_compile_error(),
         },
-        Expr::FunctionCall { function, args } => match function.as_tokens() {
-            Some(tokens) => {
-                quote!(#crate_name::db::query::Expr::value(#tokens(#(#args),*)))
+        Expr::FunctionCall { function, args } =>  {
+            let field_free_tokens = function.as_tokens();
+
+            if field_free_tokens.is_none() {
+                if let Expr::MemberAccess { member_name, .. } = &*function {
+                    if let Some(method) = StringMethod::from_ident(member_name) {
+                        let Expr::MemberAccess { parent, ..} = *function else {
+                            unreachable!("function call must have a parent");
+                        };
+                        return handle_string_method(model_name, *parent, args, method);
+                    }
+                }
             }
-            None => syn::Error::new_spanned(
-                function.as_tokens_full(),
-                "calling functions that reference database fields is unsupported",
-            )
-            .to_compile_error(),
+
+            match field_free_tokens {
+                Some(tokens) => {
+                    quote!(#crate_name::db::query::Expr::value(#tokens(#(#args),*)))
+                }
+                None => syn::Error::new_spanned(
+                    function.as_tokens_full(),
+                    "calling functions that reference database fields is unsupported \
+                     (only `.contains(..)`, `.starts_with(..)`, and `.ends_with(..)` \
+                     are supported directly on database fields)",
+                )
+                    .to_compile_error(),
+            }
         },
         Expr::And(lhs, rhs) => {
             let lhs = expr_to_tokens(model_name, *lhs);
@@ -123,4 +167,46 @@ fn handle_binary_comparison(
     let lhs = expr_to_tokens(model_name, lhs);
     let rhs = expr_to_tokens(model_name, rhs);
     quote!(#crate_name::db::query::Expr::#bin_fn(#lhs, #rhs))
+}
+
+
+fn handle_string_method(
+    model_name: &syn::Type,
+    receiver: Expr,
+    args: Vec<syn::Expr>,
+    method: StringMethod,
+) -> TokenStream {
+    let crate_name = cot_ident();
+    let method_ident = method.as_ident();
+
+    let arg = match <[syn::Expr; 1]>::try_from(args) {
+        Ok([arg]) => arg,
+        Err(args) => {
+            let span = args
+                .first()
+                .map_or_else(proc_macro2::Span::call_site, syn::spanned::Spanned::span);
+            return syn::Error::new(
+                span,
+                format!("`{method_ident}` expects exactly one string argument"),
+            )
+                .to_compile_error();
+        }
+    };
+
+    if let Expr::FieldRef { ref field_name, .. } = receiver {
+        return quote! {
+            #crate_name::db::query::ExprLike::#method_ident(
+                <#model_name as #crate_name::db::Model>::Fields::#field_name,
+                #arg
+            )
+        };
+    }
+
+    let receiver_tokens = expr_to_tokens(model_name, receiver);
+    quote! {
+        #crate_name::db::query::Expr::#method_ident(
+            #receiver_tokens,
+            #crate_name::db::query::Expr::value(#arg)
+        )
+    }
 }

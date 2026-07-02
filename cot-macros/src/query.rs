@@ -24,31 +24,36 @@ impl Parse for Query {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum StringMethod{
+pub enum StringMethod {
     Contains,
     StartsWith,
-    EndsWith
+    EndsWith,
 }
 
 impl StringMethod {
-    pub fn from_ident(ident: &syn::Ident) -> Option<Self>{
+    pub fn from_ident(ident: &syn::Ident) -> Option<Self> {
         match ident.to_string().as_str() {
             "contains" => Some(Self::Contains),
             "starts_with" => Some(Self::StartsWith),
             "ends_with" => Some(Self::EndsWith),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn as_ident(&self) -> syn::Ident {
-        match self{
-            Self::Contains => {format_ident!("contains")}
-            Self::StartsWith => {format_ident!("starts_with")}
-            Self::EndsWith => {format_ident!("ends_with")}
+        match self {
+            Self::Contains => {
+                format_ident!("contains")
+            }
+            Self::StartsWith => {
+                format_ident!("starts_with")
+            }
+            Self::EndsWith => {
+                format_ident!("ends_with")
+            }
         }
     }
 }
-
 
 pub(super) fn query_to_tokens(query: Query) -> TokenStream {
     let crate_name = cot_ident();
@@ -97,13 +102,13 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
             )
             .to_compile_error(),
         },
-        Expr::FunctionCall { function, args } =>  {
+        Expr::FunctionCall { function, args } => {
             let field_free_tokens = function.as_tokens();
 
             if field_free_tokens.is_none() {
                 if let Expr::MemberAccess { member_name, .. } = &*function {
                     if let Some(method) = StringMethod::from_ident(member_name) {
-                        let Expr::MemberAccess { parent, ..} = *function else {
+                        let Expr::MemberAccess { parent, .. } = *function else {
                             unreachable!("function call must have a parent");
                         };
                         return handle_string_method(model_name, *parent, args, method);
@@ -121,9 +126,9 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
                      (only `.contains(..)`, `.starts_with(..)`, and `.ends_with(..)` \
                      are supported directly on database fields)",
                 )
-                    .to_compile_error(),
+                .to_compile_error(),
             }
-        },
+        }
         Expr::And(lhs, rhs) => {
             let lhs = expr_to_tokens(model_name, *lhs);
             let rhs = expr_to_tokens(model_name, *rhs);
@@ -169,7 +174,6 @@ fn handle_binary_comparison(
     quote!(#crate_name::db::query::Expr::#bin_fn(#lhs, #rhs))
 }
 
-
 fn handle_string_method(
     model_name: &syn::Type,
     receiver: Expr,
@@ -189,7 +193,7 @@ fn handle_string_method(
                 span,
                 format!("`{method_ident}` expects exactly one string argument"),
             )
-                .to_compile_error();
+            .to_compile_error();
         }
     };
 

@@ -597,7 +597,7 @@ pub enum Expr {
     Div(Box<Expr>, Box<Expr>),
     Contains(Box<Expr>, Box<Expr>),
     StartsWith(Box<Expr>, Box<Expr>),
-    EndsWith(Box<Expr>, Box<Expr>)
+    EndsWith(Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -1040,7 +1040,7 @@ impl Expr {
             Self::Div(lhs, rhs) => lhs.as_sea_query_expr().div(rhs.as_sea_query_expr()),
             Self::Contains(lhs, rhs) => like_expr(lhs, rhs, LikeMode::Contains),
             Self::StartsWith(lhs, rhs) => like_expr(lhs, rhs, LikeMode::StartsWith),
-            Self::EndsWith(lhs, rhs) => like_expr(lhs, rhs, LikeMode::EndsWith)
+            Self::EndsWith(lhs, rhs) => like_expr(lhs, rhs, LikeMode::EndsWith),
         }
     }
 }
@@ -1356,7 +1356,7 @@ impl<T: ToDbFieldValue + Ord + 'static> ExprOrd<T> for FieldRef<T> {
     }
 }
 
-pub trait ExprLike<T>{
+pub trait ExprLike<T> {
     fn contains<V: IntoField<T>>(self, other: V) -> Expr;
     fn starts_with<V: IntoField<T>>(self, other: V) -> Expr;
     fn ends_with<V: IntoField<T>>(self, other: V) -> Expr;
@@ -1375,7 +1375,7 @@ impl<T: ToDbFieldValue + 'static> ExprLike<T> for FieldRef<T> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum LikeMode{
+enum LikeMode {
     Contains,
     StartsWith,
     EndsWith,
@@ -1386,7 +1386,7 @@ const LIKE_ESCAPE_CHAR: char = '\\';
 fn escape_like_value(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len());
     for c in value.chars() {
-        if matches!(c, '%' | '_' | LIKE_ESCAPE_CHAR){
+        if matches!(c, '%' | '_' | LIKE_ESCAPE_CHAR) {
             escaped.push(LIKE_ESCAPE_CHAR)
         }
         escaped.push(c);
@@ -1398,7 +1398,7 @@ fn build_like_pattern(value: &str, mode: LikeMode) -> sea_query::LikeExpr {
     let pattern = match mode {
         LikeMode::Contains => format!("%{escaped}%"),
         LikeMode::StartsWith => format!("%{escaped}"),
-        LikeMode::EndsWith => format!("{escaped}%")
+        LikeMode::EndsWith => format!("{escaped}%"),
     };
     sea_query::LikeExpr::new(pattern).escape(LIKE_ESCAPE_CHAR)
 }
@@ -1413,7 +1413,7 @@ fn like_expr(lhs: &Expr, rhs: &Expr, mode: LikeMode) -> sea_query::SimpleExpr {
     let sea_value: sea_query::Value = value.clone().into();
     match sea_value {
         sea_query::Value::String(Some(s)) => lhs_expr.like(build_like_pattern(&s, mode)),
-        _ => sea_query::Expr::val(1).eq(0)
+        _ => sea_query::Expr::val(1).eq(0),
     }
 }
 

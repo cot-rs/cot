@@ -12,8 +12,6 @@ env:
   CARGO_INCREMENTAL: 0
   # Required by cargo-insta: https://insta.rs/docs/quickstart/#continuous-integration
   CI: true
-  SCCACHE_GHA_ENABLED: true
-  RUSTC_WRAPPER: sccache
 
   _RUST_STABLE: &rust_stable stable
   # Pinning the nightly version to a "stable" version to avoid CI breakages.
@@ -47,9 +45,6 @@ jobs:
         with:
           shared-key: 'rust-ci'
           cache-bin: 'false'
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Run cargo check
         run: cargo check --all-targets --all-features
@@ -86,9 +81,6 @@ jobs:
         with:
           shared-key: 'rust-ci'
           cache-bin: 'false'
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -133,9 +125,6 @@ jobs:
           cache-bin: 'false'
           save-if: 'false'
 
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
-
       - name: Run clippy
         run: cargo clippy --no-deps --all-targets -- -D warnings
 
@@ -161,9 +150,6 @@ jobs:
           shared-key: 'rust-ci'
           cache-bin: 'false'
           save-if: 'false'
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -217,9 +203,6 @@ jobs:
           cache-bin: 'false'
           save-if: 'false'
 
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
-
       - name: Run the external dependencies
         run: docker compose up -d
 
@@ -269,9 +252,6 @@ jobs:
           cache-bin: 'false'
           save-if: 'false'
 
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
-
       - name: Run fmt
         run: cargo fmt --all -- --check
 
@@ -281,9 +261,6 @@ jobs:
     name: Machete dependencies checks
     runs-on: ubuntu-latest
     needs: ["check"]
-    env:
-      RUSTC_WRAPPER: ""
-      SCCACHE_GHA_ENABLED: ""
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -322,9 +299,6 @@ jobs:
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
-
       - name: Run cargo check with minimal versions
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
@@ -358,9 +332,6 @@ jobs:
 
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
-
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Run cargo check with every combination of features
         run: cargo hack check --feature-powerset --depth 3 --exclude-features db --no-dev-deps
@@ -407,9 +378,6 @@ jobs:
 
     name: License check
     runs-on: ubuntu-latest
-    env:
-      SCCACHE_GHA_ENABLED: ""
-      RUSTC_WRAPPER: ""
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -423,9 +391,6 @@ jobs:
     if: github.event_name == 'pull_request'
     name: Semver compatibility check
     runs-on: ubuntu-latest
-    env:
-      RUSTC_WRAPPER: ""
-      SCCACHE_GHA_ENABLED: ""
     steps:
       - name: Checkout source
         uses: actions/checkout@v7

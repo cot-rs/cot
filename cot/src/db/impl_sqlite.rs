@@ -1,7 +1,11 @@
 //! Database interface implementation – SQLite backend.
 
+use sea_query::extension::sqlite::SqliteExpr;
+use sea_query::{ExprTrait, SimpleExpr};
 use sea_query_sqlx::SqlxValues;
 
+use crate::db::query::QueryBuildingError;
+use crate::db::query::expr::like::{CaseSensitivity, LIKE_ESCAPE_CHAR, LikeDialect};
 use crate::db::sea_query_db::impl_sea_query_db_backend;
 
 impl_sea_query_db_backend!(DatabaseSqlite: sqlx::sqlite::Sqlite, sqlx::sqlite::SqlitePool, SqliteRow, SqliteValueRef, sea_query::SqliteQueryBuilder);
@@ -33,5 +37,52 @@ impl DatabaseSqlite {
         column_type: crate::db::ColumnType,
     ) -> sea_query::ColumnType {
         sea_query::ColumnType::from(column_type)
+    }
+}
+
+impl DatabaseSqlite {
+    fn convert_to_sqlite_glob(glob: &str) -> String {
+        let mut escaped = String::with_capacity(glob.len());
+        let mut chars = glob.chars();
+        while let Some(ch) = chars.next() {
+            match ch {
+                LIKE_ESCAPE_CHAR => {
+                    if let Some(ch) = chars.next() {
+                        Self::push_glob_literal(&mut escaped, ch);
+                    }
+                }
+                other => Self::push_glob_literal(&mut escaped, other),
+            }
+        }
+        escaped
+    }
+
+    fn push_glob_literal(out: &mut String, ch: char) {
+        if matches!(ch, '*' | '?' | '[') {
+            out.push('[');
+            out.push(ch);
+            out.push(']');
+        } else {
+            out.push(ch);
+        }
+    }
+}
+
+impl LikeDialect for DatabaseSqlite {
+    fn like_expr(
+        &self,
+        lhs: SimpleExpr,
+        glob_pattern: &str,
+        case_sensitivity: CaseSensitivity,
+    ) -> Result<SimpleExpr, QueryBuildingError> {
+        match case_sensitivity {
+            CaseSensitivity::Sensitive => {
+                let glob = Self::convert_to_sqlite_glob(glob_pattern);
+                Ok(lhs.glob(glob))
+            }
+            CaseSensitivity::Insensitive => {
+                Ok(sea_query::Func::lower(lhs).like(glob_pattern.to_lowercase()))
+            }
+        }
     }
 }

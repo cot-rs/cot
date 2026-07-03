@@ -5,7 +5,7 @@ use bytes::Bytes;
 use cot::auth::PasswordHash;
 use cot::common_types::{Email, Password, Url};
 use cot::db::migrations::{Field, Operation};
-use cot::db::query::ExprEq;
+use cot::db::query::expr::ExprEq;
 use cot::db::{
     Auto, Database, DatabaseError, DatabaseField, ForeignKey, ForeignKeyOnDeletePolicy,
     ForeignKeyOnUpdatePolicy, Identifier, LimitedString, Model, model, query,

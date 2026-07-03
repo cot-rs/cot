@@ -257,12 +257,12 @@ async fn get_customer(db: Database) -> cot::Result<()> {
 The [`query!`](macro@cot::db::query) macro returns a [`Query`](struct@cot::db::query::Query) object, on which you can call terminal methods (such as [`get`](struct@cot::db::query::Query#method.get) which returns the first matching result, and [`all`](struct@cot::db::query::Query#method.all) which returns all matching results) to retrieve the final results.
 
 ### Using the Query struct
-The [`query!`](macro@cot::db::query) macro is syntactic sugar for manually constructing a [`Query`](struct@cot::db::query::Query) with [`Expr`](enum@cot::db::query::Expr) expressions. The [`Query`](struct@cot::db::query::Query) object can be accessed directly by calling the [`objects`](trait@cot::db::Model#method.objects) method on the model, and filtered using the [`filter`](struct@cot::db::query::Query#method.filter) method.
+The [`query!`](macro@cot::db::query) macro is syntactic sugar for manually constructing a [`Query`](struct@cot::db::query::Query) with [`Expr`](enum@cot::db::query::expr::Expr) expressions. The [`Query`](struct@cot::db::query::Query) object can be accessed directly by calling the [`objects`](trait@cot::db::Model#method.objects) method on the model, and filtered using the [`filter`](struct@cot::db::query::Query#method.filter) method.
 You may prefer this approach when you need more control over how expressions are constructed. The example below is equivalent to the one above:
 
 ```rust
 use cot::db::Database;
-use cot::db::query::Expr;
+use cot::db::query::expr::Expr;
 
 # #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn get_customer(db: Database) -> cot::Result<()> {
@@ -272,14 +272,14 @@ async fn get_customer(db: Database) -> cot::Result<()> {
 }
 ```
 
-The [`filter`](struct@cot::db::query::Query#method.filter) method takes a [`filter expression`](enum@cot::db::query::Expr). In the example above, the expression `Expr::eq(Expr::field("id"), Expr::value("5"))` is evaluated as `id = 5`.
+The [`filter`](struct@cot::db::query::Query#method.filter) method takes a [`filter expression`](enum@cot::db::query::expr::Expr). In the example above, the expression `Expr::eq(Expr::field("id"), Expr::value("5"))` is evaluated as `id = 5`.
 
 ### Retrieving all objects
 One way to retrieve all objects of a model is to call the [`all`](struct@cot::db::query::Query#method.all) method after filtering the query results.
 
 ```rust
 use cot::db::Database;
-use cot::db::query::Expr;
+use cot::db::query::expr::Expr;
 
 # #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn get_all_customers(db: Database) -> cot::Result<()> {
@@ -296,7 +296,7 @@ The [`filter`](struct@cot::db::query::Query#method.filter) method returns a new 
 
 ```rust
 use cot::db::Database;
-use cot::db::query::Expr;
+use cot::db::query::expr::Expr;
 
 # #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn get_customers(db: Database) -> cot::Result<()> {

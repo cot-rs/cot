@@ -1,4 +1,5 @@
-use cot::db::query::{Expr, ExprAdd, ExprDiv, ExprEq, ExprMul, ExprOrd, ExprSub, Query};
+use cot::db::query::Query;
+use cot::db::query::expr::{Expr, ExprAdd, ExprDiv, ExprEq, ExprMul, ExprOrd, ExprSub};
 use cot::db::{model, query};
 
 #[model]
@@ -189,7 +190,7 @@ fn test_query_mul_fields() {
     );
 
     assert_eq!(
-        <MyModel as ::cot::db::Model>::objects().filter(::cot::db::query::ExprMul::mul(
+        <MyModel as ::cot::db::Model>::objects().filter(::cot::db::query::expr::ExprMul::mul(
             <MyModel as ::cot::db::Model>::Fields::quantity,
             5i64
         )),

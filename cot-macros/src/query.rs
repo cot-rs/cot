@@ -24,34 +24,85 @@ impl Parse for Query {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum StringMethod {
-    Contains,
-    StartsWith,
-    EndsWith,
+pub(crate) enum StringMethod {
+    Contains { case_sensitive: bool },
+    StartsWith { case_sensitive: bool },
+    EndsWith { case_sensitive: bool },
+    Raw { case_sensitive: bool },
 }
 
 impl StringMethod {
-    pub fn from_ident(ident: &syn::Ident) -> Option<Self> {
+    pub(crate) fn from_ident(ident: &syn::Ident) -> Option<Self> {
         match ident.to_string().as_str() {
-            "contains" => Some(Self::Contains),
-            "starts_with" => Some(Self::StartsWith),
-            "ends_with" => Some(Self::EndsWith),
+            "contains" => Some(Self::Contains {
+                case_sensitive: true,
+            }),
+            "icontains" => Some(Self::Contains {
+                case_sensitive: false,
+            }),
+            "starts_with" => Some(Self::StartsWith {
+                case_sensitive: true,
+            }),
+            "istarts_with" => Some(Self::StartsWith {
+                case_sensitive: false,
+            }),
+            "ends_with" => Some(Self::EndsWith {
+                case_sensitive: true,
+            }),
+            "iends_with" => Some(Self::EndsWith {
+                case_sensitive: false,
+            }),
+            "raw" => Some(Self::Raw {
+                case_sensitive: true,
+            }),
+            "iraw" => Some(Self::Raw {
+                case_sensitive: false,
+            }),
             _ => None,
         }
     }
 
-    pub fn as_ident(&self) -> syn::Ident {
-        match self {
-            Self::Contains => {
-                format_ident!("contains")
-            }
-            Self::StartsWith => {
-                format_ident!("starts_with")
-            }
-            Self::EndsWith => {
-                format_ident!("ends_with")
-            }
-        }
+    pub(crate) fn as_ident(self) -> syn::Ident {
+        let name = match self {
+            Self::Contains {
+                case_sensitive: true,
+            } => "contains",
+            Self::Contains {
+                case_sensitive: false,
+            } => "icontains",
+            Self::StartsWith {
+                case_sensitive: true,
+            } => "starts_with",
+            Self::StartsWith {
+                case_sensitive: false,
+            } => "istarts_with",
+            Self::EndsWith {
+                case_sensitive: true,
+            } => "ends_with",
+            Self::EndsWith {
+                case_sensitive: false,
+            } => "iends_with",
+            Self::Raw {
+                case_sensitive: true,
+            } => "raw",
+            Self::Raw {
+                case_sensitive: false,
+            } => "iraw",
+        };
+        format_ident!("{name}")
+    }
+
+    pub(crate) fn all_names() -> &'static [&'static str] {
+        &[
+            "contains",
+            "icontains",
+            "starts_with",
+            "istarts_with",
+            "ends_with",
+            "iends_with",
+            "raw",
+            "iraw",
+        ]
     }
 }
 
@@ -72,7 +123,7 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
             quote!(<#model_name as #crate_name::db::Model>::Fields::#field_name.as_expr())
         }
         Expr::Value(value) => {
-            quote!(#crate_name::db::query::Expr::value(#value))
+            quote!(#crate_name::db::query::expr::Expr::value(#value))
         }
         Expr::MemberAccess {
             parent,
@@ -80,7 +131,7 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
             ..
         } => match parent.as_tokens() {
             Some(tokens) => {
-                quote!(#crate_name::db::query::Expr::value(#tokens.#member_name))
+                quote!(#crate_name::db::query::expr::Expr::value(#tokens.#member_name))
             }
             None => syn::Error::new_spanned(
                 parent.as_tokens_full(),
@@ -94,7 +145,7 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
             ..
         } => match parent.as_tokens() {
             Some(tokens) => {
-                quote!(#crate_name::db::query::Expr::value(#tokens::#path_segment))
+                quote!(#crate_name::db::query::expr::Expr::value(#tokens::#path_segment))
             }
             None => syn::Error::new_spanned(
                 parent.as_tokens_full(),
@@ -103,41 +154,38 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
             .to_compile_error(),
         },
         Expr::FunctionCall { function, args } => {
-            let field_free_tokens = function.as_tokens();
+            let non_field_tokens = function.as_tokens();
 
-            if field_free_tokens.is_none() {
-                if let Expr::MemberAccess { member_name, .. } = &*function {
-                    if let Some(method) = StringMethod::from_ident(member_name) {
-                        let Expr::MemberAccess { parent, .. } = *function else {
-                            unreachable!("function call must have a parent");
-                        };
-                        return handle_string_method(model_name, *parent, args, method);
-                    }
-                }
+            if non_field_tokens.is_none()
+                && let Expr::MemberAccess { member_name, .. } = &*function
+                && let Some(method) = StringMethod::from_ident(member_name)
+            {
+                let Expr::MemberAccess { parent, .. } = *function else {
+                    unreachable!("function call must have a parent");
+                };
+                return handle_string_method(model_name, *parent, args, method);
             }
 
-            match field_free_tokens {
-                Some(tokens) => {
-                    quote!(#crate_name::db::query::Expr::value(#tokens(#(#args),*)))
-                }
-                None => syn::Error::new_spanned(
-                    function.as_tokens_full(),
+            if let Some(tokens) = non_field_tokens {
+                quote!(#crate_name::db::query::expr::Expr::value(#tokens(#(#args),*)))
+            } else {
+                let all_function_names = StringMethod::all_names().join(", ");
+                let msg = format!(
                     "calling functions that reference database fields is unsupported \
-                     (only `.contains(..)`, `.starts_with(..)`, and `.ends_with(..)` \
-                     are supported directly on database fields)",
-                )
-                .to_compile_error(),
+                        (only {all_function_names} are supported directly on database fields)"
+                );
+                syn::Error::new_spanned(function.as_tokens_full(), msg).to_compile_error()
             }
         }
         Expr::And(lhs, rhs) => {
             let lhs = expr_to_tokens(model_name, *lhs);
             let rhs = expr_to_tokens(model_name, *rhs);
-            quote!(#crate_name::db::query::Expr::and(#lhs, #rhs))
+            quote!(#crate_name::db::query::expr::Expr::and(#lhs, #rhs))
         }
         Expr::Or(lhs, rhs) => {
             let lhs = expr_to_tokens(model_name, *lhs);
             let rhs = expr_to_tokens(model_name, *rhs);
-            quote!(#crate_name::db::query::Expr::or(#lhs, #rhs))
+            quote!(#crate_name::db::query::expr::Expr::or(#lhs, #rhs))
         }
         Expr::Eq(lhs, rhs) => handle_binary_comparison(model_name, *lhs, *rhs, "eq", "ExprEq"),
         Expr::Ne(lhs, rhs) => handle_binary_comparison(model_name, *lhs, *rhs, "ne", "ExprEq"),
@@ -166,12 +214,12 @@ fn handle_binary_comparison(
     if let Expr::FieldRef { ref field_name, .. } = lhs
         && let Some(rhs_tokens) = rhs.as_tokens()
     {
-        return quote!(#crate_name::db::query::#bin_trait::#bin_fn(<#model_name as #crate_name::db::Model>::Fields::#field_name, #rhs_tokens));
+        return quote!(#crate_name::db::query::expr::#bin_trait::#bin_fn(<#model_name as #crate_name::db::Model>::Fields::#field_name, #rhs_tokens));
     }
 
     let lhs = expr_to_tokens(model_name, lhs);
     let rhs = expr_to_tokens(model_name, rhs);
-    quote!(#crate_name::db::query::Expr::#bin_fn(#lhs, #rhs))
+    quote!(#crate_name::db::query::expr::Expr::#bin_fn(#lhs, #rhs))
 }
 
 fn handle_string_method(
@@ -199,7 +247,7 @@ fn handle_string_method(
 
     if let Expr::FieldRef { ref field_name, .. } = receiver {
         return quote! {
-            #crate_name::db::query::ExprLike::#method_ident(
+            #crate_name::db::query::expr::ExprLike::#method_ident(
                 <#model_name as #crate_name::db::Model>::Fields::#field_name,
                 #arg
             )
@@ -208,9 +256,9 @@ fn handle_string_method(
 
     let receiver_tokens = expr_to_tokens(model_name, receiver);
     quote! {
-        #crate_name::db::query::Expr::#method_ident(
+        #crate_name::db::query::expr::Expr::#method_ident(
             #receiver_tokens,
-            #crate_name::db::query::Expr::value(#arg)
+            #crate_name::db::query::expr::Expr::value(#arg)
         )
     }
 }

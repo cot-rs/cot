@@ -1,10 +1,11 @@
 //! Database interface implementation – MySQL backend.
 
-use sea_query::{ExprTrait, SimpleExpr};
+use cot::db::query::expr::like::LIKE_ESCAPE_CHAR;
+use sea_query::{ExprTrait, LikeExpr, SimpleExpr};
 
 use crate::db::ColumnType;
 use crate::db::query::QueryBuildingError;
-use crate::db::query::expr::like::{CaseSensitivity, LikeDialect, to_sql_like};
+use crate::db::query::expr::like::{CaseSensitivity, LikeExprBuilder, to_sql_like};
 use crate::db::sea_query_db::impl_sea_query_db_backend;
 
 impl_sea_query_db_backend!(DatabaseMySql: sqlx::mysql::MySql, sqlx::mysql::MySqlPool, MySqlRow, MySqlValueRef, sea_query::MysqlQueryBuilder);
@@ -40,14 +41,14 @@ impl DatabaseMySql {
     }
 }
 
-impl LikeDialect for DatabaseMySql {
+impl LikeExprBuilder for DatabaseMySql {
     fn like_expr(
         &self,
         lhs: SimpleExpr,
         glob_pattern: &str,
         case_sensitivity: CaseSensitivity,
     ) -> Result<SimpleExpr, QueryBuildingError> {
-        let glob = to_sql_like(glob_pattern);
+        let like = LikeExpr::new(to_sql_like(glob_pattern).to_lowercase()).escape(LIKE_ESCAPE_CHAR);
 
         match case_sensitivity {
             CaseSensitivity::Sensitive => {
@@ -56,12 +57,10 @@ impl LikeDialect for DatabaseMySql {
                         sea_query::BinOper::Custom("COLLATE"),
                         sea_query::Expr::cust("utf8mb4_bin"),
                     )
-                    .like(glob);
+                    .like(like);
                 Ok(expr)
             }
-            CaseSensitivity::Insensitive => {
-                Ok(sea_query::Func::lower(lhs).like(glob.to_lowercase()))
-            }
+            CaseSensitivity::Insensitive => Ok(sea_query::Func::lower(lhs).like(like)),
         }
     }
 }

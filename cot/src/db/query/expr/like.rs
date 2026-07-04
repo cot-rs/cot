@@ -1,7 +1,7 @@
 //! Database expressions for pattern-matching.
 
 use cot::db::ToDbFieldValue;
-use cot::db::query::expr::{FieldRef, SqlDialect};
+use cot::db::query::expr::{FieldRef, SqlQueryBuilder};
 use cot::db::query::{Expr, IntoField, QueryBuildingError};
 use sea_query::{ExprTrait, SimpleExpr};
 
@@ -16,27 +16,79 @@ pub trait ExprLike<T> {
     /// See [`Expr::contains`] for the underlying semantics.
     fn contains<V: IntoField<T>>(self, other: V) -> Expr;
 
+    /// Checks if the field contains `other` as a literal substring.
+    /// This is the case-insensitive counterpart of [`Self::contains`].
+    ///
+    /// See [`Expr::contains`] for the underlying semantics.
+    fn icontains<V: IntoField<T>>(self, other: V) -> Expr;
+
     /// Checks if the field starts with `other`, comparing
     /// case-sensitively.
     ///
     /// See [`Expr::starts_with`] for the underlying semantics.
     fn starts_with<V: IntoField<T>>(self, other: V) -> Expr;
 
+    /// Checks if the field starts with `other`.
+    /// This is the case-insensitive counterpart of [`Self::starts_with`].
+    ///
+    /// See [`Expr::starts_with`] for the underlying semantics.
+    fn istarts_with<V: IntoField<T>>(self, other: V) -> Expr;
+
     /// Checks if the field ends with `other`, comparing case-sensitively.
     ///
     /// See [`Expr::ends_with`] for the underlying semantics.
     fn ends_with<V: IntoField<T>>(self, other: V) -> Expr;
+
+    /// Checks if the field ends with `other`.
+    /// This is the case-insensitive counterpart of [`Self::ends_with`].
+    ///
+    /// See [`Expr::ends_with`] for the underlying semantics.
+    fn iends_with<V: IntoField<T>>(self, other: V) -> Expr;
+
+    /// Matches an expression against the raw pattern provided in  `other`,
+    /// matching case-sensitively.
+    ///
+    /// See [`Expr::raw_like`] for the underlying semantics.
+    fn raw_like<V: IntoField<T>>(self, other: V) -> Expr;
+
+    /// Matches an expression against the raw pattern provided in  `other`.
+    /// This is the case-insensitive counterpart of [`Self::raw_like`].
+    ///
+    /// See [`Expr::iraw_like`] for the underlying semantics.
+    fn iraw_like<V: IntoField<T>>(self, other: V) -> Expr;
 }
 
 impl<T: ToDbFieldValue + 'static> ExprLike<T> for FieldRef<T> {
     fn contains<V: IntoField<T>>(self, other: V) -> Expr {
         Expr::contains(self.as_expr(), Expr::value(other.into_field()))
     }
+
+    fn icontains<V: IntoField<T>>(self, other: V) -> Expr {
+        Expr::icontains(self.as_expr(), Expr::value(other.into_field()))
+    }
+
     fn starts_with<V: IntoField<T>>(self, other: V) -> Expr {
         Expr::starts_with(self.as_expr(), Expr::value(other.into_field()))
     }
+
+    fn istarts_with<V: IntoField<T>>(self, other: V) -> Expr {
+        Expr::istarts_with(self.as_expr(), Expr::value(other.into_field()))
+    }
+
     fn ends_with<V: IntoField<T>>(self, other: V) -> Expr {
         Expr::ends_with(self.as_expr(), Expr::value(other.into_field()))
+    }
+
+    fn iends_with<V: IntoField<T>>(self, other: V) -> Expr {
+        Expr::iends_with(self.as_expr(), Expr::value(other.into_field()))
+    }
+
+    fn raw_like<V: IntoField<T>>(self, other: V) -> Expr {
+        Expr::raw_like(self.as_expr(), Expr::value(other.into_field()))
+    }
+
+    fn iraw_like<V: IntoField<T>>(self, other: V) -> Expr {
+        Expr::iraw_like(self.as_expr(), Expr::value(other.into_field()))
     }
 }
 
@@ -85,7 +137,7 @@ fn push_like_literal(out: &mut String, ch: char) {
 }
 
 pub(crate) fn like_expr(
-    sql_dialect: &dyn SqlDialect,
+    sql_dialect: &dyn SqlQueryBuilder,
     lhs: &Expr,
     rhs: &Expr,
     mode: LikeMode,
@@ -134,7 +186,7 @@ pub enum CaseSensitivity {
 /// left-hand-side expression, a pattern already expressed in Cot's
 /// canonical glob syntax (`*`/`?`/`\` — see [`Expr::raw_like`]), and the
 /// requested [`CaseSensitivity`].
-pub trait LikeDialect {
+pub trait LikeExprBuilder {
     /// Builds the `sea_query` expression that checks whether `lhs`
     /// matches `glob_pattern`, honoring `case_sensitivity`.
     ///

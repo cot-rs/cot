@@ -1,11 +1,13 @@
 //! Database interface implementation – SQLite backend.
 
 use sea_query::extension::sqlite::SqliteExpr;
-use sea_query::{ExprTrait, SimpleExpr};
+use sea_query::{ExprTrait, LikeExpr, SimpleExpr};
 use sea_query_sqlx::SqlxValues;
 
 use crate::db::query::QueryBuildingError;
-use crate::db::query::expr::like::{CaseSensitivity, LIKE_ESCAPE_CHAR, LikeDialect};
+use crate::db::query::expr::like::{
+    CaseSensitivity, LIKE_ESCAPE_CHAR, LikeExprBuilder, to_sql_like,
+};
 use crate::db::sea_query_db::impl_sea_query_db_backend;
 
 impl_sea_query_db_backend!(DatabaseSqlite: sqlx::sqlite::Sqlite, sqlx::sqlite::SqlitePool, SqliteRow, SqliteValueRef, sea_query::SqliteQueryBuilder);
@@ -51,6 +53,8 @@ impl DatabaseSqlite {
                         Self::push_glob_literal(&mut escaped, ch);
                     }
                 }
+                '*' => escaped.push('*'),
+                '?' => escaped.push('?'),
                 other => Self::push_glob_literal(&mut escaped, other),
             }
         }
@@ -68,7 +72,7 @@ impl DatabaseSqlite {
     }
 }
 
-impl LikeDialect for DatabaseSqlite {
+impl LikeExprBuilder for DatabaseSqlite {
     fn like_expr(
         &self,
         lhs: SimpleExpr,
@@ -81,7 +85,9 @@ impl LikeDialect for DatabaseSqlite {
                 Ok(lhs.glob(glob))
             }
             CaseSensitivity::Insensitive => {
-                Ok(sea_query::Func::lower(lhs).like(glob_pattern.to_lowercase()))
+                let like = LikeExpr::new(to_sql_like(&glob_pattern.to_lowercase()))
+                    .escape(LIKE_ESCAPE_CHAR);
+                Ok(sea_query::Func::lower(lhs).like(like))
             }
         }
     }

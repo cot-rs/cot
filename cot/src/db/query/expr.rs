@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use cot::db::query::{IntoField, QueryBuildingError};
 use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, ToDbFieldValue};
 pub use like::ExprLike;
-use like::{CaseSensitivity, LikeDialect, LikeMode};
+use like::{CaseSensitivity, LikeExprBuilder, LikeMode};
 use sea_query::{ExprTrait, IntoColumnRef, SimpleExpr};
 
 /// An expression that can be used to filter, update, or delete rows.
@@ -1227,62 +1227,62 @@ impl Expr {
     /// expression.
     pub fn as_sea_query_expr(
         &self,
-        sql_dialect: &dyn SqlDialect,
+        sql_builder: &dyn SqlQueryBuilder,
     ) -> Result<SimpleExpr, QueryBuildingError> {
         match self {
             Self::Field(identifier) => Ok((*identifier).into_column_ref().into()),
             Self::Value(value) => Ok((*value).clone().into()),
-            Self::And(lhs, rhs) => lhs
-                .as_sea_query_expr(sql_dialect)
-                .and(rhs.as_sea_query_expr(sql_dialect)),
-            Self::Or(lhs, rhs) => lhs
-                .as_sea_query_expr(sql_dialect)
-                .or(rhs.as_sea_query_expr(sql_dialect)),
+            Self::And(lhs, rhs) => Ok(lhs
+                .as_sea_query_expr(sql_builder)?
+                .and(rhs.as_sea_query_expr(sql_builder)?)),
+            Self::Or(lhs, rhs) => Ok(lhs
+                .as_sea_query_expr(sql_builder)?
+                .or(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Eq(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .eq(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .eq(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Ne(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .ne(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .ne(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Lt(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .lt(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .lt(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Lte(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .lte(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .lte(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Gt(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .gt(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .gt(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Gte(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .gte(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .gte(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Add(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .add(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .add(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Sub(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .sub(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .sub(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Mul(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .mul(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .mul(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Div(lhs, rhs) => Ok(lhs
-                .as_sea_query_expr(sql_dialect)?
-                .div(rhs.as_sea_query_expr(sql_dialect)?)),
+                .as_sea_query_expr(sql_builder)?
+                .div(rhs.as_sea_query_expr(sql_builder)?)),
             Self::Contains(lhs, rhs, case_sensitivity) => {
-                like::like_expr(sql_dialect, lhs, rhs, LikeMode::Contains, *case_sensitivity)
+                like::like_expr(sql_builder, lhs, rhs, LikeMode::Contains, *case_sensitivity)
             }
             Self::StartsWith(lhs, rhs, case_sensitivity) => like::like_expr(
-                sql_dialect,
+                sql_builder,
                 lhs,
                 rhs,
                 LikeMode::StartsWith,
                 *case_sensitivity,
             ),
             Self::EndsWith(lhs, rhs, case_sensitivity) => {
-                like::like_expr(sql_dialect, lhs, rhs, LikeMode::EndsWith, *case_sensitivity)
+                like::like_expr(sql_builder, lhs, rhs, LikeMode::EndsWith, *case_sensitivity)
             }
             Self::RawLike(lhs, rhs, case_sensitivity) => {
-                like::like_expr(sql_dialect, lhs, rhs, LikeMode::Raw, *case_sensitivity)
+                like::like_expr(sql_builder, lhs, rhs, LikeMode::Raw, *case_sensitivity)
             }
         }
     }
@@ -1611,9 +1611,9 @@ impl<T: ToDbFieldValue + Ord + 'static> ExprOrd<T> for FieldRef<T> {
 
 /// A marker trait that represents the full set of query-translation
 /// capabilities a database backend may support.
-pub trait SqlDialect: LikeDialect {}
+pub trait SqlQueryBuilder: LikeExprBuilder {}
 
-impl<T> SqlDialect for T where T: LikeDialect {}
+impl<T> SqlQueryBuilder for T where T: LikeExprBuilder {}
 
 macro_rules! impl_expr {
     ($ty:ty, $trait:ident, $method:ident) => {

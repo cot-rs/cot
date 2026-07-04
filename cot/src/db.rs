@@ -424,7 +424,7 @@ use derive_more::{Debug, Deref, Display};
 #[cfg(test)]
 use mockall::automock;
 use query::Query;
-use query::expr::like::{CaseSensitivity, LikeDialect};
+use query::expr::like::{CaseSensitivity, LikeExprBuilder};
 pub use relations::{ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use sea_query::{
     ColumnRef, ExprTrait, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder,
@@ -1988,7 +1988,7 @@ impl ColumnTypeMapper for Database {
     }
 }
 
-impl LikeDialect for Database {
+impl LikeExprBuilder for Database {
     fn like_expr(
         &self,
         lhs: SimpleExpr,

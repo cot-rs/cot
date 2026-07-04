@@ -1,10 +1,11 @@
 //! Database interface implementation – PostgreSQL backend.
 
 use cot::db::query::QueryBuildingError;
+use cot::db::query::expr::like::LIKE_ESCAPE_CHAR;
 use sea_query::extension::postgres::PgExpr;
-use sea_query::{ExprTrait, SimpleExpr};
+use sea_query::{ExprTrait, LikeExpr, SimpleExpr};
 
-use crate::db::query::expr::like::{CaseSensitivity, LikeDialect, to_sql_like};
+use crate::db::query::expr::like::{CaseSensitivity, LikeExprBuilder, to_sql_like};
 use crate::db::sea_query_db::impl_sea_query_db_backend;
 
 impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::postgres::PgPool, PostgresRow, PostgresValueRef, sea_query::PostgresQueryBuilder);
@@ -48,14 +49,14 @@ impl DatabasePostgres {
     }
 }
 
-impl LikeDialect for DatabasePostgres {
+impl LikeExprBuilder for DatabasePostgres {
     fn like_expr(
         &self,
         lhs: SimpleExpr,
         glob_pattern: &str,
         case_sensitivity: CaseSensitivity,
     ) -> Result<SimpleExpr, QueryBuildingError> {
-        let glob = to_sql_like(glob_pattern);
+        let glob = LikeExpr::new(to_sql_like(glob_pattern)).escape(LIKE_ESCAPE_CHAR);
 
         match case_sensitivity {
             CaseSensitivity::Sensitive => Ok(lhs.like(glob)),

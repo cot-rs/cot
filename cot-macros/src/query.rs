@@ -52,10 +52,10 @@ impl StringMethod {
             "iends_with" => Some(Self::EndsWith {
                 case_sensitive: false,
             }),
-            "raw" => Some(Self::Raw {
+            "raw_like" => Some(Self::Raw {
                 case_sensitive: true,
             }),
-            "iraw" => Some(Self::Raw {
+            "iraw_like" => Some(Self::Raw {
                 case_sensitive: false,
             }),
             _ => None,
@@ -84,10 +84,10 @@ impl StringMethod {
             } => "iends_with",
             Self::Raw {
                 case_sensitive: true,
-            } => "raw",
+            } => "raw_like",
             Self::Raw {
                 case_sensitive: false,
-            } => "iraw",
+            } => "iraw_like",
         };
         format_ident!("{name}")
     }
@@ -100,8 +100,8 @@ impl StringMethod {
             "istarts_with",
             "ends_with",
             "iends_with",
-            "raw",
-            "iraw",
+            "raw_like",
+            "iraw_like",
         ]
     }
 }
@@ -254,6 +254,11 @@ fn handle_string_method(
         };
     }
 
+    // If the receiver isn't a bare field reference (e.g. a composite
+    // expression like `$a + $b`), fall back to the untyped `Expr` constructor.
+    // This bypasses compile-time type checking, so a mismatched type will
+    // only surface as a runtime error (or, in the worst case, a
+    // silently-wrong query) rather than a compile error.
     let receiver_tokens = expr_to_tokens(model_name, receiver);
     quote! {
         #crate_name::db::query::expr::Expr::#method_ident(

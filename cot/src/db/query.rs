@@ -9,7 +9,7 @@ use sea_query::ExprTrait;
 use thiserror::Error;
 
 use crate::db;
-use crate::db::query::expr::SqlDialect;
+use crate::db::query::expr::SqlQueryBuilder;
 pub use crate::db::query::expr::{Expr, ExprAdd, ExprDiv, ExprMul, ExprOrd, ExprSub};
 use crate::db::{
     Auto, Database, DatabaseBackend, ForeignKey, Model, StatementResult, ToDbFieldValue,
@@ -249,10 +249,10 @@ impl<T: Model> Query<T> {
     pub(super) fn add_filter_to_statement<S: sea_query::ConditionalStatement>(
         &self,
         statement: &mut S,
-        db: &dyn SqlDialect,
+        sql_builder: &dyn SqlQueryBuilder,
     ) -> Result<(), QueryBuildingError> {
         if let Some(filter) = &self.filter {
-            statement.and_where(filter.as_sea_query_expr(db)?);
+            statement.and_where(filter.as_sea_query_expr(sql_builder)?);
         }
         Ok(())
     }

@@ -48,19 +48,20 @@ impl LikeExprBuilder for DatabaseMySql {
         glob_pattern: &str,
         case_sensitivity: CaseSensitivity,
     ) -> Result<SimpleExpr, QueryBuildingError> {
-        let like = LikeExpr::new(to_sql_like(glob_pattern).to_lowercase()).escape(LIKE_ESCAPE_CHAR);
+        let sql_pattern = to_sql_like(glob_pattern);
 
         match case_sensitivity {
             CaseSensitivity::Sensitive => {
-                let expr = lhs
-                    .binary(
-                        sea_query::BinOper::Custom("COLLATE"),
-                        sea_query::Expr::cust("utf8mb4_bin"),
-                    )
-                    .like(like);
+                let expr = SimpleExpr::cust_with_exprs(
+                    format!("? LIKE BINARY ? ESCAPE '{LIKE_ESCAPE_CHAR}'",),
+                    [lhs, SimpleExpr::val(sql_pattern)],
+                );
                 Ok(expr)
             }
-            CaseSensitivity::Insensitive => Ok(sea_query::Func::lower(lhs).like(like)),
+            CaseSensitivity::Insensitive => {
+                let like = LikeExpr::new(sql_pattern.to_lowercase()).escape(LIKE_ESCAPE_CHAR);
+                Ok(sea_query::Func::lower(lhs).like(like))
+            }
         }
     }
 }

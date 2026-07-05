@@ -53,7 +53,7 @@ impl LikeExprBuilder for DatabaseMySql {
         match case_sensitivity {
             CaseSensitivity::Sensitive => {
                 let expr = SimpleExpr::cust_with_exprs(
-                    format!("? LIKE BINARY ? ESCAPE '{LIKE_ESCAPE_CHAR}'",),
+                    format!("? LIKE BINARY ? ESCAPE {LIKE_ESCAPE_CHAR}"),
                     [lhs, SimpleExpr::val(sql_pattern)],
                 );
                 Ok(expr)

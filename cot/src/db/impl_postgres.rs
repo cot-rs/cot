@@ -1,7 +1,6 @@
 //! Database interface implementation – PostgreSQL backend.
 
 use cot::db::query::QueryBuildingError;
-use cot::db::query::expr::like::LIKE_ESCAPE_CHAR;
 use sea_query::extension::postgres::PgExpr;
 use sea_query::{ExprTrait, LikeExpr, SimpleExpr};
 
@@ -56,7 +55,7 @@ impl LikeExprBuilder for DatabasePostgres {
         glob_pattern: &str,
         case_sensitivity: CaseSensitivity,
     ) -> Result<SimpleExpr, QueryBuildingError> {
-        let glob = LikeExpr::new(to_sql_like(glob_pattern)).escape(LIKE_ESCAPE_CHAR);
+        let glob = LikeExpr::new(to_sql_like(glob_pattern));
 
         match case_sensitivity {
             CaseSensitivity::Sensitive => Ok(lhs.like(glob)),

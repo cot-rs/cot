@@ -53,13 +53,12 @@ impl LikeExprBuilder for DatabaseMySql {
         match case_sensitivity {
             CaseSensitivity::Sensitive => {
                 let expr = SimpleExpr::cust_with_exprs(
-                    // Doubled the escape character. MySQL's string-literal lexer needs `\\` for
-                    // one literal `\`. We cast the pattern (not the column) so
-                    // the column stays bare and usable by an index;
-                    // sea_query's `LikeExpr` can't cast its pattern, so this needs raw text
-                    // instead of `.like(...)`.
-                    format!("? LIKE BINARY ? ESCAPE '{LIKE_ESCAPE_CHAR}{LIKE_ESCAPE_CHAR}'"),
-                    [lhs, SimpleExpr::val(sql_pattern)],
+                    "? LIKE BINARY ? ESCAPE ?",
+                    [
+                        lhs,
+                        SimpleExpr::val(sql_pattern),
+                        SimpleExpr::val(LIKE_ESCAPE_CHAR.to_string()),
+                    ],
                 );
                 Ok(expr)
             }

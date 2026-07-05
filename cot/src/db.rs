@@ -419,6 +419,75 @@ pub use cot_macros::model;
 /// let _ = query!(Customer, $status == constants::ACTIVE_STATUS);
 /// let _ = query!(Customer, $id == next_customer_id());
 /// ```
+///
+/// ## String pattern matching
+///
+/// Query expressions support substring, prefix, suffix, and raw
+/// glob-pattern matching on `String` fields, via
+/// [`contains`](cot::db::query::expr::Expr::contains),
+/// [`starts_with`](cot::db::query::expr::Expr::starts_with),
+/// [`ends_with`](cot::db::query::expr::Expr::ends_with), and
+/// [`raw_like`](cot::db::query::expr::Expr::raw_like), along with an
+/// `i`-prefixed case-insensitive counterpart of each
+/// ([`icontains`](cot::db::query::expr::Expr::icontains),
+/// [`istarts_with`](cot::db::query::expr::Expr::istarts_with),
+/// [`iends_with`](cot::db::query::expr::Expr::iends_with),
+/// [`iraw_like`](cot::db::query::expr::Expr::iraw_like)).
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// # }
+/// let _ = query!(Customer, $full_name.contains("Doe"));
+/// let _ = query!(Customer, $full_name.icontains("doe"));
+/// let _ = query!(Customer, $full_name.starts_with("Jon"));
+/// let _ = query!(Customer, $full_name.istarts_with("jon"));
+/// let _ = query!(Customer, $full_name.ends_with("Doe"));
+/// let _ = query!(Customer, $full_name.iends_with("doe"));
+/// ```
+///
+/// `raw_like`/`iraw_like` accept a raw glob pattern (`*` for zero-or-more
+/// characters, `?` for exactly one, `\` to escape a wildcard) rather than
+/// a plain literal, for shapes the other four methods can't express, such
+/// as a fixed-width or middle-of-string match:
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// # }
+/// let _ = query!(Customer, $full_name.raw_like("J?n Do*"));
+/// let _ = query!(Customer, $full_name.iraw_like("j*n ??e"));
+/// ```
+///
+/// These methods can be combined with boolean and comparison operators
+/// like any other expression:
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// #     is_active: bool,
+/// # }
+/// let _ = query!(Customer, $full_name.contains("Doe") && $is_active == true);
+/// ```
+///
+/// See [`Expr::contains`](cot::db::query::expr::Expr::contains) and
+/// [`Expr::raw_like`](cot::db::query::expr::Expr::raw_like) for the full
+/// semantics, escaping rules, and glob pattern syntax.
 pub use cot_macros::query;
 use derive_more::{Debug, Deref, Display};
 #[cfg(test)]

@@ -6,6 +6,7 @@ use std::fmt::{Display, Formatter};
 ///
 /// [`step`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/step
 #[derive(Debug, Copy, Clone)]
+#[non_exhaustive]
 pub enum Step<T> {
     /// Indicates that the user may enter any value (no fixed “step” interval).
     ///
@@ -122,6 +123,7 @@ impl Display for AutoComplete {
 ///
 /// [`autocapitalize`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/autocapitalize
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum AutoCapitalize {
     /// No capitalization.
     Off,
@@ -155,6 +157,7 @@ impl Display for AutoCapitalize {
 ///
 /// [`dir`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/dir
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum Dir {
     /// Right-to-left text direction.
     Rtl,
@@ -187,6 +190,7 @@ impl Display for Dir {
 ///
 /// [`capture`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/file#capture
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum Capture {
     /// Use the user-facing camera or microphone.
     User,

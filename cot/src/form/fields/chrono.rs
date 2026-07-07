@@ -143,6 +143,7 @@ impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
 /// );
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
+#[non_exhaustive]
 pub struct DateTimeFieldOptions {
     /// The maximum datetime value of the field used to set the `max` attribute
     /// in the HTML input element.
@@ -291,6 +292,7 @@ impl From<ParseError> for FormFieldValidationError {
 /// );
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
+#[non_exhaustive]
 pub struct DateTimeWithTimezoneFieldOptions {
     /// The maximum allowed datetime (with offset) for this field.
     ///
@@ -476,6 +478,7 @@ impl_form_field!(TimeField, TimeFieldOptions, "a time");
 /// );
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
+#[non_exhaustive]
 pub struct TimeFieldOptions {
     /// The maximum time value of the field used to set the `max` attribute
     /// in the HTML input element.
@@ -597,6 +600,7 @@ impl_form_field!(DateField, DateFieldOptions, "a date");
 /// );
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
+#[non_exhaustive]
 pub struct DateFieldOptions {
     /// The maximum date value of the field used to set the `max` attribute
     /// in the HTML input element.

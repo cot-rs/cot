@@ -184,6 +184,7 @@ impl_form_field!(SelectField, SelectFieldOptions, "a dropdown list", T: SelectCh
 
 /// Custom options for a [`SelectField`].
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct SelectFieldOptions<T> {
     /// The list of available choices for the select field.
     /// If not set, the default choices from [`SelectChoice::default_choices`]
@@ -282,6 +283,7 @@ impl<T: SelectChoice + Send> FormField for SelectMultipleField<T> {
 
 /// Custom options for a [`SelectMultipleField`].
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct SelectMultipleFieldOptions<T> {
     /// The list of available choices for the multi-select field.
     /// If not set, the default choices from [`SelectChoice::default_choices`]

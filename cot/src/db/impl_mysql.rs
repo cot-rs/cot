@@ -52,16 +52,12 @@ impl LikeExprBuilder for DatabaseMySql {
 
         match case_sensitivity {
             CaseSensitivity::Sensitive => {
-                let expr = lhs
-                    .binary(
-                        sea_query::BinOper::Custom("COLLATE"),
-                        // We assume that the database is using utf8mb4 character set, which is the
-                        // default in MySQL 8.0. See https://dev.mysql.com/doc/refman/9.7/en/charset.html
-                        // TODO: Allow users to change collation in the future if needed.
-                        sea_query::Expr::cust("utf8mb4_bin"),
-                    )
-                    .like(sql_pattern);
-                Ok(expr)
+                // We assume that the database is using utf8mb4 character set, which is the
+                // default in MySQL 8.0. See https://dev.mysql.com/doc/refman/9.7/en/charset.html
+                // TODO: Allow users to change collation in the future if needed.
+                let collated_lhs = sea_query::Expr::cust_with_exprs("? COLLATE utf8mb4_bin", [lhs]);
+                let like = LikeExpr::new(sql_pattern).escape(LIKE_ESCAPE_CHAR);
+                Ok(collated_lhs.like(like))
             }
             CaseSensitivity::Insensitive => {
                 let like = LikeExpr::new(sql_pattern.to_lowercase()).escape(LIKE_ESCAPE_CHAR);

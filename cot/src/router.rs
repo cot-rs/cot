@@ -1335,7 +1335,7 @@ mod tests {
     #[cot::test]
     async fn prefer_literal_over_placeholder_wildcard() {
         let router = Router::with_urls(vec![
-            Route::with_handler("/foo/{prarm}", MockHandler),
+            Route::with_handler("/foo/{param}", MockHandler),
             Route::with_handler("/foo/bar", SelectedHandler),
             Route::with_handler("/foo/{*path}", MockHandler),
         ]);

@@ -2,8 +2,10 @@ use std::fmt::{Display, Formatter};
 
 use askama::filters::HtmlSafe;
 use bytes::Bytes;
+use cot::form::fields::impl_field_options_builder;
 use cot::form::{AsFormField, FormFieldValidationError};
 use cot::html::HtmlTag;
+use derive_builder::Builder;
 
 use crate::form::fields::attrs::Capture;
 use crate::form::{FormField, FormFieldOptions, FormFieldValue, FormFieldValueError};
@@ -52,7 +54,9 @@ impl FormField for FileField {
 }
 
 /// Custom options for a [`FileField`].
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
 #[non_exhaustive]
 pub struct FileFieldOptions {
     /// The accepted file types. Used to set the [`accept` attribute] in the
@@ -150,6 +154,11 @@ impl InMemoryUploadedFile {
     }
 }
 
+impl_field_options_builder!(
+    FileFieldOptions,
+    FileFieldOptionsBuilder { accept, capture }
+);
+
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
@@ -167,10 +176,10 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FileFieldOptions {
-                accept: Some(vec!["image/*".to_string(), ".pdf".to_string()]),
-                capture: Some(Capture::Environment),
-            },
+            FileFieldOptions::builder()
+                .accept(vec!["image/*".to_string(), ".pdf".to_string()])
+                .capture(Capture::Environment)
+                .build(),
         );
 
         let html = field.to_string();
@@ -189,10 +198,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FileFieldOptions {
-                accept: None,
-                capture: Some(Capture::User),
-            },
+            FileFieldOptions::builder().capture(Capture::User).build(),
         );
 
         let html = field.to_string();
@@ -211,9 +217,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FileFieldOptions {
-                ..Default::default()
-            },
+            FileFieldOptions::builder().build(),
         );
 
         let boundary = "boundary";
@@ -248,9 +252,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FileFieldOptions {
-                ..Default::default()
-            },
+            FileFieldOptions::builder().build(),
         );
 
         let value = InMemoryUploadedFile::clean_value(&field);

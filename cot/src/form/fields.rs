@@ -15,6 +15,7 @@ pub use chrono::{
     DateField, DateFieldOptions, DateTimeField, DateTimeFieldOptions, DateTimeWithTimezoneField,
     DateTimeWithTimezoneFieldOptions, TimeField, TimeFieldOptions,
 };
+use derive_builder::Builder;
 pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
 pub(crate) use select::check_required_multiple;
 pub use select::{
@@ -68,12 +69,95 @@ macro_rules! impl_form_field {
         }
     };
 }
+
+macro_rules! impl_field_options_builder {
+    (
+        $ty:ident < $($gen:ident),+ >,
+        $builder:ident < $($gen2:ident),+ >
+        { $($field:ident),+ $(,)? }
+    ) => {
+        impl<$($gen: Clone),+> $ty<$($gen),+> {
+            #[doc = concat!(
+                "Creates a new [`", stringify!($builder), "`] to build a ",
+                "[`", stringify!($ty), "`].\n\n",
+                "# Examples\n\n",
+                "```\n",
+                "# use cot::form::fields::", stringify!($ty), ";\n",
+                "let options = ", stringify!($ty), "::<i32>::builder().build();\n",
+                "```",
+            )]
+            #[must_use]
+            pub fn builder() -> $builder<$($gen),+> {
+                $builder::default()
+            }
+        }
+
+        impl<$($gen2: Clone),+> $builder<$($gen2),+> {
+            #[doc = concat!(
+                "Builds the [`", stringify!($ty), "`], falling back to ",
+                "defaults for any field that wasn't explicitly set.\n\n",
+                "# Examples\n\n",
+                "```\n",
+                "# use cot::form::fields::", stringify!($ty), ";\n",
+                "let options = ", stringify!($ty), "::<i32>::builder().build();\n",
+                "```",
+            )]
+            #[must_use]
+            pub fn build(&self) -> $ty<$($gen2),+> {
+                $ty {
+                    $( $field: self.$field.clone().unwrap_or_default(), )+
+                }
+            }
+        }
+    };
+
+    ($ty:ident, $builder:ident { $($field:ident),+ $(,)? }) => {
+        impl $ty {
+            #[doc = concat!(
+                "Creates a new [`", stringify!($builder), "`] to build a ",
+                "[`", stringify!($ty), "`].\n\n",
+                "# Examples\n\n",
+                "```\n",
+                "# use cot::form::fields::", stringify!($ty), ";\n",
+                "let options = ", stringify!($ty), "::builder().build();\n",
+                "```",
+            )]
+            #[must_use]
+            pub fn builder() -> $builder {
+                $builder::default()
+            }
+        }
+
+        impl $builder {
+            #[doc = concat!(
+                "Builds the [`", stringify!($ty), "`], falling back to ",
+                "defaults for any field that wasn't explicitly set.\n\n",
+                "# Examples\n\n",
+                "```\n",
+                "# use cot::form::fields::", stringify!($ty), ";\n",
+                "let options = ", stringify!($ty), "::builder().build();\n",
+                "```",
+            )]
+            #[must_use]
+            pub fn build(&self) -> $ty {
+                $ty {
+                    $( $field: self.$field.clone().unwrap_or_default(), )+
+                }
+            }
+        }
+    };
+}
+
+pub(crate) use impl_field_options_builder;
 pub(crate) use impl_form_field;
 
 impl_form_field!(StringField, StringFieldOptions, "a string");
 
 /// Custom options for a [`StringField`].
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct StringFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
@@ -213,7 +297,10 @@ impl<const LEN: u32> AsFormField for LimitedString<LEN> {
 impl_form_field!(PasswordField, PasswordFieldOptions, "a password");
 
 /// Custom options for a [`PasswordField`].
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct PasswordFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
@@ -325,7 +412,10 @@ impl AsFormField for PasswordHash {
 impl_form_field!(EmailField, EmailFieldOptions, "an email");
 
 /// Custom options for [`EmailField`]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct EmailFieldOptions {
     /// The maximum length of the field used to set the `maxlength` attribute
     /// in the HTML input element.
@@ -468,7 +558,10 @@ impl HtmlSafe for EmailField {}
 impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer + Display);
 
 /// Custom options for a [`IntegerField`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct IntegerFieldOptions<T> {
     /// The minimum value of the field. Used to set the `min` attribute in the
     /// HTML input element.
@@ -664,7 +757,10 @@ impl_integer_as_form_field!(NonZeroUsize);
 impl_form_field!(BoolField, BoolFieldOptions, "a boolean");
 
 /// Custom options for a [`BoolField`].
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct BoolFieldOptions {
     /// If `true`, the field must be checked to be considered valid.
     pub must_be_true: Option<bool>,
@@ -849,7 +945,10 @@ pub(crate) fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldV
 impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float + Display);
 
 /// Custom options for a [`FloatField`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct FloatFieldOptions<T> {
     /// The minimum value of the field. Used to set the `min` attribute in the
     /// HTML input element.
@@ -998,7 +1097,10 @@ impl_float_as_form_field!(f64);
 impl_form_field!(UrlField, UrlFieldOptions, "a URL");
 
 /// Custom options for a [`UrlField`].
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct UrlFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
@@ -1108,6 +1210,64 @@ impl AsFormField for Url {
     }
 }
 
+impl_field_options_builder!(
+    StringFieldOptions,
+    StringFieldOptionsBuilder {
+        max_length,
+        min_length,
+        size,
+        autocapitalize,
+        autocomplete,
+        dir,
+        dirname,
+        list,
+        placeholder,
+        readonly
+    }
+);
+impl_field_options_builder!(
+    PasswordFieldOptions,
+    PasswordFieldOptionsBuilder {
+        max_length,
+        min_length,
+        size,
+        autocomplete,
+        placeholder,
+        readonly
+    }
+);
+impl_field_options_builder!(
+    EmailFieldOptions,
+    EmailFieldOptionsBuilder {
+        max_length,
+        min_length,
+        size,
+        autocomplete,
+        dir,
+        dirname,
+        list,
+        placeholder,
+        readonly
+    }
+);
+impl_field_options_builder!(IntegerFieldOptions<T>, IntegerFieldOptionsBuilder<T>{min, max, placeholder, readonly, step});
+impl_field_options_builder!(FloatFieldOptions<T>, FloatFieldOptionsBuilder<T>{min, max, placeholder, readonly, step});
+impl_field_options_builder!(
+    UrlFieldOptions,
+    UrlFieldOptionsBuilder {
+        max_length,
+        min_length,
+        size,
+        autocomplete,
+        dir,
+        dirname,
+        list,
+        placeholder,
+        readonly
+    }
+);
+impl_field_options_builder!(BoolFieldOptions, BoolFieldOptionsBuilder { must_be_true });
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1121,18 +1281,18 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            StringFieldOptions {
-                max_length: Some(10),
-                min_length: Some(5),
-                size: Some(15),
-                autocapitalize: Some(AutoCapitalize::Words),
-                autocomplete: Some(AutoComplete::Value("foo bar".to_string())),
-                dir: Some(Dir::Ltr),
-                dirname: Some("dir".to_string()),
-                list: Some(List::new(["bar", "baz"])),
-                placeholder: Some("Enter text".to_string()),
-                readonly: Some(true),
-            },
+            StringFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .size(15)
+                .autocapitalize(AutoCapitalize::Words)
+                .autocomplete(AutoComplete::Value("foo bar".to_string()))
+                .dir(Dir::Ltr)
+                .dirname("dir".to_string())
+                .list(List::new(["bar", "baz"]))
+                .placeholder("Enter text".to_string())
+                .readonly(true)
+                .build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"text\""));
@@ -1158,10 +1318,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            StringFieldOptions {
-                max_length: Some(10),
-                ..Default::default()
-            },
+            StringFieldOptions::builder().max_length(10).build(),
         );
         field
             .set_value(FormFieldValue::new_text("test"))
@@ -1179,10 +1336,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            StringFieldOptions {
-                max_length: Some(10),
-                ..Default::default()
-            },
+            StringFieldOptions::builder().max_length(10).build(),
         );
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
         let value = String::clean_value(&field);
@@ -1197,14 +1351,14 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            PasswordFieldOptions {
-                max_length: Some(10),
-                min_length: Some(5),
-                size: Some(15),
-                autocomplete: Some(AutoComplete::Value("foo bar".to_string())),
-                placeholder: Some("Enter password".to_string()),
-                readonly: Some(false),
-            },
+            PasswordFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .size(15)
+                .autocomplete(AutoComplete::Value("foo bar".to_string()))
+                .placeholder("Enter password".to_string())
+                .readonly(false)
+                .build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"password\""));
@@ -1223,10 +1377,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            PasswordFieldOptions {
-                max_length: Some(10),
-                ..Default::default()
-            },
+            PasswordFieldOptions::builder().max_length(10).build(),
         );
         field
             .set_value(FormFieldValue::new_text("password"))
@@ -1244,17 +1395,17 @@ mod tests {
                 name: "test_name".to_owned(),
                 required: true,
             },
-            EmailFieldOptions {
-                max_length: Some(10),
-                min_length: Some(5),
-                size: Some(15),
-                autocomplete: Some(AutoComplete::Value("foo bar".to_string())),
-                dir: Some(Dir::Ltr),
-                dirname: Some("dir".to_string()),
-                list: Some(List::new(["foo@example.com", "baz@example.com"])),
-                placeholder: Some("Enter text".to_string()),
-                readonly: Some(true),
-            },
+            EmailFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .size(15)
+                .autocomplete(AutoComplete::Value("foo bar".to_string()))
+                .dir(Dir::Ltr)
+                .dirname("dir".to_string())
+                .list(List::new(["foo@example.com", "baz@example.com"]))
+                .placeholder("Enter text".to_string())
+                .readonly(true)
+                .build(),
         );
 
         let html = field.to_string();
@@ -1282,11 +1433,10 @@ mod tests {
                 name: "email_test".to_owned(),
                 required: true,
             },
-            EmailFieldOptions {
-                min_length: Some(10),
-                max_length: Some(50),
-                ..Default::default()
-            },
+            EmailFieldOptions::builder()
+                .max_length(50)
+                .min_length(10)
+                .build(),
         );
 
         field
@@ -1306,11 +1456,10 @@ mod tests {
                 name: "email_test".to_owned(),
                 required: true,
             },
-            EmailFieldOptions {
-                min_length: Some(10),
-                max_length: Some(50),
-                ..Default::default()
-            },
+            EmailFieldOptions::builder()
+                .max_length(50)
+                .min_length(10)
+                .build(),
         );
 
         field
@@ -1330,11 +1479,10 @@ mod tests {
                 name: "email_test".to_owned(),
                 required: true,
             },
-            EmailFieldOptions {
-                min_length: Some(5),
-                max_length: Some(10),
-                ..Default::default()
-            },
+            EmailFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .build(),
         );
 
         field
@@ -1357,11 +1505,10 @@ mod tests {
                 name: "email_test".to_owned(),
                 required: true,
             },
-            EmailFieldOptions {
-                min_length: Some(5),
-                max_length: Some(10),
-                ..Default::default()
-            },
+            EmailFieldOptions::builder()
+                .max_length(50)
+                .min_length(10)
+                .build(),
         );
 
         field
@@ -1384,11 +1531,10 @@ mod tests {
                 name: "email_test".to_owned(),
                 required: true,
             },
-            EmailFieldOptions {
-                min_length: Some(50),
-                max_length: Some(10),
-                ..Default::default()
-            },
+            EmailFieldOptions::builder()
+                .max_length(10)
+                .min_length(50)
+                .build(),
         );
 
         field
@@ -1412,13 +1558,13 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            IntegerFieldOptions {
-                min: Some(1),
-                max: Some(10),
-                placeholder: Some("Enter text".to_string()),
-                readonly: Some(false),
-                step: Some(Step::Value(10)),
-            },
+            IntegerFieldOptions::builder()
+                .max(10)
+                .min(1)
+                .placeholder("Enter text".to_string())
+                .readonly(false)
+                .step(Step::Value(10))
+                .build(),
         );
         let html = field.to_string();
 
@@ -1441,11 +1587,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            IntegerFieldOptions {
-                min: Some(1),
-                max: Some(10),
-                ..Default::default()
-            },
+            IntegerFieldOptions::builder().max(10).min(1).build(),
         );
         field
             .set_value(FormFieldValue::new_text("5"))
@@ -1463,11 +1605,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            IntegerFieldOptions {
-                min: Some(10),
-                max: Some(50),
-                ..Default::default()
-            },
+            IntegerFieldOptions::builder().min(10).max(50).build(),
         );
         field
             .set_value(FormFieldValue::new_text("5"))
@@ -1488,11 +1626,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            IntegerFieldOptions {
-                min: Some(10),
-                max: Some(50),
-                ..Default::default()
-            },
+            IntegerFieldOptions::builder().min(10).max(50).build(),
         );
         field
             .set_value(FormFieldValue::new_text("100"))
@@ -1513,9 +1647,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            BoolFieldOptions {
-                must_be_true: Some(false),
-            },
+            BoolFieldOptions::builder().must_be_true(false).build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"checkbox\""));
@@ -1531,9 +1663,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            BoolFieldOptions {
-                must_be_true: Some(true),
-            },
+            BoolFieldOptions::builder().must_be_true(true).build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"checkbox\""));
@@ -1549,9 +1679,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            BoolFieldOptions {
-                must_be_true: Some(true),
-            },
+            BoolFieldOptions::builder().must_be_true(false).build(),
         );
         field
             .set_value(FormFieldValue::new_text("true"))
@@ -1569,13 +1697,13 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FloatFieldOptions {
-                min: Some(1.5),
-                max: Some(10.7),
-                placeholder: Some("Enter text".to_string()),
-                readonly: Some(true),
-                step: Some(Step::Any),
-            },
+            FloatFieldOptions::builder()
+                .min(1.5)
+                .max(10.7)
+                .step(Step::Any)
+                .placeholder("Enter text".to_string())
+                .readonly(true)
+                .build(),
         );
         let html = field.to_string();
 
@@ -1599,11 +1727,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FloatFieldOptions {
-                min: Some(1.0),
-                max: Some(10.0),
-                ..Default::default()
-            },
+            FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         field
             .set_value(FormFieldValue::new_text("5.0"))
@@ -1621,11 +1745,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FloatFieldOptions {
-                min: Some(5.0),
-                max: Some(10.0),
-                ..Default::default()
-            },
+            FloatFieldOptions::builder().min(5.0).max(10.0).build(),
         );
         field
             .set_value(FormFieldValue::new_text("2.0"))
@@ -1646,11 +1766,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FloatFieldOptions {
-                min: Some(5.0),
-                max: Some(10.0),
-                ..Default::default()
-            },
+            FloatFieldOptions::builder().min(5.0).max(10.0).build(),
         );
         field
             .set_value(FormFieldValue::new_text("20.0"))
@@ -1671,11 +1787,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FloatFieldOptions {
-                min: Some(1.0),
-                max: Some(10.0),
-                ..Default::default()
-            },
+            FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         let bad_inputs = ["NaN", "inf"];
 
@@ -1702,11 +1814,7 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            FloatFieldOptions {
-                min: Some(1.0),
-                max: Some(10.0),
-                ..Default::default()
-            },
+            FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
         let value = f32::clean_value(&field);
@@ -1721,17 +1829,17 @@ mod tests {
                 name: "test".to_owned(),
                 required: true,
             },
-            UrlFieldOptions {
-                max_length: Some(100),
-                min_length: Some(5),
-                size: Some(30),
-                list: Some(List::new(["https://example.com"])),
-                dir: Some(Dir::Ltr),
-                dirname: Some("dir".to_owned()),
-                autocomplete: Some(AutoComplete::Value("url".to_owned())),
-                placeholder: Some("Enter URL".to_owned()),
-                readonly: Some(true),
-            },
+            UrlFieldOptions::builder()
+                .max_length(100)
+                .min_length(5)
+                .size(30)
+                .autocomplete(AutoComplete::Value("url".to_string()))
+                .dir(Dir::Ltr)
+                .dirname("dir".to_string())
+                .list(List::new(["http:://example.com"]))
+                .placeholder("Enter URL".to_string())
+                .readonly(true)
+                .build(),
         );
 
         field
@@ -1754,17 +1862,17 @@ mod tests {
                 name: "url".to_owned(),
                 required: true,
             },
-            UrlFieldOptions {
-                max_length: Some(120),
-                min_length: Some(10),
-                size: Some(40),
-                list: Some(List::new(["https://one.com", "https://two.com"])),
-                dir: Some(Dir::Ltr),
-                dirname: Some("lang".to_owned()),
-                autocomplete: Some(AutoComplete::Value("url".to_owned())),
-                placeholder: Some("Paste link".to_owned()),
-                readonly: Some(true),
-            },
+            UrlFieldOptions::builder()
+                .max_length(120)
+                .min_length(10)
+                .size(40)
+                .list(List::new(["http://example.com", "https://example.org"]))
+                .dir(Dir::Ltr)
+                .dirname("lang".to_owned())
+                .autocomplete(AutoComplete::Value("url".to_owned()))
+                .placeholder("Paste link".to_owned())
+                .readonly(true)
+                .build(),
         );
 
         field
@@ -1798,17 +1906,16 @@ mod tests {
                 name: "url".to_owned(),
                 required: true,
             },
-            UrlFieldOptions {
-                max_length: Some(50),
-                min_length: Some(5),
-                size: Some(20),
-                list: None,
-                dir: Some(Dir::Rtl),
-                dirname: Some("rtl".to_owned()),
-                autocomplete: Some(AutoComplete::Off),
-                placeholder: Some("Enter a link".to_owned()),
-                readonly: Some(false),
-            },
+            UrlFieldOptions::builder()
+                .max_length(120)
+                .min_length(10)
+                .size(40)
+                .dir(Dir::Ltr)
+                .dirname("rtl".to_owned())
+                .autocomplete(AutoComplete::Value("url".to_owned()))
+                .placeholder("Enter a link".to_owned())
+                .readonly(false)
+                .build(),
         );
 
         field.set_value(FormFieldValue::new_text("")).await.unwrap();

@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use askama::filters::HtmlSafe;
+use cot::form::fields::impl_field_options_builder;
 /// Derive helper that implements `AsFormField` for select-like enums and common
 /// collections.
 ///
@@ -131,6 +132,7 @@ pub use cot_macros::SelectAsFormField;
 /// [`SelectField`]: cot::form::fields::SelectField
 /// [`SelectMultipleField`]: cot::form::fields::SelectMultipleField
 pub use cot_macros::SelectChoice;
+use derive_builder::Builder;
 use indexmap::IndexSet;
 
 use crate::form::fields::impl_form_field;
@@ -183,7 +185,9 @@ pub(crate) use impl_as_form_field_mult_collection;
 impl_form_field!(SelectField, SelectFieldOptions, "a dropdown list", T: SelectChoice + Send);
 
 /// Custom options for a [`SelectField`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
 #[non_exhaustive]
 pub struct SelectFieldOptions<T> {
     /// The list of available choices for the select field.
@@ -282,7 +286,9 @@ impl<T: SelectChoice + Send> FormField for SelectMultipleField<T> {
 }
 
 /// Custom options for a [`SelectMultipleField`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
 #[non_exhaustive]
 pub struct SelectMultipleFieldOptions<T> {
     /// The list of available choices for the multi-select field.
@@ -623,6 +629,8 @@ pub trait SelectChoice {
     fn to_string(&self) -> String;
 }
 
+impl_field_options_builder!(SelectFieldOptions<T>, SelectFieldOptionsBuilder<T>{choices, none_option});
+impl_field_options_builder!(SelectMultipleFieldOptions<T>, SelectMultipleFieldOptionsBuilder<T>{choices, size});
 #[cfg(test)]
 mod tests {
     use std::collections::{HashSet, LinkedList, VecDeque};
@@ -719,10 +727,9 @@ mod tests {
                 name: "test_select".to_owned(),
                 required: false,
             },
-            SelectFieldOptions {
-                choices: None,
-                none_option: Some("Please select...".to_string()),
-            },
+            SelectFieldOptions::builder()
+                .none_option("Please select...".to_owned())
+                .build(),
         );
         let html = field.to_string();
 
@@ -738,10 +745,9 @@ mod tests {
                 name: "test_select".to_owned(),
                 required: false,
             },
-            SelectFieldOptions {
-                choices: Some(vec![TestChoice::Option1, TestChoice::Option3]),
-                none_option: None,
-            },
+            SelectFieldOptions::builder()
+                .choices(vec![TestChoice::Option1, TestChoice::Option3])
+                .build(),
         );
         let html = field.to_string();
 
@@ -800,10 +806,7 @@ mod tests {
                 name: "test_multi".to_owned(),
                 required: false,
             },
-            SelectMultipleFieldOptions {
-                choices: None,
-                size: Some(5),
-            },
+            SelectMultipleFieldOptions::builder().size(5).build(),
         );
         let html = field.to_string();
 

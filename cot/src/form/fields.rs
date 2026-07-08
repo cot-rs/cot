@@ -10,17 +10,18 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
-pub use attrs::{AutoCapitalize, AutoComplete, Dir, List, Step};
+pub use attrs::{AutoCapitalize, AutoComplete, Capture, Dir, List, Step};
 pub use chrono::{
-    DateField, DateFieldOptions, DateTimeField, DateTimeFieldOptions, DateTimeWithTimezoneField,
-    DateTimeWithTimezoneFieldOptions, TimeField, TimeFieldOptions,
+    DateField, DateFieldOptions, DateFieldOptionsBuilder, DateTimeField, DateTimeFieldOptions,
+    DateTimeFieldOptionsBuilder, DateTimeWithTimezoneField, DateTimeWithTimezoneFieldOptions,
+    DateTimeWithTimezoneFieldOptionsBuilder, TimeField, TimeFieldOptions, TimeFieldOptionsBuilder,
 };
 use derive_builder::Builder;
-pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
+pub use files::{FileField, FileFieldOptions, FileFieldOptionsBuilder, InMemoryUploadedFile};
 pub(crate) use select::check_required_multiple;
 pub use select::{
-    SelectAsFormField, SelectChoice, SelectField, SelectFieldOptions, SelectMultipleField,
-    SelectMultipleFieldOptions,
+    SelectAsFormField, SelectChoice, SelectField, SelectFieldOptions, SelectFieldOptionsBuilder,
+    SelectMultipleField, SelectMultipleFieldOptions, SelectMultipleFieldOptionsBuilder,
 };
 
 use crate::auth::PasswordHash;

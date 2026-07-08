@@ -200,6 +200,7 @@ pub enum Capture {
 
 impl Capture {
     /// Returns the string representation for use in HTML.
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::User => "user",

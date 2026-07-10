@@ -781,7 +781,7 @@ mod tests {
         let field = SelectMultipleField::<TestChoice>::with_options(
             FormFieldOptions::builder()
                 .id("test_multi".to_owned())
-                .name("tes_multi".to_owned())
+                .name("test_multi".to_owned())
                 .required(false)
                 .build(),
             SelectMultipleFieldOptions::default(),
@@ -803,7 +803,7 @@ mod tests {
         let field = SelectMultipleField::<TestChoice>::with_options(
             FormFieldOptions::builder()
                 .id("test_multi".to_owned())
-                .name("tes_multi".to_owned())
+                .name("test_multi".to_owned())
                 .required(false)
                 .build(),
             SelectMultipleFieldOptions::builder().size(5).build(),
@@ -818,7 +818,7 @@ mod tests {
         let field = SelectMultipleField::<TestChoice>::with_options(
             FormFieldOptions::builder()
                 .id("test_multi".to_owned())
-                .name("tes_multi".to_owned())
+                .name("test_multi".to_owned())
                 .required(true)
                 .build(),
             SelectMultipleFieldOptions::default(),
@@ -833,7 +833,7 @@ mod tests {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
             FormFieldOptions::builder()
                 .id("test_multi".to_owned())
-                .name("tes_multi".to_owned())
+                .name("test_multi".to_owned())
                 .required(false)
                 .build(),
             SelectMultipleFieldOptions::default(),

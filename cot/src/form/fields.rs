@@ -1507,8 +1507,8 @@ mod tests {
                 .required(true)
                 .build(),
             EmailFieldOptions::builder()
-                .max_length(50)
-                .min_length(10)
+                .max_length(10)
+                .min_length(5)
                 .build(),
         );
 

@@ -1277,11 +1277,11 @@ mod tests {
     #[test]
     fn string_field_render() {
         let field = StringField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             StringFieldOptions::builder()
                 .max_length(10)
                 .min_length(5)
@@ -1314,11 +1314,11 @@ mod tests {
     #[cot::test]
     async fn string_field_clean_value() {
         let mut field = StringField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             StringFieldOptions::builder().max_length(10).build(),
         );
         field
@@ -1332,11 +1332,11 @@ mod tests {
     #[cot::test]
     async fn string_field_clean_required() {
         let mut field = StringField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             StringFieldOptions::builder().max_length(10).build(),
         );
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
@@ -1347,11 +1347,11 @@ mod tests {
     #[test]
     fn password_field_render() {
         let field = PasswordField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             PasswordFieldOptions::builder()
                 .max_length(10)
                 .min_length(5)
@@ -1373,11 +1373,11 @@ mod tests {
     #[cot::test]
     async fn password_field_clean_value() {
         let mut field = PasswordField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             PasswordFieldOptions::builder().max_length(10).build(),
         );
         field
@@ -1391,11 +1391,11 @@ mod tests {
     #[test]
     fn email_field_render() {
         let field = EmailField::with_options(
-            FormFieldOptions {
-                id: "test_id".to_owned(),
-                name: "test_name".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test_id".to_owned())
+                .name("test_name".to_owned())
+                .required(true)
+                .build(),
             EmailFieldOptions::builder()
                 .max_length(10)
                 .min_length(5)
@@ -1429,11 +1429,11 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_valid() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
             EmailFieldOptions::builder()
                 .max_length(50)
                 .min_length(10)
@@ -1452,11 +1452,11 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_invalid_format() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
             EmailFieldOptions::builder()
                 .max_length(50)
                 .min_length(10)
@@ -1475,11 +1475,11 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_exceeds_max_length() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
             EmailFieldOptions::builder()
                 .max_length(10)
                 .min_length(5)
@@ -1501,11 +1501,11 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_below_min_length() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
             EmailFieldOptions::builder()
                 .max_length(50)
                 .min_length(10)
@@ -1527,11 +1527,11 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_invalid_length_options() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
             EmailFieldOptions::builder()
                 .max_length(10)
                 .min_length(50)
@@ -1554,11 +1554,11 @@ mod tests {
     #[test]
     fn integer_field_render() {
         let field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             IntegerFieldOptions::builder()
                 .max(10)
                 .min(1)
@@ -1583,11 +1583,11 @@ mod tests {
     #[cot::test]
     async fn integer_field_clean_value() {
         let mut field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             IntegerFieldOptions::builder().max(10).min(1).build(),
         );
         field
@@ -1601,11 +1601,11 @@ mod tests {
     #[cot::test]
     async fn integer_field_clean_value_below_min_value() {
         let mut field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             IntegerFieldOptions::builder().min(10).max(50).build(),
         );
         field
@@ -1622,11 +1622,11 @@ mod tests {
     #[cot::test]
     async fn integer_field_clean_value_above_max_value() {
         let mut field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             IntegerFieldOptions::builder().min(10).max(50).build(),
         );
         field
@@ -1643,11 +1643,11 @@ mod tests {
     #[test]
     fn bool_field_render() {
         let field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             BoolFieldOptions::builder().must_be_true(false).build(),
         );
         let html = field.to_string();
@@ -1659,11 +1659,11 @@ mod tests {
     #[test]
     fn bool_field_render_must_be_true() {
         let field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             BoolFieldOptions::builder().must_be_true(true).build(),
         );
         let html = field.to_string();
@@ -1675,11 +1675,11 @@ mod tests {
     #[cot::test]
     async fn bool_field_clean_value() {
         let mut field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             BoolFieldOptions::builder().must_be_true(false).build(),
         );
         field
@@ -1693,11 +1693,11 @@ mod tests {
     #[test]
     fn float_field_render() {
         let field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             FloatFieldOptions::builder()
                 .min(1.5)
                 .max(10.7)
@@ -1723,11 +1723,11 @@ mod tests {
     #[expect(clippy::float_cmp)]
     async fn float_field_clean_value() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         field
@@ -1741,11 +1741,11 @@ mod tests {
     #[cot::test]
     async fn float_field_clean_value_min_value_not_met() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             FloatFieldOptions::builder().min(5.0).max(10.0).build(),
         );
         field
@@ -1762,11 +1762,11 @@ mod tests {
     #[cot::test]
     async fn float_field_clean_value_max_value_exceeded() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             FloatFieldOptions::builder().min(5.0).max(10.0).build(),
         );
         field
@@ -1783,11 +1783,11 @@ mod tests {
     #[cot::test]
     async fn float_field_clean_value_nan_and_inf() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         let bad_inputs = ["NaN", "inf"];
@@ -1810,11 +1810,11 @@ mod tests {
     #[cot::test]
     async fn float_field_clean_required() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
@@ -1825,11 +1825,11 @@ mod tests {
     #[cot::test]
     async fn url_field_clean_value() {
         let mut field = UrlField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             UrlFieldOptions::builder()
                 .max_length(100)
                 .min_length(5)
@@ -1858,11 +1858,11 @@ mod tests {
     #[cot::test]
     async fn url_field_render() {
         let mut field = UrlField::with_options(
-            FormFieldOptions {
-                id: "id_url".to_owned(),
-                name: "url".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("id_url".to_owned())
+                .name("url".to_owned())
+                .required(true)
+                .build(),
             UrlFieldOptions::builder()
                 .max_length(120)
                 .min_length(10)
@@ -1902,11 +1902,11 @@ mod tests {
     #[cot::test]
     async fn url_field_clean_required() {
         let mut field = UrlField::with_options(
-            FormFieldOptions {
-                id: "id_url".to_owned(),
-                name: "url".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("id_url".to_owned())
+                .name("url".to_owned())
+                .required(true)
+                .build(),
             UrlFieldOptions::builder()
                 .max_length(120)
                 .min_length(10)

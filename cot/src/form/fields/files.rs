@@ -171,11 +171,11 @@ mod tests {
     #[test]
     fn file_field_render() {
         let field = FileField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".into())
+                .name("test".into())
+                .required(true)
+                .build(),
             FileFieldOptions::builder()
                 .accept(vec!["image/*".to_string(), ".pdf".to_string()])
                 .capture(Capture::Environment)
@@ -193,11 +193,11 @@ mod tests {
     #[test]
     fn file_field_render_no_accept() {
         let field = FileField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".into())
+                .name("test".into())
+                .required(true)
+                .build(),
             FileFieldOptions::builder().capture(Capture::User).build(),
         );
 
@@ -212,11 +212,11 @@ mod tests {
     #[cot::test]
     async fn file_field_clean_value() {
         let mut field = FileField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".into())
+                .name("test".into())
+                .required(true)
+                .build(),
             FileFieldOptions::builder().build(),
         );
 
@@ -247,11 +247,11 @@ mod tests {
     #[cot::test]
     async fn file_field_clean_required() {
         let field = FileField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".into())
+                .name("test".into())
+                .required(true)
+                .build(),
             FileFieldOptions::builder().build(),
         );
 

@@ -329,3 +329,67 @@ async fn delete_customer(db: Database) -> cot::Result<()> {
 
 ### Other Query methods
 The methods listed on this page are the most commonly used query methods. For a complete comprehensive list of supported query methods, see the [`Query`](struct@cot::db::query::Query) docs.
+
+## Raw SQL queries
+While the [`Query`](struct@cot::db::query::Query) interface and the [`query!`](macro@cot::db::query) macro should cover the vast majority of use cases, sometimes you may need to run a query that they don't support, such as a complex join or a database-specific function. For these cases, Cot provides an escape hatch to run raw SQL directly through the [`Database`](struct@cot::db::Database) struct.
+
+> **Warning:** These methods execute the given SQL string as-is, without any sanitization. Never build the query string by interpolating untrusted input directly into it, as that would expose your application to SQL injection. Use the parameterized variants below whenever the query depends on external data.
+
+### `raw` and `raw_with`
+The [`raw`](struct@cot::db::Database#method.raw) method executes a raw SQL statement and returns a [`StatementResult`](struct@cot::db::StatementResult), which contains the number of affected rows (and, when available, the ID of the last inserted row). It's most useful for statements that don't return rows, such as `CREATE TABLE`, `INSERT`, `UPDATE`, or `DELETE`.
+
+```rust
+use cot::db::Database;
+
+async fn create_table(db: &Database) -> cot::Result<()> {
+    db.raw("CREATE TABLE example (id INTEGER PRIMARY KEY, name TEXT)").await?;
+#   Ok(())
+}
+```
+
+If your query takes parameters, use [`raw_with`](struct@cot::db::Database#method.raw_with) instead of interpolating the values into the query string yourself. The parameters are passed separately and bound safely by the underlying database driver, so this is the preferred way of running raw statements that depend on runtime values.
+
+```rust
+use cot::db::Database;
+
+async fn deactivate_customer(db: &Database, customer_id: i64) -> cot::Result<()> {
+    db.raw_with(
+        "UPDATE customer SET is_verified = false WHERE id = ?",
+        &[&customer_id],
+    ).await?;
+#   Ok(())
+}
+```
+
+### `raw_as` and `raw_as_with`
+To run a raw `SELECT` query and map the returned rows onto a model, use the [`raw_as`](struct@cot::db::Database#method.raw_as) method. It runs the query and applies the model's [`Model::from_db`](trait@cot::db::Model#method.from_db) mapping to every returned row, so the columns selected by the query must match the model's fields.
+
+This is handy for queries that are difficult or impossible to express with the [`Query`](struct@cot::db::query::Query) interface, such as joins across multiple tables or aggregate expressions:
+
+```rust
+use cot::db::{Auto, Database};
+
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn get_verified_customers(db: &Database) -> cot::Result<()> {
+    let customers = db
+        .raw_as::<Customer>("SELECT * FROM customer WHERE is_verified = true")
+        .await?;
+    println!("Verified customers: {:?}", customers);
+#   Ok(())
+}
+```
+
+Just like [`raw_with`](struct@cot::db::Database#method.raw_with) is the parameterized counterpart of [`raw`](struct@cot::db::Database#method.raw), [`raw_as_with`](struct@cot::db::Database#method.raw_as_with) is the parameterized counterpart of `raw_as`. Prefer it whenever the query depends on runtime values, instead of interpolating them into the query string yourself:
+
+```rust
+use cot::db::{Auto, Database};
+
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn get_customers_by_name(db: &Database, full_name: &str) -> cot::Result<()> {
+    let customers = db
+        .raw_as_with::<Customer>("SELECT * FROM customer WHERE full_name = ?", &[&full_name])
+        .await?;
+    println!("Customers: {:?}", customers);
+#   Ok(())
+}
+```

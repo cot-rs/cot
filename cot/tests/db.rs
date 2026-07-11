@@ -188,6 +188,135 @@ async fn model_macro_filtering(test_db: &mut TestDatabase) {
     assert!(objects.is_empty());
 }
 
+#[cot_macros::dbtest]
+async fn raw_as_maps_rows_to_model(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+
+    let mut model1 = TestModel {
+        id: Auto::fixed(1),
+        name: "test1".to_owned(),
+    };
+    model1.save(&**test_db).await.unwrap();
+    let mut model2 = TestModel {
+        id: Auto::fixed(2),
+        name: "test2".to_owned(),
+    };
+    model2.save(&**test_db).await.unwrap();
+
+    let mut objects = test_db
+        .raw_as::<TestModel>("SELECT * FROM cot__test_model")
+        .await
+        .unwrap();
+    objects.sort_by_key(|o| o.id);
+    assert_eq!(objects, vec![model1, model2]);
+}
+
+#[cot_macros::dbtest]
+async fn raw_executes_statement(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+
+    let mut model = TestModel {
+        id: Auto::fixed(1),
+        name: "test".to_owned(),
+    };
+    model.save(&**test_db).await.unwrap();
+
+    let result = test_db
+        .raw("UPDATE cot__test_model SET name = 'updated'")
+        .await
+        .unwrap();
+    assert_eq!(result.rows_affected().0, 1);
+
+    let objects = TestModel::objects().all(&**test_db).await.unwrap();
+    assert_eq!(objects[0].name, "updated");
+}
+
+#[cot_macros::dbtest]
+async fn raw_returns_error_for_invalid_sql(test_db: &mut TestDatabase) {
+    migrate_test_model(&*test_db).await;
+
+    let result = test_db.raw("NOT A VALID SQL STATEMENT").await;
+    assert!(result.is_err());
+}
+
+// `raw_with`/`raw_as_with` need bound-parameter placeholders in the SQL text
+// itself (`?` on SQLite/MySQL vs. `$1, $2, ...` on PostgreSQL), so a single
+// `dbtest` function body can't exercise all three backends. These are
+// therefore SQLite-only.
+
+#[cfg(feature = "sqlite")]
+#[cot::test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+)]
+async fn raw_with_executes_parameterized_statement() {
+    let db = TestDatabase::new_sqlite()
+        .await
+        .expect("failed to create SQLite test database");
+    migrate_test_model(&db).await;
+
+    let mut model = TestModel {
+        id: Auto::fixed(1),
+        name: "test".to_owned(),
+    };
+    model.save(&*db).await.unwrap();
+
+    let params: &[&dyn cot::db::ToDbValue] = &[&"updated", &1_i32];
+    let result = db
+        .raw_with("UPDATE cot__test_model SET name = ? WHERE id = ?", params)
+        .await
+        .unwrap();
+    assert_eq!(result.rows_affected().0, 1);
+
+    let objects = TestModel::objects().all(&*db).await.unwrap();
+    assert_eq!(objects[0].name, "updated");
+
+    db.cleanup()
+        .await
+        .expect("failed to clean up SQLite test database");
+}
+
+#[cfg(feature = "sqlite")]
+#[cot::test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+)]
+async fn raw_as_with_maps_parameterized_rows_to_model() {
+    let db = TestDatabase::new_sqlite()
+        .await
+        .expect("failed to create SQLite test database");
+    migrate_test_model(&db).await;
+
+    let mut model1 = TestModel {
+        id: Auto::fixed(1),
+        name: "test1".to_owned(),
+    };
+    model1.save(&*db).await.unwrap();
+    let mut model2 = TestModel {
+        id: Auto::fixed(2),
+        name: "test2".to_owned(),
+    };
+    model2.save(&*db).await.unwrap();
+
+    let objects = db
+        .raw_as_with::<TestModel>("SELECT * FROM cot__test_model WHERE name = ?", &[&"test1"])
+        .await
+        .unwrap();
+    assert_eq!(objects, vec![model1]);
+
+    let objects = db
+        .raw_as_with::<TestModel>("SELECT * FROM cot__test_model WHERE name = ?", &[&"test2"])
+        .await
+        .unwrap();
+    assert_eq!(objects, vec![model2]);
+
+    db.cleanup()
+        .await
+        .expect("failed to clean up SQLite test database");
+}
+
 async fn migrate_test_model(db: &Database) {
     CREATE_TEST_MODEL.forwards(db).await.unwrap();
 }

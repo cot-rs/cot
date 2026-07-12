@@ -58,6 +58,7 @@ use cot_core::headers::{MULTIPART_FORM_CONTENT_TYPE, URLENCODED_FORM_CONTENT_TYP
 /// fields. If the form fields are not safe to render as HTML, the form context
 /// will not be safe to render as HTML either.
 pub use cot_macros::Form;
+use derive_builder::Builder;
 use derive_more::with_trait::Debug;
 pub use field_value::{FormFieldValue, FormFieldValueError};
 use http_body_util::BodyExt;
@@ -508,7 +509,9 @@ pub trait FormContext: Debug {
 }
 
 /// Generic options valid for all types of form fields.
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[non_exhaustive]
 pub struct FormFieldOptions {
     /// The HTML ID of the form field.
     pub id: String,
@@ -519,6 +522,51 @@ pub struct FormFieldOptions {
     /// fields are required. If you want to make a field optional, just use
     /// [`Option`] in the struct definition.
     pub required: bool,
+}
+
+impl FormFieldOptions {
+    /// Creates a new [`FormFieldOptionsBuilder`] to build a
+    /// [`FormFieldOptions`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::FormFieldOptions;
+    ///
+    /// let options = FormFieldOptions::builder()
+    ///     .name("field_name".to_owned())
+    ///     .id("field_id".to_owned())
+    ///     .required(true)
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> FormFieldOptionsBuilder {
+        FormFieldOptionsBuilder::default()
+    }
+}
+impl FormFieldOptionsBuilder {
+    /// Builds the [`FormFieldOptions`], falling back to defaults for any field
+    /// that wasn't explicitly set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::form::FormFieldOptions;
+    ///
+    /// let options = FormFieldOptions::builder()
+    ///     .name("field_name".to_owned())
+    ///     .id("field_id".to_owned())
+    ///     .required(true)
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> FormFieldOptions {
+        FormFieldOptions {
+            id: self.id.clone().unwrap_or_default(),
+            name: self.name.clone().unwrap_or_default(),
+            required: self.required.unwrap_or_default(),
+        }
+    }
 }
 
 /// A form field.

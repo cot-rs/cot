@@ -42,36 +42,6 @@ impl DatabaseSqlite {
     }
 }
 
-impl DatabaseSqlite {
-    fn convert_to_sqlite_glob(glob: &str) -> String {
-        let mut escaped = String::with_capacity(glob.len());
-        let mut chars = glob.chars();
-        while let Some(ch) = chars.next() {
-            match ch {
-                LIKE_ESCAPE_CHAR => {
-                    if let Some(ch) = chars.next() {
-                        Self::push_glob_literal(&mut escaped, ch);
-                    }
-                }
-                '*' => escaped.push('*'),
-                '?' => escaped.push('?'),
-                other => Self::push_glob_literal(&mut escaped, other),
-            }
-        }
-        escaped
-    }
-
-    fn push_glob_literal(out: &mut String, ch: char) {
-        if matches!(ch, '*' | '?' | '[') {
-            out.push('[');
-            out.push(ch);
-            out.push(']');
-        } else {
-            out.push(ch);
-        }
-    }
-}
-
 impl LikeExprBuilder for DatabaseSqlite {
     fn like_expr(
         &self,
@@ -81,7 +51,7 @@ impl LikeExprBuilder for DatabaseSqlite {
     ) -> Result<SimpleExpr, QueryBuildingError> {
         match case_sensitivity {
             CaseSensitivity::Sensitive => {
-                let glob = Self::convert_to_sqlite_glob(glob_pattern);
+                let glob = to_sqlite_glob(glob_pattern);
                 Ok(lhs.glob(glob))
             }
             CaseSensitivity::Insensitive => {
@@ -90,5 +60,33 @@ impl LikeExprBuilder for DatabaseSqlite {
                 Ok(sea_query::Func::lower(lhs).like(like))
             }
         }
+    }
+}
+
+fn to_sqlite_glob(glob: &str) -> String {
+    let mut escaped = String::with_capacity(glob.len());
+    let mut chars = glob.chars();
+    while let Some(ch) = chars.next() {
+        match ch {
+            LIKE_ESCAPE_CHAR => {
+                if let Some(ch) = chars.next() {
+                    push_glob_literal(&mut escaped, ch);
+                }
+            }
+            '*' => escaped.push('*'),
+            '?' => escaped.push('?'),
+            other => push_glob_literal(&mut escaped, other),
+        }
+    }
+    escaped
+}
+
+fn push_glob_literal(out: &mut String, ch: char) {
+    if matches!(ch, '*' | '?' | '[') {
+        out.push('[');
+        out.push(ch);
+        out.push(']');
+    } else {
+        out.push(ch);
     }
 }

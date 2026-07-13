@@ -418,7 +418,8 @@ jobs:
         with:
           log-level: warn
           command: check licenses
-          command-arguments: --config .cargo/deny.toml
+          arguments: --config .cargo/deny.toml
+          command-arguments: licenses bans sources
   semver-check:
     if: github.event_name == 'pull_request'
     name: Semver compatibility check

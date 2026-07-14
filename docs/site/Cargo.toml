@@ -7,5 +7,5 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-cot = { version = "0.6", default-features = false }
-cot-site = { git = "https://github.com/cot-rs/cot-site.git", rev = "98bf06e5cd3b2d9b9c2bd76e2710e93fe27eb7d0" }
+cot = { version = "0.7", default-features = false }
+cot-site = { git = "https://github.com/cot-rs/cot-site.git", rev = "07ef835b426c9d0ce58f68113b2a7c263bd54b8d" }

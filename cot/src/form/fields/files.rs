@@ -2,9 +2,12 @@ use std::fmt::{Display, Formatter};
 
 use askama::filters::HtmlSafe;
 use bytes::Bytes;
+use cot::form::fields::impl_field_options_builder;
 use cot::form::{AsFormField, FormFieldValidationError};
 use cot::html::HtmlTag;
+use derive_builder::Builder;
 
+use crate::form::fields::attrs::Capture;
 use crate::form::{FormField, FormFieldOptions, FormFieldValue, FormFieldValueError};
 
 #[derive(Debug)]
@@ -51,7 +54,10 @@ impl FormField for FileField {
 }
 
 /// Custom options for a [`FileField`].
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct FileFieldOptions {
     /// The accepted file types. Used to set the [`accept` attribute] in the
     /// HTML input element. Each string in the vector represents a file type
@@ -64,6 +70,8 @@ pub struct FileFieldOptions {
     ///
     /// [`accept` attribute]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/file#limiting_accepted_file_types
     pub accept: Option<Vec<String>>,
+    /// The [`Capture`] attribute specifies the source of the file input.
+    pub capture: Option<Capture>,
 }
 
 impl Display for FileField {
@@ -76,6 +84,10 @@ impl Display for FileField {
         }
         if let Some(accept) = &self.custom_options.accept {
             tag.attr("accept", accept.join(","));
+        }
+
+        if let Some(capture) = self.custom_options.capture {
+            tag.attr("capture", capture.to_string());
         }
 
         write!(f, "{}", tag.render())
@@ -142,6 +154,11 @@ impl InMemoryUploadedFile {
     }
 }
 
+impl_field_options_builder!(
+    FileFieldOptions,
+    FileFieldOptionsBuilder { accept, capture }
+);
+
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
@@ -154,14 +171,15 @@ mod tests {
     #[test]
     fn file_field_render() {
         let field = FileField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FileFieldOptions {
-                accept: Some(vec!["image/*".to_string(), ".pdf".to_string()]),
-            },
+            FormFieldOptions::builder()
+                .id("test".into())
+                .name("test".into())
+                .required(true)
+                .build(),
+            FileFieldOptions::builder()
+                .accept(vec!["image/*".to_string(), ".pdf".to_string()])
+                .capture(Capture::Environment)
+                .build(),
         );
 
         let html = field.to_string();
@@ -169,17 +187,18 @@ mod tests {
         assert!(html.contains("type=\"file\""));
         assert!(html.contains("required"));
         assert!(html.contains("accept=\"image/*,.pdf\""));
+        assert!(html.contains("capture=\"environment\""));
     }
 
     #[test]
     fn file_field_render_no_accept() {
         let field = FileField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FileFieldOptions { accept: None },
+            FormFieldOptions::builder()
+                .id("test".into())
+                .name("test".into())
+                .required(true)
+                .build(),
+            FileFieldOptions::builder().capture(Capture::User).build(),
         );
 
         let html = field.to_string();
@@ -187,17 +206,18 @@ mod tests {
         assert!(html.contains("type=\"file\""));
         assert!(html.contains("required"));
         assert!(!html.contains("accept="));
+        assert!(html.contains("capture=\"user\""));
     }
 
     #[cot::test]
     async fn file_field_clean_value() {
         let mut field = FileField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FileFieldOptions { accept: None },
+            FormFieldOptions::builder()
+                .id("test".into())
+                .name("test".into())
+                .required(true)
+                .build(),
+            FileFieldOptions::builder().build(),
         );
 
         let boundary = "boundary";
@@ -227,12 +247,12 @@ mod tests {
     #[cot::test]
     async fn file_field_clean_required() {
         let field = FileField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FileFieldOptions { accept: None },
+            FormFieldOptions::builder()
+                .id("test".into())
+                .name("test".into())
+                .required(true)
+                .build(),
+            FileFieldOptions::builder().build(),
         );
 
         let value = InMemoryUploadedFile::clean_value(&field);

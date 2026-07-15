@@ -75,7 +75,7 @@ axum = { version = "0.8", default-features = false }
 backtrace = "0.3.76"
 blake3 = "1.8.5"
 bytes = "1.11"
-cargo_toml = "0.22"
+cargo_toml = "1.0"
 chrono = { version = "0.4.44", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
 clap = { version = "4.6.1", features = ["deprecated"] }
@@ -83,11 +83,11 @@ clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.3.0"
 comrak = { version = "0.52", default-features = false }
-cot = { version = "0.6.0", path = "cot" }
-cot-cli = { version = "0.6.0", path = "cot-cli" }
-cot_codegen = { version = "0.6.0", path = "cot-codegen" }
-cot_core = { version = "0.6.0", path = "cot-core" }
-cot_macros = { version = "0.6.0", path = "cot-macros" }
+cot = { version = "0.7.0", path = "cot" }
+cot-cli = { version = "0.7.0", path = "cot-cli" }
+cot_codegen = { version = "0.7.0", path = "cot-codegen" }
+cot_core = { version = "0.7.0", path = "cot-core" }
+cot_macros = { version = "0.7.0", path = "cot-macros" }
 criterion = "0.8"
 darling = "0.23"
 deadpool-redis = { version = "0.23", default-features = false }
@@ -117,7 +117,7 @@ lettre = { version = "0.11.22", default-features = false }
 libtest-mimic = "0.8"
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
-mockall = "0.14"
+mockall = "0.15"
 multer = "3"
 password-auth = { version = "1", default-features = false }
 securer-string = "0.1.3"

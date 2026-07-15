@@ -23,7 +23,7 @@ impl Parse for Query {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub(crate) enum StringMethod {
     Contains { case_sensitive: bool },
     StartsWith { case_sensitive: bool },
@@ -254,16 +254,97 @@ fn handle_string_method(
         };
     }
 
-    // If the receiver isn't a bare field reference (e.g. a composite
-    // expression like `$a + $b`), fall back to the untyped `Expr` constructor.
-    // This bypasses compile-time type checking, so a mismatched type will
-    // only surface as a runtime error (or, in the worst case, a
-    // silently-wrong query) rather than a compile error.
     let receiver_tokens = expr_to_tokens(model_name, receiver);
     quote! {
         #crate_name::db::query::expr::Expr::#method_ident(
             #receiver_tokens,
             #crate_name::db::query::expr::Expr::value(#arg)
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_string_method_all_names() {
+        let all_names = StringMethod::all_names();
+        assert_eq!(all_names.len(), 8);
+        assert_eq!(
+            all_names,
+            [
+                "contains",
+                "icontains",
+                "starts_with",
+                "istarts_with",
+                "ends_with",
+                "iends_with",
+                "raw_like",
+                "iraw_like",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_string_method_from_ident() {
+        let idents = [
+            (
+                "contains",
+                Some(StringMethod::Contains {
+                    case_sensitive: true,
+                }),
+            ),
+            (
+                "icontains",
+                Some(StringMethod::Contains {
+                    case_sensitive: false,
+                }),
+            ),
+            (
+                "starts_with",
+                Some(StringMethod::StartsWith {
+                    case_sensitive: true,
+                }),
+            ),
+            (
+                "istarts_with",
+                Some(StringMethod::StartsWith {
+                    case_sensitive: false,
+                }),
+            ),
+            (
+                "ends_with",
+                Some(StringMethod::EndsWith {
+                    case_sensitive: true,
+                }),
+            ),
+            (
+                "iends_with",
+                Some(StringMethod::EndsWith {
+                    case_sensitive: false,
+                }),
+            ),
+            (
+                "raw_like",
+                Some(StringMethod::Raw {
+                    case_sensitive: true,
+                }),
+            ),
+            (
+                "iraw_like",
+                Some(StringMethod::Raw {
+                    case_sensitive: false,
+                }),
+            ),
+            ("__non_existent__", None),
+        ];
+
+        for (ident, expected) in idents {
+            assert_eq!(
+                StringMethod::from_ident(&format_ident!("{}", ident)),
+                expected
+            );
+        }
     }
 }

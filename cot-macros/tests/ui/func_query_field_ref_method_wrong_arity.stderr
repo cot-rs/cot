@@ -1,0 +1,13 @@
+error: `contains` expects exactly one string argument
+  --> tests/ui/func_query_field_ref_method_wrong_arity.rs:11:5
+   |
+11 |     query!(MyModel, $name.contains());
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `contains` expects exactly one string argument
+  --> tests/ui/func_query_field_ref_method_wrong_arity.rs:12:36
+   |
+12 |     query!(MyModel, $name.contains("a", "b"));
+   |                                    ^^^

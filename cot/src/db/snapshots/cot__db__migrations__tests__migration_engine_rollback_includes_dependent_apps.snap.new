@@ -1,0 +1,20 @@
+---
+source: cot/src/db/migrations.rs
+assertion_line: 2577
+expression: "dry_run_snapshot(&engine, &test_db.database(), &mut output, \"0001\",\n\"rollback_app1\").await"
+---
+Rollback dry run
+
+Target:
+  app:       rollback_app1
+  migration: 0001
+  mode:      exclusive (target migration remains applied)
+
+Rollback plan:
+  1. rollback_dependent::m_0001_initial
+  2. rollback_app1::m_0002_second
+
+Summary:
+  to roll back:     2
+  skipped:          0
+  database changes: none

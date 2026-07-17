@@ -937,6 +937,7 @@ dependencies = [
  "humantime",
  "idna",
  "indexmap",
+ "insta",
  "is_terminal_polyfill",
  "lettre",
  "mime",

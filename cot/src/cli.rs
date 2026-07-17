@@ -625,8 +625,7 @@ impl CliTask for MigrationRollback {
         let crate_name = bootstrapper.project().cli_metadata().name;
         let app_name = matches
             .get_one::<String>("app")
-            .map(String::as_str)
-            .unwrap_or(crate_name);
+            .map_or(crate_name, String::as_str);
 
         let BootstrappedProject {
             context,

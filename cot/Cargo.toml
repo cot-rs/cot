@@ -72,6 +72,7 @@ url = { workspace = true, features = ["serde"] }
 criterion = { workspace = true, features = ["async_tokio"] }
 fake.workspace = true
 fantoccini.workspace = true
+insta.workspace = true
 mockall.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 rustversion.workspace = true

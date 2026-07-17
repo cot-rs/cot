@@ -2390,13 +2390,34 @@ mod tests {
             .build()];
     }
 
-    async fn assert_migration_applied(database: Database, app: &str, name: &str, expected: bool) {
+    async fn assert_migration_applied(database: &Database, app: &str, name: &str, expected: bool) {
         let applied = query!(AppliedMigration, $app == app && $name == name)
-            .exists(&database)
+            .exists(database)
             .await
             .unwrap();
 
         assert_eq!(applied, expected, "{app}::{name}");
+    }
+
+    async fn assert_migrations_applied(db: &Database, expected: &[(&str, &str, bool)]) {
+        for &(app, name, applied) in expected {
+            assert_migration_applied(db, app, name, applied).await;
+        }
+    }
+
+    async fn dry_run_snapshot(
+        engine: &MigrationEngine,
+        db: &Database,
+        output: &mut Vec<u8>,
+        migration_name: &str,
+        app_name: &str,
+    ) -> String {
+        output.clear();
+        engine
+            .rollback_dry_run(db, migration_name, app_name, output)
+            .await
+            .unwrap();
+        std::str::from_utf8(output).unwrap().to_owned()
     }
 
     #[cot_macros::dbtest]
@@ -2430,6 +2451,7 @@ mod tests {
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_rollback_single_app(test_db: &mut TestDatabase) {
+        let mut output = Vec::new();
         #[expect(trivial_casts)]
         let engine = MigrationEngine::new([
             &RollbackApp1Initial as &SyncDynMigration,
@@ -2440,26 +2462,48 @@ mod tests {
 
         engine.run(&test_db.database()).await.unwrap();
         // migrations should be applied
-
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0003_third", true).await;
+        assert_migrations_applied(
+            &test_db.database(),
+            &[
+                ("rollback_app1", "m_0001_initial", true),
+                ("rollback_app1", "m_0002_second", true),
+                ("rollback_app1", "m_0003_third", true),
+            ],
+        )
+        .await;
 
         // rollback everything except the initial migration
+        insta::assert_snapshot!(
+            dry_run_snapshot(
+                &engine,
+                &test_db.database(),
+                &mut output,
+                "0001",
+                "rollback_app1"
+            )
+            .await
+        );
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
             .unwrap();
 
-        // the initial migration should stay applied
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", true).await;
-        // everything else should be unapplied
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", false).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0003_third", false).await;
+        assert_migrations_applied(
+            &test_db.database(),
+            &[
+                // the initial migration should stay applied
+                ("rollback_app1", "m_0001_initial", true),
+                // everything else should be unapplied
+                ("rollback_app1", "m_0002_second", false),
+                ("rollback_app1", "m_0003_third", false),
+            ],
+        )
+        .await;
     }
 
     #[cot_macros::dbtest]
     async fn test_migration_rollback_unrelated_apps(test_db: &mut TestDatabase) {
+        let mut output = Vec::new();
         let mut migrations = DatabaseUserApp::new().migrations();
         // combine migrations from multiple apps/crates
         #[expect(trivial_casts)]
@@ -2473,30 +2517,53 @@ mod tests {
 
         engine.run(&test_db.database()).await.unwrap();
         // migrations should be applied across all apps
-        assert_migration_applied(test_db.database(), "cot", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "cot_session", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app2", "m_0001_initial", true).await;
+        assert_migrations_applied(
+            &test_db.database(),
+            &[
+                ("cot", "m_0001_initial", true),
+                ("cot_session", "m_0001_initial", true),
+                ("rollback_app1", "m_0001_initial", true),
+                ("rollback_app1", "m_0002_second", true),
+                ("rollback_app2", "m_0001_initial", true),
+            ],
+        )
+        .await;
 
         // rollback every migration in the rollback_app1 app except the initial
+        insta::assert_snapshot!(
+            dry_run_snapshot(
+                &engine,
+                &test_db.database(),
+                &mut output,
+                "0001",
+                "rollback_app1"
+            )
+            .await
+        );
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
             .unwrap();
 
-        // the initial migration should stay applied
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", true).await;
-        // everything else in the rollback_app1 app should be unapplied
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", false).await;
-        // migrations from other apps should remain unaffected
-        assert_migration_applied(test_db.database(), "cot", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "cot_session", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app2", "m_0001_initial", true).await;
+        assert_migrations_applied(
+            &test_db.database(),
+            &[
+                // the initial migration should stay applied
+                ("rollback_app1", "m_0001_initial", true),
+                // everything else in the rollback_app1 app should be unapplied
+                ("rollback_app1", "m_0002_second", false),
+                // migrations from other apps should remain unaffected
+                ("cot", "m_0001_initial", true),
+                ("cot_session", "m_0001_initial", true),
+                ("rollback_app2", "m_0001_initial", true),
+            ],
+        )
+        .await;
     }
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_rollback_includes_dependent_apps(test_db: &mut TestDatabase) {
+        let mut output = Vec::new();
         #[expect(trivial_casts)]
         let engine = MigrationEngine::new([
             &RollbackApp1Initial as &SyncDynMigration,
@@ -2507,50 +2574,52 @@ mod tests {
         .unwrap();
 
         engine.run(&test_db.database()).await.unwrap();
-        engine
-            .rollback_dry_run(
-                &test_db.database(),
-                "m_0001_initial",
-                "rollback_app2",
-                &mut io::stderr(),
-            )
-            .await
-            .unwrap();
 
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", true).await;
-        assert_migration_applied(
-            test_db.database(),
-            "rollback_dependent",
-            "m_0001_initial",
-            true,
+        assert_migrations_applied(
+            &test_db.database(),
+            &[
+                ("rollback_app1", "m_0001_initial", true),
+                ("rollback_app1", "m_0002_second", true),
+                ("rollback_dependent", "m_0001_initial", true),
+                ("rollback_app2", "m_0001_initial", true),
+            ],
         )
         .await;
-        assert_migration_applied(test_db.database(), "rollback_app2", "m_0001_initial", true).await;
 
         // rollback everything except the initial migration in the source/independent
         // app
+        insta::assert_snapshot!(
+            dry_run_snapshot(
+                &engine,
+                &test_db.database(),
+                &mut output,
+                "0001",
+                "rollback_app1"
+            )
+            .await
+        );
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
             .unwrap();
 
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", false).await;
-        // the sink/dependent app should also be unapplied/rolled back
-        assert_migration_applied(
-            test_db.database(),
-            "rollback_dependent",
-            "m_0001_initial",
-            false,
+        assert_migrations_applied(
+            &test_db.database(),
+            &[
+                ("rollback_app1", "m_0001_initial", true),
+                ("rollback_app1", "m_0002_second", false),
+                // the sink/dependent app should also be unapplied/rolled back
+                ("rollback_dependent", "m_0001_initial", false),
+                // migrations from non-dependent apps should remain unaffected
+                ("rollback_app2", "m_0001_initial", true),
+            ],
         )
         .await;
-        // migrations from non-dependent apps should remain unaffected
-        assert_migration_applied(test_db.database(), "rollback_app2", "m_0001_initial", true).await;
     }
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_rollback_zero(test_db: &mut TestDatabase) {
+        let mut output = Vec::new();
         #[expect(trivial_casts)]
         let engine = MigrationEngine::new([
             &RollbackApp1Initial as &SyncDynMigration,
@@ -2562,32 +2631,44 @@ mod tests {
 
         engine.run(&test_db.database()).await.unwrap();
 
-        engine
-            .rollback_dry_run(
+        assert_migrations_applied(
+            &test_db.database(),
+            &[
+                ("rollback_app1", "m_0001_initial", true),
+                ("rollback_app1", "m_0002_second", true),
+                ("rollback_app1", "m_0003_third", true),
+                ("rollback_app2", "m_0001_initial", true),
+            ],
+        )
+        .await;
+
+        insta::assert_snapshot!(
+            dry_run_snapshot(
+                &engine,
                 &test_db.database(),
+                &mut output,
                 "zero",
-                "rollback_app1",
-                &mut io::stderr(),
+                "rollback_app1"
             )
             .await
-            .unwrap();
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0003_third", true).await;
-        assert_migration_applied(test_db.database(), "rollback_app2", "m_0001_initial", true).await;
-
+        );
         engine
             .rollback(&test_db.database(), "zero", "rollback_app1")
             .await
             .unwrap();
-        // everything should be unapplied
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0001_initial", false)
-            .await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0002_second", false).await;
-        assert_migration_applied(test_db.database(), "rollback_app1", "m_0003_third", false).await;
 
-        // the non dependent apps should be unaffected
-        assert_migration_applied(test_db.database(), "rollback_app2", "m_0001_initial", true).await;
+        assert_migrations_applied(
+            &test_db.database(),
+            &[
+                // everything should be unapplied
+                ("rollback_app1", "m_0001_initial", false),
+                ("rollback_app1", "m_0002_second", false),
+                ("rollback_app1", "m_0003_third", false),
+                // the non dependent apps should be unaffected
+                ("rollback_app2", "m_0001_initial", true),
+            ],
+        )
+        .await;
     }
 
     #[test]

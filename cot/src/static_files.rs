@@ -477,7 +477,7 @@ mod tests {
             &StaticFilesConfig::builder()
                 .url("/assets/")
                 .rewrite(StaticFilesPathRewriteMode::QueryParam)
-                .cache_timeout(Duration::from_secs(300))
+                .cache_timeout(Duration::from_mins(5))
                 .build(),
         );
         static_files.add_file(StaticFile::new("test.txt", "This is a test file"));

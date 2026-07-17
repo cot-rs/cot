@@ -22,8 +22,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
+use securer_string::SecureBytes;
 use serde::{Deserialize, Serialize};
-use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 #[cfg(feature = "email")]
@@ -596,8 +596,7 @@ impl Timeout {
 
 impl Default for Timeout {
     fn default() -> Self {
-        // expire after 5 mins.
-        Self::After(Duration::from_secs(300))
+        Self::After(Duration::from_mins(5))
     }
 }
 
@@ -2116,11 +2115,12 @@ impl Default for EmailConfig {
 ///
 /// # Security
 ///
-/// The implementation of the [`PartialEq`] trait for this type is constant-time
-/// to prevent timing attacks.
+/// The implementation of the [`PartialEq`] trait for this type uses
+/// constant-time comparison to prevent timing attacks.
 ///
-/// The implementation of the [`Debug`] trait for this type hides the secret key
-/// to prevent it from being leaked in logs or other debug output.
+/// The implementation of the [`Debug`] trait for this type is inherited from
+/// [`SecureBytes`], which hides the secret key to prevent it from being leaked
+/// in logs or other debug output.
 ///
 /// # Examples
 ///
@@ -2131,9 +2131,18 @@ impl Default for EmailConfig {
 /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
 /// ```
 #[repr(transparent)]
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq)]
 #[serde(from = "String")]
-pub struct SecretKey(Box<[u8]>);
+pub struct SecretKey(SecureBytes);
+
+impl Serialize for SecretKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.as_bytes())
+    }
+}
 
 impl SecretKey {
     /// Create a new [`SecretKey`] from a byte array.
@@ -2148,7 +2157,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn new(hash: &[u8]) -> Self {
-        Self(Box::from(hash))
+        Self(SecureBytes::new(hash.to_vec()))
     }
 
     /// Get the byte array stored in the [`SecretKey`].
@@ -2163,7 +2172,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.0
+        self.0.unsecure()
     }
 
     /// Consume the [`SecretKey`] and return the byte array stored in it.
@@ -2178,7 +2187,19 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn into_bytes(self) -> Box<[u8]> {
-        self.0
+        self.0.unsecure().to_vec().into_boxed_slice()
+    }
+}
+
+impl Debug for SecretKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SecretKey").finish_non_exhaustive()
+    }
+}
+
+impl Default for SecretKey {
+    fn default() -> Self {
+        Self::new(&[])
     }
 }
 
@@ -2197,27 +2218,6 @@ impl From<String> for SecretKey {
 impl From<&str> for SecretKey {
     fn from(value: &str) -> Self {
         Self::new(value.as_bytes())
-    }
-}
-
-impl PartialEq for SecretKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.ct_eq(&other.0).into()
-    }
-}
-
-impl Eq for SecretKey {}
-
-impl Debug for SecretKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write in single line, regardless whether alternate mode was used or not
-        write!(f, "SecretKey(\"**********\")")
-    }
-}
-
-impl Default for SecretKey {
-    fn default() -> Self {
-        Self::new(&[])
     }
 }
 
@@ -2495,6 +2495,7 @@ impl From<&str> for EmailUrl {
 
 #[cfg(test)]
 mod tests {
+    use serde_json;
     use time::OffsetDateTime;
 
     use super::*;
@@ -2540,7 +2541,7 @@ mod tests {
         );
         assert_eq!(
             config.static_files.cache_timeout,
-            Some(Duration::from_secs(3600))
+            Some(Duration::from_hours(1))
         );
         assert!(config.middlewares.live_reload.enabled);
         assert!(!config.middlewares.session.secure);
@@ -2623,7 +2624,7 @@ mod tests {
         let expiry_opts = [
             (
                 "2h",
-                Expiry::OnInactivity(Duration::from_secs(7200)),
+                Expiry::OnInactivity(Duration::from_hours(2)),
                 tower_sessions::Expiry::OnInactivity(time::Duration::seconds(7200)),
             ),
             (
@@ -2764,6 +2765,14 @@ mod tests {
             StaticFilesPathRewriteMode::QueryParam
         );
     }
+
+    #[test]
+    fn secret_key_serialize_json() {
+        let key = SecretKey::from("abc123");
+        let serialized = serde_json::to_string(&key).unwrap();
+        // Should serialize as a byte array
+        assert_eq!(serialized, "[97,98,99,49,50,51]");
+    }
     #[test]
     #[cfg(feature = "redis")]
     fn cache_type_from_str_redis() {
@@ -2853,10 +2862,7 @@ mod tests {
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
         assert_eq!(config.cache.max_retries, 5);
-        assert_eq!(
-            config.cache.timeout,
-            Timeout::After(Duration::from_secs(60))
-        );
+        assert_eq!(config.cache.timeout, Timeout::After(Duration::from_mins(1)));
         assert_eq!(config.cache.prefix, Some("v1".to_string()));
         assert_eq!(config.cache.store.store_type, CacheStoreTypeConfig::Memory);
     }
@@ -2902,10 +2908,7 @@ mod tests {
             let config = ProjectConfig::from_toml(toml_content).unwrap();
 
             assert_eq!(config.cache.max_retries, 10);
-            assert_eq!(
-                config.cache.timeout,
-                Timeout::After(Duration::from_secs(120))
-            );
+            assert_eq!(config.cache.timeout, Timeout::After(Duration::from_mins(2)));
             assert_eq!(config.cache.prefix, None);
 
             if let CacheStoreTypeConfig::Redis { url, pool_size } = config.cache.store.store_type {
@@ -3027,7 +3030,7 @@ mod tests {
         let offset = FixedOffset::east_opt(3600).unwrap();
         let insertion_time: DateTime<FixedOffset> =
             (Utc::now() - chrono::Duration::hours(1)).with_timezone(&offset);
-        let timeout = Timeout::After(Duration::from_secs(60)); // 1 minute
+        let timeout = Timeout::After(Duration::from_mins(1));
         assert!(timeout.is_expired(Some(insertion_time)));
     }
 
@@ -3037,14 +3040,14 @@ mod tests {
         let offset = FixedOffset::east_opt(-2 * 3600).unwrap();
         let insertion_time: DateTime<FixedOffset> =
             (Utc::now() - chrono::Duration::seconds(10)).with_timezone(&offset);
-        let timeout = Timeout::After(Duration::from_secs(60));
+        let timeout = Timeout::After(Duration::from_mins(1));
         assert!(!timeout.is_expired(Some(insertion_time)));
     }
 
     #[test]
     #[should_panic(expected = "insertion_time is required for Timeout::After expiry check")]
     fn after_is_expired_panics_with_no_insertion_time() {
-        let timeout = Timeout::After(Duration::from_secs(60));
+        let timeout = Timeout::After(Duration::from_mins(1));
         let _ = timeout.is_expired(None);
     }
 

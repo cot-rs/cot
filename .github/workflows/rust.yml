@@ -17,7 +17,7 @@ env:
 
   _RUST_STABLE: &rust_stable stable
   # Pinning the nightly version to a "stable" version to avoid CI breakages.
-  _RUST_NIGHTLY: &rust_nightly nightly-2026-02-28
+  _RUST_NIGHTLY: &rust_nightly nightly-2026-06-20
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -66,7 +66,7 @@ jobs:
           - rust: nightly
             version: *rust_nightly
           - rust: MSRV
-            version: "1.88" # MSRV
+            version: "1.94" # MSRV
 
     name: Build & test
     runs-on: ${{ matrix.os }}
@@ -74,7 +74,7 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -118,7 +118,7 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -147,7 +147,7 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -190,7 +190,7 @@ jobs:
     needs: ["build"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install LLVM
         run: sudo apt-get install -y llvm
@@ -237,7 +237,7 @@ jobs:
       - name: Merge code coverage reports
         run: cargo llvm-cov report --codecov --output-path codecov.json
 
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         with:
           files: codecov.json
           flags: rust
@@ -253,7 +253,7 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -286,7 +286,7 @@ jobs:
       SCCACHE_GHA_ENABLED: ""
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -304,7 +304,7 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -342,7 +342,7 @@ jobs:
     needs: ["check"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -373,7 +373,7 @@ jobs:
     needs: ["build"]
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -412,13 +412,14 @@ jobs:
       RUSTC_WRAPPER: ""
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Check licenses
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           log-level: warn
           command: check licenses
-          command-arguments: --config .cargo/deny.toml
+          arguments: --config .cargo/deny.toml
+          command-arguments: licenses bans sources
   semver-check:
     if: github.event_name == 'pull_request'
     name: Semver compatibility check
@@ -428,7 +429,7 @@ jobs:
       SCCACHE_GHA_ENABLED: ""
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

@@ -991,13 +991,13 @@ impl Expr {
     /// ```
     /// use cot::db::Identifier;
     /// use cot::db::query::Expr;
-    /// use sea_query::IntoColumnRef;
+    /// use sea_query::{ExprTrait, IntoColumnRef};
     ///
     /// let expr = Expr::eq(Expr::field("id"), Expr::value(5));
     ///
     /// assert_eq!(
     ///     expr.as_sea_query_expr(),
-    ///     sea_query::SimpleExpr::eq(
+    ///     ExprTrait::eq(
     ///         sea_query::SimpleExpr::Column(Identifier::new("id").into_column_ref()),
     ///         sea_query::SimpleExpr::Value(sea_query::Value::Int(Some(5)))
     ///     )

@@ -1307,7 +1307,7 @@ mod tests {
         let id_2 = session.id();
 
         assert!(id_2.is_some());
-        assert!(id_1 != id_2);
+        assert_ne!(id_1, id_2);
     }
 
     /// Test that the user is logged out when there is an invalid user ID in the

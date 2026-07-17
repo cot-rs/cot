@@ -1,6 +1,7 @@
 #![cfg(feature = "fake")]
 #![cfg_attr(miri, ignore)]
 
+use bytes::Bytes;
 use cot::auth::PasswordHash;
 use cot::common_types::{Email, Password, Url};
 use cot::db::migrations::{Field, Operation};
@@ -246,6 +247,8 @@ struct AllFieldsModel {
     field_datetime_timezone: chrono::DateTime<chrono::FixedOffset>,
     field_string: String,
     field_blob: Vec<u8>,
+    #[dummy(expr = "Bytes::from_static(b\"test bytes\")")]
+    field_bytes: Bytes,
     field_option: Option<String>,
     field_limited_string: LimitedString<10>,
     field_option_limited_string: Option<LimitedString<10>>,
@@ -288,6 +291,7 @@ const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
         all_fields_migration_field!(datetime_timezone, chrono::DateTime<chrono::FixedOffset>),
         all_fields_migration_field!(string, String),
         all_fields_migration_field!(blob, Vec<u8>),
+        all_fields_migration_field!(bytes, Bytes),
         all_fields_migration_field!(option, Option<String>),
         all_fields_migration_field!(limited_string, LimitedString<10>),
         all_fields_migration_field!(option_limited_string, Option<LimitedString<10>>),

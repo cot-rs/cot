@@ -1,4 +1,4 @@
-FROM docker.io/library/rust:1.93 AS builder
+FROM docker.io/library/rust:1.97 AS builder
 WORKDIR /usr/src/cot
 COPY . .
 WORKDIR /usr/src/cot/site

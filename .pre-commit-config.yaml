@@ -35,12 +35,12 @@ repos:
         entry: cargo fmt
         pass_filenames: false
   - repo: https://github.com/instrumentl/pre-commit-just
-    rev: v0.1
+    rev: v0.2
     hooks:
       - id: format-justfile
         name: "format justfiles"
   - repo: https://github.com/djlint/djLint
-    rev: v1.36.4
+    rev: v1.40.3
     hooks:
       - id: djlint
         name: djLint

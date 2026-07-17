@@ -1,3 +1,4 @@
 profile = "jinja"
 ignore = "H006,H030,H031"
 no_function_formatting = true
+ignore_blocks = "match,when"

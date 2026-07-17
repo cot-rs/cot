@@ -9,9 +9,7 @@
     <div class="container">
         <form action="" method="post">
             {% if form.has_errors() %}
-                <div class="form-errors">
-                    {% for error in form.errors_for(FormErrorTarget::Form) %}{{ error }}{% endfor %}
-                </div>
+                <div class="form-errors">{% for error in form.errors_for(FormErrorTarget::Form) %}{{ error }}{% endfor %}</div>
             {% endif %}
             <div class="form-row">
                 <label for="{{ form.username.id() }}">Username:</label>

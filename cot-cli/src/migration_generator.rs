@@ -1978,6 +1978,8 @@ mod tests {
                     unique: false,
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(crate::Table2),
+                        on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                        on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                     }),
                 }),
             },
@@ -2016,6 +2018,8 @@ mod tests {
                     unique: false,
                     foreign_key: Some(ForeignKeySpec {
                         to_model: parse_quote!(crate::Table2),
+                        on_delete: Some(ForeignKeyOnDeletePolicy::Cascade),
+                        on_update: Some(ForeignKeyOnUpdatePolicy::Cascade),
                     }),
                 }),
                 new_field: Box::new(Field {

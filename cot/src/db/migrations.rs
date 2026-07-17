@@ -470,9 +470,7 @@ impl Operation {
     ///         Identifier::new("name"),
     ///         <String as DatabaseField>::TYPE,
     ///     ))
-    ///     .new_field(
-    ///         Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE).null(),
-    ///     )
+    ///     .new_field(Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE).null())
     ///     .build();
     ///
     /// OPERATION.forwards(&database).await?;

@@ -2405,21 +2405,6 @@ mod tests {
         }
     }
 
-    async fn dry_run_snapshot(
-        engine: &MigrationEngine,
-        db: &Database,
-        output: &mut Vec<u8>,
-        migration_name: &str,
-        app_name: &str,
-    ) -> String {
-        output.clear();
-        engine
-            .rollback_dry_run(db, migration_name, app_name, output)
-            .await
-            .unwrap();
-        std::str::from_utf8(output).unwrap().to_owned()
-    }
-
     #[cot_macros::dbtest]
     async fn test_migration_rollback_no_deps(test_db: &mut TestDatabase) {
         let engine = MigrationEngine::new([RollbackApp1Initial]).unwrap();
@@ -2451,7 +2436,6 @@ mod tests {
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_rollback_single_app(test_db: &mut TestDatabase) {
-        let mut output = Vec::new();
         #[expect(trivial_casts)]
         let engine = MigrationEngine::new([
             &RollbackApp1Initial as &SyncDynMigration,
@@ -2473,16 +2457,6 @@ mod tests {
         .await;
 
         // rollback everything except the initial migration
-        insta::assert_snapshot!(
-            dry_run_snapshot(
-                &engine,
-                &test_db.database(),
-                &mut output,
-                "0001",
-                "rollback_app1"
-            )
-            .await
-        );
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
@@ -2503,7 +2477,6 @@ mod tests {
 
     #[cot_macros::dbtest]
     async fn test_migration_rollback_unrelated_apps(test_db: &mut TestDatabase) {
-        let mut output = Vec::new();
         let mut migrations = DatabaseUserApp::new().migrations();
         // combine migrations from multiple apps/crates
         #[expect(trivial_casts)]
@@ -2530,16 +2503,6 @@ mod tests {
         .await;
 
         // rollback every migration in the rollback_app1 app except the initial
-        insta::assert_snapshot!(
-            dry_run_snapshot(
-                &engine,
-                &test_db.database(),
-                &mut output,
-                "0001",
-                "rollback_app1"
-            )
-            .await
-        );
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
@@ -2563,7 +2526,6 @@ mod tests {
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_rollback_includes_dependent_apps(test_db: &mut TestDatabase) {
-        let mut output = Vec::new();
         #[expect(trivial_casts)]
         let engine = MigrationEngine::new([
             &RollbackApp1Initial as &SyncDynMigration,
@@ -2588,16 +2550,6 @@ mod tests {
 
         // rollback everything except the initial migration in the source/independent
         // app
-        insta::assert_snapshot!(
-            dry_run_snapshot(
-                &engine,
-                &test_db.database(),
-                &mut output,
-                "0001",
-                "rollback_app1"
-            )
-            .await
-        );
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
@@ -2619,7 +2571,6 @@ mod tests {
 
     #[cot_macros::dbtest]
     async fn test_migration_engine_rollback_zero(test_db: &mut TestDatabase) {
-        let mut output = Vec::new();
         #[expect(trivial_casts)]
         let engine = MigrationEngine::new([
             &RollbackApp1Initial as &SyncDynMigration,
@@ -2642,16 +2593,6 @@ mod tests {
         )
         .await;
 
-        insta::assert_snapshot!(
-            dry_run_snapshot(
-                &engine,
-                &test_db.database(),
-                &mut output,
-                "zero",
-                "rollback_app1"
-            )
-            .await
-        );
         engine
             .rollback(&test_db.database(), "zero", "rollback_app1")
             .await

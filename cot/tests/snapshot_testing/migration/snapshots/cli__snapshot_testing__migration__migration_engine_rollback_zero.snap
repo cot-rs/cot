@@ -1,6 +1,5 @@
 ---
-source: cot/src/db/migrations.rs
-assertion_line: 2624
+source: cot/tests/snapshot_testing/migration/mod.rs
 expression: "dry_run_snapshot(&engine, &test_db.database(), &mut output, \"zero\",\n\"rollback_app1\").await"
 ---
 Rollback dry run

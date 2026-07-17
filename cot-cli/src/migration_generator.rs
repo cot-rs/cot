@@ -770,7 +770,7 @@ impl MigrationOperationGenerator {
     fn make_remove_model_operation(migration_model: &ModelInSource) -> DynOperation {
         print_status_msg(
             StatusType::Removing,
-            &format!("Model '{}'", &migration_model.model.name),
+            &format!("Model '{}'", migration_model.model.name),
         );
 
         let op = DynOperation::RemoveModel {
@@ -781,7 +781,7 @@ impl MigrationOperationGenerator {
 
         print_status_msg(
             StatusType::Removed,
-            &format!("Model '{}'", &migration_model.model.name),
+            &format!("Model '{}'", migration_model.model.name),
         );
 
         op
@@ -791,10 +791,7 @@ impl MigrationOperationGenerator {
     fn make_add_field_operation(app_model: &ModelInSource, field: &Field) -> DynOperation {
         print_status_msg(
             StatusType::Adding,
-            &format!(
-                "Field '{}' to Model '{}'",
-                &field.name, app_model.model.name
-            ),
+            &format!("Field '{}' to Model '{}'", field.name, app_model.model.name),
         );
 
         let op = DynOperation::AddField {
@@ -805,10 +802,7 @@ impl MigrationOperationGenerator {
 
         print_status_msg(
             StatusType::Added,
-            &format!(
-                "Field '{}' to Model '{}'",
-                &field.name, app_model.model.name
-            ),
+            &format!("Field '{}' to Model '{}'", field.name, app_model.model.name),
         );
 
         op
@@ -828,7 +822,7 @@ impl MigrationOperationGenerator {
             StatusType::Modifying,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.name, migration_model.model.name
+                migration_field.name, migration_model.model.name
             ),
         );
 
@@ -839,7 +833,7 @@ impl MigrationOperationGenerator {
             StatusType::Modified,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.name, migration_model.model.name
+                migration_field.name, migration_model.model.name
             ),
         );
     }
@@ -853,7 +847,7 @@ impl MigrationOperationGenerator {
             StatusType::Removing,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.name, migration_model.model.name
+                migration_field.name, migration_model.model.name
             ),
         );
 
@@ -867,7 +861,7 @@ impl MigrationOperationGenerator {
             StatusType::Removed,
             &format!(
                 "Field '{}' from Model '{}'",
-                &migration_field.name, migration_model.model.name
+                migration_field.name, migration_model.model.name
             ),
         );
 

@@ -16,6 +16,7 @@ use tracing::{Level, info};
 use crate::db::migrations::sorter::{MigrationSorter, MigrationSorterError};
 use crate::db::relations::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use crate::db::{Auto, ColumnType, Database, DatabaseField, Identifier, Result, model, query};
+use crate::utils::cli::{StatusType, print_status_msg};
 
 const MIGRATION_ZERO_NAME: &str = "zero";
 
@@ -259,6 +260,10 @@ impl MigrationEngine {
                 migration.name(),
                 migration.app_name()
             );
+            print_status_msg(
+                StatusType::RollingBack,
+                &format!("Migration {}::{}", migration.app_name(), migration.name()),
+            );
 
             for operation in migration.operations().iter().rev() {
                 operation.backwards(database).await?;
@@ -267,6 +272,10 @@ impl MigrationEngine {
             if Self::is_migration_applied(database, migration).await? {
                 Self::mark_migration_unapplied(database, migration).await?;
             }
+            print_status_msg(
+                StatusType::RolledBack,
+                &format!("Migration {}::{}", migration.app_name(), migration.name()),
+            );
         }
 
         Ok(())

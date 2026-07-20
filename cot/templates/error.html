@@ -9,14 +9,10 @@
     </head>
     <body>
         <h1 class="{% match kind %}{% when Kind::NotFound %}warning{% else %}error{% endmatch %}">
-            {% match kind %}{% when Kind::NotFound %}Not found
-        {% else %}
-            Cot failure{% endmatch %}
+            {% match kind %}{% when Kind::NotFound %}Not found{% else %}Cot failure{% endmatch %}
         </h1>
         <p>
-            {% match kind %}{% when Kind::NotFound %}The URL requested could not be found.{% when Kind::Panic %}The request handler has panicked.
-        {% else %}
-            An error occurred while handling a request.{% endmatch %}
+            {% match kind %}{% when Kind::NotFound %}The URL requested could not be found.{% when Kind::Panic %}The request handler has panicked.{% else %}An error occurred while handling a request.{% endmatch %}
         </p>
         {% match kind %}
         {% when Kind::Panic %}

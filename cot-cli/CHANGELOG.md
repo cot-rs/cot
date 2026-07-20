@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/cot-rs/cot/compare/cot-cli-v0.7.0...cot-cli-v0.7.1) - 2026-07-20
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.7.0/cot-cli/0.7.1/Cargo.toml)
+
+### Other
+
+- *(deps)* Bump all deps ([#616](https://github.com/cot-rs/cot/pull/616)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.7.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.6.0...cot-cli-v0.7.0) - 2026-07-11
 
 [View diff on diff.rs](https://diff.rs/cot-cli/0.6.0/cot-cli/0.7.0/Cargo.toml)

@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.1](https://github.com/cot-rs/cot/compare/cot-v0.7.0...cot-v0.7.1) - 2026-07-20
+
+[View diff on diff.rs](https://diff.rs/cot/0.7.0/cot/0.7.1/Cargo.toml)
+
+### Other
+
+- Use built-in askama profile in djlint ([#620](https://github.com/cot-rs/cot/pull/620)) (by [@m4tx](https://github.com/m4tx))
+- *(pre-commit.ci)* Pre-commit autoupdate ([#607](https://github.com/cot-rs/cot/pull/607)) (by [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
 ## [0.7.0](https://github.com/cot-rs/cot/compare/cot-v0.6.0...cot-v0.7.0) - 2026-07-11
 
 [View diff on diff.rs](https://diff.rs/cot/0.6.0/cot/0.7.0/Cargo.toml)

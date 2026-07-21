@@ -24,85 +24,58 @@ impl Parse for Query {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub(crate) enum StringMethod {
-    Contains { case_sensitive: bool },
-    StartsWith { case_sensitive: bool },
-    EndsWith { case_sensitive: bool },
-    Raw { case_sensitive: bool },
+pub(crate) struct FieldRefMethod {
+    name: &'static str,
+    arity: u32,
 }
 
-impl StringMethod {
-    pub(crate) fn from_ident(ident: &syn::Ident) -> Option<Self> {
-        match ident.to_string().as_str() {
-            "contains" => Some(Self::Contains {
-                case_sensitive: true,
-            }),
-            "icontains" => Some(Self::Contains {
-                case_sensitive: false,
-            }),
-            "starts_with" => Some(Self::StartsWith {
-                case_sensitive: true,
-            }),
-            "istarts_with" => Some(Self::StartsWith {
-                case_sensitive: false,
-            }),
-            "ends_with" => Some(Self::EndsWith {
-                case_sensitive: true,
-            }),
-            "iends_with" => Some(Self::EndsWith {
-                case_sensitive: false,
-            }),
-            "raw_like" => Some(Self::Raw {
-                case_sensitive: true,
-            }),
-            "iraw_like" => Some(Self::Raw {
-                case_sensitive: false,
-            }),
-            _ => None,
-        }
+const FIELD_REF_METHODS: &[FieldRefMethod] = &[
+    FieldRefMethod {
+        name: "contains",
+        arity: 1,
+    },
+    FieldRefMethod {
+        name: "icontains",
+        arity: 1,
+    },
+    FieldRefMethod {
+        name: "starts_with",
+        arity: 1,
+    },
+    FieldRefMethod {
+        name: "istarts_with",
+        arity: 1,
+    },
+    FieldRefMethod {
+        name: "ends_with",
+        arity: 1,
+    },
+    FieldRefMethod {
+        name: "iends_with",
+        arity: 1,
+    },
+    FieldRefMethod {
+        name: "raw_like",
+        arity: 1,
+    },
+    FieldRefMethod {
+        name: "iraw_like",
+        arity: 1,
+    },
+];
+
+impl FieldRefMethod {
+    pub(crate) fn lookup(ident: &syn::Ident) -> Option<&'static Self> {
+        let name = ident.to_string();
+        FIELD_REF_METHODS.iter().find(|m| m.name == name)
     }
 
     pub(crate) fn as_ident(self) -> syn::Ident {
-        let name = match self {
-            Self::Contains {
-                case_sensitive: true,
-            } => "contains",
-            Self::Contains {
-                case_sensitive: false,
-            } => "icontains",
-            Self::StartsWith {
-                case_sensitive: true,
-            } => "starts_with",
-            Self::StartsWith {
-                case_sensitive: false,
-            } => "istarts_with",
-            Self::EndsWith {
-                case_sensitive: true,
-            } => "ends_with",
-            Self::EndsWith {
-                case_sensitive: false,
-            } => "iends_with",
-            Self::Raw {
-                case_sensitive: true,
-            } => "raw_like",
-            Self::Raw {
-                case_sensitive: false,
-            } => "iraw_like",
-        };
-        format_ident!("{name}")
+        format_ident!("{}", self.name)
     }
 
-    pub(crate) fn all_names() -> &'static [&'static str] {
-        &[
-            "contains",
-            "icontains",
-            "starts_with",
-            "istarts_with",
-            "ends_with",
-            "iends_with",
-            "raw_like",
-            "iraw_like",
-        ]
+    pub(crate) fn all_names() -> impl Iterator<Item = &'static str> {
+        FIELD_REF_METHODS.iter().map(|m| m.name)
     }
 }
 
@@ -158,18 +131,18 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
 
             if non_field_tokens.is_none()
                 && let Expr::MemberAccess { member_name, .. } = &*function
-                && let Some(method) = StringMethod::from_ident(member_name)
+                && let Some(method) = FieldRefMethod::lookup(member_name)
             {
                 let Expr::MemberAccess { parent, .. } = *function else {
                     unreachable!("function call must have a parent");
                 };
-                return handle_string_method(model_name, *parent, args, method);
+                return handle_field_ref_method(model_name, *parent, &args, *method);
             }
 
             if let Some(tokens) = non_field_tokens {
                 quote!(#crate_name::db::query::expr::Expr::value(#tokens(#(#args),*)))
             } else {
-                let all_function_names = StringMethod::all_names().join(", ");
+                let all_function_names = FieldRefMethod::all_names().collect::<Vec<_>>().join(", ");
                 let msg = format!(
                     "calling functions that reference database fields is unsupported \
                         (only {all_function_names} are supported directly on database fields)"
@@ -222,43 +195,48 @@ fn handle_binary_comparison(
     quote!(#crate_name::db::query::expr::Expr::#bin_fn(#lhs, #rhs))
 }
 
-fn handle_string_method(
+fn handle_field_ref_method(
     model_name: &syn::Type,
     receiver: Expr,
-    args: Vec<syn::Expr>,
-    method: StringMethod,
+    args: &[syn::Expr],
+    method: FieldRefMethod,
 ) -> TokenStream {
     let crate_name = cot_ident();
     let method_ident = method.as_ident();
 
-    let arg = match <[syn::Expr; 1]>::try_from(args) {
-        Ok([arg]) => arg,
-        Err(args) => {
-            let span = args
-                .first()
-                .map_or_else(proc_macro2::Span::call_site, syn::spanned::Spanned::span);
-            return syn::Error::new(
-                span,
-                format!("`{method_ident}` expects exactly one string argument"),
-            )
-            .to_compile_error();
-        }
-    };
+    if method.arity as usize != args.len() {
+        let arity = method.arity;
+        let span = args
+            .first()
+            .map_or_else(proc_macro2::Span::call_site, syn::spanned::Spanned::span);
+        return syn::Error::new(
+            span,
+            format!(
+                "`{method_ident}` expects {arity} arguments, found {}",
+                args.len()
+            ),
+        )
+        .to_compile_error();
+    }
 
     if let Expr::FieldRef { ref field_name, .. } = receiver {
         return quote! {
             #crate_name::db::query::expr::ExprLike::#method_ident(
                 <#model_name as #crate_name::db::Model>::Fields::#field_name,
-                #arg
+                #(#args),*
             )
         };
     }
 
     let receiver_tokens = expr_to_tokens(model_name, receiver);
+    let wrapped_args = args
+        .iter()
+        .map(|arg| quote!(#crate_name::db::query::expr::Expr::value(#arg)));
+
     quote! {
         #crate_name::db::query::expr::Expr::#method_ident(
             #receiver_tokens,
-            #crate_name::db::query::expr::Expr::value(#arg)
+            #(#wrapped_args),*
         )
     }
 }
@@ -268,8 +246,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_string_method_all_names() {
-        let all_names = StringMethod::all_names();
+    fn test_field_ref_method_all_names() {
+        let all_names = FieldRefMethod::all_names().collect::<Vec<_>>();
         assert_eq!(all_names.len(), 8);
         assert_eq!(
             all_names,
@@ -287,54 +265,62 @@ mod tests {
     }
 
     #[test]
-    fn test_string_method_from_ident() {
+    fn test_field_ref_method_lookup() {
         let idents = [
             (
                 "contains",
-                Some(StringMethod::Contains {
-                    case_sensitive: true,
+                Some(FieldRefMethod {
+                    name: "contains",
+                    arity: 1,
                 }),
             ),
             (
                 "icontains",
-                Some(StringMethod::Contains {
-                    case_sensitive: false,
+                Some(FieldRefMethod {
+                    name: "icontains",
+                    arity: 1,
                 }),
             ),
             (
                 "starts_with",
-                Some(StringMethod::StartsWith {
-                    case_sensitive: true,
+                Some(FieldRefMethod {
+                    name: "starts_with",
+                    arity: 1,
                 }),
             ),
             (
                 "istarts_with",
-                Some(StringMethod::StartsWith {
-                    case_sensitive: false,
+                Some(FieldRefMethod {
+                    name: "istarts_with",
+                    arity: 1,
                 }),
             ),
             (
                 "ends_with",
-                Some(StringMethod::EndsWith {
-                    case_sensitive: true,
+                Some(FieldRefMethod {
+                    name: "ends_with",
+                    arity: 1,
                 }),
             ),
             (
                 "iends_with",
-                Some(StringMethod::EndsWith {
-                    case_sensitive: false,
+                Some(FieldRefMethod {
+                    name: "iends_with",
+                    arity: 1,
                 }),
             ),
             (
                 "raw_like",
-                Some(StringMethod::Raw {
-                    case_sensitive: true,
+                Some(FieldRefMethod {
+                    name: "raw_like",
+                    arity: 1,
                 }),
             ),
             (
                 "iraw_like",
-                Some(StringMethod::Raw {
-                    case_sensitive: false,
+                Some(FieldRefMethod {
+                    name: "iraw_like",
+                    arity: 1,
                 }),
             ),
             ("__non_existent__", None),
@@ -342,7 +328,7 @@ mod tests {
 
         for (ident, expected) in idents {
             assert_eq!(
-                StringMethod::from_ident(&format_ident!("{}", ident)),
+                FieldRefMethod::lookup(&format_ident!("{}", ident)).copied(),
                 expected
             );
         }

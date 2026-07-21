@@ -175,6 +175,10 @@ impl Cli {
         self.tasks.insert(Some(name), Box::new(task));
     }
 
+    pub(crate) fn command(&self) -> &Command {
+        &self.command
+    }
+
     #[must_use]
     pub(crate) fn common_options(&mut self) -> CommonOptions {
         let matches = self.command.get_matches_mut();

@@ -54,7 +54,7 @@ schemars = { workspace = true, optional = true, features = ["derive"] }
 sea-query = { workspace = true, optional = true }
 sea-query-sqlx = { workspace = true, features = ["with-chrono"], optional = true }
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true, optional = true }
+serde_json.workspace = true
 sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
@@ -111,7 +111,7 @@ sqlite = ["db", "sea-query/backend-sqlite", "sea-query-sqlx/sqlx-sqlite", "sqlx/
 postgres = ["db", "sea-query/backend-postgres", "sea-query-sqlx/sqlx-postgres", "sqlx/postgres"]
 mysql = ["db", "sea-query/backend-mysql", "sea-query-sqlx/sqlx-mysql", "sqlx/mysql"]
 redis = ["cache", "dep:deadpool-redis", "dep:redis", "json"]
-json = ["dep:serde_json", "cot_core/json"]
+json = ["cot_core/json"]
 openapi = ["json", "cot_core/schemars", "dep:aide", "dep:schemars"]
 swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]

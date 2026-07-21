@@ -1,7 +1,11 @@
+use std::ffi::OsString;
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::CommandFactory;
+use cot::metadata::CommandMeta;
 
 use crate::args::{
     Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, MigrationNewArgs,
@@ -11,6 +15,7 @@ use crate::migration_generator::{
     MigrationGeneratorOptions, create_new_migration, list_migrations, make_migrations,
 };
 use crate::new_project::{CotSource, new_project};
+use crate::project::ProjectBinary;
 
 pub fn handle_new_project(
     ProjectNewArgs { path, name, source }: ProjectNewArgs,
@@ -93,6 +98,90 @@ pub fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> any
     generate_completions(shell, &mut std::io::stdout());
 
     Ok(())
+}
+
+pub fn handle_external(
+    args: &[OsString],
+    project: Option<ProjectBinary>,
+    _release: bool,
+) -> anyhow::Result<()> {
+    let subcmd = args[0].to_string_lossy();
+
+    let Some(proj) = project else {
+        anyhow::bail!(
+            "Unknown command `{subcmd}` and no project binary was found in target/.\n\
+             Hint: run `cargo build` first, or `cargo build --release`."
+        );
+    };
+
+    let known = proj
+        .metadata
+        .commands
+        .iter()
+        .any(|c| c.name == subcmd.as_ref() || c.aliases.iter().any(|a| a == subcmd.as_ref()));
+
+    if !known {
+        anyhow::bail!(
+            "Unknown command `{subcmd}`.\n\
+             Run `cot --help` to see all available commands."
+        );
+    }
+
+    exec(&proj, args)
+}
+
+fn exec(proj: &ProjectBinary, args: &[OsString]) -> anyhow::Result<()> {
+    #[cfg(unix)]
+    {
+        let err = std::process::Command::new(&proj.path).args(args).exec();
+        anyhow::bail!("Failed to exec {}: {err}", proj.path.display());
+    }
+
+    #[cfg(not(unix))]
+    {
+        let status = std::process::Command::new(&proj.path).args(args).status()?;
+        std::process::exit(status.code().unwrap_or(1));
+    }
+}
+
+/// Build a fresh [`clap::Command`] and inject the project's subcommands into
+/// it before printing.
+pub fn handle_combined_help(project: Option<&ProjectBinary>) -> anyhow::Result<()> {
+    let mut cmd = combined_help_command(project);
+
+    cmd.print_long_help()?;
+    println!();
+    Ok(())
+}
+
+fn combined_help_command(project: Option<&ProjectBinary>) -> clap::Command {
+    let mut cmd = Cli::command();
+
+    if let Some(proj) = project {
+        for meta_cmd in &proj.metadata.commands {
+            cmd = cmd.subcommand(build_clap_subcommand(meta_cmd));
+        }
+    }
+
+    cmd
+}
+
+fn build_clap_subcommand(meta: &CommandMeta) -> clap::Command {
+    let mut cmd = clap::Command::new(&meta.name);
+
+    if let Some(about) = &meta.about {
+        cmd = cmd.about(about.clone());
+    }
+
+    for alias in &meta.aliases {
+        cmd = cmd.visible_alias(alias.clone());
+    }
+
+    for sub in &meta.subcommands {
+        cmd = cmd.subcommand(build_clap_subcommand(sub));
+    }
+
+    cmd
 }
 
 fn generate_completions(shell: clap_complete::Shell, writer: &mut impl std::io::Write) {
@@ -179,5 +268,99 @@ mod tests {
         generate_completions(clap_complete::Shell::Bash, &mut output);
 
         assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn external_command_without_project_reports_build_hint() {
+        let result = handle_external(&[OsString::from("serve")], None, false);
+
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("Unknown command `serve`"));
+        assert!(message.contains("run `cargo build` first"));
+    }
+
+    #[test]
+    fn external_command_unknown_to_project_reports_unknown_command() {
+        let project = ProjectBinary {
+            path: PathBuf::from("target/debug/example"),
+            metadata: cot::metadata::ProjectMetadata {
+                binary_name: "example".to_string(),
+                commands: vec![CommandMeta {
+                    name: "check".to_string(),
+                    about: None,
+                    aliases: vec![],
+                    subcommands: vec![],
+                }],
+            },
+        };
+
+        let result = handle_external(&[OsString::from("foo")], Some(project), false);
+
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("Unknown command `foo`"));
+        assert!(message.contains("cot --help"));
+    }
+
+    #[test]
+    fn build_clap_subcommand_preserves_about_aliases_and_nested_subcommands() {
+        let meta = CommandMeta {
+            name: "migration".to_string(),
+            about: Some("Migration commands".to_string()),
+            aliases: vec!["database".to_string()],
+            subcommands: vec![CommandMeta {
+                name: "rollback".to_string(),
+                about: Some("Rollback migrations".to_string()),
+                aliases: vec!["rbk".to_string()],
+                subcommands: vec![],
+            }],
+        };
+
+        let cmd = build_clap_subcommand(&meta);
+
+        assert_eq!(cmd.get_name(), "migration");
+        assert_eq!(cmd.get_about().unwrap().to_string(), "Migration commands");
+        assert!(cmd.get_all_aliases().any(|alias| alias == "database"));
+        let nested = cmd
+            .get_subcommands()
+            .find(|subcommand| subcommand.get_name() == "rollback")
+            .unwrap();
+        assert_eq!(
+            nested.get_about().unwrap().to_string(),
+            "Rollback migrations"
+        );
+        assert!(nested.get_all_aliases().any(|alias| alias == "rbk"));
+    }
+
+    #[test]
+    fn combined_help_command_includes_project_commands_and_builtin_commands() {
+        let project = ProjectBinary {
+            path: PathBuf::from("target/debug/example"),
+            metadata: cot::metadata::ProjectMetadata {
+                binary_name: "example".to_string(),
+                commands: vec![CommandMeta {
+                    name: "health".to_string(),
+                    about: Some("Check the server health".to_string()),
+                    aliases: vec![],
+                    subcommands: vec![],
+                }],
+            },
+        };
+
+        let cmd = combined_help_command(Some(&project));
+
+        assert!(
+            cmd.get_subcommands()
+                .any(|subcommand| subcommand.get_name() == "new")
+        );
+        let health = cmd
+            .get_subcommands()
+            .find(|subcommand| subcommand.get_name() == "health")
+            .unwrap();
+        assert_eq!(
+            health.get_about().unwrap().to_string(),
+            "Check the server health"
+        );
     }
 }

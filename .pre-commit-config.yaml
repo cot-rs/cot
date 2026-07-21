@@ -40,7 +40,7 @@ repos:
       - id: format-justfile
         name: "format justfiles"
   - repo: https://github.com/djlint/djLint
-    rev: v1.40.3
+    rev: v1.42.0
     hooks:
       - id: djlint
         name: djLint

@@ -1,17 +1,30 @@
 //! Utilities for CLI
+
+use std::io;
+use std::io::Write;
+
 use anstyle::{AnsiColor, Color, Effects, Style};
 
 #[doc(hidden)] // Not part of Cot's public API; used by the CLI.
 pub fn print_status_msg(status: StatusType, message: &str) {
+    write_status_msg(&mut io::stderr(), status, message)
+        .expect("writing to stderr should not fail");
+}
+
+pub(crate) fn write_status_msg(
+    output: &mut impl Write,
+    status: StatusType,
+    message: &str,
+) -> io::Result<()> {
     let style = status.style();
     let status_str = status.as_str();
 
-    eprintln!("{style}{status_str:>12}{style:#} {message}");
+    writeln!(output, "{style}{status_str:>12}{style:#} {message}")
 }
 
-#[doc(hidden)]
+#[doc(hidden)] // Not part of Cot's public API; used by the CLI.
 #[derive(Debug, Clone, Copy)]
-#[non_exhaustive] // Not part of Cot's public API; used by the CLI.
+#[non_exhaustive]
 pub enum StatusType {
     // In-Progress Ops
     Creating,

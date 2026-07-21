@@ -647,7 +647,7 @@ impl CliTask for MigrationRollback {
                     .await?;
             } else {
                 migration_engine
-                    .rollback(context.database(), file, app_name)
+                    .rollback(context.database(), file, app_name, &mut std::io::stderr())
                     .await?;
             }
         }

@@ -16,7 +16,7 @@ use tracing::{Level, info};
 use crate::db::migrations::sorter::{MigrationSorter, MigrationSorterError};
 use crate::db::relations::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use crate::db::{Auto, ColumnType, Database, DatabaseField, Identifier, Result, model, query};
-use crate::utils::cli::{StatusType, print_status_msg};
+use crate::utils::cli::{StatusType, write_status_msg};
 
 const MIGRATION_ZERO_NAME: &str = "zero";
 
@@ -236,6 +236,7 @@ impl MigrationEngine {
         database: &Database,
         migration_name: &str,
         app_name: &str,
+        output: &mut impl Write,
     ) -> Result<()> {
         info!("Rolling back migrations");
         // TODO: use a DB transaction here
@@ -260,10 +261,12 @@ impl MigrationEngine {
                 migration.name(),
                 migration.app_name()
             );
-            print_status_msg(
+            write_status_msg(
+                output,
                 StatusType::RollingBack,
                 &format!("Migration {}::{}", migration.app_name(), migration.name()),
-            );
+            )
+            .map_err(MigrationEngineError::Io)?;
 
             for operation in migration.operations().iter().rev() {
                 operation.backwards(database).await?;
@@ -272,10 +275,12 @@ impl MigrationEngine {
             if Self::is_migration_applied(database, migration).await? {
                 Self::mark_migration_unapplied(database, migration).await?;
             }
-            print_status_msg(
+            write_status_msg(
+                output,
                 StatusType::RolledBack,
                 &format!("Migration {}::{}", migration.app_name(), migration.name()),
-            );
+            )
+            .map_err(MigrationEngineError::Io)?;
         }
 
         Ok(())
@@ -2416,7 +2421,7 @@ mod tests {
         }
     }
 
-    async fn dry_run_snapshot(
+    async fn migration_rollback_dry_run(
         engine: &MigrationEngine,
         db: &Database,
         output: &mut Vec<u8>,
@@ -2426,6 +2431,21 @@ mod tests {
         output.clear();
         engine
             .rollback_dry_run(db, migration_name, app_name, output)
+            .await
+            .unwrap();
+        std::str::from_utf8(output).unwrap().to_owned()
+    }
+
+    async fn migration_rollback(
+        engine: &MigrationEngine,
+        db: &Database,
+        output: &mut Vec<u8>,
+        migration_name: &str,
+        app_name: &str,
+    ) -> String {
+        output.clear();
+        engine
+            .rollback(db, migration_name, app_name, output)
             .await
             .unwrap();
         std::str::from_utf8(output).unwrap().to_owned()
@@ -2484,7 +2504,7 @@ mod tests {
         .await;
 
         // rollback everything except the initial migration
-        let snapshot_text = dry_run_snapshot(
+        let dry_run_output = migration_rollback_dry_run(
             &engine,
             &test_db.database(),
             &mut output,
@@ -2495,13 +2515,21 @@ mod tests {
 
         insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
             insta::assert_snapshot!(
-                snapshot_text,
+                dry_run_output,
             );
         });
-        engine
-            .rollback(&test_db.database(), "0001", "rollback_app1")
-            .await
-            .unwrap();
+
+        let rollback_output = migration_rollback(
+            &engine,
+            &test_db.database(),
+            &mut output,
+            "0001",
+            "rollback_app1",
+        )
+        .await;
+        insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+            insta::assert_snapshot!(rollback_output);
+        });
 
         assert_migrations_applied(
             &test_db.database(),
@@ -2546,7 +2574,7 @@ mod tests {
         .await;
 
         // rollback every migration in the rollback_app1 app except the initial
-        let snapshot_text = dry_run_snapshot(
+        let dry_run_output = migration_rollback_dry_run(
             &engine,
             &test_db.database(),
             &mut output,
@@ -2557,13 +2585,21 @@ mod tests {
 
         insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
             insta::assert_snapshot!(
-                snapshot_text,
+                dry_run_output,
             );
         });
-        engine
-            .rollback(&test_db.database(), "0001", "rollback_app1")
-            .await
-            .unwrap();
+
+        let rollback_output = migration_rollback(
+            &engine,
+            &test_db.database(),
+            &mut output,
+            "0001",
+            "rollback_app1",
+        )
+        .await;
+        insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+            insta::assert_snapshot!(rollback_output);
+        });
 
         assert_migrations_applied(
             &test_db.database(),
@@ -2608,7 +2644,7 @@ mod tests {
 
         // rollback everything except the initial migration in the source/independent
         // app
-        let snapshot_text = dry_run_snapshot(
+        let dry_run_output = migration_rollback_dry_run(
             &engine,
             &test_db.database(),
             &mut output,
@@ -2619,13 +2655,21 @@ mod tests {
 
         insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
             insta::assert_snapshot!(
-                snapshot_text,
+                dry_run_output,
             );
         });
-        engine
-            .rollback(&test_db.database(), "0001", "rollback_app1")
-            .await
-            .unwrap();
+
+        let rollback_output = migration_rollback(
+            &engine,
+            &test_db.database(),
+            &mut output,
+            "0001",
+            "rollback_app1",
+        )
+        .await;
+        insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+            insta::assert_snapshot!(rollback_output);
+        });
 
         assert_migrations_applied(
             &test_db.database(),
@@ -2666,7 +2710,7 @@ mod tests {
         )
         .await;
 
-        let snapshot_text = dry_run_snapshot(
+        let dry_run_output = migration_rollback_dry_run(
             &engine,
             &test_db.database(),
             &mut output,
@@ -2677,13 +2721,21 @@ mod tests {
 
         insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
             insta::assert_snapshot!(
-                snapshot_text,
+                dry_run_output,
             );
         });
-        engine
-            .rollback(&test_db.database(), "zero", "rollback_app1")
-            .await
-            .unwrap();
+
+        let rollback_output = migration_rollback(
+            &engine,
+            &test_db.database(),
+            &mut output,
+            "zero",
+            "rollback_app1",
+        )
+        .await;
+        insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+            insta::assert_snapshot!(rollback_output);
+        });
 
         assert_migrations_applied(
             &test_db.database(),

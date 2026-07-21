@@ -181,6 +181,61 @@ fn router(&self) -> Router {
 
 Now, when you visit [`localhost:8000/hello/John/Smith/`](http://localhost:8000/hello/John), you should see `Hello, John Smith!` displayed on the page!
 
+Cot also supports wildcard parameters to match all sub-paths within a route segment.
+
+```rust
+# struct MyApp;
+async fn wildcard_path(Path(path): Path<String>) -> cot::Result<Html> {
+    Ok(Html::new(format!("Passed path: {path}")))
+}
+
+// inside `impl App`:
+# impl App for MyApp {
+fn router(&self) -> Router {
+    Router::with_urls([
+        // ...
+        Route::with_handler_and_name("/wildcard/{*path}", wildcard_path, "wildcard_path"),
+    ])
+}
+#   fn name(&self) -> &str { todo!() }
+# }
+```
+
+Prefixing the parameter name with an asterisk (`*`) designates it as a wildcard.
+
+In this case, it matches `/wildcard/foo`, `/wildcard/foo/bar` and so on, but it won't match `/wildcard/`.
+
+Also note that, wildcard param can only be used at the end of path pattern.
+
+### Routes precedence
+
+When a request path matches multiple routes, cot automatically uses the most specific route, so you do not need to worry about the order in which you define your routes.
+
+It looks something like this:
+
+**Literal segments** > **parameter segments** > **wildcard segments**.
+
+#### Example 1:
+
+If you have:
+
+- `/{*wildcard}`
+- `/foo/{param}`
+- `/foo/bar`
+
+For a request to `/foo/bar`, all three routes technically match. However, the 3<sup>rd</sup> route (`/foo/bar`) wins because explicit literal segments take absolute priority over dynamic parameters and wildcards.
+
+#### Example 2:
+
+Consider a scenario where two routes have an identical structural mix of literals and parameters:
+
+- Route A: `/foo/{param}/baz` *(Literal, Param, Literal)*
+- Route B: `/foo/bar/{param}` *(Weights: Literal, Literal, Param)*
+
+For request `/foo/bar/baz`, it is tie, because two routes have same number of *literals* and *placeholders*, so to break the tie cot evaluates the patterns from left to right.
+
+At the second segment, **Route B** provides a concrete literal (`/bar`), whereas **Route A** opens up to a dynamic parameter (`{param}`). Because literals are more specific than placeholders, **Route B** wins.
+
 ## Project structure
 
 ### App

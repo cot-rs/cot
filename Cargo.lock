@@ -910,6 +910,7 @@ version = "0.7.0"
 dependencies = [
  "ahash",
  "aide",
+ "anstyle",
  "askama",
  "async-trait",
  "axum",
@@ -937,6 +938,7 @@ dependencies = [
  "humantime",
  "idna",
  "indexmap",
+ "insta",
  "is_terminal_polyfill",
  "lettre",
  "mime",
@@ -976,7 +978,6 @@ dependencies = [
 name = "cot-cli"
 version = "0.7.0"
 dependencies = [
- "anstyle",
  "anyhow",
  "assert_cmd",
  "cargo_toml",

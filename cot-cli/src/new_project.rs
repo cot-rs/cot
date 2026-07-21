@@ -1,11 +1,10 @@
 use std::path::Path;
 
+use cot::utils::cli::{StatusType, print_status_msg};
 use heck::ToPascalCase;
 use rand::rngs::{StdRng, SysRng};
 use rand::{Rng, SeedableRng};
 use tracing::trace;
-
-use crate::utils::{StatusType, print_status_msg};
 
 macro_rules! project_file {
     ($name:literal) => {

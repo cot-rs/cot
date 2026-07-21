@@ -1,0 +1,10 @@
+---
+source: cot/src/db/migrations.rs
+expression: rollback_output
+---
+[1m[95mRolling Back[0m Migration rollback_app1::m_0003_third
+[1m[35m Rolled Back[0m Migration rollback_app1::m_0003_third
+[1m[95mRolling Back[0m Migration rollback_app1::m_0002_second
+[1m[35m Rolled Back[0m Migration rollback_app1::m_0002_second
+[1m[95mRolling Back[0m Migration rollback_app1::m_0001_initial
+[1m[35m Rolled Back[0m Migration rollback_app1::m_0001_initial

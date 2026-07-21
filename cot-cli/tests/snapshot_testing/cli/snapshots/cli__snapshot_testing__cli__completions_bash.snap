@@ -116,20 +116,12 @@ _cot() {
 
     case "${cmd}" in
         cot)
-            opts="-p -v -q -h -V --release --package --verbose --quiet --help --version new migration cli help"
+            opts="-v -q -h -V --verbose --quiet --help --version new migration cli help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -138,20 +130,12 @@ _cot() {
             return 0
             ;;
         cot__subcmd__cli)
-            opts="-p -v -q -h --release --package --verbose --quiet --help manpages completions help"
+            opts="-v -q -h --verbose --quiet --help manpages completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -160,20 +144,12 @@ _cot() {
             return 0
             ;;
         cot__subcmd__cli__subcmd__completions)
-            opts="-p -v -q -h --release --package --verbose --quiet --help bash elvish fish powershell zsh"
+            opts="-v -q -h --verbose --quiet --help bash elvish fish powershell zsh"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -238,7 +214,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__cli__subcmd__manpages)
-            opts="-o -c -p -v -q -h --output-dir --create --release --package --verbose --quiet --help"
+            opts="-o -c -v -q -h --output-dir --create --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -249,14 +225,6 @@ _cot() {
                     return 0
                     ;;
                 -o)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -408,20 +376,12 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration)
-            opts="-p -v -q -h --release --package --verbose --quiet --help list make new help"
+            opts="-v -q -h --verbose --quiet --help list make new help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -500,20 +460,12 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration__subcmd__list)
-            opts="-p -v -q -h --release --package --verbose --quiet --help [PATH]"
+            opts="-v -q -h --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -522,7 +474,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration__subcmd__make)
-            opts="-p -v -q -h --app-name --output-dir --release --package --verbose --quiet --help [PATH]"
+            opts="-v -q -h --app-name --output-dir --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -536,14 +488,6 @@ _cot() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -552,21 +496,13 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration__subcmd__new)
-            opts="-p -v -q -h --app-name --release --package --verbose --quiet --help <NAME> [PATH]"
+            opts="-v -q -h --app-name --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --app-name)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -578,7 +514,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__new)
-            opts="-p -v -q -h --name --use-git --cot-path --release --package --verbose --quiet --help <PATH>"
+            opts="-v -q -h --name --use-git --cot-path --verbose --quiet --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -589,14 +525,6 @@ _cot() {
                     return 0
                     ;;
                 --cot-path)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

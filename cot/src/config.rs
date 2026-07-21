@@ -22,8 +22,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
+use securer_string::SecureBytes;
 use serde::{Deserialize, Serialize};
-use subtle::ConstantTimeEq;
 use thiserror::Error;
 
 #[cfg(feature = "email")]
@@ -2115,11 +2115,12 @@ impl Default for EmailConfig {
 ///
 /// # Security
 ///
-/// The implementation of the [`PartialEq`] trait for this type is constant-time
-/// to prevent timing attacks.
+/// The implementation of the [`PartialEq`] trait for this type uses
+/// constant-time comparison to prevent timing attacks.
 ///
-/// The implementation of the [`Debug`] trait for this type hides the secret key
-/// to prevent it from being leaked in logs or other debug output.
+/// The implementation of the [`Debug`] trait for this type is inherited from
+/// [`SecureBytes`], which hides the secret key to prevent it from being leaked
+/// in logs or other debug output.
 ///
 /// # Examples
 ///
@@ -2130,9 +2131,18 @@ impl Default for EmailConfig {
 /// assert_eq!(key.as_bytes(), &[1, 2, 3]);
 /// ```
 #[repr(transparent)]
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Deserialize, PartialEq, Eq)]
 #[serde(from = "String")]
-pub struct SecretKey(Box<[u8]>);
+pub struct SecretKey(SecureBytes);
+
+impl Serialize for SecretKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.as_bytes())
+    }
+}
 
 impl SecretKey {
     /// Create a new [`SecretKey`] from a byte array.
@@ -2147,7 +2157,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn new(hash: &[u8]) -> Self {
-        Self(Box::from(hash))
+        Self(SecureBytes::new(hash.to_vec()))
     }
 
     /// Get the byte array stored in the [`SecretKey`].
@@ -2162,7 +2172,7 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.0
+        self.0.unsecure()
     }
 
     /// Consume the [`SecretKey`] and return the byte array stored in it.
@@ -2177,7 +2187,19 @@ impl SecretKey {
     /// ```
     #[must_use]
     pub fn into_bytes(self) -> Box<[u8]> {
-        self.0
+        self.0.unsecure().to_vec().into_boxed_slice()
+    }
+}
+
+impl Debug for SecretKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SecretKey").finish_non_exhaustive()
+    }
+}
+
+impl Default for SecretKey {
+    fn default() -> Self {
+        Self::new(&[])
     }
 }
 
@@ -2196,27 +2218,6 @@ impl From<String> for SecretKey {
 impl From<&str> for SecretKey {
     fn from(value: &str) -> Self {
         Self::new(value.as_bytes())
-    }
-}
-
-impl PartialEq for SecretKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.ct_eq(&other.0).into()
-    }
-}
-
-impl Eq for SecretKey {}
-
-impl Debug for SecretKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write in single line, regardless whether alternate mode was used or not
-        write!(f, "SecretKey(\"**********\")")
-    }
-}
-
-impl Default for SecretKey {
-    fn default() -> Self {
-        Self::new(&[])
     }
 }
 
@@ -2494,6 +2495,7 @@ impl From<&str> for EmailUrl {
 
 #[cfg(test)]
 mod tests {
+    use serde_json;
     use time::OffsetDateTime;
 
     use super::*;
@@ -2762,6 +2764,14 @@ mod tests {
             config.static_files.rewrite,
             StaticFilesPathRewriteMode::QueryParam
         );
+    }
+
+    #[test]
+    fn secret_key_serialize_json() {
+        let key = SecretKey::from("abc123");
+        let serialized = serde_json::to_string(&key).unwrap();
+        // Should serialize as a byte array
+        assert_eq!(serialized, "[97,98,99,49,50,51]");
     }
     #[test]
     #[cfg(feature = "redis")]

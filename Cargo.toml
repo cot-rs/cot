@@ -64,30 +64,30 @@ needless_continue = "allow"
 [workspace.dependencies]
 ahash = { version = "0.8.12", default-features = false }
 aide = { version = "=0.16.0-alpha.4", default-features = false }
-anstyle = "1.0.13"
-anyhow = "1.0.102"
-askama = { version = "0.16.0", default-features = false }
-askama_derive = { version = "0.16.0", default-features = false, features = ["external-sources", "proc-macro"] }
+anstyle = "1.0.14"
+anyhow = "1.0.103"
+askama = { version = "0.16", default-features = false }
+askama_derive = { version = "0.16", default-features = false, features = ["external-sources", "proc-macro"] }
 assert_cmd = "2"
 async-stream = "0.3"
 async-trait = "0.1"
 axum = { version = "0.8", default-features = false }
 backtrace = "0.3.76"
 blake3 = "1.8.5"
-bytes = "1.11"
-cargo_toml = "0.22"
-chrono = { version = "0.4.44", default-features = false }
-chrono-tz = { version = "0.10.4", default-features = false }
-clap = { version = "4.6.1", features = ["deprecated"] }
+bytes = "1.12"
+cargo_toml = "1.0"
+chrono = { version = "0.4.45", default-features = false }
+chrono-tz = { version = "0.10", default-features = false }
+clap = { version = "4.6", features = ["deprecated"] }
 clap-verbosity-flag = { version = "3", default-features = false }
 clap_complete = "4"
 clap_mangen = "0.3.0"
-comrak = { version = "0.52", default-features = false }
-cot = { version = "0.6.0", path = "cot" }
-cot-cli = { version = "0.6.0", path = "cot-cli" }
-cot_codegen = { version = "0.6.0", path = "cot-codegen" }
-cot_core = { version = "0.6.0", path = "cot-core" }
-cot_macros = { version = "0.6.0", path = "cot-macros" }
+comrak = { version = "0.54", default-features = false }
+cot = { version = "0.7.0", path = "cot" }
+cot-cli = { version = "0.7.0", path = "cot-cli" }
+cot_codegen = { version = "0.7.0", path = "cot-codegen" }
+cot_core = { version = "0.7.0", path = "cot-core" }
+cot_macros = { version = "0.7.0", path = "cot-macros" }
 criterion = "0.8"
 darling = "0.23"
 deadpool-redis = { version = "0.23", default-features = false }
@@ -106,7 +106,7 @@ heck = "0.5"
 hex = "0.4"
 http = "1.4"
 http-body = "1"
-http-body-util = "0.1.3"
+http-body-util = "0.1.4"
 humantime = "2"
 idna = { version = "1.1", default-features = false }
 indexmap = "2"
@@ -117,9 +117,10 @@ lettre = { version = "0.11.22", default-features = false }
 libtest-mimic = "0.8"
 mime = "0.3"
 mime_guess = { version = "2", default-features = false }
-mockall = "0.14"
+mockall = "0.15"
 multer = "3"
 password-auth = { version = "1", default-features = false }
+securer-string = "0.1.3"
 petgraph = { version = "0.8", default-features = false }
 pin-project-lite = "0.2"
 prettyplease = "0.2"
@@ -145,7 +146,7 @@ syn = { version = "2", default-features = false }
 sync_wrapper = "1"
 tempfile = "3"
 thiserror = "2"
-time = { version = "0.3.46", default-features = false }
+time = { version = "0.3.53", default-features = false }
 tokio = { version = "1.52", default-features = false }
 toml = { version = "1", default-features = false }
 tower = "0.5.3"

@@ -6,7 +6,7 @@
         Create
     {% endif %}
     {{ model.name() }}
-{%- endblock %}
+{%- endblock title %}
 {% block content -%}
     <h2>
         {%- if is_edit -%}
@@ -22,8 +22,8 @@
             <div class="form-row">
                 <label for="{{ field.dyn_id() }}">
                     {% if required %}<strong>{% endif %}
-                        {{ field.dyn_options().name }}:
-                        {% if required %}</strong>{% endif %}
+                    {{ field.dyn_options().name }}:
+                    {% if required %}</strong>{% endif %}
                 </label>
                 <div>
                     {{ field|safe }}

@@ -2284,6 +2284,8 @@ mod tests {
     use crate::db::{ColumnType, DatabaseField, Identifier};
     use crate::session::db::SessionApp;
 
+    const SNAPSHOT_RELATIVE_PATH: &str = "../../tests/snapshots/migrations";
+
     struct TestMigration;
 
     impl Migration for TestMigration {
@@ -2414,6 +2416,21 @@ mod tests {
         }
     }
 
+    async fn dry_run_snapshot(
+        engine: &MigrationEngine,
+        db: &Database,
+        output: &mut Vec<u8>,
+        migration_name: &str,
+        app_name: &str,
+    ) -> String {
+        output.clear();
+        engine
+            .rollback_dry_run(db, migration_name, app_name, output)
+            .await
+            .unwrap();
+        std::str::from_utf8(output).unwrap().to_owned()
+    }
+
     #[cot_macros::dbtest]
     async fn test_migration_rollback_no_deps(test_db: &mut TestDatabase) {
         let engine = MigrationEngine::new([RollbackApp1Initial]).unwrap();
@@ -2452,6 +2469,7 @@ mod tests {
             &RollbackApp1003 as &SyncDynMigration,
         ])
         .unwrap();
+        let mut output = Vec::new();
 
         engine.run(&test_db.database()).await.unwrap();
         // migrations should be applied
@@ -2466,6 +2484,20 @@ mod tests {
         .await;
 
         // rollback everything except the initial migration
+        let snapshot_text = dry_run_snapshot(
+            &engine,
+            &test_db.database(),
+            &mut output,
+            "0001",
+            "rollback_app1",
+        )
+        .await;
+
+        insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+            insta::assert_snapshot!(
+                snapshot_text,
+            );
+        });
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
@@ -2495,6 +2527,8 @@ mod tests {
             &RollbackApp2Initial as &SyncDynMigration,
         ]));
         migrations.extend(SessionApp::new().migrations());
+        let mut output = Vec::new();
+
         let engine = MigrationEngine::new(migrations).unwrap();
 
         engine.run(&test_db.database()).await.unwrap();
@@ -2512,6 +2546,20 @@ mod tests {
         .await;
 
         // rollback every migration in the rollback_app1 app except the initial
+        let snapshot_text = dry_run_snapshot(
+            &engine,
+            &test_db.database(),
+            &mut output,
+            "0001",
+            "rollback_app1",
+        )
+        .await;
+
+        insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+            insta::assert_snapshot!(
+                snapshot_text,
+            );
+        });
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
@@ -2543,6 +2591,7 @@ mod tests {
             &RollbackApp2Initial as &SyncDynMigration,
         ])
         .unwrap();
+        let mut output = Vec::new();
 
         engine.run(&test_db.database()).await.unwrap();
 
@@ -2559,6 +2608,20 @@ mod tests {
 
         // rollback everything except the initial migration in the source/independent
         // app
+        let snapshot_text = dry_run_snapshot(
+            &engine,
+            &test_db.database(),
+            &mut output,
+            "0001",
+            "rollback_app1",
+        )
+        .await;
+
+        insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+            insta::assert_snapshot!(
+                snapshot_text,
+            );
+        });
         engine
             .rollback(&test_db.database(), "0001", "rollback_app1")
             .await
@@ -2588,6 +2651,7 @@ mod tests {
             &RollbackApp2Initial as &SyncDynMigration,
         ])
         .unwrap();
+        let mut output = Vec::new();
 
         engine.run(&test_db.database()).await.unwrap();
 
@@ -2602,6 +2666,20 @@ mod tests {
         )
         .await;
 
+        let snapshot_text = dry_run_snapshot(
+            &engine,
+            &test_db.database(),
+            &mut output,
+            "zero",
+            "rollback_app1",
+        )
+        .await;
+
+        insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+            insta::assert_snapshot!(
+                snapshot_text,
+            );
+        });
         engine
             .rollback(&test_db.database(), "zero", "rollback_app1")
             .await

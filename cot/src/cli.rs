@@ -576,6 +576,7 @@ impl CliTask for CliTaskGroup {
 #[cfg(feature = "db")]
 struct MigrationRollback;
 
+#[cfg(feature = "db")]
 #[async_trait(?Send)]
 impl CliTask for MigrationRollback {
     fn subcommand(&self) -> Command {

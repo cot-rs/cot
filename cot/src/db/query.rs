@@ -7,8 +7,8 @@ use sea_query::{ExprTrait, IntoColumnRef};
 
 use crate::db;
 use crate::db::{
-    Auto, Database, DatabaseBackend, DbFieldValue, DbValue, ForeignKey, FromDbValue, Identifier,
-    Model, RawExecutor, StatementResult, ToDbFieldValue,
+    Auto, DatabaseBackend, DbFieldValue, DbValue, ForeignKey, FromDbValue, Identifier, Model,
+    StatementResult, ToDbFieldValue,
 };
 
 /// A query that can be executed on a database. Can be used to filter, update,
@@ -196,20 +196,8 @@ impl<T: Model> Query<T> {
     /// # Errors
     ///
     /// Returns an error if the query fails.
-    pub async fn count(&self, db: &Database) -> db::Result<u64> {
-        let mut select = sea_query::Query::select();
-        select
-            .from(T::TABLE_NAME)
-            .expr(sea_query::Expr::col(sea_query::Asterisk).count());
-        self.add_filter_to_statement(&mut select);
-        let mut db_ref = db;
-        let row = db_ref.fetch_option(&select).await?;
-        let count = match row {
-            #[expect(clippy::cast_sign_loss)]
-            Some(row) => row.get::<i64>(0)? as u64,
-            None => 0,
-        };
-        Ok(count)
+    pub async fn count<DB: DatabaseBackend>(&self, mut db: DB) -> db::Result<u64> {
+        db.count(self).await
     }
 
     /// Execute the query and check if any results exist.

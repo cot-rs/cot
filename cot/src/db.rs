@@ -516,9 +516,6 @@ pub enum DatabaseError {
         /// The actual number of rows returned.
         actual: usize,
     },
-    /// Nested transactions are not supported yet.
-    #[error("{ERROR_PREFIX} nested transactions are not supported yet")]
-    NestedTransactionsNotSupported,
 }
 impl_into_cot_error!(DatabaseError, INTERNAL_SERVER_ERROR);
 
@@ -555,12 +552,12 @@ pub type Result<T> = std::result::Result<T, DatabaseError>;
 ///     name: String,
 /// }
 /// ```
+#[async_trait]
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not marked as a database model",
     label = "`{Self}` is not annotated with `#[cot::db::model]`",
     note = "annotate `{Self}` with the `#[cot::db::model]` attribute"
 )]
-#[async_trait]
 pub trait Model: Sized + Send + 'static {
     #[allow(
         clippy::allow_attributes,
@@ -1366,6 +1363,10 @@ impl DatabaseBackend for Transaction<'_> {
         Database::exists_generic(self, query).await
     }
 
+    async fn count<T: Model>(&mut self, query: &Query<T>) -> Result<u64> {
+        Database::count_generic(self, query).await
+    }
+
     async fn delete<T: Model>(&mut self, query: &Query<T>) -> Result<StatementResult> {
         let mut delete = sea_query::Query::delete();
         delete.from_table(T::TABLE_NAME);
@@ -1469,10 +1470,16 @@ impl RawExecutor for &Database {
 
     fn max_params(&self) -> usize {
         match &*self.inner {
+            // https://sqlite.org/limits.html#max_variable_number
+            // Assuming SQLite > 3.32.0 (2020-05-22)
             #[cfg(feature = "sqlite")]
             DatabaseImpl::Sqlite(_) => 32766,
+            // https://www.postgresql.org/docs/18/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-BIND
+            // The number of parameter format codes is Int16
             #[cfg(feature = "postgres")]
             DatabaseImpl::Postgres(_) => 65535,
+            // https://dev.mysql.com/doc/dev/mysql-server/9.5.0/page_protocol_com_stmt_prepare.html#sect_protocol_com_stmt_prepare_response
+            // The number of parameter returned in the COM_STMT_PREPARE_OK packet is int<2>
             #[cfg(feature = "mysql")]
             DatabaseImpl::MySql(_) => 65535,
         }
@@ -1519,10 +1526,16 @@ impl RawExecutor for Transaction<'_> {
 
     fn max_params(&self) -> usize {
         match &self.inner {
+            // https://sqlite.org/limits.html#max_variable_number
+            // Assuming SQLite > 3.32.0 (2020-05-22)
             #[cfg(feature = "sqlite")]
             TransactionImpl::Sqlite(_) => 32766,
+            // https://www.postgresql.org/docs/18/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-BIND
+            // The number of parameter format codes is Int16
             #[cfg(feature = "postgres")]
             TransactionImpl::Postgres(_) => 65535,
+            // https://dev.mysql.com/doc/dev/mysql-server/9.5.0/page_protocol_com_stmt_prepare.html#sect_protocol_com_stmt_prepare_response
+            // The number of parameter returned in the COM_STMT_PREPARE_OK packet is int<2>
             #[cfg(feature = "mysql")]
             TransactionImpl::MySql(_) => 65535,
         }
@@ -1917,7 +1930,7 @@ impl Database {
     pub async fn bulk_insert_or_update<T: Model>(&self, data: &mut [T]) -> Result<()> {
         let span = span!(
             Level::TRACE,
-            "insert_or_update",
+            "bulk_insert_or_update",
             table = %T::TABLE_NAME,
             count = data.len()
         );
@@ -1986,7 +1999,7 @@ impl Database {
             .checked_div(num_value_fields)
             .ok_or(DatabaseError::BulkInsertNoValueColumns)?;
 
-        if data.len() <= batch_size {
+        if data.len() <= batch_size && (auto_col_ids.is_empty() || executor.supports_returning()) {
             Self::bulk_insert_chunk_generic(
                 executor,
                 data,
@@ -2227,6 +2240,40 @@ impl Database {
         Ok(rows.is_some())
     }
 
+    /// Returns the number of rows that match the given query.
+    ///
+    /// # Errors
+    ///
+    /// This method can return an error if the query is invalid.
+    ///
+    /// This method can return an error if the model doesn't exist in the
+    /// database (usually meaning the migrations haven't been generated or
+    /// applied).
+    ///
+    /// Can return an error if the database connection is lost.
+    pub async fn count<T: Model>(&self, query: &Query<T>) -> Result<u64> {
+        Self::count_generic(self, query).await
+    }
+
+    async fn count_generic<T: Model, E: RawExecutor>(
+        mut executor: E,
+        query: &Query<T>,
+    ) -> Result<u64> {
+        let mut select = sea_query::Query::select();
+        select
+            .from(T::TABLE_NAME)
+            .expr(sea_query::Expr::col(sea_query::Asterisk).count());
+        query.add_filter_to_statement(&mut select);
+
+        let row = executor.fetch_option(&select).await?;
+        let count = match row {
+            #[expect(clippy::cast_sign_loss)]
+            Some(row) => row.get::<i64>(0)? as u64,
+            None => 0,
+        };
+        Ok(count)
+    }
+
     /// Deletes all rows that match the given query.
     ///
     /// # Errors
@@ -2458,6 +2505,19 @@ pub trait DatabaseBackend: Send {
     /// Can return an error if the database connection is lost.
     async fn exists<T: Model>(&mut self, query: &Query<T>) -> Result<bool>;
 
+    /// Returns the number of rows that match the given query.
+    ///
+    /// # Errors
+    ///
+    /// This method can return an error if the query is invalid.
+    ///
+    /// This method can return an error if the model doesn't exist in the
+    /// database (usually meaning the migrations haven't been generated or
+    /// applied).
+    ///
+    /// Can return an error if the database connection is lost.
+    async fn count<T: Model>(&mut self, query: &Query<T>) -> Result<u64>;
+
     /// Deletes all rows that match the given query.
     ///
     /// # Errors
@@ -2506,6 +2566,10 @@ impl<DB: DatabaseBackend + ?Sized + Send> DatabaseBackend for &mut DB {
         (**self).exists(query).await
     }
 
+    async fn count<T: Model>(&mut self, query: &Query<T>) -> Result<u64> {
+        (**self).count(query).await
+    }
+
     async fn delete<T: Model>(&mut self, query: &Query<T>) -> Result<StatementResult> {
         (**self).delete(query).await
     }
@@ -2543,6 +2607,10 @@ impl DatabaseBackend for &Database {
 
     async fn exists<T: Model>(&mut self, query: &Query<T>) -> Result<bool> {
         Database::exists_generic(*self, query).await
+    }
+
+    async fn count<T: Model>(&mut self, query: &Query<T>) -> Result<u64> {
+        Database::count_generic(*self, query).await
     }
 
     async fn delete<T: Model>(&mut self, query: &Query<T>) -> Result<StatementResult> {

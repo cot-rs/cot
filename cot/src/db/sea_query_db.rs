@@ -270,7 +270,7 @@ macro_rules! impl_sea_query_transaction_backend {
                 sqlx_statement: sqlx::query::Query<'b, $sqlx_db_ty, A>,
             ) -> crate::db::Result<crate::db::StatementResult>
             where
-                A: 'b + sqlx::IntoArguments<'b, $sqlx_db_ty>,
+                A: 'b + sqlx::IntoArguments<$sqlx_db_ty>,
             {
                 let result = sqlx_statement
                     .execute(&mut *self.inner)

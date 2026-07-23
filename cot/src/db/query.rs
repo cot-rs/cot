@@ -7,8 +7,8 @@ use sea_query::{ExprTrait, IntoColumnRef};
 
 use crate::db;
 use crate::db::{
-    Auto, Database, DatabaseBackend, DbFieldValue, DbValue, ForeignKey, FromDbValue, Identifier,
-    Model, StatementResult, ToDbFieldValue,
+    Auto, DatabaseBackend, DbFieldValue, DbValue, ForeignKey, FromDbValue, Identifier, Model,
+    StatementResult, ToDbFieldValue,
 };
 
 /// A query that can be executed on a database. Can be used to filter, update,
@@ -177,7 +177,7 @@ impl<T: Model> Query<T> {
     /// # Errors
     ///
     /// Returns an error if the query fails.
-    pub async fn all<DB: DatabaseBackend>(&self, db: &DB) -> db::Result<Vec<T>> {
+    pub async fn all<DB: DatabaseBackend>(&self, mut db: DB) -> db::Result<Vec<T>> {
         db.query(self).await
     }
 
@@ -186,7 +186,7 @@ impl<T: Model> Query<T> {
     /// # Errors
     ///
     /// Returns an error if the query fails.
-    pub async fn get<DB: DatabaseBackend>(&self, db: &DB) -> db::Result<Option<T>> {
+    pub async fn get<DB: DatabaseBackend>(&self, mut db: DB) -> db::Result<Option<T>> {
         // TODO panic/error if more than one result
         db.get(self).await
     }
@@ -196,19 +196,8 @@ impl<T: Model> Query<T> {
     /// # Errors
     ///
     /// Returns an error if the query fails.
-    pub async fn count(&self, db: &Database) -> db::Result<u64> {
-        let mut select = sea_query::Query::select();
-        select
-            .from(T::TABLE_NAME)
-            .expr(sea_query::Expr::col(sea_query::Asterisk).count());
-        self.add_filter_to_statement(&mut select);
-        let row = db.fetch_option(&select).await?;
-        let count = match row {
-            #[expect(clippy::cast_sign_loss)]
-            Some(row) => row.get::<i64>(0)? as u64,
-            None => 0,
-        };
-        Ok(count)
+    pub async fn count<DB: DatabaseBackend>(&self, mut db: DB) -> db::Result<u64> {
+        db.count(self).await
     }
 
     /// Execute the query and check if any results exist.
@@ -216,7 +205,7 @@ impl<T: Model> Query<T> {
     /// # Errors
     ///
     /// Returns an error if the query fails.
-    pub async fn exists<DB: DatabaseBackend>(&self, db: &DB) -> db::Result<bool> {
+    pub async fn exists<DB: DatabaseBackend>(&self, mut db: DB) -> db::Result<bool> {
         db.exists(self).await
     }
 
@@ -225,7 +214,7 @@ impl<T: Model> Query<T> {
     /// # Errors
     ///
     /// Returns an error if the query fails.
-    pub async fn delete<DB: DatabaseBackend>(&self, db: &DB) -> db::Result<StatementResult> {
+    pub async fn delete<DB: DatabaseBackend>(&self, mut db: DB) -> db::Result<StatementResult> {
         db.delete(self).await
     }
 
@@ -1484,7 +1473,7 @@ mod tests {
         db.expect_query().returning(|_| Ok(Vec::<MockModel>::new()));
         let query: Query<MockModel> = Query::new();
 
-        let result = query.all(&db).await;
+        let result = query.all(&mut db).await;
 
         assert_eq!(result.unwrap(), Vec::<MockModel>::new());
     }
@@ -1495,7 +1484,7 @@ mod tests {
         db.expect_get().returning(|_| Ok(Option::<MockModel>::None));
         let query: Query<MockModel> = Query::new();
 
-        let result = query.get(&db).await;
+        let result = query.get(&mut db).await;
 
         assert_eq!(result.unwrap(), Option::<MockModel>::None);
     }
@@ -1508,7 +1497,7 @@ mod tests {
 
         let query: Query<MockModel> = Query::new();
 
-        let result = query.exists(&db).await;
+        let result = query.exists(&mut db).await;
         assert!(result.is_ok());
     }
 
@@ -1519,7 +1508,7 @@ mod tests {
             .returning(|_: &Query<MockModel>| Ok(StatementResult::new(RowsNum(0))));
         let query: Query<MockModel> = Query::new();
 
-        let result = query.delete(&db).await;
+        let result = query.delete(&mut db).await;
 
         assert!(result.is_ok());
     }

@@ -225,11 +225,11 @@ impl ModelBuilder {
                 }
 
                 async fn get_by_primary_key<DB: #orm_ident::DatabaseBackend>(
-                    db: &DB,
+                    mut db: DB,
                     pk: Self::PrimaryKey,
                 ) -> #orm_ident::Result<Option<Self>> {
                     #orm_ident::query!(Self, $#pk_field_name == pk)
-                        .get(db)
+                        .get(&mut db)
                         .await
                 }
             }

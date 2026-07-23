@@ -1035,12 +1035,13 @@ fn extract_is_required(object_item: &mut Schema) -> bool {
             types.retain(|t| t != &null_value);
             false
         } else {
-            // If "null" is not in the types, we assume it's a required parameter
+            // If "null" is not in the types, we assume it's a required
+            // parameter
             true
         }
     } else {
-        // If the type is a single string (or some other unknown value), we assume it's
-        // a required parameter
+        // If the type is a single string (or some other unknown value), we
+        // assume it's a required parameter
         true
     }
 }

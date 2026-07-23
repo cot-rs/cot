@@ -70,6 +70,7 @@ impl From<SMTPError> for TransportError {
 ///
 /// The default is `Plain`.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum Mechanism {

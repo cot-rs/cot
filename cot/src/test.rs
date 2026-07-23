@@ -1633,7 +1633,8 @@ pub fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
         Ok(guard) => guard,
         Err(poison_error) => {
             lock.clear_poison();
-            // We can ignore poisoned mutexes because we don't store any data inside
+            // We can ignore poisoned mutexes because we don't store any data
+            // inside
             poison_error.into_inner()
         }
     }
@@ -1768,8 +1769,8 @@ impl RedisDbAllocator {
             .await
             .map_err(|err| RedisDbAllocatorError::Redis(err.to_string()))?;
 
-        // keys should expire after a short while, a double defense against reuse by
-        // subsequent runs
+        // keys should expire after a short while, a double defense against
+        // reuse by subsequent runs
         redis::cmd("EXPIRE")
             .arg(POOL_KEY)
             .arg(KEY_TIMEOUT_SECS)

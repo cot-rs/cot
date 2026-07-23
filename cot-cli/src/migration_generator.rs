@@ -1172,11 +1172,13 @@ impl GeneratedMigration {
                 unreachable!("AddField operation should never create cycles")
             }
             DynOperation::RemoveField { .. } => {
-                // RemoveField doesn't create dependencies, it only removes a field
+                // RemoveField doesn't create dependencies, it only removes a
+                // field
                 unreachable!("RemoveField operation should never create cycles")
             }
             DynOperation::RemoveModel { .. } => {
-                // RemoveModel doesn't create dependencies, it only removes a model
+                // RemoveModel doesn't create dependencies, it only removes a
+                // model
                 unreachable!("RemoveModel operation should never create cycles")
             }
         }

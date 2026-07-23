@@ -922,8 +922,9 @@ impl AuthInner {
 
     fn user_lock(&self) -> MutexGuard<'_, UserWrapper> {
         self.user.lock().unwrap_or_else(|poison_error| {
-            // We don't have any invariants about the structure of the UserWrapper object,
-            // so we can safely clear the poison.
+            // We don't have any invariants about the structure of the
+            // UserWrapper object, so we can safely clear the
+            // poison.
             self.user.clear_poison();
             poison_error.into_inner()
         })

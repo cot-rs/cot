@@ -103,8 +103,8 @@ impl App for SwaggerUi {
 
         let swagger_handler = async move |static_files: StaticFiles| {
             let swagger_ui = swagger_ui.get_or_init(move || {
-                // TODO return an error when feature(once_cell_get_mut) is stable:
-                // https://github.com/rust-lang/rust/issues/121641
+                // TODO return an error when feature(once_cell_get_mut) is
+                // stable: https://github.com/rust-lang/rust/issues/121641
                 Self::build_swagger_ui((*openapi_path).clone(), &static_files)
                     .expect("could not build swagger UI")
             });

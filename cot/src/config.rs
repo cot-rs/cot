@@ -35,6 +35,7 @@ use crate::utils::chrono::DateTimeWithOffsetAdapter;
 /// This is all the project-specific configuration data that can (and makes
 /// sense to) be expressed in a TOML configuration file.
 #[derive(Debug, Clone, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -304,6 +305,7 @@ pub struct ProjectConfig {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[serde(flatten)]
+    #[cfg_attr(feature = "config-docs", schemars(skip))]
     pub extra: toml::Table,
 }
 
@@ -430,6 +432,7 @@ impl ProjectConfigBuilder {
 /// let config = AuthBackendConfig::Database;
 /// ```
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum AuthBackendConfig {
@@ -461,6 +464,7 @@ pub enum AuthBackendConfig {
 /// ```
 #[cfg(feature = "db")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -605,6 +609,7 @@ const MAX_RETRIES_DEFAULT: u32 = 3;
 
 #[cfg(feature = "cache")]
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -674,6 +679,7 @@ pub struct CacheConfig {
     /// timeout = "2h"
     /// ```
     #[serde(with = "crate::serializers::cache_timeout")]
+    #[cfg_attr(feature = "config-docs", schemars(with = "Option<String>"))]
     pub timeout: Timeout,
 
     /// Prefix for cache keys.
@@ -792,6 +798,7 @@ impl CacheConfig {
 
 #[cfg(feature = "cache")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 /// Configuration for the cache store backend.
@@ -903,6 +910,7 @@ const fn is_default_redis_pool_size(size: &usize) -> bool {
 /// assert_eq!(mem, CacheStoreTypeConfig::Memory);
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 #[cfg(feature = "cache")]
@@ -927,6 +935,8 @@ pub enum CacheStoreTypeConfig {
     /// must be specified, and additional Redis-specific options can be
     /// configured.
     Redis {
+        /// The URL of the Redis server.
+        ///
         /// # Examples
         ///
         /// ```
@@ -937,7 +947,6 @@ pub enum CacheStoreTypeConfig {
         ///     pool_size: 20,
         /// };
         /// ```
-        /// The URL of the Redis server.
         url: CacheUrl,
         /// Connection pool size for Redis connections.
 
@@ -954,6 +963,8 @@ pub enum CacheStoreTypeConfig {
     /// This stores cache data in files on the local filesystem. The path to
     /// the directory where the cache files will be stored must be specified.
     File {
+        /// The path to the directory where cache files will be stored.
+        ///
         /// # Examples
         ///
         /// ```
@@ -965,7 +976,6 @@ pub enum CacheStoreTypeConfig {
         ///     path: PathBuf::from("/tmp/cache"),
         /// };
         /// ```
-        /// The path to the directory where cache files will be stored.
         path: PathBuf,
     },
 }
@@ -1013,6 +1023,7 @@ pub enum CacheStoreTypeConfig {
 ///     .build();
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -1104,6 +1115,7 @@ pub struct StaticFilesConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     #[serde(with = "crate::serializers::humantime")]
+    #[cfg_attr(feature = "config-docs", schemars(with = "Option<String>"))]
     #[builder(setter(strip_option), default)]
     pub cache_timeout: Option<Duration>,
 }
@@ -1112,6 +1124,7 @@ pub struct StaticFilesConfig {
 ///
 /// This is used as part of the [`StaticFilesConfig`] struct.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum StaticFilesPathRewriteMode {
@@ -1193,6 +1206,7 @@ impl StaticFilesConfig {
 ///     .build();
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -1254,6 +1268,7 @@ impl MiddlewareConfigBuilder {
 /// let config = LiveReloadMiddlewareConfig::builder().enabled(true).build();
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -1333,6 +1348,7 @@ impl LiveReloadMiddlewareConfigBuilder {
 /// };
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SessionStoreTypeConfig {
     /// In-memory session storage.
@@ -1413,6 +1429,7 @@ pub enum SessionStoreTypeConfig {
 /// ```
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct SessionStoreConfig {
@@ -1489,6 +1506,7 @@ impl SessionStoreConfigBuilder {
 ///
 ///  [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SameSite {
@@ -1599,6 +1617,7 @@ impl From<Expiry> for tower_sessions::Expiry {
 /// let config = SessionMiddlewareConfig::builder().secure(false).build();
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -1777,6 +1796,7 @@ pub struct SessionMiddlewareConfig {
     /// );
     /// ```
     #[serde(with = "crate::serializers::session_expiry_time")]
+    #[cfg_attr(feature = "config-docs", schemars(with = "Option<String>"))]
     pub expiry: Expiry,
 
     /// What session store to use.
@@ -1863,6 +1883,7 @@ impl Default for SessionMiddlewareConfig {
 /// The default backend if not specified is `console`.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum EmailTransportTypeConfig {
@@ -1940,6 +1961,7 @@ pub enum EmailTransportTypeConfig {
 /// configuration.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct EmailTransportConfig {
@@ -2018,6 +2040,7 @@ impl EmailTransportConfigBuilder {
 /// ```
 #[cfg(feature = "email")]
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct EmailConfig {
@@ -2132,7 +2155,9 @@ impl Default for EmailConfig {
 /// ```
 #[repr(transparent)]
 #[derive(Clone, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(from = "String")]
+#[cfg_attr(feature = "config-docs", schemars(with = "String"))]
 pub struct SecretKey(SecureBytes);
 
 impl Serialize for SecretKey {
@@ -2239,7 +2264,9 @@ impl From<&str> for SecretKey {
 /// let url = DatabaseUrl::from("postgres://user:password@localhost:5432/database");
 /// ```
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(transparent)]
+#[cfg_attr(feature = "config-docs", schemars(with = "String"))]
 #[cfg(feature = "db")]
 pub struct DatabaseUrl(url::Url);
 
@@ -2348,7 +2375,9 @@ impl std::str::FromStr for CacheType {
 /// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
 /// ```
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(transparent)]
+#[cfg_attr(feature = "config-docs", schemars(with = "String"))]
 #[cfg(feature = "cache")]
 pub struct CacheUrl(url::Url);
 
@@ -2457,7 +2486,9 @@ impl std::fmt::Display for CacheUrl {
 /// let url = EmailUrl::from("smtp://user:pass@hostname:587");
 /// ```
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "config-docs", derive(schemars::JsonSchema))]
 #[serde(transparent)]
+#[cfg_attr(feature = "config-docs", schemars(with = "String"))]
 #[cfg(feature = "email")]
 pub struct EmailUrl(url::Url);
 

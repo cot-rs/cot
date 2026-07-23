@@ -6,6 +6,9 @@ use cot_cli::new_project::{CotSource, new_project};
 use libtest_mimic::Failed;
 use thiserror::Error;
 
+#[cfg(feature = "config-docs")]
+pub mod config_reference;
+
 pub const COMMON_IMPORTS: &[&str] = &[
     "cot::db::*",
     "cot::request::extractors::*",

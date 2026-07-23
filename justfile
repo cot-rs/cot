@@ -78,3 +78,7 @@ alias td := test-docs
 
 test-docs:
     cargo nextest run -p cot-test
+
+generate-config-docs:
+    # regenerates docs/configuration.md from `cot::config::ProjectConfig`
+    cargo run -p cot-test --features config-docs --bin generate_config_docs

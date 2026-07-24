@@ -1255,6 +1255,9 @@ pub trait SqlxValueRef<'r>: Sized {
     }
 }
 
+/// Marker trait for DB field types that behave like texts.
+pub trait TextField: ToDbFieldValue {}
+
 /// A database connection structure that holds the connection to the database.
 ///
 /// It is used to execute queries and interact with the database. The connection

@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// backwards compatible shim for form Password type.
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
+use cot::db::TextField;
 use cot_core::error::impl_into_cot_error;
 use derive_more::with_trait::Debug;
 #[cfg(test)]
@@ -729,6 +730,8 @@ impl ToDbValue for Option<PasswordHash> {
         }
     }
 }
+
+impl TextField for PasswordHash {}
 
 /// Authentication helper structure.
 ///

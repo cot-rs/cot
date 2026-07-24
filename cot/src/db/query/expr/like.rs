@@ -1,9 +1,10 @@
 //! Database expressions for pattern-matching.
 
-use cot::db::ToDbFieldValue;
 use cot::db::query::expr::{FieldRef, SqlQueryBuilder};
 use cot::db::query::{Expr, QueryBuildingError};
 use sea_query::{ExprTrait, SimpleExpr};
+
+use crate::db::TextField;
 
 pub(crate) const LIKE_ESCAPE_CHAR: char = '\\';
 
@@ -58,7 +59,7 @@ pub trait ExprLike<T> {
     fn iraw_like<V: Into<String>>(self, other: V) -> Expr;
 }
 
-impl<T: ToDbFieldValue + 'static> ExprLike<T> for FieldRef<T> {
+impl<T: TextField + 'static> ExprLike<T> for FieldRef<T> {
     fn contains<V: Into<String>>(self, other: V) -> Expr {
         Expr::contains(self.as_expr(), Expr::value(other.into()))
     }

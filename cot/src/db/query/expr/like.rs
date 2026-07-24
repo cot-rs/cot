@@ -202,3 +202,26 @@ pub trait LikeExprBuilder {
         case_sensitivity: CaseSensitivity,
     ) -> Result<SimpleExpr, QueryBuildingError>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn converts_glob_wildcards_to_sql_wildcards() {
+        assert_eq!(to_sql_like("*foo*"), "%foo%");
+        assert_eq!(to_sql_like("foo*"), "foo%");
+        assert_eq!(to_sql_like("*foo"), "%foo");
+        assert_eq!(to_sql_like("f?o"), "f_o");
+        assert_eq!(to_sql_like("f??o"), "f__o");
+        assert_eq!(to_sql_like("100% off"), "100\\% off");
+        assert_eq!(to_sql_like("under_score"), "under\\_score");
+        assert_eq!(to_sql_like("a\\*b"), "a*b");
+        assert_eq!(to_sql_like("a\\?b"), "a?b");
+        assert_eq!(to_sql_like("C:\\\\Users"), "C:\\\\Users");
+        assert_eq!(to_sql_like(""), "");
+        assert_eq!(to_sql_like("foo\\"), "foo");
+        assert_eq!(to_sql_like("café*"), "café%");
+        assert_eq!(to_sql_like("日本語"), "日本語");
+    }
+}

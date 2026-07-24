@@ -1,4 +1,4 @@
-error: `contains` expects exactly 1 argument found 0
+error: `contains` expects exactly 1 argument(s), found 0
   --> tests/ui/func_query_field_ref_method_wrong_arity.rs:11:5
    |
 11 |     query!(MyModel, $name.contains());

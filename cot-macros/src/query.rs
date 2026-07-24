@@ -212,7 +212,7 @@ fn handle_field_ref_method(
         return syn::Error::new(
             span,
             format!(
-                "`{method_ident}` expects {arity} arguments, found {}",
+                "`{method_ident}` expects {arity} argument(s), found {}",
                 args.len()
             ),
         )

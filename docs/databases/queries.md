@@ -388,7 +388,7 @@ Say you're searching for shipment tracking codes that start with `"PKG"` and end
 ```rust
 use cot::db::Database;
 
-# #[model] struct Shipment { #[model(primary_key)] id: Auto<i64>, tracking_code: LimitedString<64>, is_delivered: bool }
+# #[model] #[derive(Debug)] struct Shipment { #[model(primary_key)] id: Auto<i64>, tracking_code: LimitedString<64>, is_delivered: bool }
 async fn find_matching_tracking_codes(db: Database) -> cot::Result<()> {
     // Matches "PKG-US", "PKG123-US", "PKGXXUS", and so on
     let shipments = query!(Shipment, $tracking_code.raw_like("PKG*US")).all(&db).await?;

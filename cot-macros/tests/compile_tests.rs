@@ -64,6 +64,8 @@ fn func_query() {
     t.compile_fail("tests/ui/func_query_double_field.rs");
     t.compile_fail("tests/ui/func_query_invalid_field.rs");
     t.compile_fail("tests/ui/func_query_method_call_on_db_field.rs");
+    t.compile_fail("tests/ui/func_query_field_ref_method_wrong_arity.rs");
+    t.compile_fail("tests/ui/func_query_field_ref_non_existing_method.rs");
 }
 
 #[rustversion::attr(

@@ -153,8 +153,8 @@ impl ModelBuilder {
 
         self.fields_as_field_refs.push(quote!(
             #[doc = concat!("Field reference to [`", stringify!(#name), "::", stringify!(#column_name), "`].")]
-            pub const #name: #orm_ident::query::FieldRef<#ty> =
-                #orm_ident::query::FieldRef::<#ty>::new(#orm_ident::Identifier::new(#column_name));
+            pub const #name: #orm_ident::query::expr::FieldRef<#ty> =
+                #orm_ident::query::expr::FieldRef::<#ty>::new(#orm_ident::Identifier::new(#column_name));
         ));
     }
 

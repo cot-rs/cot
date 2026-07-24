@@ -1,5 +1,10 @@
 //! Database interface implementation – PostgreSQL backend.
 
+use cot::db::query::QueryBuildingError;
+use sea_query::extension::postgres::PgExpr;
+use sea_query::{ExprTrait, LikeExpr, SimpleExpr};
+
+use crate::db::query::expr::like::{CaseSensitivity, LikeExprBuilder, to_sql_like};
 use crate::db::sea_query_db::impl_sea_query_db_backend;
 
 impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::postgres::PgPool, PostgresRow, PostgresValueRef, sea_query::PostgresQueryBuilder);
@@ -40,5 +45,97 @@ impl DatabasePostgres {
         column_type: crate::db::ColumnType,
     ) -> sea_query::ColumnType {
         sea_query::ColumnType::from(column_type)
+    }
+}
+
+impl LikeExprBuilder for DatabasePostgres {
+    fn like_expr(
+        &self,
+        lhs: SimpleExpr,
+        glob_pattern: &str,
+        case_sensitivity: CaseSensitivity,
+    ) -> Result<SimpleExpr, QueryBuildingError> {
+        let glob = LikeExpr::new(to_sql_like(glob_pattern));
+
+        match case_sensitivity {
+            CaseSensitivity::Sensitive => Ok(lhs.like(glob)),
+            CaseSensitivity::Insensitive => Ok(lhs.ilike(glob)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_query::{Alias, Asterisk, PostgresQueryBuilder, Query};
+
+    use super::*;
+    use crate::test::DEFAULT_POSTGRES_TEST_URL;
+
+    #[expect(clippy::unused_async)]
+    async fn test_db() -> DatabasePostgres {
+        let db_url =
+            std::env::var("POSTGRES_URL").unwrap_or_else(|_| DEFAULT_POSTGRES_TEST_URL.to_string());
+        let db_connection = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy(&format!("{db_url}/postgres"))
+            .expect("lazy pool creation should not fail");
+        DatabasePostgres { db_connection }
+    }
+
+    fn col_expr() -> SimpleExpr {
+        sea_query::Expr::col(Alias::new("name"))
+    }
+
+    fn render(expr: SimpleExpr) -> String {
+        Query::select()
+            .column(Asterisk)
+            .from(Alias::new("t"))
+            .and_where(expr)
+            .to_string(PostgresQueryBuilder)
+    }
+
+    fn assert_where(expr: SimpleExpr, expected_where: &str) {
+        let sql = render(expr);
+        let expected = format!("SELECT * FROM \"t\" WHERE {expected_where}");
+        assert_eq!(sql, expected);
+    }
+
+    #[ignore = "Tests that use PostgreSQL are ignored by default"]
+    #[cot::test]
+    async fn case_sensitive_uses_like_not_ilike() {
+        let db = test_db().await;
+        let expr = db
+            .like_expr(col_expr(), "foo*", CaseSensitivity::Sensitive)
+            .unwrap();
+        assert_where(expr, "\"name\" LIKE 'foo%'");
+    }
+
+    #[ignore = "Tests that use PostgreSQL are ignored by default"]
+    #[cot::test]
+    async fn case_insensitive_uses_ilike_and_preserves_pattern_case() {
+        let db = test_db().await;
+        let expr = db
+            .like_expr(col_expr(), "Foo*", CaseSensitivity::Insensitive)
+            .unwrap();
+        assert_where(expr, "\"name\" ILIKE 'Foo%'");
+    }
+
+    #[ignore = "Tests that use PostgreSQL are ignored by default"]
+    #[cot::test]
+    async fn glob_wildcards_translate_to_sql_wildcards() {
+        let db = test_db().await;
+        let expr = db
+            .like_expr(col_expr(), "f??o", CaseSensitivity::Sensitive)
+            .unwrap();
+        assert_where(expr, "\"name\" LIKE 'f__o'");
+    }
+
+    #[ignore = "Tests that use PostgreSQL are ignored by default"]
+    #[cot::test]
+    async fn literal_percent_and_underscore_are_escaped() {
+        let db = test_db().await;
+        let expr = db
+            .like_expr(col_expr(), "100%off_sale", CaseSensitivity::Sensitive)
+            .unwrap();
+        assert_where(expr, "\"name\" LIKE E'100\\\\%off\\\\_sale'");
     }
 }

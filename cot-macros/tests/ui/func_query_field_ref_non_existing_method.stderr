@@ -1,0 +1,5 @@
+error: calling functions that reference database fields is unsupported (only contains, icontains, starts_with, istarts_with, ends_with, iends_with, raw_like, iraw_like are supported directly on database fields)
+  --> tests/ui/func_query_field_ref_non_existing_method.rs:11:21
+   |
+11 |     query!(MyModel, $name.non_existing_method());
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^

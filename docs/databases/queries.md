@@ -257,12 +257,12 @@ async fn get_customer(db: Database) -> cot::Result<()> {
 The [`query!`](macro@cot::db::query) macro returns a [`Query`](struct@cot::db::query::Query) object, on which you can call terminal methods (such as [`get`](struct@cot::db::query::Query#method.get) which returns the first matching result, and [`all`](struct@cot::db::query::Query#method.all) which returns all matching results) to retrieve the final results.
 
 ### Using the Query struct
-The [`query!`](macro@cot::db::query) macro is syntactic sugar for manually constructing a [`Query`](struct@cot::db::query::Query) with [`Expr`](enum@cot::db::query::Expr) expressions. The [`Query`](struct@cot::db::query::Query) object can be accessed directly by calling the [`objects`](trait@cot::db::Model#method.objects) method on the model, and filtered using the [`filter`](struct@cot::db::query::Query#method.filter) method.
+The [`query!`](macro@cot::db::query) macro is syntactic sugar for manually constructing a [`Query`](struct@cot::db::query::Query) with [`Expr`](enum@cot::db::query::expr::Expr) expressions. The [`Query`](struct@cot::db::query::Query) object can be accessed directly by calling the [`objects`](trait@cot::db::Model#method.objects) method on the model, and filtered using the [`filter`](struct@cot::db::query::Query#method.filter) method.
 You may prefer this approach when you need more control over how expressions are constructed. The example below is equivalent to the one above:
 
 ```rust
 use cot::db::Database;
-use cot::db::query::Expr;
+use cot::db::query::expr::Expr;
 
 # #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn get_customer(db: Database) -> cot::Result<()> {
@@ -272,14 +272,14 @@ async fn get_customer(db: Database) -> cot::Result<()> {
 }
 ```
 
-The [`filter`](struct@cot::db::query::Query#method.filter) method takes a [`filter expression`](enum@cot::db::query::Expr). In the example above, the expression `Expr::eq(Expr::field("id"), Expr::value("5"))` is evaluated as `id = 5`.
+The [`filter`](struct@cot::db::query::Query#method.filter) method takes a [`filter expression`](enum@cot::db::query::expr::Expr). In the example above, the expression `Expr::eq(Expr::field("id"), Expr::value("5"))` is evaluated as `id = 5`.
 
 ### Retrieving all objects
 One way to retrieve all objects of a model is to call the [`all`](struct@cot::db::query::Query#method.all) method after filtering the query results.
 
 ```rust
 use cot::db::Database;
-use cot::db::query::Expr;
+use cot::db::query::expr::Expr;
 
 # #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn get_all_customers(db: Database) -> cot::Result<()> {
@@ -296,7 +296,7 @@ The [`filter`](struct@cot::db::query::Query#method.filter) method returns a new 
 
 ```rust
 use cot::db::Database;
-use cot::db::query::Expr;
+use cot::db::query::expr::Expr;
 
 # #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
 async fn get_customers(db: Database) -> cot::Result<()> {
@@ -313,6 +313,112 @@ The example above shows how to retrieve all customers with a primary key greater
 > Note: Although this example works, the idiomatic way to do this is to use the [`Expr::and`](enum@cot::db::query::Expr::method.and) expression instead.
 
 Similarly, the [`query`](macro@cot::db::query) macro returns a new [`Query`](struct@cot::db::query::Query) instance which can be used to chain multiple filters.
+
+### Searching within a field (pattern matching)
+
+Sometimes an exact match isn't what you want. You might want to find all customers whose name contains a certain word, or all products whose name starts with a certain prefix. Cot supports this kind of substring, prefix, and suffix search directly in the `query!` macro (and, if you're building expressions by hand, on [`Expr`](enum@cot::db::query::expr::Expr) as well).
+
+```rust
+use cot::db::Database;
+
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn search_customers(db: Database) -> cot::Result<()> {
+    let customers = query!(Customer, $full_name.contains("Doe")).all(&db).await?;
+    println!("Customers: {:?}", customers);
+#   Ok(())
+}
+```
+
+Alongside `contains`, there's `starts_with` and `ends_with`, which anchor the match to the beginning or the end of the field's value instead of allowing it anywhere:
+
+```rust
+use cot::db::Database;
+
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn search_customers_further(db: Database) -> cot::Result<()> {
+    // Matches "Jon Doe", "Jonathan Smith", etc.
+    let jons = query!(Customer, $full_name.starts_with("Jon")).all(&db).await?;
+
+    // Matches anyone whose name ends with "Doe"
+    let does = query!(Customer, $full_name.ends_with("Doe")).all(&db).await?;
+
+    println!("{:?} {:?}", jons, does);
+#   Ok(())
+}
+```
+
+By default, all three of these are case-sensitive, so `contains("Doe")` won't match a customer named "jane doe". If you'd rather the match ignore case, each method has an `i`-prefixed counterpart: `icontains`, `istarts_with`, and `iends_with`.
+
+```rust
+use cot::db::Database;
+
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn case_insensitive_search(db: Database) -> cot::Result<()> {
+    let customers = query!(Customer, $full_name.icontains("doe")).all(&db).await?;
+    println!("Customers: {:?}", customers);
+#   Ok(())
+}
+```
+
+These combine with the rest of the filter naturally too. Use them alongside boolean and comparison operators just like any other condition:
+
+```rust
+use cot::db::Database;
+
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn verified_does(db: Database) -> cot::Result<()> {
+    let customers = query!(Customer, $full_name.icontains("doe") && $is_verified == true)
+        .all(&db)
+        .await?;
+    println!("Customers: {:?}", customers);
+#   Ok(())
+}
+```
+
+#### Matching a custom pattern
+
+`contains`, `starts_with`, and `ends_with` cover most everyday searches, but they can't express every shape of match. What if you need to check both the start and the end of a value at once, or match a value that follows a specific structure? For cases like this, Cot provides `raw_like` (and its case-insensitive counterpart, `iraw_like`), which let you write the match pattern yourself, using a small glob-style syntax:
+
+- `*` matches zero or more of any character
+- `?` matches exactly one character
+- `\` escapes the character after it, so it's matched literally instead of as a wildcard
+
+Say you're searching for shipment tracking codes that start with `"PKG"` and end with `"US"`, with anything in between:
+
+```rust
+use cot::db::Database;
+
+# #[model] #[derive(Debug)] struct Shipment { #[model(primary_key)] id: Auto<i64>, tracking_code: LimitedString<64>, is_delivered: bool }
+async fn find_matching_tracking_codes(db: Database) -> cot::Result<()> {
+    // Matches "PKG-US", "PKG123-US", "PKGXXUS", and so on
+    let shipments = query!(Shipment, $tracking_code.raw_like("PKG*US")).all(&db).await?;
+    println!("Shipments: {:?}", shipments);
+#   Ok(())
+}
+```
+
+`raw_like` is more flexible than `contains`, `starts_with`, and `ends_with`, but it also means you're responsible for escaping any wildcard characters you want to match literally. See the [`Expr::raw_like`](enum@cot::db::query::expr::Expr#method.raw_like) docs for the full pattern syntax and escaping rules.
+
+#### Using the Expr struct directly
+
+As with the other operators in this guide, all of these have an equivalent on [`Expr`](enum@cot::db::query::expr::Expr) for when you're building queries by hand rather than through the `query!` macro:
+
+```rust
+use cot::db::Database;
+use cot::db::query::expr::Expr;
+
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn search_customers_with_expr(db: Database) -> cot::Result<()> {
+    let customers = Customer::objects()
+        .filter(Expr::contains(Expr::field("full_name"), Expr::value("Doe")))
+        .all(&db)
+        .await?;
+    println!("Customers: {:?}", customers);
+#   Ok(())
+}
+```
+
+For the complete list of pattern-matching methods, their case-insensitive counterparts, and the glob pattern syntax used by `raw_like`, see the [`Expr`](enum@cot::db::query::expr::Expr) and [`ExprLike`](trait@cot::db::query::expr::ExprLike) docs.
 
 ## Removing an object
 The [`delete`](struct@cot::db::query::Query#method.delete) method can be used to remove an object from the database. The example below shows how to remove a `Customer` instance with the primary key of `5`.

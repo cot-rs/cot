@@ -20,6 +20,7 @@ use securer_string::SecureString;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::db::TextField;
 #[cfg(feature = "db")]
 use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
 
@@ -459,6 +460,8 @@ impl DatabaseField for Url {
     const TYPE: ColumnType = ColumnType::Text;
 }
 
+impl TextField for Url {}
+
 /// A validated email address.
 ///
 /// This is a newtype wrapper around [`EmailAddress`] that provides validation
@@ -804,6 +807,8 @@ impl Display for Email {
         f.write_str(self.0.as_str())
     }
 }
+
+impl TextField for Email {}
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,5 @@
 ---
-source: cot/tests/db.rs
+source: cot/tests/db_testing/migrations.rs
 expression: rollback_output
 ---
 [1m[95mRolling Back[0m Migration rollback_app1::m_0002_second

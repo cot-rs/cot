@@ -82,10 +82,10 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
                         file_name, node_data.sourcepos.start.line, node_data.sourcepos.start.column
                     );
                     panic!(
-                        "{} in {}\ncontent: {}",
-                        err.to_string(),
+                        "{} in {}\n{}",
+                        err,
                         file_info,
-                        code_block.literal.replace("\n", "\n   ")
+                        code_block.literal.replace('\n', "\n   ")
                     )
                 });
 

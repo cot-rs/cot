@@ -16,7 +16,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// backwards compatible shim for form Password type.
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
-use cot::db::TextField;
 use cot_core::error::impl_into_cot_error;
 use derive_more::with_trait::Debug;
 #[cfg(test)]
@@ -28,7 +27,9 @@ use thiserror::Error;
 
 use crate::config::SecretKey;
 #[cfg(feature = "db")]
-use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
+use crate::db::{
+    ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, TextField, ToDbValue,
+};
 use crate::request::{Request, RequestExt};
 use crate::session::Session;
 
@@ -731,6 +732,7 @@ impl ToDbValue for Option<PasswordHash> {
     }
 }
 
+#[cfg(feature = "db")]
 impl TextField for PasswordHash {}
 
 /// Authentication helper structure.

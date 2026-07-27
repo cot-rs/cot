@@ -121,16 +121,9 @@ This file is regenerated in full every time you run `cot migration make` or `cot
 
 ## Operations
 
-An [`Operation`](struct@cot::db::migrations::Operation) describes one schema change, and knows how to apply itself both [`forwards`](struct@cot::db::migrations::Operation#method.forwards) (when migrating) and [`backwards`](struct@cot::db::migrations::Operation#method.backwards) (when rolling back). You'll rarely construct these by hand since `cot migration make` does it for you, but it helps to know what's available, especially if you're writing a custom migration.
+An [`Operation`](struct@cot::db::migrations::Operation) describes one schema change, and knows how to apply itself both [`forwards`](struct@cot::db::migrations::Operation#method.forwards) (when migrating) and [`backwards`](struct@cot::db::migrations::Operation#method.backwards) (when rolling back). You'll rarely construct these by hand since `cot migration make` does it for you, but it's useful to know the shape, especially if you're writing a custom migration.
 
-| Operation | What it does |
-|---|---|
-| `Operation::create_model` | Creates a new table from a table name and a list of fields. Add `.if_not_exists()` if you want it to be a no-op when the table's already there. |
-| `Operation::add_field` | Adds a single field to an existing table. |
-| `Operation::remove_field` | Drops a single field from a table. |
-| `Operation::remove_model` | Drops a table entirely. |
-
-Each of these is built with a small builder, for example:
+For example, adding a field to an existing table:
 
 ```rust
 # use cot::db::migrations::{Operation, Field};
@@ -141,9 +134,11 @@ const OPERATION: Operation = Operation::add_field()
     .build();
 ```
 
+Besides [`add_field`](struct@cot::db::migrations::Operation#method.add_field), Cot ships builders for creating a model, removing a field, and removing a model. See the [`Operation`](struct@cot::db::migrations::Operation) for the full list of supported operations.
+
 ### Custom operations
 
-Sometimes a schema change isn't expressible with the four operations above, or you need to run a data migration alongside a schema one. For that, there's [`Operation::custom`](struct@cot::db::migrations::Operation#custom):
+Sometimes a schema change isn't expressible with the built-in operations above, or you need to run a data migration alongside a schema one. For that, there's [`Operation::custom`](struct@cot::db::migrations::Operation#method.custom):
 
 ```rust
 use cot::db::Result;
@@ -164,7 +159,7 @@ async fn backwards(ctx: MigrationContext<'_>) -> Result<()> {
 const OPERATION: Operation = Operation::custom(forwards).backwards(backwards).build();
 ```
 
-The `#[migration_op](macro@cot::db::migrations::migration_op)` macro just takes care of the boilerplate needed to match the function signature Cot expects. `backwards` is optional. If you skip it and someone later tries to roll this migration back, Cot will simply return an error saying the backwards migration isn't implemented, rather than silently doing nothing.
+The [`#[migration_op]`](attr@cot::db::migrations::migration_op) macro just takes care of the boilerplate needed to match the function signature Cot expects. `backwards` is optional. If you skip it and someone later tries to roll this migration back, Cot will simply return an error saying the backwards migration isn't implemented, rather than silently doing nothing.
 
 ## Dependencies
 

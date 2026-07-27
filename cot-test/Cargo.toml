@@ -18,7 +18,13 @@ cot-cli = { workspace = true, features = ["test_utils"] }
 cot.workspace = true
 glob.workspace = true
 libtest-mimic.workspace = true
+schemars = { workspace = true, features = ["std"] }
+serde_json.workspace = true
 thiserror.workspace = true
+
+[features]
+# Enables generating the configuration file reference (docs/configuration.md).
+config-docs = ["cot/config-docs"]
 
 [lints]
 workspace = true
@@ -27,3 +33,13 @@ workspace = true
 name = "doc_code_blocks"
 path = "tests/doc_code_blocks.rs"
 harness = false
+
+[[test]]
+name = "config_reference"
+path = "tests/config_reference.rs"
+required-features = ["config-docs"]
+
+[[bin]]
+name = "generate_config_docs"
+path = "src/bin/generate_config_docs.rs"
+required-features = ["config-docs"]

@@ -117,6 +117,8 @@ swagger-ui = ["openapi", "dep:swagger-ui-redist"]
 live-reload = ["dep:tower-livereload"]
 cache = ["json"]
 test = []
+# Internal feature used to generate the configuration file reference (docs/configuration.md).
+config-docs = ["dep:schemars", "schemars/std", "schemars/preserve_order", "full"]
 
 [lib]
 bench = false

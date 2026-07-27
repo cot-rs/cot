@@ -36,6 +36,7 @@ impl Project for CotSiteProject {
                     "Getting started",
                     vec![
                         GuideItem::Page(md_page!("introduction")),
+                        GuideItem::Page(md_page!("configuration")),
                         GuideItem::Page(md_page!("templates")),
                         GuideItem::Page(md_page!("forms")),
                         GuideItem::SubCategory {

@@ -1204,6 +1204,23 @@ enum DatabaseImpl {
     MySql(DatabaseMySql),
 }
 
+/// A [`SqlxBinder`] wrapping a raw SQL string and its bound values, letting
+/// raw queries reuse the same [`Database::fetch_all`] path as
+/// `sea_query`-built statements.
+struct RawStatement<'a> {
+    sql: &'a str,
+    values: SqlxValues,
+}
+
+impl SqlxBinder for RawStatement<'_> {
+    fn build_sqlx<T>(&self, _query_builder: T) -> (String, SqlxValues)
+    where
+        T: sea_query::QueryBuilder,
+    {
+        (self.sql.to_owned(), self.values.clone())
+    }
+}
+
 impl Database {
     /// Creates a new database connection. The connection string should be in
     /// the format of the database URL.
@@ -1904,6 +1921,110 @@ impl Database {
             #[cfg(feature = "mysql")]
             DatabaseImpl::MySql(_) => false,
         }
+    }
+
+    /// Executes a raw SQL query and maps the results to a model type.
+    ///
+    /// Unlike [`Database::raw`], this method returns the rows as model objects
+    /// by applying the model's [`Model::from_db`] mapping.
+    ///
+    /// # Safety
+    ///
+    /// This method executes the raw SQL string without any sanitization.
+    /// Callers are responsible for ensuring the query is safe.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query is invalid, if the model doesn't exist in
+    /// the database, or if the database connection is lost.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::{Auto, Database, model};
+    ///
+    /// #[model]
+    /// struct User {
+    ///     #[model(primary_key)]
+    ///     id: Auto<i32>,
+    ///     username: String,
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let db = Database::new("sqlite::memory:").await?;
+    /// db.raw("CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT)")
+    ///     .await?;
+    /// db.raw("INSERT INTO user (username) VALUES ('jondoe')")
+    ///     .await?;
+    ///
+    /// let users = db.raw_as::<User>("SELECT * FROM user").await?;
+    /// assert_eq!(users.len(), 1);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn raw_as<T: Model>(&self, query: &str) -> Result<Vec<T>> {
+        self.raw_as_with(query, &[]).await
+    }
+
+    /// Executes a raw SQL query with parameters and maps the results to a
+    /// model type.
+    ///
+    /// Unlike [`Database::raw_with`], this method returns the rows as model
+    /// objects by applying the model's [`Model::from_db`] mapping.
+    ///
+    /// # Safety
+    ///
+    /// This method executes the raw SQL string without any sanitization.
+    /// Callers are responsible for ensuring the query is safe. The bound
+    /// `values`, however, are passed to the database driver separately from
+    /// the query text and are safe from SQL injection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query is invalid, if the model doesn't exist in
+    /// the database, or if the database connection is lost.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::{Auto, Database, model};
+    ///
+    /// #[model]
+    /// struct User {
+    ///     #[model(primary_key)]
+    ///     id: Auto<i32>,
+    ///     username: String,
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> cot::Result<()> {
+    /// let db = Database::new("sqlite::memory:").await?;
+    /// db.raw("CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT)")
+    ///     .await?;
+    /// db.raw("INSERT INTO user (username) VALUES ('jondoe')")
+    ///     .await?;
+    ///
+    /// let users = db
+    ///     .raw_as_with::<User>("SELECT * FROM user WHERE username = ?", &[&"jondoe"])
+    ///     .await?;
+    /// assert_eq!(users.len(), 1);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn raw_as_with<T: Model>(
+        &self,
+        query: &str,
+        values: &[&dyn ToDbValue],
+    ) -> Result<Vec<T>> {
+        let values = values
+            .iter()
+            .map(ToDbValue::to_db_value)
+            .collect::<Vec<_>>();
+        let values = SqlxValues(sea_query::Values(values));
+
+        let rows = self.fetch_all(&RawStatement { sql: query, values }).await?;
+        rows.into_iter().map(T::from_db).collect::<Result<_>>()
     }
 
     async fn fetch_all<T>(&self, statement: &T) -> Result<Vec<Row>>

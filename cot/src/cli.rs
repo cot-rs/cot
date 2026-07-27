@@ -675,6 +675,8 @@ use crate::static_files::StaticFiles;
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     use clap::Command;
     use cot::test::serial_guard;
     use tempfile::tempdir;
@@ -757,6 +759,41 @@ mod tests {
                 .get_subcommands()
                 .any(|command| command.get_name() == MIGRATION_ROLLBACK_SUBCOMMAND)
         );
+    }
+
+    #[cot::test]
+    async fn cli_task_group_dispatches_nested_task() {
+        struct NestedTask;
+        #[async_trait(?Send)]
+        impl CliTask for NestedTask {
+            fn subcommand(&self) -> Command {
+                Command::new("nested")
+            }
+
+            async fn execute(
+                &mut self,
+                _matches: &ArgMatches,
+                _bootstrapper: Bootstrapper<WithConfig>,
+            ) -> Result<()> {
+                TASK_CALLED.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+
+        struct TestProject;
+        impl crate::Project for TestProject {}
+
+        static TASK_CALLED: AtomicBool = AtomicBool::new(false);
+        TASK_CALLED.store(false, Ordering::SeqCst);
+
+        let mut group = CliTaskGroup::new("group");
+        group.add_task(NestedTask);
+        let matches = group.subcommand().get_matches_from(["group", "nested"]);
+        let bootstrapper = Bootstrapper::new(TestProject).with_config(ProjectConfig::default());
+
+        group.execute(&matches, bootstrapper).await.unwrap();
+
+        assert!(TASK_CALLED.load(Ordering::SeqCst));
     }
 
     #[test]

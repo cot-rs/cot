@@ -75,7 +75,19 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
                             TestConfig::Default,
                         )
                     };
-                let lang = lang.expect("unknown language");
+
+                let lang = lang.unwrap_or_else(|err| {
+                    let file_info = format!(
+                        "{}:{}:{}",
+                        file_name, node_data.sourcepos.start.line, node_data.sourcepos.start.column
+                    );
+                    panic!(
+                        "{} in {}\ncontent: {}",
+                        err.to_string(),
+                        file_info,
+                        code_block.literal.replace("\n", "\n   ")
+                    )
+                });
 
                 if let Some(runner) = TEST_RUNNERS.get().unwrap().get(&(lang, test_config)) {
                     let literal = if lang == TestLanguage::Rust {

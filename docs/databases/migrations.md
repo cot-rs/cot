@@ -20,7 +20,7 @@ A few things worth knowing about how this works:
 
 * The **app name** for a migration is your crate name by default. You can override it with `--app-name` if you'd like, though in most single-crate projects you'll never need to.
 * Migrations are generated per crate. If you have a Cargo workspace with multiple crates, each one gets its own `migrations` directory and its own independent history. There's currently no way for a migration in one crate to be generated against models living in another crate in the same workspace, that's on the roadmap but not there yet.
-* By default, migrations are written to `src/migrations/` inside your crate. You can point this elsewhere with `--output-dir` if needed.
+* By default, migrations are written to the `src/migrations/` directory inside your crate. You can point this elsewhere with `--output-dir` if needed.
 
 If you want an empty migration to hand-write yourself (useful for data migrations, or anything that isn't a simple schema change), use:
 
@@ -28,7 +28,7 @@ If you want an empty migration to hand-write yourself (useful for data migration
 cot migration new <name>
 ```
 
-This scaffolds a migration file with [`forwards`](struct@cot::db::migrations::Operation#method.forwards) and [`backwards`](struct@cot::db::migrations::Operation#method.backwards) stubs ready to fill in, rather than trying to auto-detect any model changes.
+This scaffolds a migration file with `forwards` and `backwards` stubs ready to fill in, rather than trying to auto-detect any model changes.
 
 ## Running migrations
 
@@ -91,8 +91,8 @@ struct _Product {
 Every migration is just a unit struct that implements the [`Migration`](trait@cot::db::migrations::Migration) trait, made up of four consts:
 
 * **`APP_NAME`**: the app (crate) this migration belongs to. This, together with `MIGRATION_NAME`, is what Cot uses to identify a migration uniquely.
-* **`MIGRATION_NAME`**: the migration's own name, matching the file name minus the extension (for example `m_0001_initial`). By convention, auto-generated names after the first one look like `m_0002_auto_20260527_004236`, a sequence number followed by a timestamp, since there's no more descriptive name to give them automatically. Migrations created with `cot migration new my_name` instead get `m_0002_my_name`.
-* **`DEPENDENCIES`**: a list of other migrations (possibly in other apps) that must run before this one. See [Dependencies](#dependencies) below.
+* **`MIGRATION_NAME`**: the migration's own name, matching the file name minus the extension (for example `m_0001_initial`). By convention, auto-generated names after the first one look like `m_0002_auto_20260527_004236`, a sequence number followed by a timestamp. Migrations created with `cot migration new my_name` instead get `m_0002_my_name`.
+* **`DEPENDENCIES`**: a list of other migrations (including those in other apps) that must run before this one. See [Dependencies](#dependencies) below.
 * **`OPERATIONS`**: the actual list of schema changes this migration performs, applied in order. See [Operations](#operations) below.
 
 You'll also notice a second struct below the `Migration` impl, prefixed with an underscore (`_Product` above). This is a snapshot of the model as it looked at the time this migration was generated, marked with `model_type = "migration"`. Cot uses these snapshots to work out what changed the next time you run `cot migration make`, by diffing your current models against the latest snapshot on record. You shouldn't need to touch these by hand, they exist purely so future migrations can be generated correctly.
@@ -117,7 +117,7 @@ pub const MIGRATIONS: &[&::cot::db::migrations::SyncDynMigration] = &[
 ];
 ```
 
-This file is regenerated in full every time you run `cot migration make` or `cot migration new`, so treat it as generated code. It's what your `App::migrations()` implementation typically returns, usually with the help of the [`wrap_migrations`](fn@cot::db::migrations::wrap_migrations) helper.
+This file is regenerated in full every time you run `cot migration make` or `cot migration new`, so treat it as generated code. It's what your [`App::migrations`](trait@cot::project::App#method.migrations) implementation typically returns, usually with the help of the [`wrap_migrations`](fn@cot::db::migrations::wrap_migrations) helper.
 
 ## Operations
 
@@ -125,10 +125,10 @@ An [`Operation`](struct@cot::db::migrations::Operation) describes one schema cha
 
 | Operation | What it does |
 |---|---|
-| `Operation::create_model()` | Creates a new table from a table name and a list of fields. Add `.if_not_exists()` if you want it to be a no-op when the table's already there. |
-| `Operation::add_field()` | Adds a single field to an existing table. |
-| `Operation::remove_field()` | Drops a single field from a table. |
-| `Operation::remove_model()` | Drops a table entirely. |
+| `Operation::create_model` | Creates a new table from a table name and a list of fields. Add `.if_not_exists()` if you want it to be a no-op when the table's already there. |
+| `Operation::add_field` | Adds a single field to an existing table. |
+| `Operation::remove_field` | Drops a single field from a table. |
+| `Operation::remove_model` | Drops a table entirely. |
 
 Each of these is built with a small builder, for example:
 
@@ -143,7 +143,7 @@ const OPERATION: Operation = Operation::add_field()
 
 ### Custom operations
 
-Sometimes a schema change isn't expressible with the four operations above, or you need to run a data migration alongside a schema one. For that, there's [`Operation::custom()`](struct@cot::db::migrations::Operation#custom):
+Sometimes a schema change isn't expressible with the four operations above, or you need to run a data migration alongside a schema one. For that, there's [`Operation::custom`](struct@cot::db::migrations::Operation#custom):
 
 ```rust
 use cot::db::Result;
@@ -164,14 +164,14 @@ async fn backwards(ctx: MigrationContext<'_>) -> Result<()> {
 const OPERATION: Operation = Operation::custom(forwards).backwards(backwards).build();
 ```
 
-The `#[migration_op]` macro just takes care of the boilerplate needed to match the function signature Cot expects. `backwards` is optional. If you skip it and someone later tries to roll this migration back, Cot will simply return an error saying the backwards migration isn't implemented, rather than silently doing nothing.
+The `#[migration_op](macro@cot::db::migrations::migration_op)` macro just takes care of the boilerplate needed to match the function signature Cot expects. `backwards` is optional. If you skip it and someone later tries to roll this migration back, Cot will simply return an error saying the backwards migration isn't implemented, rather than silently doing nothing.
 
 ## Dependencies
 
 Migrations within the same app are always applied in the order their names sort in (which is why the auto-generated names are zero-padded and sequential). Across apps, or whenever ordering needs to be more explicit than that, you can add entries to `DEPENDENCIES`:
 
-* **`MigrationDependency::migration(app, migration_name)`**, for depending on a specific migration in a specific app being applied first.
-* **`MigrationDependency::model(app, table_name)`**, for depending on whichever migration created a given model, without needing to know or hardcode its exact name.
+* **[`MigrationDependency::migration`](struct@cot::db::migrations::MigrationDependency#method.migration)**, for depending on a specific migration in a specific app being applied first.
+* **[`MigrationDependency::model`](struct@cot::db::migrations::MigrationDependency#method.model)**, for depending on whichever migration created a given model, without needing to know or hardcode its exact name.
 
 You'll see `cot migration make` add these automatically whenever a new foreign key points at a model that isn't being created in the very same migration. That's the most common reason you'd end up depending on another app: a `ForeignKey<Customer>` field pointing at a model whose migration lives elsewhere.
 
@@ -195,7 +195,7 @@ cot migration rollback <MIGRATION_NAME> [--app <APP>] [--dry-run]
 
 Rollbacks aren't limited to a single app either. If another app has a migration that depends on one of the migrations you're rolling back (say, through a foreign key), that dependent migration gets rolled back too, so you're never left with a dangling reference. Migrations that were never applied in the first place are simply skipped.
 
-Because rolling back can have a wider blast radius than expected once cross-app dependencies are involved, it's worth checking first with:
+Because rolling back can have a wider blast radius than expected once cross-app dependencies are involved, it's worth checking first with the `--dry-run` flag which shows a preview of what migrations will be undone:
 
 ```bash
 cot migration rollback <MIGRATION_NAME> --dry-run

@@ -6,6 +6,25 @@ use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 
+/// An attribute macro that defines a custom migration operation.
+///
+/// This macro simplifies writing custom migration operations by allowing you to
+/// write them as regular `async` functions. It handles the necessary pinning
+/// and boxing of the return type to make it compatible with the migration
+/// engine.
+///
+/// # Examples
+///
+/// ```
+/// use cot::db::Result;
+/// use cot::db::migrations::{MigrationContext, migration_op};
+///
+/// #[migration_op]
+/// async fn my_migration(ctx: MigrationContext<'_>) -> Result<()> {
+///     // Your migration logic here
+///     Ok(())
+/// }
+/// ```
 pub use cot_macros::migration_op;
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;

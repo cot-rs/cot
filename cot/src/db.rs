@@ -656,6 +656,9 @@ pub trait Model: Sized + Send + 'static {
     /// The columns of the model.
     const COLUMNS: &'static [Column];
 
+    #[doc(hidden)]
+    const IS_APPLICATION_MODEL: bool = true;
+
     /// Creates a model instance from a database row.
     ///
     /// # Errors
@@ -1266,6 +1269,7 @@ pub trait TextField: ToDbFieldValue {}
 #[derive(Debug, Clone)]
 pub struct Database {
     inner: Arc<DatabaseImpl>,
+    migration_context: bool,
 }
 
 #[derive(Debug)]
@@ -1328,6 +1332,7 @@ impl Database {
             let inner = DatabaseSqlite::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::Sqlite(inner)),
+                migration_context: false,
             });
         }
 
@@ -1336,6 +1341,7 @@ impl Database {
             let inner = DatabasePostgres::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::Postgres(inner)),
+                migration_context: false,
             });
         }
 
@@ -1344,10 +1350,30 @@ impl Database {
             let inner = DatabaseMySql::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::MySql(inner)),
+                migration_context: false,
             });
         }
 
         panic!("Unsupported database URL: {url}");
+    }
+
+    fn for_migration(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            migration_context: true,
+        }
+    }
+
+    fn ensure_model_allowed<T: Model>(&self) -> Result<()> {
+        if self.migration_context && T::IS_APPLICATION_MODEL {
+            return Err(DatabaseError::MigrationError(
+                migrations::MigrationEngineError::Custom(format!(
+                    "application model `{}` cannot be used in migrations; use a migration model",
+                    std::any::type_name::<T>()
+                )),
+            ));
+        }
+        Ok(())
     }
 
     /// Closes the database connection.
@@ -1419,6 +1445,7 @@ impl Database {
     }
 
     async fn insert_or_update_impl<T: Model>(&self, data: &mut T, update: bool) -> Result<()> {
+        self.ensure_model_allowed::<T>()?;
         let column_identifiers = T::COLUMNS
             .iter()
             .map(|column| Identifier::from(column.name.as_str()));
@@ -1526,6 +1553,7 @@ impl Database {
     }
 
     async fn update_impl<T: Model>(&self, data: &mut T) -> Result<()> {
+        self.ensure_model_allowed::<T>()?;
         let column_identifiers = T::COLUMNS
             .iter()
             .map(|column| Identifier::from(column.name.as_str()));
@@ -1606,6 +1634,7 @@ impl Database {
     }
 
     async fn bulk_insert_impl<T: Model>(&self, data: &mut [T], update: bool) -> Result<()> {
+        self.ensure_model_allowed::<T>()?;
         // TODO: add transactions when implemented
 
         if data.is_empty() {
@@ -1818,6 +1847,7 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
+        self.ensure_model_allowed::<T>()?;
         let columns_to_get: Vec<_> = T::COLUMNS.iter().map(|column| column.name).collect();
         let mut select = sea_query::Query::select();
         select.columns(columns_to_get).from(T::TABLE_NAME);
@@ -1844,6 +1874,7 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>> {
+        self.ensure_model_allowed::<T>()?;
         let columns_to_get: Vec<_> = T::COLUMNS.iter().map(|column| column.name).collect();
         let mut select = sea_query::Query::select();
         select.columns(columns_to_get).from(T::TABLE_NAME);
@@ -1871,6 +1902,7 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool> {
+        self.ensure_model_allowed::<T>()?;
         let mut select = sea_query::Query::select();
         select.expr(sea_query::Expr::value(1)).from(T::TABLE_NAME);
         query.add_filter_to_statement(&mut select, self)?;
@@ -1893,6 +1925,7 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult> {
+        self.ensure_model_allowed::<T>()?;
         let mut delete = sea_query::Query::delete();
         delete.from_table(T::TABLE_NAME);
         query.add_filter_to_statement(&mut delete, self)?;
@@ -2094,6 +2127,7 @@ impl Database {
         query: &str,
         values: &[&dyn ToDbValue],
     ) -> Result<Vec<T>> {
+        self.ensure_model_allowed::<T>()?;
         let values = values
             .iter()
             .map(ToDbValue::to_db_value)

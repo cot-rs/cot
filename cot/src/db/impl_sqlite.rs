@@ -140,6 +140,10 @@ mod tests {
             .to_string(SqliteQueryBuilder)
     }
 
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`"
+    )]
     #[cot::test]
     async fn case_sensitive_uses_glob() {
         let db = test_db().await;
@@ -149,6 +153,10 @@ mod tests {
         assert_where(expr, "\"name\" GLOB 'foo*'");
     }
 
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`"
+    )]
     #[cot::test]
     async fn case_sensitive_positional_pattern_translates_question_marks() {
         let db = test_db().await;
@@ -158,6 +166,10 @@ mod tests {
         assert_where(expr, "\"name\" GLOB 'f??o'");
     }
 
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`"
+    )]
     #[cot::test]
     async fn case_sensitive_escapes_literal_wildcard_chars_for_glob() {
         let db = test_db().await;
@@ -167,6 +179,10 @@ mod tests {
         assert_where(expr, "\"name\" GLOB '50[*]off'");
     }
 
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`"
+    )]
     #[cot::test]
     async fn case_insensitive_uses_lower_and_like() {
         let db = test_db().await;
@@ -176,6 +192,10 @@ mod tests {
         assert_where(expr, "LOWER(\"name\") LIKE 'foo%' ESCAPE '\\'");
     }
 
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`"
+    )]
     #[cot::test]
     async fn case_insensitive_pattern_is_lowercased_before_conversion() {
         let db = test_db().await;
@@ -185,6 +205,10 @@ mod tests {
         assert_where(expr, "LOWER(\"name\") LIKE 'readme' ESCAPE '\\'");
     }
 
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2` on OS `linux`"
+    )]
     #[cot::test]
     async fn case_insensitive_includes_escape_clause() {
         let db = test_db().await;

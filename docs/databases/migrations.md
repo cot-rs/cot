@@ -8,7 +8,7 @@ Migration files are plain Rust files. There's no separate DSL to learn and nothi
 
 ## Creating migrations
 
-Once you've added or changed a [`#[model]`](attr@cot::db::model) struct, run:
+Once you've added or changed a struct annotated with [`#[model]`](attr@cot::db::model), run:
 
 ```bash
 cot migration make
@@ -57,12 +57,12 @@ Here's a trimmed down version of what `cot migration make` generates for a simpl
 pub(super) struct Migration;
 
 impl ::cot::db::migrations::Migration for Migration {
-    const APP_NAME: &'static str = "customers";
+    const APP_NAME: &'static str = "ecommerce";
     const MIGRATION_NAME: &'static str = "m_0001_initial";
     const DEPENDENCIES: &'static [::cot::db::migrations::MigrationDependency] = &[];
     const OPERATIONS: &'static [::cot::db::migrations::Operation] = &[
         ::cot::db::migrations::Operation::create_model()
-            .table_name(::cot::db::Identifier::new("customers__product"))
+            .table_name(::cot::db::Identifier::new("ecommerce__product"))
             .fields(&[
                 ::cot::db::migrations::Field::new(
                     ::cot::db::Identifier::new("id"),
@@ -117,7 +117,7 @@ pub const MIGRATIONS: &[&::cot::db::migrations::SyncDynMigration] = &[
 ];
 ```
 
-This file is regenerated in full every time you run `cot migration make` or `cot migration new`, so treat it as generated code. It's what your [`App::migrations`](trait@cot::project::App#method.migrations) implementation typically returns, usually with the help of the [`wrap_migrations`](fn@cot::db::migrations::wrap_migrations) helper.
+This file is regenerated in full every time you run `cot migration make` or `cot migration new`, so treat it as generated code. It's what your [`App::migrations`](trait@cot::project::App#method.migrations) implementation typically returns.
 
 ## Operations
 

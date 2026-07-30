@@ -6,6 +6,7 @@ use std::sync::OnceLock;
 use comrak::arena_tree::NodeEdge;
 use comrak::nodes::NodeValue;
 use comrak::{Arena, parse_document};
+use cot_test::utils::format_code_snippet;
 use cot_test::{TestConfig, TestLanguage, get_test_project};
 use libtest_mimic::{Arguments, Failed, Trial};
 
@@ -77,16 +78,18 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
                     };
 
                 let lang = lang.unwrap_or_else(|err| {
-                    let file_info = format!(
-                        "{}:{}:{}",
-                        file_name, node_data.sourcepos.start.line, node_data.sourcepos.start.column
+                    let start_line = node_data.sourcepos.start.line;
+                    let start_col = node_data.sourcepos.start.column;
+
+                    let snippet = format_code_snippet(
+                        &code_block.literal,
+                        file_name,
+                        start_line,
+                        start_col,
+                        5,
                     );
-                    panic!(
-                        "{} in {}\n{}",
-                        err,
-                        file_info,
-                        code_block.literal.replace('\n', "\n   ")
-                    )
+
+                    panic!("{err}\n{snippet}");
                 });
 
                 if let Some(runner) = TEST_RUNNERS.get().unwrap().get(&(lang, test_config)) {

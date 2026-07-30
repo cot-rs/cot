@@ -174,10 +174,10 @@ If Cot ever detects a cycle in your migration dependencies, it will refuse to ru
 
 ## Rolling back migrations
 
-To undo migrations, use:
+Rolling back migrations runs through your compiled project binary in the target dir, not the `cot` CLI:
 
 ```bash
-cot migration rollback <MIGRATION_NAME> [--app <APP>] [--dry-run]
+./path/to/binary migration rollback <MIGRATION_NAME> [--app <APP>] [--dry-run]
 ```
 
 `<MIGRATION_NAME>` can be given a few different ways:
@@ -193,7 +193,7 @@ Rollbacks aren't limited to a single app either. If another app has a migration 
 Because rolling back can have a wider blast radius than expected once cross-app dependencies are involved, it's worth checking first with the `--dry-run` flag which shows a preview of what migrations will be undone:
 
 ```bash
-cot migration rollback <MIGRATION_NAME> --dry-run
+./target/debug/binary migration rollback <MIGRATION_NAME> --dry-run
 ```
 
 This prints the exact rollback plan without touching your database at all, something like:

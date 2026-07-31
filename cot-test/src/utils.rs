@@ -1,5 +1,7 @@
 //! Test utilities
 
+use std::fmt::Write;
+
 /// Formats a code snippet for an error message using the style of rustc
 /// diagnostics
 ///
@@ -15,6 +17,7 @@
 /// 205 |      migration: m_0001_initial
 ///     |
 /// ```
+#[must_use]
 pub fn format_code_snippet(
     literal: &str,
     file_name: &str,
@@ -22,6 +25,7 @@ pub fn format_code_snippet(
     start_col: usize,
     max_lines: usize,
 ) -> String {
+    const FMT_MSG: &str = "failed to write to string buffer";
     let lines: Vec<&str> = literal.lines().take(max_lines).collect();
 
     // Width of the largest line number, for gutter alignment.
@@ -29,25 +33,23 @@ pub fn format_code_snippet(
     let gutter_width = last_line_num.to_string().len();
 
     let mut out = String::new();
-    out.push_str(&format!(
+    writeln!(
+        out,
         "{:width$}--> {}:{}:{}\n",
         "",
         file_name,
         start_line,
         start_col,
         width = gutter_width + 1
-    ));
-    out.push_str(&format!("{:width$} |\n", "", width = gutter_width));
+    )
+    .expect(FMT_MSG);
+    writeln!(out, "{:gutter_width$} |", "").expect(FMT_MSG);
 
     for (i, line) in lines.iter().enumerate() {
         let line_num = start_line + i;
-        out.push_str(&format!(
-            "{line_num:width$} | {line}\n",
-            width = gutter_width
-        ));
+        writeln!(out, "{line_num:gutter_width$} | {line}").expect(FMT_MSG);
     }
-
-    out.push_str(&format!("{:width$} |", "", width = gutter_width));
+    writeln!(out, "{:gutter_width$} |", "").expect(FMT_MSG);
 
     out
 }

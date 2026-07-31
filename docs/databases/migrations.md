@@ -95,7 +95,7 @@ Every migration is just a unit struct that implements the [`Migration`](trait@co
 * **`DEPENDENCIES`**: a list of other migrations (including those in other apps) that must run before this one. See [Dependencies](#dependencies) below.
 * **`OPERATIONS`**: the actual list of schema changes this migration performs, applied in order. See [Operations](#operations) below.
 
-You'll also notice a second struct below the `Migration` impl, prefixed with an underscore (`_Product` above). This is a snapshot of the model as it looked at the time this migration was generated, marked with `model_type = "migration"`. Cot uses these snapshots to work out what changed the next time you run `cot migration make`, by diffing your current models against the latest snapshot on record. You shouldn't need to touch these by hand, they exist purely so future migrations can be generated correctly.
+You'll also notice a second struct below the `Migration` impl, prefixed with an underscore (`_Product` above). This is a snapshot of the model as it looked at the time this migration was generated, marked with `model_type = "migration"`. Cot uses these snapshots to work out what changed the next time you run `cot migration make`, by diffing your current models against the latest snapshot on record. It's also the struct you should reach for if you need typed access to this model inside a custom operation, See [Using models inside custom operations](#using-models-inside-custom-operations) below for more on this. .
 
 ### The `migrations.rs` module
 
@@ -121,7 +121,7 @@ This file is regenerated in full every time you run `cot migration make` or `cot
 
 ## Operations
 
-An [`Operation`](struct@cot::db::migrations::Operation) describes one schema change, and knows how to apply itself both [`forwards`](struct@cot::db::migrations::Operation#method.forwards) (when migrating) and [`backwards`](struct@cot::db::migrations::Operation#method.backwards) (when rolling back). You'll rarely construct these by hand since `cot migration make` does it for you, but it's useful to know the shape, especially if you're writing a custom migration.
+An [`Operation`](struct@cot::db::migrations::Operation) describes one schema change, and knows how to apply itself both [`forward`](struct@cot::db::migrations::Operation#method.forwards) (when migrating) and [`backwards`](struct@cot::db::migrations::Operation#method.backwards) (when rolling back). You'll rarely construct these by hand since `cot migration make` does it for you, but it's useful to know the shape, especially if you're writing a custom migration.
 
 For example, adding a field to an existing table:
 
@@ -160,6 +160,10 @@ const OPERATION: Operation = Operation::custom(forwards).backwards(backwards).bu
 ```
 
 The [`#[migration_op]`](attr@cot::db::migrations::migration_op) macro just takes care of the boilerplate needed to match the function signature Cot expects. `backwards` is optional. If you skip it and someone later tries to roll this migration back, Cot will simply return an error saying the backwards migration isn't implemented, rather than silently doing nothing.
+
+#### Using models inside custom operations
+
+When you query a model inside `forwards` or `backwards` operation functions, use the snapshot Model (annotated with `model_type = "migration"` in the migration file), not the live one from your crate (eg. `crate::Product`). Migrations replay in order on every fresh database, so at the point this migration runs, later migrations haven't happened yet. The live model may already have fields the table doesn't have at this stage, which can fail outright, or worse, write bad data without failing at all. The snapshot always matches the table as it actually looked at this point in history.
 
 ## Dependencies
 

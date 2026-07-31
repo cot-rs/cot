@@ -1387,6 +1387,12 @@ impl Database {
                     std::any::type_name::<T>()
                 ))),
             ),
+            (DatabaseContext::Default, ModelType::Migration) => Err(DatabaseError::MigrationError(
+                migrations::MigrationEngineError::Custom(format!(
+                    "migration model `{}` cannot be used outside migrations; use an application model",
+                    std::any::type_name::<T>()
+                )),
+            )),
             _ => Ok(()),
         }
     }

@@ -2190,6 +2190,14 @@ mod tests {
     async fn operation_custom_model_access() {
         let test_db = TestDatabase::new_sqlite().await.unwrap();
 
+        let result = _MigrationModel::objects().all(&test_db.database()).await;
+        assert!(matches!(
+            result,
+            Err(DatabaseError::MigrationError(MigrationEngineError::Custom(
+                _
+            )))
+        ));
+
         #[migration_op]
         async fn application_model(ctx: MigrationContext<'_>) -> Result<()> {
             ApplicationModel::objects().all(ctx.db).await?;

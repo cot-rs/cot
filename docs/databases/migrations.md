@@ -163,7 +163,7 @@ The [`#[migration_op]`](attr@cot::db::migrations::migration_op) macro just takes
 
 #### Using models inside custom operations
 
-When you query a model inside `forwards` or `backwards` operation functions, use the snapshot Model (annotated with `model_type = "migration"` in the migration file), not the live one from your crate (eg. `crate::Product`). Migrations replay in order on every fresh database, so at the point this migration runs, later migrations haven't happened yet. The live model may already have fields the table doesn't have at this stage, which can fail outright, or worse, write bad data without failing at all. The snapshot always matches the table as it actually looked at this point in history.
+When you query a model inside `forwards` or `backwards` operation functions, use the migration Model (annotated with `model_type = "migration"` in the migration file), not the live one from your crate (eg. `crate::Product`). Migrations replay in order on every fresh database, so at the point this migration runs, later migrations haven't happened yet. The live model may already have fields the table doesn't have at this stage, which can fail outright, or worse, write bad data without failing at all. The migration model always matches the table as it actually looked at this point in history.
 
 ## Dependencies
 

@@ -36,7 +36,7 @@ use tracing::debug;
 use crate::error::NotFound;
 use crate::request::{PathParams, Request, RequestExt, RequestHead};
 use crate::response::Response;
-use crate::router::path::{CaptureResult, PathMatcher, ReverseParamMap};
+use crate::router::path::{PathMatcher, PathPart, ReverseParamMap};
 use crate::{Error, ProjectContext, Result};
 
 pub mod method;
@@ -66,6 +66,7 @@ pub struct Router {
     app_name: Option<AppName>,
     urls: Vec<Route>,
     names: HashMap<RouteName, Arc<PathMatcher>>,
+    route_tree: RouteTree,
 }
 
 impl Router {
@@ -102,6 +103,29 @@ impl Router {
     /// ```
     #[must_use]
     pub fn with_urls<T: Into<Vec<Route>>>(urls: T) -> Self {
+        match Self::try_with_urls(urls) {
+            Ok(router) => router,
+            Err(err) => panic!("{err}"),
+        }
+    }
+
+    /// Create a router with the given routes. This is a fallible version
+    /// of [Self::with_urls]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::Request;
+    /// use cot::response::Response;
+    /// use cot::router::{Route, Router};
+    ///
+    /// async fn home(request: Request) -> cot::Result<Response> {
+    ///     unimplemented!()
+    /// }
+    ///
+    /// let router = Router::try_with_urls([Route::with_handler_and_name("/", home, "home")]).unwrap();
+    /// ```
+    pub fn try_with_urls<T: Into<Vec<Route>>>(urls: T) -> Result<Self> {
         let urls = urls.into();
         let mut names = HashMap::new();
 
@@ -110,12 +134,13 @@ impl Router {
                 names.insert(name.clone(), url.url.clone());
             }
         }
-
-        Self {
+        let route_tree = RouteTree::from_routes(&urls)?;
+        Ok(Self {
             app_name: None,
             urls,
             names,
-        }
+            route_tree,
+        })
     }
 
     pub(crate) fn set_app_name(&mut self, app_name: AppName) {
@@ -145,60 +170,7 @@ impl Router {
     }
 
     fn get_handler(&self, request_path: &str) -> Option<HandlerFound<'_>> {
-        for route in &self.urls {
-            if let Some(matches) = route.url.capture(request_path) {
-                let matches_fully = matches.matches_fully();
-
-                match &route.view {
-                    RouteInner::Handler(handler) => {
-                        if matches_fully {
-                            return Some(HandlerFound {
-                                handler: &**handler,
-                                app_name: self.app_name.clone(),
-                                name: route.name.clone(),
-                                params: Self::matches_to_path_params(&matches, Vec::new()),
-                            });
-                        }
-                    }
-                    RouteInner::Router(router) => {
-                        if let Some(result) = router.get_handler(matches.remaining_path) {
-                            return Some(HandlerFound {
-                                handler: result.handler,
-                                app_name: result.app_name.or_else(|| self.app_name.clone()),
-                                name: result.name,
-                                params: Self::matches_to_path_params(&matches, result.params),
-                            });
-                        }
-                    }
-                    #[cfg(feature = "openapi")]
-                    RouteInner::ApiHandler(handler) => {
-                        if matches_fully {
-                            let handler: &(dyn BoxRequestHandler + Send + Sync) = &**handler;
-                            return Some(HandlerFound {
-                                handler,
-                                app_name: self.app_name.clone(),
-                                name: route.name.clone(),
-                                params: Self::matches_to_path_params(&matches, Vec::new()),
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        None
-    }
-
-    fn matches_to_path_params(
-        matches: &CaptureResult<'_, '_>,
-        mut path_params: Vec<(String, String)>,
-    ) -> Vec<(String, String)> {
-        // Adding in reverse order, since we're doing this from the bottom up (we're
-        // going to reverse the order before running the handler)
-        for param in matches.params.iter().rev() {
-            path_params.push((param.name.to_owned(), param.value.clone()));
-        }
-        path_params
+        self.route_tree.find(self, request_path)
     }
 
     /// Handle a request.
@@ -451,6 +423,381 @@ struct NoViewToReverse {
     view_name: String,
 }
 impl_into_cot_error!(NoViewToReverse);
+
+type RouteNodeResult<T> = std::result::Result<T, RouteConflictError>;
+const ERROR_PREFIX: &str = "route conflict error:";
+#[derive(Debug, thiserror::Error)]
+enum RouteConflictError {
+    #[error(
+        "{ERROR_PREFIX} duplicate route: `{new}` conflicts with an already registered handler route `{existing}` \
+         (both fully match the same path)"
+    )]
+    DuplicateHandler { existing: String, new: String },
+
+    #[error(
+        "{ERROR_PREFIX} duplicate nested router: `{new}` conflicts with an already registered \
+         nested router mounted at `{existing}`"
+    )]
+    DuplicateRouter { existing: String, new: String },
+
+    #[error(
+        "{ERROR_PREFIX} conflicting route parameters: `{existing}` uses `{{{existing_name}}}` but `{new}` uses \
+         `{{{new_name}}}` at the same position in the path -- both routes must bind the same \
+         parameter name there, since only one value can be captured at that position"
+    )]
+    ConflictingParamName {
+        existing: String,
+        existing_name: String,
+        new: String,
+        new_name: String,
+    },
+
+    #[error(
+        "{ERROR_PREFIX} conflicting wildcard parameters: `{existing}` uses `{{*{existing_name}}}` but `{new}` \
+         uses `{{*{new_name}}}` at the same position in the path"
+    )]
+    ConflictingWildcardName {
+        existing: String,
+        existing_name: String,
+        new: String,
+        new_name: String,
+    },
+
+    #[error(
+        "{ERROR_PREFIX} duplicate wildcard route: `{new}` conflicts with an already-registered \
+         wildcard route `{existing}`"
+    )]
+    DuplicateWildcard { existing: String, new: String },
+}
+impl_into_cot_error!(RouteConflictError);
+
+#[derive(Debug, Clone)]
+struct RouteTree {
+    root: RouteNode,
+}
+
+impl RouteTree {
+    fn from_routes(routes: &[Route]) -> Result<Self> {
+        let mut tree = Self {
+            root: RouteNode::default(),
+        };
+        for (index, route) in routes.iter().enumerate() {
+            tree.root.insert(route.url.parts(), index, routes)?;
+        }
+
+        Ok(tree)
+    }
+
+    fn find<'a>(&'a self, router: &'a Router, path: &str) -> Option<HandlerFound<'a>> {
+        let mut params = Vec::new();
+        self.root.find(router, path, &mut params)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct RouteNode {
+    prefix: String,
+    static_children: Vec<RouteNode>,
+    param_child: Option<Box<ParamRouteNode>>,
+    wildcard_child: Option<WildcardRouteNode>,
+    handler_route: Option<usize>,
+    router_route: Option<usize>,
+}
+
+impl RouteNode {
+    fn insert(
+        &mut self,
+        parts: &[PathPart],
+        route_index: usize,
+        routes: &[Route],
+    ) -> RouteNodeResult<()> {
+        if let Some((part, rest)) = parts.split_first() {
+            match part {
+                PathPart::Literal(literal) => {
+                    self.insert_static(literal, rest, route_index, routes)
+                }
+                PathPart::Param { name } => self.insert_param(name, rest, route_index, routes),
+                PathPart::Wildcard { name } => {
+                    self.insert_wildcard(name, rest, route_index, routes)
+                }
+            }
+        } else {
+            self.insert_route(route_index, routes)
+        }
+    }
+
+    fn insert_static(
+        &mut self,
+        literal: &str,
+        rest: &[PathPart],
+        route_index: usize,
+        routes: &[Route],
+    ) -> RouteNodeResult<()> {
+        if literal.is_empty() {
+            return self.insert(rest, route_index, routes);
+        }
+
+        for child in &mut self.static_children {
+            let common = common_prefix_len(&child.prefix, literal);
+            if common == 0 {
+                continue;
+            }
+            if common < child.prefix.len() {
+                child.split_at(common);
+            }
+            return if common == literal.len() {
+                child.insert(rest, route_index, routes)
+            } else {
+                child.insert_static(&literal[common..], rest, route_index, routes)
+            };
+        }
+
+        let mut child = Self {
+            prefix: literal.to_string(),
+            ..Self::default()
+        };
+        child.insert(rest, route_index, routes)?;
+        self.static_children.push(child);
+        Ok(())
+    }
+
+    fn insert_param(
+        &mut self,
+        name: &str,
+        rest: &[PathPart],
+        route_index: usize,
+        routes: &[Route],
+    ) -> RouteNodeResult<()> {
+        if let Some(param_child) = &mut self.param_child {
+            if param_child.name != name {
+                return Err(RouteConflictError::ConflictingParamName {
+                    existing: routes[param_child.origin_route].url(),
+                    existing_name: param_child.name.clone(),
+                    new: routes[route_index].url(),
+                    new_name: name.to_string(),
+                });
+            }
+            return param_child.node.insert(rest, route_index, routes);
+        }
+
+        let mut node = RouteNode::default();
+        node.insert(rest, route_index, routes)?;
+        self.param_child = Some(Box::new(ParamRouteNode {
+            name: name.to_string(),
+            node,
+            origin_route: route_index,
+        }));
+        Ok(())
+    }
+
+    fn insert_wildcard(
+        &mut self,
+        name: &str,
+        rest: &[PathPart],
+        route_index: usize,
+        routes: &[Route],
+    ) -> RouteNodeResult<()> {
+        debug_assert!(
+            rest.is_empty(),
+            "wildcard should always be the final segment"
+        );
+
+        if let Some(wildcard_child) = &self.wildcard_child {
+            return Err(if wildcard_child.name != name {
+                RouteConflictError::ConflictingWildcardName {
+                    existing: routes[wildcard_child.route_index].url(),
+                    existing_name: wildcard_child.name.clone(),
+                    new: routes[route_index].url(),
+                    new_name: name.to_string(),
+                }
+            } else {
+                RouteConflictError::DuplicateWildcard {
+                    existing: routes[wildcard_child.route_index].url(),
+                    new: routes[route_index].url(),
+                }
+            });
+        }
+
+        self.wildcard_child = Some(WildcardRouteNode {
+            name: name.to_string(),
+            route_index,
+        });
+        Ok(())
+    }
+
+    fn insert_route(&mut self, route_index: usize, routes: &[Route]) -> RouteNodeResult<()> {
+        match routes[route_index].kind() {
+            RouteKind::Handler => {
+                if let Some(existing) = self.handler_route {
+                    return Err(RouteConflictError::DuplicateHandler {
+                        existing: routes[existing].url(),
+                        new: routes[route_index].url(),
+                    });
+                }
+                self.handler_route = Some(route_index);
+            }
+            RouteKind::Router => {
+                if let Some(existing) = self.router_route {
+                    return Err(RouteConflictError::DuplicateRouter {
+                        existing: routes[existing].url(),
+                        new: routes[route_index].url(),
+                    });
+                }
+                self.router_route = Some(route_index);
+            }
+        }
+        Ok(())
+    }
+
+    fn split_at(&mut self, index: usize) {
+        let child = Self {
+            prefix: self.prefix[index..].to_string(),
+            static_children: std::mem::take(&mut self.static_children),
+            param_child: self.param_child.take(),
+            wildcard_child: self.wildcard_child.take(),
+            handler_route: self.handler_route.take(),
+            router_route: self.router_route.take(),
+        };
+
+        self.prefix.truncate(index);
+        self.static_children.push(child);
+    }
+
+    fn find<'a>(
+        &'a self,
+        router: &'a Router,
+        path: &str,
+        params: &mut Vec<(String, String)>,
+    ) -> Option<HandlerFound<'a>> {
+        if !path.starts_with(&self.prefix) {
+            return None;
+        }
+
+        let remaining_path = &path[self.prefix.len()..];
+        if remaining_path.is_empty()
+            && let Some(found) = self.find_handler_route(router, params)
+        {
+            return Some(found);
+        }
+
+        for child in &self.static_children {
+            let checkpoint = params.len();
+            if let Some(found) = child.find(router, remaining_path, params) {
+                return Some(found);
+            }
+            params.truncate(checkpoint);
+        }
+
+        if let Some(param_child) = &self.param_child {
+            let segment_end = remaining_path.find('/').unwrap_or(remaining_path.len());
+            if segment_end > 0 {
+                let (value, path_after_param) = remaining_path.split_at(segment_end);
+                params.push((param_child.name.clone(), value.to_string()));
+                if let Some(found) = param_child.node.find(router, path_after_param, params) {
+                    return Some(found);
+                }
+                params.pop();
+            }
+        }
+
+        if let Some(wildcard_child) = &self.wildcard_child
+            && !remaining_path.is_empty()
+        {
+            params.push((wildcard_child.name.clone(), remaining_path.to_string()));
+            if let Some(found) =
+                Self::route_to_handler(router, wildcard_child.route_index, "", params)
+            {
+                return Some(found);
+            }
+            params.pop();
+        }
+
+        if let Some(found) = self.find_router_route(router, remaining_path, params) {
+            return Some(found);
+        }
+
+        None
+    }
+
+    fn find_handler_route<'a>(
+        &'a self,
+        router: &'a Router,
+        params: &[(String, String)],
+    ) -> Option<HandlerFound<'a>> {
+        let route_index = self.handler_route?;
+        Self::route_to_handler(router, route_index, "", params)
+    }
+
+    fn find_router_route<'a>(
+        &'a self,
+        router: &'a Router,
+        remaining_path: &str,
+        params: &[(String, String)],
+    ) -> Option<HandlerFound<'a>> {
+        let route_index = self.router_route?;
+        Self::route_to_handler(router, route_index, remaining_path, params)
+    }
+
+    fn route_to_handler<'a>(
+        router: &'a Router,
+        route_index: usize,
+        remaining_path: &str,
+        params: &[(String, String)],
+    ) -> Option<HandlerFound<'a>> {
+        let route = &router.urls[route_index];
+
+        match &route.view {
+            RouteInner::Handler(handler) => Some(HandlerFound {
+                handler: &**handler,
+                app_name: router.app_name.clone(),
+                name: route.name.clone(),
+                params: params.iter().rev().cloned().collect(),
+            }),
+            RouteInner::Router(nested_router) => {
+                nested_router.get_handler(remaining_path).map(|mut result| {
+                    result.app_name = result.app_name.or_else(|| router.app_name.clone());
+                    result.params.extend(params.iter().rev().cloned());
+                    result
+                })
+            }
+            #[cfg(feature = "openapi")]
+            RouteInner::ApiHandler(handler) => {
+                let handler: &(dyn BoxRequestHandler + Send + Sync) = &**handler;
+                Some(HandlerFound {
+                    handler,
+                    app_name: router.app_name.clone(),
+                    name: route.name.clone(),
+                    params: params.iter().rev().cloned().collect(),
+                })
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ParamRouteNode {
+    name: String,
+    node: RouteNode,
+    origin_route: usize,
+}
+
+#[derive(Debug, Clone)]
+struct WildcardRouteNode {
+    name: String,
+    route_index: usize,
+}
+
+fn common_prefix_len(a: &str, b: &str) -> usize {
+    let mut common = 0;
+    for ((a_index, a_char), (b_index, b_char)) in a.char_indices().zip(b.char_indices()) {
+        if a_char != b_char {
+            break;
+        }
+        debug_assert_eq!(a_index, b_index);
+        common = a_index + a_char.len_utf8();
+    }
+    common
+}
 
 #[derive(Debug)]
 struct HandlerFound<'a> {
@@ -1195,6 +1542,274 @@ mod tests {
     }
 
     #[test]
+    fn router_no_param_route_matches_exact_path() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users",
+            MockHandler,
+            "users",
+        )]);
+
+        let found = router.get_handler("/users").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("users".to_string())));
+        assert!(found.params.is_empty());
+    }
+
+    #[test]
+    fn router_no_param_route_rejects_different_path() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users",
+            MockHandler,
+            "users",
+        )]);
+
+        assert!(router.get_handler("/test").is_none());
+    }
+
+    #[test]
+    fn router_param_route_captures_single_segment() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users/{id}",
+            MockHandler,
+            "user_detail",
+        )]);
+
+        let found = router.get_handler("/users/123").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("user_detail".to_string())));
+        assert_params(found.params, &[("id", "123")]);
+    }
+
+    #[test]
+    fn router_param_route_rejects_empty_segment() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users/{id}",
+            MockHandler,
+            "user_detail",
+        )]);
+
+        assert!(router.get_handler("/users/").is_none());
+    }
+
+    #[test]
+    fn router_param_route_rejects_extra_path_for_handler() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users/{id}",
+            MockHandler,
+            "user_detail",
+        )]);
+
+        assert!(router.get_handler("/users/123/abc").is_none());
+    }
+
+    #[test]
+    fn router_multiple_param_route_captures_all_params() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users/{id}/posts/{post_id}",
+            MockHandler,
+            "post_detail",
+        )]);
+
+        let found = router.get_handler("/users/123/posts/456").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("post_detail".to_string())));
+        assert_params(found.params, &[("id", "123"), ("post_id", "456")]);
+    }
+
+    #[test]
+    fn router_escaped_literal_route_matches() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users/{{{{{{escaped}}}}}}",
+            MockHandler,
+            "escaped",
+        )]);
+
+        let found = router.get_handler("/users/{{{escaped}}}").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("escaped".to_string())));
+        assert!(found.params.is_empty());
+    }
+
+    #[test]
+    fn router_non_ascii_literal_route_matches() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/café/{id}",
+            MockHandler,
+            "cafe",
+        )]);
+
+        let found = router.get_handler("/café/123").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("cafe".to_string())));
+        assert_params(found.params, &[("id", "123")]);
+    }
+
+    #[test]
+    fn router_routes_with_common_static_prefixes_match_independently() {
+        let router = Router::with_urls(vec![
+            Route::with_handler_and_name("/car", MockHandler, "car"),
+            Route::with_handler_and_name("/cart", MockHandler, "cart"),
+            Route::with_handler_and_name("/catalog", MockHandler, "catalog"),
+        ]);
+
+        assert_eq!(
+            router.get_handler("/car").unwrap().name,
+            Some(RouteName("car".to_string()))
+        );
+        assert_eq!(
+            router.get_handler("/cart").unwrap().name,
+            Some(RouteName("cart".to_string()))
+        );
+        assert_eq!(
+            router.get_handler("/catalog").unwrap().name,
+            Some(RouteName("catalog".to_string()))
+        );
+        assert!(router.get_handler("/cartographer").is_none());
+    }
+
+    #[test]
+    fn router_static_route_takes_priority_over_dynamic_route() {
+        let router = Router::with_urls(vec![
+            Route::with_handler_and_name("/users/{id}", MockHandler, "dynamic"),
+            Route::with_handler_and_name("/users/new", MockHandler, "static"),
+        ]);
+
+        let found = router.get_handler("/users/new").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("static".to_string())));
+    }
+
+    #[test]
+    fn router_dynamic_route_takes_priority_over_wildcard_route() {
+        let router = Router::with_urls(vec![
+            Route::with_handler_and_name("/files/{name}", MockHandler, "dynamic"),
+            Route::with_handler_and_name("/files/{*path}", MockHandler, "wildcard"),
+        ]);
+
+        let found = router.get_handler("/files/readme").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("dynamic".to_string())));
+        assert_params(found.params, &[("name", "readme")]);
+    }
+
+    #[test]
+    fn router_wildcard_route_captures_remaining_path() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/static/{*path}",
+            MockHandler,
+            "static_asset",
+        )]);
+
+        let found = router.get_handler("/static/css/app.css").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("static_asset".to_string())));
+        assert_eq!(
+            found.params,
+            vec![("path".to_string(), "css/app.css".to_string())]
+        );
+    }
+
+    #[test]
+    fn router_wildcard_route_rejects_empty_remaining_path() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/static/{*path}",
+            MockHandler,
+            "static_asset",
+        )]);
+
+        assert!(router.get_handler("/static/").is_none());
+    }
+
+    #[test]
+    fn router_wildcard_route_is_lower_priority_than_static_route() {
+        let router = Router::with_urls(vec![
+            Route::with_handler_and_name("/static/{*path}", MockHandler, "wildcard"),
+            Route::with_handler_and_name("/static/index.html", MockHandler, "static"),
+        ]);
+
+        let found = router.get_handler("/static/index.html").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("static".to_string())));
+    }
+
+    #[test]
+    fn router_nested_router_consumes_remaining_path() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/posts/{post_id}",
+            MockHandler,
+            "post_detail",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/users/{id}", sub_router)]);
+
+        let found = router.get_handler("/users/123/posts/456").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("post_detail".to_string())));
+        assert_params(found.params, &[("id", "123"), ("post_id", "456")]);
+    }
+
+    #[test]
+    fn router_handler_takes_priority_over_nested_router_at_same_path() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "nested",
+        )]);
+        let router = Router::with_urls(vec![
+            Route::with_router("/users", sub_router),
+            Route::with_handler_and_name("/users", MockHandler, "handler"),
+        ]);
+
+        let found = router.get_handler("/users").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("handler".to_string())));
+    }
+
+    #[test]
+    #[should_panic(expected = "Duplicate handler route at the same path")]
+    fn router_duplicate_handler_routes_panic() {
+        let _ = Router::with_urls(vec![
+            Route::with_handler("/users", MockHandler),
+            Route::with_handler("/users", MockHandler),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Duplicate nested router route at the same path")]
+    fn router_duplicate_nested_router_routes_panic() {
+        let _ = Router::with_urls(vec![
+            Route::with_router("/users", Router::empty()),
+            Route::with_router("/users", Router::empty()),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Conflicting route parameters")]
+    fn router_conflicting_param_names_panic() {
+        let _ = Router::with_urls(vec![
+            Route::with_handler("/foo/{bar}/", MockHandler),
+            Route::with_handler("/foo/{baz}", MockHandler),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Duplicate wildcard route")]
+    fn router_duplicate_wildcard_routes_panic() {
+        let _ = Router::with_urls(vec![
+            Route::with_handler("/static/{*path}", MockHandler),
+            Route::with_handler("/static/{*path}", MockHandler),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Conflicting wildcard route parameters")]
+    fn router_conflicting_wildcard_names_panic() {
+        let _ = Router::with_urls(vec![
+            Route::with_handler("/static/{*path}", MockHandler),
+            Route::with_handler("/static/{*file_path}", MockHandler),
+        ]);
+    }
+
+    #[test]
     fn router_reverse_app_name() {
         let route = Route::with_handler_and_name("/test", MockHandler, "test");
         let mut router_1 = Router::with_urls(vec![route.clone()]);
@@ -1305,5 +1920,15 @@ mod tests {
 
     fn test_request() -> Request {
         TestRequestBuilder::get("/test").build()
+    }
+
+    fn assert_params(mut actual: Vec<(String, String)>, expected: &[(&str, &str)]) {
+        let mut expected = expected
+            .iter()
+            .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+            .collect::<Vec<_>>();
+        actual.sort();
+        expected.sort();
+        assert_eq!(actual, expected);
     }
 }

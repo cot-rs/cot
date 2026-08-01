@@ -9,7 +9,56 @@ use std::fmt::Display;
 
 use cot_core::error::impl_into_cot_error;
 use thiserror::Error;
-use tracing::debug;
+
+const PATH_MATCHER_ERROR_PREFIX: &str = "route conflict error:";
+/// An error produced when parsing a route path pattern fails.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub(super) enum PathMatcherError {
+    /// Two parameters appear consecutively with no literal text between them,
+    #[error("{PATH_MATCHER_ERROR_PREFIX} consecutive parameters are not allowed in pattern `{pattern}` (at position {position})")]
+    #[non_exhaustive]
+    ConsecutiveParams { pattern: String, position: usize },
+
+    /// A `{` was opened but never closed with a matching `}`.
+    #[error("{PATH_MATCHER_ERROR_PREFIX} unclosed parameter `{{{name}` in pattern `{pattern}` -- expected a closing `}}`")]
+    #[non_exhaustive]
+    UnclosedParam { pattern: String, name: String },
+
+    /// A `}` appeared without a preceding `{` to open it.
+    #[error(
+        "{PATH_MATCHER_ERROR_PREFIX} closing brace `}}` without a matching opening `{{` in pattern `{pattern}` \
+         (at position {position})"
+    )]
+    #[non_exhaustive]
+    UnmatchedClosingBrace { pattern: String, position: usize },
+
+    /// A parameter name is empty or contains characters other than
+    /// alphanumerics/underscore, or starts with a digit.
+    #[error(
+        "{PATH_MATCHER_ERROR_PREFIX} invalid parameter name `{name}` in pattern `{pattern}` -- parameter names must start \
+         with a letter or underscore and contain only letters, digits, or underscores"
+    )]
+    #[non_exhaustive]
+    InvalidParamName { pattern: String, name: String },
+
+    /// Same as `InvalidParamName`, but for the name following a `*` in a wildcard segment.
+    #[error(
+        "{PATH_MATCHER_ERROR_PREFIX} invalid wildcard name `{name}` in pattern `{pattern}` -- wildcard names must start \
+         with a letter or underscore and contain only letters, digits, or underscores"
+    )]
+    #[non_exhaustive]
+    InvalidWildcardName { pattern: String, name: String },
+
+    /// A wildcard segment (`{*name}`) was followed by more path segments,
+    #[error(
+        "{PATH_MATCHER_ERROR_PREFIX} wildcard parameter `{{*{name}}}` must be the last segment of pattern `{pattern}` -- \
+         a wildcard consumes the rest of the path, so nothing can follow it"
+    )]
+    #[non_exhaustive]
+    WildcardNotAtEnd { pattern: String, name: String },
+}
+impl_into_cot_error!(PathMatcherError);
 
 #[derive(Debug, Clone)]
 pub(super) struct PathMatcher {
@@ -19,6 +68,13 @@ pub(super) struct PathMatcher {
 impl PathMatcher {
     #[must_use]
     pub(crate) fn new<T: Into<String>>(path_pattern: T) -> Self {
+        match Self::try_new(path_pattern) {
+            Ok(matcher) => matcher,
+            Err(err) => panic!("{err}"),
+        }
+    }
+
+    pub(crate) fn try_new<T: Into<String>>(path_pattern: T) -> Result<Self, PathMatcherError> {
         #[derive(Debug, Copy, Clone)]
         enum State {
             Literal { start: usize },
@@ -43,10 +99,12 @@ impl PathMatcher {
                 (Some('{') | None, State::Literal { start }) => {
                     let literal = &path_pattern[start..index];
                     if literal.is_empty() {
-                        assert!(
-                            index == 0 || ch.is_none(),
-                            "Consecutive parameters are not allowed"
-                        );
+                        if index != 0 && ch.is_some() {
+                            return Err(PathMatcherError::ConsecutiveParams {
+                                pattern: path_pattern.clone(),
+                                position: index,
+                            });
+                        }
                     } else {
                         parts.push(PathPart::Literal(literal.to_string()));
                     }
@@ -57,7 +115,10 @@ impl PathMatcher {
                         // escaped `{`
                         state = State::Literal { start: index };
                     } else {
-                        panic!("Unclosed parameter: `{}`", &path_pattern[start..index]);
+                        return Err(PathMatcherError::UnclosedParam {
+                            pattern: path_pattern.clone(),
+                            name: path_pattern[start..index].to_string(),
+                        });
                     }
                 }
                 (Some('}'), State::Literal { start }) => {
@@ -71,29 +132,56 @@ impl PathMatcher {
                         char_iter.next();
                         state = State::Literal { start: index + 2 };
                     } else {
-                        panic!("Closing brace encountered without opening brace");
+                        return Err(PathMatcherError::UnmatchedClosingBrace {
+                            pattern: path_pattern.clone(),
+                            position: index,
+                        });
                     }
                 }
                 (Some('}'), State::Param { start }) => {
-                    let param_name = &path_pattern[start..index].trim();
-                    assert!(
-                        Self::is_param_name_valid(param_name),
-                        "Invalid parameter name: `{param_name}`"
-                    );
+                    let param_name = path_pattern[start..index].trim();
+                    if let Some(wildcard_name) = param_name.strip_prefix('*') {
+                        if !Self::is_param_name_valid(wildcard_name) {
+                            return Err(PathMatcherError::InvalidWildcardName {
+                                pattern: path_pattern.clone(),
+                                name: wildcard_name.to_string(),
+                            });
+                        }
+                        if char_iter.peek().is_some_and(|(_, next_char)| next_char.is_some()) {
+                            return Err(PathMatcherError::WildcardNotAtEnd {
+                                pattern: path_pattern.clone(),
+                                name: wildcard_name.to_string(),
+                            });
+                        }
 
-                    parts.push(PathPart::Param {
-                        name: (*param_name).to_string(),
-                    });
+                        parts.push(PathPart::Wildcard {
+                            name: wildcard_name.to_string(),
+                        });
+                    } else {
+                        if !Self::is_param_name_valid(param_name) {
+                            return Err(PathMatcherError::InvalidParamName {
+                                pattern: path_pattern.clone(),
+                                name: param_name.to_string(),
+                            });
+                        }
+
+                        parts.push(PathPart::Param {
+                            name: param_name.to_string(),
+                        });
+                    }
                     state = State::Literal { start: index + 1 };
                 }
                 (Some('/') | None, State::Param { start }) => {
-                    panic!("Unclosed parameter: `{}`", &path_pattern[start..index]);
+                    return Err(PathMatcherError::UnclosedParam {
+                        pattern: path_pattern.clone(),
+                        name: path_pattern[start..index].to_string(),
+                    });
                 }
                 _ => {}
             }
         }
 
-        Self { parts }
+        Ok(Self { parts })
     }
 
     fn is_param_name_valid(name: &str) -> bool {
@@ -112,49 +200,13 @@ impl PathMatcher {
         true
     }
 
-    #[must_use]
-    pub(crate) fn capture<'matcher, 'path>(
-        &'matcher self,
-        path: &'path str,
-    ) -> Option<CaptureResult<'matcher, 'path>> {
-        debug!("Matching path `{}` against pattern `{}`", path, self);
-
-        let mut current_path = path;
-        let mut params = Vec::with_capacity(self.param_len());
-        for part in &self.parts {
-            match part {
-                PathPart::Literal(s) => {
-                    if !current_path.starts_with(s) {
-                        return None;
-                    }
-                    current_path = &current_path[s.len()..];
-                }
-                PathPart::Param { name } => {
-                    let next_slash = current_path.find('/');
-                    let value = if let Some(next_slash) = next_slash {
-                        &current_path[..next_slash]
-                    } else {
-                        current_path
-                    };
-                    if value.is_empty() {
-                        return None;
-                    }
-                    params.push(PathParam::new(name, value));
-                    current_path = &current_path[value.len()..];
-                }
-            }
-        }
-
-        Some(CaptureResult::new(params, current_path))
-    }
-
     pub(crate) fn reverse(&self, params: &ReverseParamMap) -> Result<String, ReverseError> {
         let mut result = String::new();
 
         for part in &self.parts {
             match part {
                 PathPart::Literal(s) => result.push_str(s),
-                PathPart::Param { name } => {
+                PathPart::Param { name } | PathPart::Wildcard { name } => {
                     let value = params
                         .get(name)
                         .ok_or_else(|| ReverseError::MissingParam(name.clone()))?;
@@ -166,16 +218,16 @@ impl PathMatcher {
         Ok(result)
     }
 
-    #[must_use]
-    fn param_len(&self) -> usize {
-        self.param_names().count()
-    }
-
+    #[allow(dead_code, reason = "used by OpenAPI route generation")]
     pub(super) fn param_names(&self) -> impl Iterator<Item = &str> {
         self.parts.iter().filter_map(|part| match part {
             PathPart::Literal(..) => None,
-            PathPart::Param { name } => Some(name.as_str()),
+            PathPart::Param { name } | PathPart::Wildcard { name } => Some(name.as_str()),
         })
+    }
+
+    pub(super) fn parts(&self) -> &[PathPart] {
+        &self.parts
     }
 }
 
@@ -265,43 +317,23 @@ macro_rules! reverse_param_map {
     }};
 }
 
-const ERROR_PREFIX: &str = "failed to reverse route:";
+const REVERSE_ERROR_PREFIX: &str = "failed to reverse route:";
 /// An error that occurs when reversing a path with missing parameters.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ReverseError {
     /// A parameter is missing for the reverse operation.
-    #[error("{ERROR_PREFIX} missing parameter for reverse: `{0}`")]
+    #[error("{REVERSE_ERROR_PREFIX} missing parameter for reverse: `{0}`")]
     #[non_exhaustive]
     MissingParam(String),
 }
 impl_into_cot_error!(ReverseError);
 
-#[derive(Debug, PartialEq, Eq)]
-pub(super) struct CaptureResult<'matcher, 'path> {
-    pub(super) params: Vec<PathParam<'matcher>>,
-    pub(super) remaining_path: &'path str,
-}
-
-impl<'matcher, 'path> CaptureResult<'matcher, 'path> {
-    #[must_use]
-    fn new(params: Vec<PathParam<'matcher>>, remaining_path: &'path str) -> Self {
-        Self {
-            params,
-            remaining_path,
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn matches_fully(&self) -> bool {
-        self.remaining_path.is_empty()
-    }
-}
-
 #[derive(Debug, Clone)]
-enum PathPart {
+pub(super) enum PathPart {
     Literal(String),
     Param { name: String },
+    Wildcard { name: String },
 }
 
 impl Display for PathPart {
@@ -312,22 +344,7 @@ impl Display for PathPart {
                 write!(f, "{s}")
             }
             PathPart::Param { name } => write!(f, "{{{name}}}"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct PathParam<'a> {
-    pub(super) name: &'a str,
-    pub(super) value: String,
-}
-
-impl<'a> PathParam<'a> {
-    #[must_use]
-    pub(crate) fn new(name: &'a str, value: &str) -> Self {
-        Self {
-            name,
-            value: value.to_string(),
+            PathPart::Wildcard { name } => write!(f, "{{*{name}}}"),
         }
     }
 }
@@ -345,11 +362,11 @@ mod tests {
     #[test]
     fn path_parser_no_params() {
         let path_parser = PathMatcher::new("/users");
+        assert_eq!(path_parser.to_string(), "/users");
         assert_eq!(
-            path_parser.capture("/users"),
-            Some(CaptureResult::new(vec![], ""))
+            path_parser.param_names().collect::<Vec<_>>(),
+            Vec::<&str>::new()
         );
-        assert_eq!(path_parser.capture("/test"), None);
     }
 
     #[test]
@@ -358,77 +375,59 @@ mod tests {
         let mut params = ReverseParamMap::new();
         params.insert("id", "123");
 
-        assert_eq!(
-            path_parser.capture("/users/123"),
-            Some(CaptureResult::new(vec![PathParam::new("id", "123")], ""))
-        );
         assert_eq!(path_parser.reverse(&params).unwrap(), "/users/123");
         assert_eq!(path_parser.to_string(), "/users/{id}");
+        assert_eq!(path_parser.param_names().collect::<Vec<_>>(), vec!["id"]);
     }
 
     #[test]
     fn path_parser_escaped() {
         let path_parser = PathMatcher::new("/users/{{{{{{escaped}}}}}}");
+        assert_eq!(path_parser.to_string(), "/users/{{{{{{escaped}}}}}}");
         assert_eq!(
-            path_parser.capture("/users/{{{escaped}}}"),
-            Some(CaptureResult::new(vec![], ""))
+            path_parser.reverse(&ReverseParamMap::new()).unwrap(),
+            "/users/{{{escaped}}}"
         );
     }
 
     #[test]
     fn path_parser_single_param() {
         let path_parser = PathMatcher::new("/users/{id}");
-        assert_eq!(
-            path_parser.capture("/users/123"),
-            Some(CaptureResult::new(vec![PathParam::new("id", "123")], ""))
-        );
-        assert_eq!(
-            path_parser.capture("/users/123/"),
-            Some(CaptureResult::new(vec![PathParam::new("id", "123")], "/"))
-        );
-        assert_eq!(
-            path_parser.capture("/users/123/abc"),
-            Some(CaptureResult::new(
-                vec![PathParam::new("id", "123")],
-                "/abc"
-            ))
-        );
-        assert_eq!(path_parser.capture("/users/"), None);
+        assert_eq!(path_parser.to_string(), "/users/{id}");
+        assert_eq!(path_parser.param_names().collect::<Vec<_>>(), vec!["id"]);
     }
 
     #[test]
     fn path_parser_param_whitespace() {
         let path_parser = PathMatcher::new("/users/{ id }");
 
-        assert_eq!(
-            path_parser.capture("/users/123"),
-            Some(CaptureResult::new(vec![PathParam::new("id", "123")], ""))
-        );
+        assert_eq!(path_parser.to_string(), "/users/{id}");
+        assert_eq!(path_parser.param_names().collect::<Vec<_>>(), vec!["id"]);
     }
 
     #[test]
     fn path_parser_multiple_params() {
         let path_parser = PathMatcher::new("/users/{id}/posts/{post_id}");
         assert_eq!(
-            path_parser.capture("/users/123/posts/456"),
-            Some(CaptureResult::new(
-                vec![
-                    PathParam::new("id", "123"),
-                    PathParam::new("post_id", "456"),
-                ],
-                ""
-            ))
+            path_parser.param_names().collect::<Vec<_>>(),
+            vec!["id", "post_id"]
         );
-        assert_eq!(
-            path_parser.capture("/users/123/posts/456/abc"),
-            Some(CaptureResult::new(
-                vec![
-                    PathParam::new("id", "123"),
-                    PathParam::new("post_id", "456"),
-                ],
-                "/abc"
-            ))
-        );
+    }
+
+    #[test]
+    fn path_parser_wildcard() {
+        let path_parser = PathMatcher::new("/static/{*path}");
+        assert_eq!(path_parser.to_string(), "/static/{*path}");
+        assert_eq!(path_parser.param_names().collect::<Vec<_>>(), vec!["path"]);
+    }
+
+    #[test]
+    fn reverse_with_wildcard() {
+        let path_parser = PathMatcher::new("/static/{*path}");
+        let mut params = ReverseParamMap::new();
+        params.insert("path", "css/app.css");
+
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/static/css/app.css");
     }
 
     #[test]
@@ -453,6 +452,18 @@ mod tests {
     #[should_panic(expected = "Invalid parameter name: `abc#$%`")]
     fn path_parser_invalid_name_non_alphanumeric() {
         let _ = PathMatcher::new("/users/{abc#$%}");
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid wildcard name: ``")]
+    fn path_parser_invalid_wildcard_name_empty() {
+        let _ = PathMatcher::new("/users/{*}");
+    }
+
+    #[test]
+    #[should_panic(expected = "Wildcard parameters are only allowed at the end of a route")]
+    fn path_parser_wildcard_not_at_end() {
+        let _ = PathMatcher::new("/users/{*path}/edit");
     }
 
     #[test]

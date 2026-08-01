@@ -102,6 +102,7 @@ impl ModelOpts {
 
         let ty = {
             let mut ty = syn::Type::Path(syn::TypePath {
+                attrs: Vec::new(),
                 qself: None,
                 path: syn::Path::from(self.ident.clone()),
             });

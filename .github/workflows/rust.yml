@@ -49,7 +49,7 @@ jobs:
           cache-bin: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run cargo check
         run: cargo check --all-targets --all-features
@@ -88,10 +88,10 @@ jobs:
           cache-bin: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.4
         with:
           tool: nextest
 
@@ -134,7 +134,7 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run clippy
         run: cargo clippy --no-deps --all-targets -- -D warnings
@@ -163,10 +163,10 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.4
         with:
           tool: nextest
 
@@ -218,7 +218,7 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run the external dependencies
         run: docker compose up -d
@@ -270,7 +270,7 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run fmt
         run: cargo fmt --all -- --check
@@ -323,7 +323,7 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run cargo check with minimal versions
         run: |
@@ -360,7 +360,7 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run cargo check with every combination of features
         run: cargo hack check --feature-powerset --depth 3 --exclude-features db --no-dev-deps
@@ -390,7 +390,7 @@ jobs:
           save-if: 'false'
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.4
         with:
           tool: nextest
 

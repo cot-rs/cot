@@ -142,7 +142,10 @@ pub(super) fn expr_to_tokens(model_name: &syn::Type, expr: Expr) -> TokenStream 
             if let Some(tokens) = non_field_tokens {
                 quote!(#crate_name::db::query::expr::Expr::value(#tokens(#(#args),*)))
             } else {
-                let all_function_names = FieldRefMethod::all_names().collect::<Vec<_>>().join(", ");
+                let all_function_names = FieldRefMethod::all_names()
+                    .map(|name| format!("`{name}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 let msg = format!(
                     "calling functions that reference database fields is unsupported \
                         (only {all_function_names} are supported directly on database fields)"

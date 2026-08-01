@@ -16,12 +16,16 @@ const PATH_MATCHER_ERROR_PREFIX: &str = "route conflict error:";
 #[non_exhaustive]
 pub(super) enum PathMatcherError {
     /// Two parameters appear consecutively with no literal text between them,
-    #[error("{PATH_MATCHER_ERROR_PREFIX} consecutive parameters are not allowed in pattern `{pattern}` (at position {position})")]
+    #[error(
+        "{PATH_MATCHER_ERROR_PREFIX} consecutive parameters are not allowed in pattern `{pattern}` (at position {position})"
+    )]
     #[non_exhaustive]
     ConsecutiveParams { pattern: String, position: usize },
 
     /// A `{` was opened but never closed with a matching `}`.
-    #[error("{PATH_MATCHER_ERROR_PREFIX} unclosed parameter `{{{name}` in pattern `{pattern}` -- expected a closing `}}`")]
+    #[error(
+        "{PATH_MATCHER_ERROR_PREFIX} unclosed parameter `{{{name}` in pattern `{pattern}` -- expected a closing `}}`"
+    )]
     #[non_exhaustive]
     UnclosedParam { pattern: String, name: String },
 
@@ -42,7 +46,8 @@ pub(super) enum PathMatcherError {
     #[non_exhaustive]
     InvalidParamName { pattern: String, name: String },
 
-    /// Same as `InvalidParamName`, but for the name following a `*` in a wildcard segment.
+    /// Same as `InvalidParamName`, but for the name following a `*` in a
+    /// wildcard segment.
     #[error(
         "{PATH_MATCHER_ERROR_PREFIX} invalid wildcard name `{name}` in pattern `{pattern}` -- wildcard names must start \
          with a letter or underscore and contain only letters, digits, or underscores"
@@ -147,7 +152,10 @@ impl PathMatcher {
                                 name: wildcard_name.to_string(),
                             });
                         }
-                        if char_iter.peek().is_some_and(|(_, next_char)| next_char.is_some()) {
+                        if char_iter
+                            .peek()
+                            .is_some_and(|(_, next_char)| next_char.is_some())
+                        {
                             return Err(PathMatcherError::WildcardNotAtEnd {
                                 pattern: path_pattern.clone(),
                                 name: wildcard_name.to_string(),

@@ -538,7 +538,7 @@ impl RouteNode {
         }
 
         for child in &mut self.static_children {
-            let common = common_prefix_len(&child.prefix, literal);
+            let common = common_prefix_len(&child.prefix.as_bytes(), literal.as_bytes());
             if common == 0 {
                 continue;
             }
@@ -787,16 +787,8 @@ struct WildcardRouteNode {
     route_index: usize,
 }
 
-fn common_prefix_len(a: &str, b: &str) -> usize {
-    let mut common = 0;
-    for ((a_index, a_char), (b_index, b_char)) in a.char_indices().zip(b.char_indices()) {
-        if a_char != b_char {
-            break;
-        }
-        debug_assert_eq!(a_index, b_index);
-        common = a_index + a_char.len_utf8();
-    }
-    common
+fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {
+    a.iter().zip(b).take_while(|(a, b)| a == b).count()
 }
 
 #[derive(Debug)]

@@ -19,7 +19,7 @@ Cot compares your current models against the models recorded in the most recent 
 A few things worth knowing about how this works:
 
 * The **app name** for a migration is your crate name by default. You can override it with `--app-name` if you'd like, though in most single-crate projects you'll never need to.
-* Migrations are generated per crate. If you have a Cargo workspace with multiple crates, each one gets its own `migrations` directory and its own independent history. There's currently no way for a migration in one crate to be generated against models living in another crate in the same workspace, that's on the roadmap but not there yet.
+* Migrations are generated per crate. If you have a Cargo workspace with multiple crates, each one gets its own `migrations` directory and its own independent history. There's currently no way for a migration in one crate to be generated against models living in another crate in the same workspace.
 * By default, migrations are written to the `src/migrations/` directory inside your crate. You can point this elsewhere with `--output-dir` if needed.
 
 If you want an empty migration to hand-write yourself (useful for data migrations, or anything that isn't a simple schema change), use:

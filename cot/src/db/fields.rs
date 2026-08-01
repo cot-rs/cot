@@ -10,7 +10,7 @@ use crate::db::impl_postgres::PostgresValueRef;
 use crate::db::impl_sqlite::SqliteValueRef;
 use crate::db::{
     Auto, ColumnType, DatabaseError, DatabaseField, DbFieldValue, DbValue, ForeignKey, FromDbValue,
-    LimitedString, Model, PrimaryKey, Result, SqlxValueRef, ToDbFieldValue, ToDbValue,
+    LimitedString, Model, PrimaryKey, Result, SqlxValueRef, TextField, ToDbFieldValue, ToDbValue,
 };
 
 mod chrono_fields;
@@ -248,6 +248,8 @@ impl_db_field!(Vec<u8>, Blob);
 
 impl_db_field!(Bytes, Blob, with Vec<u8>);
 
+impl TextField for String {}
+
 impl ToDbValue for &str {
     fn to_db_value(&self) -> DbValue {
         (*self).to_string().into()
@@ -332,6 +334,8 @@ impl<const LIMIT: u32> FromDbValue for Option<LimitedString<LIMIT>> {
             .map_err(DatabaseError::value_decode)
     }
 }
+
+impl<const LIMIT: u32> TextField for LimitedString<LIMIT> {}
 
 impl<T: Model + Send + Sync> DatabaseField for ForeignKey<T> {
     const NULLABLE: bool = T::PrimaryKey::NULLABLE;

@@ -21,7 +21,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[cfg(feature = "db")]
-use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
+use crate::db::{
+    ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, TextField, ToDbValue,
+};
 
 // Maximum email length as specified in the RFC 5321
 const MAX_EMAIL_LENGTH: u32 = 254;
@@ -459,6 +461,9 @@ impl DatabaseField for Url {
     const TYPE: ColumnType = ColumnType::Text;
 }
 
+#[cfg(feature = "db")]
+impl TextField for Url {}
+
 /// A validated email address.
 ///
 /// This is a newtype wrapper around [`EmailAddress`] that provides validation
@@ -804,6 +809,9 @@ impl Display for Email {
         f.write_str(self.0.as_str())
     }
 }
+
+#[cfg(feature = "db")]
+impl TextField for Email {}
 
 #[cfg(test)]
 mod tests {

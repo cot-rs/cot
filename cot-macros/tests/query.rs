@@ -1,4 +1,5 @@
-use cot::db::query::{Expr, ExprAdd, ExprDiv, ExprEq, ExprMul, ExprOrd, ExprSub, Query};
+use cot::db::query::Query;
+use cot::db::query::expr::{Expr, ExprAdd, ExprDiv, ExprEq, ExprLike, ExprMul, ExprOrd, ExprSub};
 use cot::db::{model, query};
 
 #[model]
@@ -7,8 +8,10 @@ struct MyModel {
     #[model(primary_key)]
     id: i32,
     name: String,
+    title: String,
     price: i64,
     quantity: i64,
+    valid: bool,
 }
 
 #[test]
@@ -189,7 +192,7 @@ fn test_query_mul_fields() {
     );
 
     assert_eq!(
-        <MyModel as ::cot::db::Model>::objects().filter(::cot::db::query::ExprMul::mul(
+        <MyModel as ::cot::db::Model>::objects().filter(::cot::db::query::expr::ExprMul::mul(
             <MyModel as ::cot::db::Model>::Fields::quantity,
             5i64
         )),
@@ -287,5 +290,137 @@ fn test_query_path_access() {
             constants::ID
         )),
         query!(MyModel, $id == constants::ID)
+    );
+}
+
+#[test]
+fn test_query_string_methods_on_bare_field() {
+    assert_eq!(
+        Query::<MyModel>::new().filter(ExprLike::contains(
+            <MyModel as cot::db::Model>::Fields::name,
+            "foo"
+        )),
+        query!(MyModel, $name.contains("foo"))
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(ExprLike::icontains(
+            <MyModel as cot::db::Model>::Fields::name,
+            "FOO"
+        )),
+        query!(MyModel, $name.icontains("FOO"))
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(ExprLike::starts_with(
+            <MyModel as cot::db::Model>::Fields::name,
+            "foo"
+        )),
+        query!(MyModel, $name.starts_with("foo"))
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(ExprLike::istarts_with(
+            <MyModel as cot::db::Model>::Fields::name,
+            "FOO"
+        )),
+        query!(MyModel, $name.istarts_with("FOO"))
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(ExprLike::ends_with(
+            <MyModel as cot::db::Model>::Fields::name,
+            "bar"
+        )),
+        query!(MyModel, $name.ends_with("bar"))
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(ExprLike::iends_with(
+            <MyModel as cot::db::Model>::Fields::name,
+            "BAR"
+        )),
+        query!(MyModel, $name.iends_with("BAR"))
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(ExprLike::raw_like(
+            <MyModel as cot::db::Model>::Fields::name,
+            "f??o"
+        )),
+        query!(MyModel, $name.raw_like("f??o"))
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(ExprLike::iraw_like(
+            <MyModel as cot::db::Model>::Fields::name,
+            "F??O"
+        )),
+        query!(MyModel, $name.iraw_like("F??O"))
+    );
+}
+
+#[test]
+fn test_query_string_method_composite_receiver_falls_back_to_expr() {
+    assert_eq!(
+        Query::<MyModel>::new().filter(Expr::contains(
+            Expr::add(
+                <MyModel as cot::db::Model>::Fields::quantity.as_expr(),
+                <MyModel as cot::db::Model>::Fields::id.as_expr()
+            ),
+            Expr::value("50")
+        )),
+        query!(MyModel, ($quantity + $id).contains("50"))
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(Expr::ends_with(
+            Expr::add(
+                <MyModel as cot::db::Model>::Fields::quantity.as_expr(),
+                <MyModel as cot::db::Model>::Fields::id.as_expr()
+            ),
+            Expr::value("0")
+        )),
+        query!(MyModel, ($quantity + $id).ends_with("0"))
+    );
+}
+
+#[test]
+fn test_query_string_method_combined_with_boolean_ops() {
+    assert_eq!(
+        Query::<MyModel>::new().filter(Expr::and(
+            ExprLike::contains(<MyModel as cot::db::Model>::Fields::name, "foo"),
+            Expr::gt(
+                <MyModel as cot::db::Model>::Fields::id.as_expr(),
+                Expr::value(0)
+            )
+        )),
+        query!(MyModel, $name.contains("foo") && $id > 0)
+    );
+}
+
+#[test]
+fn test_query_string_method_string_concat_field_refs() {
+    assert_eq!(
+        Query::<MyModel>::new().filter(Expr::contains(
+            Expr::add(
+                <MyModel as cot::db::Model>::Fields::name.as_expr(),
+                <MyModel as cot::db::Model>::Fields::title.as_expr()
+            ),
+            Expr::value("foo")
+        )),
+        query!(MyModel, ($name + $title).contains("foo"))
+    );
+}
+
+#[test]
+fn test_query_string_method_non_field_receiver_call() {
+    let allowed_names = &["foo", "bar"];
+    assert_eq!(
+        Query::<MyModel>::new().filter(Expr::eq(
+            <MyModel as cot::db::Model>::Fields::valid.as_expr(),
+            Expr::value(true)
+        )),
+        query!(MyModel, $valid == allowed_names.contains(&"foo"))
     );
 }

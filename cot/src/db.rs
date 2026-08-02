@@ -599,6 +599,15 @@ impl DatabaseError {
 /// An alias for [`Result`] that uses [`DatabaseError`] as the error type.
 pub type Result<T> = std::result::Result<T, DatabaseError>;
 
+#[expect(missing_docs)]
+#[non_exhaustive]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ModelType {
+    Application,
+    Migration,
+    Internal,
+}
+
 /// A model trait for database models.
 ///
 /// This trait is used to define a model that can be stored in a database.
@@ -656,8 +665,8 @@ pub trait Model: Sized + Send + 'static {
     /// The columns of the model.
     const COLUMNS: &'static [Column];
 
-    #[doc(hidden)]
-    const IS_APPLICATION_MODEL: bool = true;
+    #[expect(missing_docs)]
+    const MODEL_TYPE: ModelType = ModelType::Application;
 
     /// Creates a model instance from a database row.
     ///
@@ -1261,6 +1270,12 @@ pub trait SqlxValueRef<'r>: Sized {
 /// Marker trait for DB field types that behave like texts.
 pub trait TextField: ToDbFieldValue {}
 
+#[derive(Debug, Clone, Copy)]
+enum DatabaseContext {
+    Default,
+    InMigration,
+}
+
 /// A database connection structure that holds the connection to the database.
 ///
 /// It is used to execute queries and interact with the database. The connection
@@ -1269,7 +1284,7 @@ pub trait TextField: ToDbFieldValue {}
 #[derive(Debug, Clone)]
 pub struct Database {
     inner: Arc<DatabaseImpl>,
-    migration_context: bool,
+    context: DatabaseContext,
 }
 
 #[derive(Debug)]
@@ -1332,7 +1347,7 @@ impl Database {
             let inner = DatabaseSqlite::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::Sqlite(inner)),
-                migration_context: false,
+                context: DatabaseContext::Default,
             });
         }
 
@@ -1341,7 +1356,7 @@ impl Database {
             let inner = DatabasePostgres::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::Postgres(inner)),
-                migration_context: false,
+                context: DatabaseContext::Default,
             });
         }
 
@@ -1350,7 +1365,7 @@ impl Database {
             let inner = DatabaseMySql::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::MySql(inner)),
-                migration_context: false,
+                context: DatabaseContext::Default,
             });
         }
 
@@ -1360,20 +1375,20 @@ impl Database {
     fn for_migration(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
-            migration_context: true,
+            context: DatabaseContext::InMigration,
         }
     }
 
     fn ensure_model_allowed<T: Model>(&self) -> Result<()> {
-        if self.migration_context && T::IS_APPLICATION_MODEL {
-            return Err(DatabaseError::MigrationError(
-                migrations::MigrationEngineError::Custom(format!(
+        match (self.context, T::MODEL_TYPE) {
+            (DatabaseContext::InMigration, ModelType::Application) => Err(
+                DatabaseError::MigrationError(migrations::MigrationEngineError::Custom(format!(
                     "application model `{}` cannot be used in migrations; use a migration model",
                     std::any::type_name::<T>()
-                )),
-            ));
+                ))),
+            ),
+            _ => Ok(()),
         }
-        Ok(())
     }
 
     /// Closes the database connection.

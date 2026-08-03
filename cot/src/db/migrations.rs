@@ -532,7 +532,8 @@ impl Operation {
                 forwards,
                 backwards: _,
             } => {
-                let context = MigrationContext::new(database);
+                let database = database.for_migration();
+                let context = MigrationContext::new(&database);
                 forwards(context).await?;
             }
         }
@@ -617,7 +618,8 @@ impl Operation {
                 backwards,
             } => {
                 if let Some(backwards) = backwards {
-                    let context = MigrationContext::new(database);
+                    let database = database.for_migration();
+                    let context = MigrationContext::new(&database);
                     backwards(context).await?;
                 } else {
                     return Err(crate::db::DatabaseError::MigrationError(
@@ -2025,7 +2027,19 @@ mod tests {
     use cot::test::TestDatabase;
 
     use super::*;
-    use crate::db::{ColumnType, DatabaseField, Identifier};
+    use crate::db::{ColumnType, DatabaseError, DatabaseField, Identifier, Model};
+
+    #[model]
+    struct ApplicationModel {
+        #[model(primary_key)]
+        id: i32,
+    }
+
+    #[model(model_type = "migration")]
+    struct _MigrationModel {
+        #[model(primary_key)]
+        id: i32,
+    }
 
     struct TestMigration;
 
@@ -2166,6 +2180,58 @@ mod tests {
 
         let result = test_db.database().raw("SELECT * FROM custom_test").await;
         assert!(result.is_ok());
+    }
+
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+    )]
+    async fn operation_custom_model_access() {
+        let test_db = TestDatabase::new_sqlite().await.unwrap();
+
+        let result = _MigrationModel::objects().all(&test_db.database()).await;
+        assert!(matches!(
+            result,
+            Err(DatabaseError::MigrationError(MigrationEngineError::Custom(
+                _
+            )))
+        ));
+
+        #[migration_op]
+        async fn application_model(ctx: MigrationContext<'_>) -> Result<()> {
+            ApplicationModel::objects().all(ctx.db).await?;
+            Ok(())
+        }
+
+        let result = Operation::custom(application_model)
+            .build()
+            .forwards(&test_db.database())
+            .await;
+        assert!(matches!(
+            result,
+            Err(DatabaseError::MigrationError(MigrationEngineError::Custom(
+                _
+            )))
+        ));
+
+        test_db
+            .database()
+            .raw("CREATE TABLE cot__migration_model (id INTEGER PRIMARY KEY)")
+            .await
+            .unwrap();
+
+        #[migration_op]
+        async fn migration_model(ctx: MigrationContext<'_>) -> Result<()> {
+            _MigrationModel::objects().all(ctx.db).await?;
+            Ok(())
+        }
+
+        Operation::custom(migration_model)
+            .build()
+            .forwards(&test_db.database())
+            .await
+            .unwrap();
     }
 
     #[cot::test]

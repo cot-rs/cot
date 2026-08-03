@@ -419,11 +419,81 @@ pub use cot_macros::model;
 /// let _ = query!(Customer, $status == constants::ACTIVE_STATUS);
 /// let _ = query!(Customer, $id == next_customer_id());
 /// ```
+///
+/// ## String pattern matching
+///
+/// Query expressions support substring, prefix, suffix, and raw
+/// glob-pattern matching on `String` fields, via
+/// [`contains`](cot::db::query::expr::Expr::contains),
+/// [`starts_with`](cot::db::query::expr::Expr::starts_with),
+/// [`ends_with`](cot::db::query::expr::Expr::ends_with), and
+/// [`raw_like`](cot::db::query::expr::Expr::raw_like), along with an
+/// `i`-prefixed case-insensitive counterpart of each
+/// ([`icontains`](cot::db::query::expr::Expr::icontains),
+/// [`istarts_with`](cot::db::query::expr::Expr::istarts_with),
+/// [`iends_with`](cot::db::query::expr::Expr::iends_with),
+/// [`iraw_like`](cot::db::query::expr::Expr::iraw_like)).
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// # }
+/// let _ = query!(Customer, $full_name.contains("Doe"));
+/// let _ = query!(Customer, $full_name.icontains("doe"));
+/// let _ = query!(Customer, $full_name.starts_with("Jon"));
+/// let _ = query!(Customer, $full_name.istarts_with("jon"));
+/// let _ = query!(Customer, $full_name.ends_with("Doe"));
+/// let _ = query!(Customer, $full_name.iends_with("doe"));
+/// ```
+///
+/// `raw_like`/`iraw_like` accept a raw glob pattern (`*` for zero-or-more
+/// characters, `?` for exactly one, `\` to escape a wildcard) rather than
+/// a plain literal, for shapes the other four methods can't express, such
+/// as a fixed-width or middle-of-string match:
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// # }
+/// let _ = query!(Customer, $full_name.raw_like("J?n Do*"));
+/// let _ = query!(Customer, $full_name.iraw_like("j*n ??e"));
+/// ```
+///
+/// These methods can be combined with boolean and comparison operators
+/// like any other expression:
+///
+/// ```
+/// use cot::db::{model, query};
+///
+/// # #[model]
+/// # struct Customer {
+/// #     #[model(primary_key)]
+/// #     id: i32,
+/// #     full_name: String,
+/// #     is_active: bool,
+/// # }
+/// let _ = query!(Customer, $full_name.contains("Doe") && $is_active == true);
+/// ```
+///
+/// See [`Expr::contains`](cot::db::query::expr::Expr::contains) and
+/// [`Expr::raw_like`](cot::db::query::expr::Expr::raw_like) for the full
+/// semantics, escaping rules, and glob pattern syntax.
 pub use cot_macros::query;
 use derive_more::{Debug, Deref, Display};
 #[cfg(test)]
 use mockall::automock;
 use query::Query;
+use query::expr::like::{CaseSensitivity, LikeExprBuilder};
 pub use relations::{ForeignKey, ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy};
 use sea_query::{
     ColumnRef, ExprTrait, Iden, IntoColumnRef, OnConflict, ReturningClause, SchemaStatementBuilder,
@@ -442,6 +512,7 @@ use crate::db::impl_postgres::{DatabasePostgres, PostgresRow, PostgresValueRef};
 #[cfg(feature = "sqlite")]
 use crate::db::impl_sqlite::{DatabaseSqlite, SqliteRow, SqliteValueRef};
 use crate::db::migrations::ColumnTypeMapper;
+use crate::db::query::QueryBuildingError;
 
 const ERROR_PREFIX: &str = "database error:";
 /// An error that can occur when interacting with the database.
@@ -453,7 +524,7 @@ pub enum DatabaseError {
     DatabaseEngineError(#[from] sqlx::Error),
     /// Error when building query.
     #[error("{ERROR_PREFIX} error when building query: {0}")]
-    QueryBuildingError(#[from] sea_query::error::Error),
+    QueryBuildingError(#[from] QueryBuildingError),
     /// Type mismatch in database value.
     #[error(
         "{ERROR_PREFIX} type mismatch in database value: expected `{expected}`, found `{found}`. \
@@ -528,6 +599,15 @@ impl DatabaseError {
 /// An alias for [`Result`] that uses [`DatabaseError`] as the error type.
 pub type Result<T> = std::result::Result<T, DatabaseError>;
 
+#[expect(missing_docs)]
+#[non_exhaustive]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ModelType {
+    Application,
+    Migration,
+    Internal,
+}
+
 /// A model trait for database models.
 ///
 /// This trait is used to define a model that can be stored in a database.
@@ -584,6 +664,9 @@ pub trait Model: Sized + Send + 'static {
 
     /// The columns of the model.
     const COLUMNS: &'static [Column];
+
+    #[expect(missing_docs)]
+    const MODEL_TYPE: ModelType = ModelType::Application;
 
     /// Creates a model instance from a database row.
     ///
@@ -1184,6 +1267,15 @@ pub trait SqlxValueRef<'r>: Sized {
     }
 }
 
+/// Marker trait for DB field types that behave like texts.
+pub trait TextField: ToDbFieldValue {}
+
+#[derive(Debug, Clone, Copy)]
+enum DatabaseContext {
+    Default,
+    InMigration,
+}
+
 /// A database connection structure that holds the connection to the database.
 ///
 /// It is used to execute queries and interact with the database. The connection
@@ -1192,6 +1284,7 @@ pub trait SqlxValueRef<'r>: Sized {
 #[derive(Debug, Clone)]
 pub struct Database {
     inner: Arc<DatabaseImpl>,
+    context: DatabaseContext,
 }
 
 #[derive(Debug)]
@@ -1254,6 +1347,7 @@ impl Database {
             let inner = DatabaseSqlite::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::Sqlite(inner)),
+                context: DatabaseContext::Default,
             });
         }
 
@@ -1262,6 +1356,7 @@ impl Database {
             let inner = DatabasePostgres::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::Postgres(inner)),
+                context: DatabaseContext::Default,
             });
         }
 
@@ -1270,10 +1365,36 @@ impl Database {
             let inner = DatabaseMySql::new(&url).await?;
             return Ok(Self {
                 inner: Arc::new(DatabaseImpl::MySql(inner)),
+                context: DatabaseContext::Default,
             });
         }
 
         panic!("Unsupported database URL: {url}");
+    }
+
+    fn for_migration(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            context: DatabaseContext::InMigration,
+        }
+    }
+
+    fn ensure_model_allowed<T: Model>(&self) -> Result<()> {
+        match (self.context, T::MODEL_TYPE) {
+            (DatabaseContext::InMigration, ModelType::Application) => Err(
+                DatabaseError::MigrationError(migrations::MigrationEngineError::Custom(format!(
+                    "application model `{}` cannot be used in migrations; use a migration model",
+                    std::any::type_name::<T>()
+                ))),
+            ),
+            (DatabaseContext::Default, ModelType::Migration) => Err(DatabaseError::MigrationError(
+                migrations::MigrationEngineError::Custom(format!(
+                    "migration model `{}` cannot be used outside migrations; use an application model",
+                    std::any::type_name::<T>()
+                )),
+            )),
+            _ => Ok(()),
+        }
     }
 
     /// Closes the database connection.
@@ -1345,6 +1466,7 @@ impl Database {
     }
 
     async fn insert_or_update_impl<T: Model>(&self, data: &mut T, update: bool) -> Result<()> {
+        self.ensure_model_allowed::<T>()?;
         let column_identifiers = T::COLUMNS
             .iter()
             .map(|column| Identifier::from(column.name.as_str()));
@@ -1383,7 +1505,8 @@ impl Database {
                     .into_iter()
                     .map(SimpleExpr::Value)
                     .collect::<Vec<_>>(),
-            )?
+            )
+            .map_err(QueryBuildingError::SeaQuery)?
             .or_default_values()
             .to_owned();
         if update && !value_identifiers.is_empty() {
@@ -1451,6 +1574,7 @@ impl Database {
     }
 
     async fn update_impl<T: Model>(&self, data: &mut T) -> Result<()> {
+        self.ensure_model_allowed::<T>()?;
         let column_identifiers = T::COLUMNS
             .iter()
             .map(|column| Identifier::from(column.name.as_str()));
@@ -1531,6 +1655,7 @@ impl Database {
     }
 
     async fn bulk_insert_impl<T: Model>(&self, data: &mut [T], update: bool) -> Result<()> {
+        self.ensure_model_allowed::<T>()?;
         // TODO: add transactions when implemented
 
         if data.is_empty() {
@@ -1647,7 +1772,9 @@ impl Database {
                 .collect();
 
             debug_assert!(!db_values.is_empty(), "expected at least 1 value field");
-            insert_statement.values(db_values)?;
+            insert_statement
+                .values(db_values)
+                .map_err(QueryBuildingError::SeaQuery)?;
         }
 
         if update {
@@ -1741,10 +1868,11 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn query<T: Model>(&self, query: &Query<T>) -> Result<Vec<T>> {
+        self.ensure_model_allowed::<T>()?;
         let columns_to_get: Vec<_> = T::COLUMNS.iter().map(|column| column.name).collect();
         let mut select = sea_query::Query::select();
         select.columns(columns_to_get).from(T::TABLE_NAME);
-        query.add_filter_to_statement(&mut select);
+        query.add_filter_to_statement(&mut select, self)?;
         query.add_limit_to_statement(&mut select);
         query.add_offset_to_statement(&mut select);
 
@@ -1767,10 +1895,11 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn get<T: Model>(&self, query: &Query<T>) -> Result<Option<T>> {
+        self.ensure_model_allowed::<T>()?;
         let columns_to_get: Vec<_> = T::COLUMNS.iter().map(|column| column.name).collect();
         let mut select = sea_query::Query::select();
         select.columns(columns_to_get).from(T::TABLE_NAME);
-        query.add_filter_to_statement(&mut select);
+        query.add_filter_to_statement(&mut select, self)?;
         select.limit(1);
 
         let row = self.fetch_option(&select).await?;
@@ -1794,9 +1923,10 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn exists<T: Model>(&self, query: &Query<T>) -> Result<bool> {
+        self.ensure_model_allowed::<T>()?;
         let mut select = sea_query::Query::select();
         select.expr(sea_query::Expr::value(1)).from(T::TABLE_NAME);
-        query.add_filter_to_statement(&mut select);
+        query.add_filter_to_statement(&mut select, self)?;
         select.limit(1);
 
         let rows = self.fetch_option(&select).await?;
@@ -1816,9 +1946,10 @@ impl Database {
     ///
     /// Can return an error if the database connection is lost.
     pub async fn delete<T: Model>(&self, query: &Query<T>) -> Result<StatementResult> {
+        self.ensure_model_allowed::<T>()?;
         let mut delete = sea_query::Query::delete();
         delete.from_table(T::TABLE_NAME);
-        query.add_filter_to_statement(&mut delete);
+        query.add_filter_to_statement(&mut delete, self)?;
 
         self.execute_statement(&delete).await
     }
@@ -2017,6 +2148,7 @@ impl Database {
         query: &str,
         values: &[&dyn ToDbValue],
     ) -> Result<Vec<T>> {
+        self.ensure_model_allowed::<T>()?;
         let values = values
             .iter()
             .map(ToDbValue::to_db_value)
@@ -2100,6 +2232,24 @@ impl ColumnTypeMapper for Database {
             DatabaseImpl::Postgres(inner) => inner.sea_query_column_type_for(column_type),
             #[cfg(feature = "mysql")]
             DatabaseImpl::MySql(inner) => inner.sea_query_column_type_for(column_type),
+        }
+    }
+}
+
+impl LikeExprBuilder for Database {
+    fn like_expr(
+        &self,
+        lhs: SimpleExpr,
+        glob_pattern: &str,
+        case_sensitivity: CaseSensitivity,
+    ) -> std::result::Result<SimpleExpr, QueryBuildingError> {
+        match &*self.inner {
+            #[cfg(feature = "sqlite")]
+            DatabaseImpl::Sqlite(inner) => inner.like_expr(lhs, glob_pattern, case_sensitivity),
+            #[cfg(feature = "postgres")]
+            DatabaseImpl::Postgres(inner) => inner.like_expr(lhs, glob_pattern, case_sensitivity),
+            #[cfg(feature = "mysql")]
+            DatabaseImpl::MySql(inner) => inner.like_expr(lhs, glob_pattern, case_sensitivity),
         }
     }
 }

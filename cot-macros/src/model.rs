@@ -75,6 +75,7 @@ struct ModelBuilder {
     name: Ident,
     vis: syn::Visibility,
     table_name: String,
+    model_type: ModelType,
     pk_field: Field,
     fields_struct_name: Ident,
     fields_as_columns: Vec<TokenStream>,
@@ -109,6 +110,7 @@ impl ModelBuilder {
             name: model.name.clone(),
             vis: model.vis,
             table_name,
+            model_type: model.model_type,
             pk_field: model.pk_field.clone(),
             fields_struct_name: format_ident!("{}Fields", model.name),
             fields_as_columns: Vec::with_capacity(field_count),
@@ -153,8 +155,8 @@ impl ModelBuilder {
 
         self.fields_as_field_refs.push(quote!(
             #[doc = concat!("Field reference to [`", stringify!(#name), "::", stringify!(#column_name), "`].")]
-            pub const #name: #orm_ident::query::FieldRef<#ty> =
-                #orm_ident::query::FieldRef::<#ty>::new(#orm_ident::Identifier::new(#column_name));
+            pub const #name: #orm_ident::query::expr::FieldRef<#ty> =
+                #orm_ident::query::expr::FieldRef::<#ty>::new(#orm_ident::Identifier::new(#column_name));
         ));
     }
 
@@ -166,6 +168,11 @@ impl ModelBuilder {
         let name = &self.name;
         let app_name = &self.app_name;
         let table_name = &self.table_name;
+        let model_type = match self.model_type {
+            ModelType::Application => quote!(#orm_ident::ModelType::Application),
+            ModelType::Migration => quote!(#orm_ident::ModelType::Migration),
+            ModelType::Internal => quote!(#orm_ident::ModelType::Internal),
+        };
         let fields_struct_name = &self.fields_struct_name;
         let fields_as_columns = &self.fields_as_columns;
         let pk_field_name = &self.pk_field.name;
@@ -185,6 +192,7 @@ impl ModelBuilder {
                 const COLUMNS: &'static [#orm_ident::Column] = &[
                     #(#fields_as_columns,)*
                 ];
+                const MODEL_TYPE: #orm_ident::ModelType = #model_type;
                 const APP_NAME: &'static str = #app_name;
                 const TABLE_NAME: #orm_ident::Identifier = #orm_ident::Identifier::new(#table_name);
                 const PRIMARY_KEY_NAME: #orm_ident::Identifier = #orm_ident::Identifier::new(#pk_column_name);

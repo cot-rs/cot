@@ -12,7 +12,8 @@ use crate::response::{Response, ResponseExt};
 use crate::router::Router;
 use crate::{Body, Error};
 
-/// Redirects missing GET and HEAD paths to a matching route with a trailing slash.
+/// Redirects missing GET and HEAD paths to a matching route with a trailing
+/// slash.
 #[derive(Debug, Clone)]
 pub struct TrailingSlashMiddleware {
     router: Arc<Router>,

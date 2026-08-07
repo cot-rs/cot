@@ -48,8 +48,10 @@
 //! # }
 //! ```
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 
+pub use axum::extract::ConnectInfo;
 use cot_core::error::impl_into_cot_error;
 /// Trait for extractors that consume the request body.
 ///
@@ -295,6 +297,44 @@ impl FromRequestHead for Auth {
     }
 }
 
+/// An extractor for the address of the peer that opened the connection.
+///
+/// This is the other end of the TCP connection, and nothing else. If the
+/// application sits behind a reverse proxy, this is the proxy's address, not
+/// the visitor's — recovering the latter means trusting a header such as
+/// `X-Forwarded-For`, and only the application knows whether the proxy in front
+/// of it can be trusted to set one honestly.
+///
+/// The address is `None` when the request didn't arrive over a socket Cot is
+/// serving, which is usually the case in tests. Insert a [`ConnectInfo`]
+/// extension into the request to set one.
+///
+/// # Examples
+///
+/// ```
+/// use cot::html::Html;
+/// use cot::request::extractors::PeerAddr;
+///
+/// async fn my_handler(PeerAddr(addr): PeerAddr) -> Html {
+///     match addr {
+///         Some(addr) => Html::new(format!("Hello, {}!", addr.ip())),
+///         None => Html::new("Hello, whoever you are!"),
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PeerAddr(pub Option<SocketAddr>);
+
+impl FromRequestHead for PeerAddr {
+    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+        Ok(Self(
+            head.extensions
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|ConnectInfo(addr)| *addr),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use cot_core::Method;
@@ -333,6 +373,27 @@ mod tests {
 
         assert_eq!(method, Method::GET);
     }
+
+    #[cot::test]
+    async fn peer_addr_extraction() {
+        let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+        let mut request = TestRequestBuilder::get("/test/").build();
+        request.extensions_mut().insert(ConnectInfo(addr));
+
+        let peer_addr: PeerAddr = request.extract_from_head().await.unwrap();
+
+        assert_eq!(peer_addr, PeerAddr(Some(addr)));
+    }
+
+    #[cot::test]
+    async fn peer_addr_extraction_without_connect_info() {
+        let mut request = TestRequestBuilder::get("/test/").build();
+
+        let peer_addr: PeerAddr = request.extract_from_head().await.unwrap();
+
+        assert_eq!(peer_addr, PeerAddr(None));
+    }
+
     #[cot::test]
     async fn request_form() {
         #[derive(Debug, PartialEq, Eq, Form)]

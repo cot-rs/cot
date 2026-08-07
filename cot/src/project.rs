@@ -21,6 +21,7 @@
 //! }
 //! ```
 use std::future::poll_fn;
+use std::net::SocketAddr;
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -2205,10 +2206,14 @@ pub async fn run_at_with_shutdown(
         };
         std::panic::set_hook(Box::new(new_hook));
     }
-    axum::serve(listener, handler.into_make_service())
-        .with_graceful_shutdown(shutdown_signal)
-        .await
-        .map_err(StartServerError)?;
+    // with_connect_info so that the `PeerAddr` extractor can see who connected
+    axum::serve(
+        listener,
+        handler.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal)
+    .await
+    .map_err(StartServerError)?;
     if register_panic_hook {
         let _ = std::panic::take_hook();
     }

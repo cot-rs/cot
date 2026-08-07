@@ -58,8 +58,8 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       matrix:
-        rust: [stable, nightly, MSRV]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [ stable, nightly, MSRV ]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
         include:
           - rust: stable
             version: *rust_stable
@@ -71,7 +71,7 @@ jobs:
     name: Build & test
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.rust == 'nightly' }}
-    needs: ["check"]
+    needs: [ "check" ]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -89,6 +89,10 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          # Pinned: sccache >= 0.17.0 expands rustc @argfiles and breaks Windows'
+          # 32K command line limit: https://github.com/mozilla/sccache/issues/2397
+          version: "v0.16.0"
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2.85.4
@@ -115,7 +119,7 @@ jobs:
 
     name: Clippy lint checks
     runs-on: ubuntu-latest
-    needs: ["check"]
+    needs: [ "check" ]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -144,7 +148,7 @@ jobs:
 
     name: Test with external dependencies
     runs-on: ubuntu-latest
-    needs: ["check"]
+    needs: [ "check" ]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -187,7 +191,7 @@ jobs:
 
     name: Test coverage checks
     runs-on: ubuntu-latest
-    needs: ["build"]
+    needs: [ "build" ]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -250,7 +254,7 @@ jobs:
 
     name: Code formatting checks
     runs-on: ubuntu-latest
-    needs: ["check"]
+    needs: [ "check" ]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -280,7 +284,7 @@ jobs:
 
     name: Machete dependencies checks
     runs-on: ubuntu-latest
-    needs: ["check"]
+    needs: [ "check" ]
     env:
       RUSTC_WRAPPER: ""
       SCCACHE_GHA_ENABLED: ""
@@ -301,7 +305,7 @@ jobs:
 
     name: Minimal dependency versions build
     runs-on: ubuntu-latest
-    needs: ["check"]
+    needs: [ "check" ]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -339,7 +343,7 @@ jobs:
 
     name: Build with each feature combination
     runs-on: ubuntu-latest
-    needs: ["check"]
+    needs: [ "check" ]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -370,7 +374,7 @@ jobs:
 
     name: Miri test
     runs-on: ubuntu-latest
-    needs: ["build"]
+    needs: [ "build" ]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7

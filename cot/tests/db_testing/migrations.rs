@@ -195,6 +195,7 @@ async fn test_migration_engine_rollback_single_app(test_db: &mut TestDatabase) {
 
     insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
         insta::assert_snapshot!(
+            "migration_engine_rollback_single_app_dry_run",
             dry_run_output,
         );
     });
@@ -208,7 +209,7 @@ async fn test_migration_engine_rollback_single_app(test_db: &mut TestDatabase) {
     )
     .await;
     insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
-        insta::assert_snapshot!(rollback_output);
+        insta::assert_snapshot!("migration_engine_rollback_single_app_rollback", rollback_output);
     });
 
     assert_migrations_applied(
@@ -265,6 +266,7 @@ async fn test_migration_rollback_unrelated_apps(test_db: &mut TestDatabase) {
 
     insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
         insta::assert_snapshot!(
+            "migration_rollback_unrelated_apps_dry_run",
             dry_run_output,
         );
     });
@@ -278,7 +280,7 @@ async fn test_migration_rollback_unrelated_apps(test_db: &mut TestDatabase) {
     )
     .await;
     insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
-        insta::assert_snapshot!(rollback_output);
+        insta::assert_snapshot!("migration_rollback_unrelated_apps_rollback", rollback_output);
     });
 
     assert_migrations_applied(
@@ -335,6 +337,7 @@ async fn test_migration_engine_rollback_includes_dependent_apps(test_db: &mut Te
 
     insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
         insta::assert_snapshot!(
+            "migration_engine_rollback_includes_dependent_apps_dry_run",
             dry_run_output,
         );
     });
@@ -348,7 +351,10 @@ async fn test_migration_engine_rollback_includes_dependent_apps(test_db: &mut Te
     )
     .await;
     insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
-        insta::assert_snapshot!(rollback_output);
+        insta::assert_snapshot!(
+            "migration_engine_rollback_includes_dependent_apps_rollback",
+            rollback_output
+        );
     });
 
     assert_migrations_applied(
@@ -401,6 +407,7 @@ async fn test_migration_engine_rollback_zero(test_db: &mut TestDatabase) {
 
     insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
         insta::assert_snapshot!(
+            "migration_engine_rollback_zero_dry_run",
             dry_run_output,
         );
     });
@@ -414,7 +421,7 @@ async fn test_migration_engine_rollback_zero(test_db: &mut TestDatabase) {
     )
     .await;
     insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
-        insta::assert_snapshot!(rollback_output);
+        insta::assert_snapshot!("migration_engine_rollback_zero_rollback", rollback_output);
     });
 
     assert_migrations_applied(

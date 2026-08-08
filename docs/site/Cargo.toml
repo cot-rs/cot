@@ -8,4 +8,4 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 cot = { version = "0.7", default-features = false }
-cot-site = { git = "https://github.com/cot-rs/cot-site.git", rev = "07ef835b426c9d0ce58f68113b2a7c263bd54b8d" }
+cot-site = { git = "https://github.com/cot-rs/cot-site.git", rev = "6c68a1b02d8aaba99eca6828101d77b55a0894f5" }

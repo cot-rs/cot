@@ -255,7 +255,7 @@ This defines the project and sets the CLI metadata (like the name, version, and 
 This registers all the apps that your project is using.
 
 ```rust
-# use cot::middleware::LiveReloadMiddleware;
+# use cot::middleware::CommonMiddleware;
 # struct CotTutorialProject;
 # impl Project for CotTutorialProject {
     fn middlewares(
@@ -264,14 +264,13 @@ This registers all the apps that your project is using.
         context: &MiddlewareContext,
     ) -> RootHandler {
         handler
-            .middleware(StaticFilesMiddleware::from_context(context))
-            .middleware(LiveReloadMiddleware::from_context(context))
+            .middleware(CommonMiddleware::from_context(context))
             .build()
     }
 # }
 ```
 
-This registers the middlewares that will be applied to all routes in the project. Note that the [`LiveReloadMiddleware`](struct@cot::middleware::LiveReloadMiddleware) may be dynamically disabled in runtime using config!
+This registers the default middlewares that will be applied to all routes in the project. Each child middleware in [`CommonMiddleware`](struct@cot::middleware::CommonMiddleware) may be disabled in runtime using config.
 
 ```rust,has_main
 # use cot::Project;

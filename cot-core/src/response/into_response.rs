@@ -388,8 +388,8 @@ impl IntoResponse for Body {
 impl IntoResponse for Redirect {
     fn into_response(self) -> crate::Result<Response> {
         let response = http::Response::builder()
-            .status(StatusCode::SEE_OTHER)
-            .header(http::header::LOCATION, self.0)
+            .status(self.status_code())
+            .header(http::header::LOCATION, self.location())
             .body(Body::empty())
             .expect(RESPONSE_BUILD_FAILURE);
         Ok(response)

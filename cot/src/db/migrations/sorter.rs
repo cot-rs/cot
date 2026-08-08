@@ -61,11 +61,11 @@ impl<'a, T: DynMigration> MigrationSorter<'a, T> {
         Ok(())
     }
 
-    fn toposort(&mut self) -> Result<()> {
-        let lookup = Self::create_lookup_table(self.migrations)?;
-        let mut graph = Graph::new(self.migrations.len());
+    pub(super) fn generate_graph(migrations: &[T]) -> Result<Graph> {
+        let lookup = Self::create_lookup_table(migrations)?;
+        let mut graph = Graph::new(migrations.len());
 
-        for (index, migration) in self.migrations.iter().enumerate() {
+        for (index, migration) in migrations.iter().enumerate() {
             for dependency in migration.dependencies() {
                 let dependency_index = lookup
                     .get(&MigrationLookup::from(dependency))
@@ -73,6 +73,12 @@ impl<'a, T: DynMigration> MigrationSorter<'a, T> {
                 graph.add_edge(*dependency_index, index);
             }
         }
+
+        Ok(graph)
+    }
+
+    fn toposort(&mut self) -> Result<()> {
+        let mut graph = Self::generate_graph(self.migrations)?;
 
         let mut sorted_indices = graph.toposort()?;
         apply_permutation(self.migrations, &mut sorted_indices);

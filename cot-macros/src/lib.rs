@@ -82,6 +82,24 @@ pub fn query(input: TokenStream) -> TokenStream {
     query_to_tokens(query_input).into()
 }
 
+/// An attribute macro that runs a test against every supported database
+/// backend.
+///
+/// The annotated function is expanded into three `#[cot::test]` functions -
+/// `*_sqlite`, `*_postgres`, and `*_mysql` - with the PostgreSQL and MySQL
+/// variants `#[ignore]`d by default.
+///
+/// # Snapshot tests
+///
+/// Each variant nests its own copy of the annotated function, so `insta`
+/// derives the *same* snapshot name for all three of them. Whenever the test
+/// binary runs in a single process (`cargo test`, and therefore
+/// `cargo llvm-cov`), `insta`'s process-global counter then hands out `-2`,
+/// `-3`, ... suffixes across backends in a thread-dependent order.
+///
+/// Always pass an explicit snapshot name - `insta::assert_snapshot!("name",
+/// value)` - instead of relying on the derived one. All backends produce the
+/// same output, so they can share a single snapshot file.
 #[proc_macro_attribute]
 pub fn dbtest(_args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_input = parse_macro_input!(input as ItemFn);

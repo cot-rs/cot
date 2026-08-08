@@ -9,9 +9,17 @@ help: the trait `ApiOperationResponse` is not implemented for `Dummy`
   |
 8 | struct Dummy;
   | ^^^^^^^^^^^^
-  = help: the following other types implement trait `ApiOperationResponse`:
-            Json<S>
-            MyResponse
-            Result<T, E>
-            Result<cot::http::Response<Body>, cot::Error>
-            WithExtension<T, D>
+help: the following other types implement trait `ApiOperationResponse`
+ --> tests/ui/derive_api_operation_response_missing_trait_impl.rs:3:10
+  |
+3 | #[derive(ApiOperationResponse)]
+  |          ^^^^^^^^^^^^^^^^^^^^ `MyResponse`
+  |
+ ::: $WORKSPACE/cot/src/openapi.rs
+  |
+  | impl<S: JsonSchema> ApiOperationResponse for Json<S> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Json<S>`
+...
+  | impl<T: ApiOperationResponse, D> ApiOperationResponse for WithExtension<T, D> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `WithExtension<T, D>`
+  = note: this error originates in the derive macro `ApiOperationResponse` (in Nightly builds, run with -Z macro-backtrace for more info)

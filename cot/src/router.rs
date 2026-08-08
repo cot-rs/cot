@@ -189,6 +189,10 @@ impl Router {
         None
     }
 
+    pub(crate) fn has_route(&self, request_path: &str) -> bool {
+        self.get_handler(request_path).is_some()
+    }
+
     fn matches_to_path_params(
         matches: &CaptureResult<'_, '_>,
         mut path_params: Vec<(String, String)>,

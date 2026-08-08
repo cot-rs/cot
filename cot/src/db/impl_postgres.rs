@@ -5,9 +5,10 @@ use sea_query::extension::postgres::PgExpr;
 use sea_query::{ExprTrait, LikeExpr, SimpleExpr};
 
 use crate::db::query::expr::like::{CaseSensitivity, LikeExprBuilder, to_sql_like};
-use crate::db::sea_query_db::impl_sea_query_db_backend;
+use crate::db::sea_query_db::{impl_sea_query_db_backend, impl_sea_query_transaction_backend};
 
 impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::postgres::PgPool, PostgresRow, PostgresValueRef, sea_query::PostgresQueryBuilder);
+impl_sea_query_transaction_backend!(DatabasePostgres, TransactionPostgres: sqlx::postgres::Postgres, PostgresRow, sea_query::PostgresQueryBuilder);
 
 impl DatabasePostgres {
     #[expect(clippy::unused_async)]
@@ -55,12 +56,25 @@ impl LikeExprBuilder for DatabasePostgres {
         glob_pattern: &str,
         case_sensitivity: CaseSensitivity,
     ) -> Result<SimpleExpr, QueryBuildingError> {
-        let glob = LikeExpr::new(to_sql_like(glob_pattern));
+        build_like_expr(lhs, glob_pattern, case_sensitivity)
+    }
+}
 
-        match case_sensitivity {
-            CaseSensitivity::Sensitive => Ok(lhs.like(glob)),
-            CaseSensitivity::Insensitive => Ok(lhs.ilike(glob)),
-        }
+/// Builds the PostgreSQL pattern-matching expression for the given case
+/// sensitivity. Shared between the connection and transaction backends.
+// Returns `Result` to match the fallible `LikeExprBuilder::like_expr` contract,
+// even though this backend can always express the pattern.
+#[expect(clippy::unnecessary_wraps)]
+pub(crate) fn build_like_expr(
+    lhs: SimpleExpr,
+    glob_pattern: &str,
+    case_sensitivity: CaseSensitivity,
+) -> Result<SimpleExpr, QueryBuildingError> {
+    let glob = LikeExpr::new(to_sql_like(glob_pattern));
+
+    match case_sensitivity {
+        CaseSensitivity::Sensitive => Ok(lhs.like(glob)),
+        CaseSensitivity::Insensitive => Ok(lhs.ilike(glob)),
     }
 }
 

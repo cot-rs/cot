@@ -32,6 +32,7 @@ use crate::session::store::redis::RedisStore;
 
 #[cfg(feature = "live-reload")]
 mod live_reload;
+mod trailing_slash;
 
 /// Middleware that converts any error type to [`Error`].
 ///
@@ -98,6 +99,7 @@ pub use cot_core::middleware::IntoCotResponseLayer;
 pub use cot_core::middleware::{IntoCotError, IntoCotResponse};
 #[cfg(feature = "live-reload")]
 pub use live_reload::LiveReloadMiddleware;
+pub use trailing_slash::{TrailingSlashMiddleware, TrailingSlashService};
 
 type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;
 

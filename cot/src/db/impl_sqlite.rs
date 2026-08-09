@@ -8,9 +8,10 @@ use crate::db::query::QueryBuildingError;
 use crate::db::query::expr::like::{
     CaseSensitivity, LIKE_ESCAPE_CHAR, LikeExprBuilder, to_sql_like,
 };
-use crate::db::sea_query_db::impl_sea_query_db_backend;
+use crate::db::sea_query_db::{impl_sea_query_db_backend, impl_sea_query_transaction_backend};
 
 impl_sea_query_db_backend!(DatabaseSqlite: sqlx::sqlite::Sqlite, sqlx::sqlite::SqlitePool, SqliteRow, SqliteValueRef, sea_query::SqliteQueryBuilder);
+impl_sea_query_transaction_backend!(DatabaseSqlite, TransactionSqlite: sqlx::sqlite::Sqlite, SqliteRow, sea_query::SqliteQueryBuilder);
 
 impl DatabaseSqlite {
     async fn init(&self) -> crate::db::Result<()> {
@@ -49,16 +50,29 @@ impl LikeExprBuilder for DatabaseSqlite {
         glob_pattern: &str,
         case_sensitivity: CaseSensitivity,
     ) -> Result<SimpleExpr, QueryBuildingError> {
-        match case_sensitivity {
-            CaseSensitivity::Sensitive => {
-                let glob = to_sqlite_glob(glob_pattern);
-                Ok(lhs.glob(glob))
-            }
-            CaseSensitivity::Insensitive => {
-                let like = LikeExpr::new(to_sql_like(&glob_pattern.to_lowercase()))
-                    .escape(LIKE_ESCAPE_CHAR);
-                Ok(sea_query::Func::lower(lhs).like(like))
-            }
+        build_like_expr(lhs, glob_pattern, case_sensitivity)
+    }
+}
+
+/// Builds the SQLite pattern-matching expression for the given case
+/// sensitivity. Shared between the connection and transaction backends.
+// Returns `Result` to match the fallible `LikeExprBuilder::like_expr` contract,
+// even though this backend can always express the pattern.
+#[expect(clippy::unnecessary_wraps)]
+pub(crate) fn build_like_expr(
+    lhs: SimpleExpr,
+    glob_pattern: &str,
+    case_sensitivity: CaseSensitivity,
+) -> Result<SimpleExpr, QueryBuildingError> {
+    match case_sensitivity {
+        CaseSensitivity::Sensitive => {
+            let glob = to_sqlite_glob(glob_pattern);
+            Ok(lhs.glob(glob))
+        }
+        CaseSensitivity::Insensitive => {
+            let like =
+                LikeExpr::new(to_sql_like(&glob_pattern.to_lowercase())).escape(LIKE_ESCAPE_CHAR);
+            Ok(sea_query::Func::lower(lhs).like(like))
         }
     }
 }

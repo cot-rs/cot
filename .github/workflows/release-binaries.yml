@@ -2,7 +2,7 @@ name: Release binaries
 
 on:
   release:
-    types: [published]
+    types: [created]
 
 permissions:
   contents: read
@@ -50,4 +50,6 @@ jobs:
           package: cot-cli
           target: ${{ matrix.target }}
           archive: cot-cli-$target
+          include: LICENSE-APACHE,LICENSE-MIT
+          checksum: sha256
           locked: true

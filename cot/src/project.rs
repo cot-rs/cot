@@ -60,6 +60,7 @@ use crate::error::UncaughtPanic;
 use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
 use crate::error_page::Diagnostics;
 use crate::html::Html;
+use crate::metadata::{METADATA_FLAG, ProjectMetadata};
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
@@ -939,8 +940,9 @@ impl Bootstrapper<Uninitialized> {
         cli.set_metadata(self.project.cli_metadata());
         self.project.register_tasks(&mut cli);
 
-        if std::env::args().any(|arg| arg == cot::metadata::METADATA_FLAG) {
-            let meta = cot::metadata::extract(cli.command());
+        if std::env::args().any(|arg| arg == METADATA_FLAG) {
+            let meta = ProjectMetadata::from(cli.command());
+
             println!("{}", serde_json::to_string_pretty(&meta).unwrap());
             std::process::exit(0);
         }

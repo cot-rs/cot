@@ -157,6 +157,7 @@ tracing-subscriber = "0.3"
 tracing-test = "0.2"
 trybuild = { version = "1", features = ["diff"] }
 url = "2"
+wait-timeout = { version = "0.2", default-features = false }
 
 [profile.dev.package]
 insta.opt-level = 3

@@ -20,9 +20,10 @@ Options:
       --name <NAME>          Set the resulting crate name [default: the directory name]
       --release              Use target/release instead of target/debug when looking for the project
                              binary
-  -p, --package <PACKAGE>    Package to use, in case you're running this in a workspace
+      --build                Build the binary if it does not exist
       --use-git              Use the latest `cot` version from git instead of a published crate
       --cot-path <COT_PATH>  Use `cot` from the specified path instead of a published crate
+  -p, --package <PACKAGE>    Package to use, in case you're running this in a workspace
   -v, --verbose...           Increase logging verbosity
   -q, --quiet...             Decrease logging verbosity
   -h, --help                 Print help

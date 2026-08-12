@@ -42,7 +42,8 @@ syn.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 serde = { workspace = true, features = ["derive"] }
-serde_json = {workspace = true}
+serde_json = { workspace = true}
+wait-timeout = { workspace = true }
 
 [dev-dependencies]
 cot-cli = { path = ".", features = ["test_utils"] }

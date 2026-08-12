@@ -30,6 +30,7 @@ _cot() {
 '-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -55,6 +56,7 @@ _arguments "${_arguments_options[@]}" : \
 '--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--use-git[Use the latest \`cot\` version from git instead of a published crate]' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -69,6 +71,7 @@ _arguments "${_arguments_options[@]}" : \
 '-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -90,6 +93,7 @@ _arguments "${_arguments_options[@]}" : \
 '-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -106,6 +110,7 @@ _arguments "${_arguments_options[@]}" : \
 '-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -121,6 +126,7 @@ _arguments "${_arguments_options[@]}" : \
 '-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -172,6 +178,7 @@ _arguments "${_arguments_options[@]}" : \
 '-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -197,6 +204,7 @@ _arguments "${_arguments_options[@]}" : \
 '-c[Create the directory if it doesn'\''t exist]' \
 '--create[Create the directory if it doesn'\''t exist]' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \
@@ -210,6 +218,7 @@ _arguments "${_arguments_options[@]}" : \
 '-p+[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--package=[Package to use, in case you'\''re running this in a workspace]:PACKAGE:_default' \
 '--release[Use target/release instead of target/debug when looking for the project binary]' \
+'--build[Build the binary if it does not exist]' \
 '*-v[Increase logging verbosity]' \
 '*--verbose[Increase logging verbosity]' \
 '(-v --verbose)*-q[Decrease logging verbosity]' \

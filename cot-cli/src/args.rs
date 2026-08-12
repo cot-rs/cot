@@ -9,6 +9,8 @@ pub const PACKAGE_SHORT_FLAG: &str = "-p";
 pub const RELEASE_FLAG: &str = "--release";
 pub const HELP_LONG_FLAG: &str = "--help";
 pub const HELP_SHORT_FLAG: &str = "-h";
+pub const BINARY_FLAG: &str = "--bin";
+pub const BUILD_FLAG: &str = "--build";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -22,6 +24,9 @@ pub struct Cli {
     /// binary
     #[arg(long, global = true)]
     release: bool,
+    /// Build the binary if it does not exist
+    #[arg(long, global = true)]
+    build: bool,
     /// Package to use, in case you're running this in a workspace
     #[arg(short = 'p', long, global = true, value_name = "PACKAGE")]
     pub package: Option<String>,
@@ -67,6 +72,9 @@ pub enum MigrationCommands {
     Make(MigrationMakeArgs),
     /// Create a new empty migration
     New(MigrationNewArgs),
+    /// External migration subcommands shipped with the cot binary
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 #[derive(Debug, Args)]
@@ -139,7 +147,7 @@ pub struct CompletionsArgs {
 
 /// Pulls `-p <name>` / `--package <name>` / `--package=<name>` out of raw
 /// argv, before clap has parsed anything. Needed because `project::load`
-/// must run before `Cli::parse()` for the `--help` interception path.
+/// must run before `Cli::parse` for the `--help` interception path.
 #[must_use]
 pub fn extract_package_arg(raw: &[String]) -> Option<String> {
     let mut iter = raw.iter();

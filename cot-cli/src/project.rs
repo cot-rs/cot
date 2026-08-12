@@ -142,8 +142,6 @@ fn build_binary(package_name: &str, binary_name: &str, release: bool) -> anyhow:
         cmd.arg(RELEASE_FLAG);
     }
 
-    // Inherit stdio so the user sees cargo's normal build output and any
-    // compile errors directly — we don't want to capture/reformat that.
     let status = cmd.status().context("failed to spawn `cargo build`")?;
 
     anyhow::ensure!(
@@ -292,6 +290,13 @@ fn load_or_refresh_metadata(
     }
 
     // slow path
+    // Both stderr and stdout are piped, to avoid deadlock. Pipe buffers
+    // are a fixed OS size, so if the child fills one while we're still
+    // waiting to read the other, its write call blocks and it can never
+    // finish producing output (or exit) for us to read. To avoid this we
+    // drain stdout and stderr on separate threads concurrently.
+    // https://doc.rust-lang.org/std/process/index.html#handling-io
+    // https://docs.rs/os_pipe/latest/os_pipe/#common-deadlocks-related-to-pipes
     let mut child = std::process::Command::new(binary_path)
         .arg(METADATA_FLAG)
         .stdout(Stdio::piped())

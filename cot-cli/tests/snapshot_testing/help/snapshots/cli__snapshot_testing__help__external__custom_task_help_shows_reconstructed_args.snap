@@ -1,0 +1,17 @@
+---
+source: cot-cli/tests/snapshot_testing/help/external.rs
+info:
+  program: cot
+  args:
+    - frobnicate
+    - "--help"
+---
+success: false
+exit_code: 101
+----- stdout -----
+
+----- stderr -----
+
+thread 'main' (6739824) panicked at /Users/eli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.5/src/builder/debug_asserts.rs:746:9:
+Argument 'target' is positional and it must take a value but action is SetTrue
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

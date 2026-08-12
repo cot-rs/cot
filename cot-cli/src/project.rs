@@ -528,7 +528,7 @@ edition = "2024"
     fn load_returns_none_without_cargo_manifest() {
         let temp_dir = TempDir::new().unwrap();
 
-        let result = load(temp_dir.path(), false, None, false).unwrap();
+        let result = load(temp_dir.path(), false, None, true).unwrap();
 
         assert!(result.is_none());
     }
@@ -537,7 +537,7 @@ edition = "2024"
     fn load_errors_when_start_path_does_not_exist() {
         let temp_dir = TempDir::new().unwrap();
 
-        let result = load(&temp_dir.path().join("missing"), false, None, false);
+        let result = load(&temp_dir.path().join("missing"), false, None, true);
 
         assert!(result.is_err());
         assert!(
@@ -566,7 +566,7 @@ edition = "2024"
         let binary_path = temp_dir.path().join("target/debug/demo");
         write_metadata_script(&binary_path, &metadata("demo", &["serve"]));
 
-        let project = load(temp_dir.path(), false, None, false).unwrap().unwrap();
+        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
         assert!(project.metadata.is_some());
@@ -586,7 +586,7 @@ edition = "2024"
         let binary_path = temp_dir.path().join("target/release/demo");
         write_metadata_script(&binary_path, &metadata("demo", &["serve"]));
 
-        let project = load(temp_dir.path(), true, None, false).unwrap().unwrap();
+        let project = load(temp_dir.path(), true, None, true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
     }
@@ -606,7 +606,7 @@ path = "src/server.rs"
         let binary_path = temp_dir.path().join("target/debug/server");
         write_metadata_script(&binary_path, &metadata("server", &["serve"]));
 
-        let project = load(temp_dir.path(), false, None, false).unwrap().unwrap();
+        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
         assert!(project.metadata.is_some());
@@ -635,7 +635,7 @@ path = "src/worker.rs"
         let binary_path = temp_dir.path().join("target/debug/api");
         write_metadata_script(&binary_path, &metadata("api", &["serve"]));
 
-        let project = load(temp_dir.path(), false, None, false).unwrap().unwrap();
+        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
         assert!(project.metadata.is_some());
@@ -658,7 +658,7 @@ path = "src/worker.rs"
 "#,
         );
 
-        let result = load(temp_dir.path(), false, None, false);
+        let result = load(temp_dir.path(), false, None, true);
 
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
@@ -677,7 +677,7 @@ path = "src/worker.rs"
             "echo stdout message\necho stderr message >&2\nexit 42\n",
         );
 
-        let project = load(temp_dir.path(), false, None, false).unwrap().unwrap();
+        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
 
         assert!(project.metadata.is_none());
     }
@@ -690,7 +690,7 @@ path = "src/worker.rs"
         let binary_path = temp_dir.path().join("target/debug/demo");
         write_shell_script(&binary_path, "echo 'not json'\n");
 
-        let project = load(temp_dir.path(), false, None, false).unwrap().unwrap();
+        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
 
         assert!(project.metadata.is_none());
     }
@@ -775,7 +775,7 @@ path = "src/worker.rs"
         write_package_manifest(&temp_dir.path().join("api"), "api", "");
         write_package_manifest(&temp_dir.path().join("web"), "web", "");
 
-        let result = load(temp_dir.path(), false, None, false);
+        let result = load(temp_dir.path(), false, None, true);
 
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
@@ -791,7 +791,7 @@ path = "src/worker.rs"
         write_package_manifest(&temp_dir.path().join("api"), "api", "");
         write_package_manifest(&temp_dir.path().join("web"), "web", "");
 
-        let result = load(temp_dir.path(), false, Some("missing"), false);
+        let result = load(temp_dir.path(), false, Some("missing"), true);
 
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
@@ -810,7 +810,7 @@ path = "src/worker.rs"
         let binary_path = temp_dir.path().join("target/debug/api");
         write_metadata_script(&binary_path, &metadata("api", &["check"]));
 
-        let project = load(temp_dir.path(), false, Some("api"), false)
+        let project = load(temp_dir.path(), false, Some("api"), true)
             .unwrap()
             .unwrap();
 
@@ -828,7 +828,7 @@ path = "src/worker.rs"
         let binary_path = temp_dir.path().join("target/debug/web");
         write_metadata_script(&binary_path, &metadata("web", &["check"]));
 
-        let project = load(&temp_dir.path().join("web"), false, None, false)
+        let project = load(&temp_dir.path().join("web"), false, None, true)
             .unwrap()
             .unwrap();
 
@@ -853,7 +853,7 @@ path = "src/worker.rs"
         };
         write_cache(&command_cache_path(temp_dir.path()), &cache).unwrap();
 
-        let project = load(temp_dir.path(), false, None, false).unwrap().unwrap();
+        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
 
         assert!(project.metadata.is_some());
         assert_eq!(project.metadata.unwrap().commands[0].name, "cached");
@@ -872,7 +872,7 @@ path = "src/worker.rs"
         };
         write_cache(&command_cache_path(temp_dir.path()), &cache).unwrap();
 
-        let project = load(temp_dir.path(), false, None, false).unwrap().unwrap();
+        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
 
         assert!(project.metadata.is_some());
         assert_eq!(project.metadata.unwrap().commands[0].name, "fresh");

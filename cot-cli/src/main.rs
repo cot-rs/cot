@@ -23,6 +23,7 @@ fn resolve_help_request(args: &[String]) -> Option<Vec<String>> {
 
     while let Some(arg) = iter.next() {
         match arg.as_str() {
+            // short-circuit once we find a help flag
             HELP_LONG_FLAG | HELP_SHORT_FLAG => return Some(path),
             RELEASE_FLAG | BUILD_FLAG => {}
             PACKAGE_SHORT_FLAG | PACKAGE_LONG_FLAG => match iter.peek() {
@@ -39,11 +40,14 @@ fn resolve_help_request(args: &[String]) -> Option<Vec<String>> {
     None
 }
 
-fn forwarded_args(clap_captured: &[OsString], after_dash_delimiter: &[String]) -> Vec<OsString> {
-    clap_captured
+fn forwarded_args(
+    clap_captured_args: &[OsString],
+    args_after_double_dash: &[String],
+) -> Vec<OsString> {
+    clap_captured_args
         .iter()
         .cloned()
-        .chain(after_dash_delimiter.iter().map(OsString::from))
+        .chain(args_after_double_dash.iter().map(OsString::from))
         .collect()
 }
 
@@ -57,7 +61,7 @@ fn split_on_double_dash(raw: &[String]) -> (&[String], &[String]) {
 fn main() -> anyhow::Result<()> {
     let raw: Vec<String> = std::env::args().collect();
 
-    let (cot_args, forwarded_tail_args) = split_on_double_dash(&raw);
+    let (cot_args, forwarded_remaining_args) = split_on_double_dash(&raw);
 
     let release = cot_args.iter().any(|a| a == RELEASE_FLAG);
     let build = cot_args.iter().any(|b| b == BUILD_FLAG);
@@ -105,7 +109,7 @@ fn main() -> anyhow::Result<()> {
                     "migration".to_string(),
                     args[0].to_string_lossy().into_owned(),
                 ];
-                let remaining = forwarded_args(&args[1..], forwarded_tail_args);
+                let remaining = forwarded_args(&args[1..], forwarded_remaining_args);
                 handlers::handle_external(&path, &remaining, project, release)
             }
         },
@@ -117,7 +121,7 @@ fn main() -> anyhow::Result<()> {
                 build,
             )?;
             let path = vec![args[0].to_string_lossy().into_owned()];
-            let remaining = forwarded_args(&args[1..], forwarded_tail_args);
+            let remaining = forwarded_args(&args[1..], forwarded_remaining_args);
             handlers::handle_external(&path, &remaining, project, release)
         }
     }

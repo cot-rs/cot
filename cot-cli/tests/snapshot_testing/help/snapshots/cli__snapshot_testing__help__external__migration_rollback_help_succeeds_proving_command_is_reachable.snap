@@ -1,0 +1,26 @@
+---
+source: cot-cli/tests/snapshot_testing/help/external.rs
+info:
+  program: cot
+  args:
+    - migration
+    - rollback
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Rollback migrations up to the specified migration file
+
+Usage: cot migration rollback [OPTIONS] <MIGRATION_NAME>
+
+Arguments:
+  <MIGRATION_NAME>  The migration name to roll back to (e.g. m_0001_initial, 0001, or zero)
+
+Options:
+      --app      The name of the app to rollback migrations for
+      --dry-run  Print the Rollback Plan without changing the database
+  -h, --help     Print help
+
+
+----- stderr -----

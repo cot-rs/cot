@@ -1,0 +1,37 @@
+---
+source: cot-cli/tests/snapshot_testing/help/mod.rs
+info:
+  program: cot
+  args:
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Command-line interface for the Cot web framework
+
+Usage: cot [OPTIONS] <COMMAND>
+
+Commands:
+  new             Create a new Cot project
+  migration       Manage migrations for a Cot project
+  cli             Manage Cot CLI
+  check           Verifies the configuration, including connections to the database and other
+                  services
+  collect-static  Collects all static files into a static directory
+  frobnicate      Frobnicates the target
+  fixture-group   Fixture task group
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+      --release            Use target/release instead of target/debug when looking for the project
+                           binary
+      --build              Build the binary if it does not exist
+  -p, --package <PACKAGE>  Package to use, in case you're running this in a workspace
+  -v, --verbose...         Increase logging verbosity
+  -q, --quiet...           Decrease logging verbosity
+  -h, --help               Print help
+  -V, --version            Print version
+
+
+----- stderr -----

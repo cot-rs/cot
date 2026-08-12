@@ -436,7 +436,7 @@ impl cot::App for {struct_name} {{
 }
 
 #[derive(Debug)]
-pub struct CotProjectHarness {
+pub struct CotProjectBuilder {
     project_name: String,
     cot_binary: PathBuf,
     features: Vec<String>,
@@ -449,7 +449,7 @@ pub struct CotProjectHarness {
     apps: Vec<CotApp>,
 }
 
-impl CotProjectHarness {
+impl CotProjectBuilder {
     #[must_use]
     pub fn new(cot_binary: PathBuf) -> Self {
         Self {
@@ -541,10 +541,10 @@ impl CotProjectHarness {
 
     /// Write all project files to a temporary directory.
     ///
-    /// Returns a [`CotTestProject`] that can be used to run commands which
+    /// Returns a [`CotProject`] that can be used to run commands which
     /// don't require a compiled binary (e.g. `cot migration list`), or can
-    /// be compiled via [`CotTestProject::compile`].
-    pub fn build(self) -> Result<CotTestProject> {
+    /// be compiled via [`CotProject::compile`].
+    pub fn build(self) -> Result<CotProject> {
         let tempdir = TempDir::with_prefix("cot-test-harness-")
             .context("failed to create temporary directory for test project")?;
 
@@ -586,7 +586,7 @@ impl CotProjectHarness {
                 .with_context(|| format!("failed to write {}", rel.display()))?;
         }
 
-        Ok(CotTestProject {
+        Ok(CotProject {
             _tempdir: tempdir,
             project_dir,
             project_name: self.project_name,
@@ -599,17 +599,17 @@ impl CotProjectHarness {
 ///
 /// Suitable for testing CLI commands that operate on source code
 ///
-/// Call [`CotTestProject::compile`] to build the binary and unlock proxy
+/// Call [`CotProject::compile`] to build the binary and unlock proxy
 /// command testing.
 #[derive(Debug)]
-pub struct CotTestProject {
+pub struct CotProject {
     _tempdir: TempDir,
     project_dir: PathBuf,
     project_name: String,
     cot_binary: PathBuf,
 }
 
-impl CotTestProject {
+impl CotProject {
     /// The absolute path to the project root directory.
     #[must_use]
     pub fn path(&self) -> &Path {
@@ -713,7 +713,7 @@ impl CotTestProject {
 /// A temporary Cot project with a compiled binary.
 #[derive(Debug)]
 pub struct CompiledCotProject {
-    inner: CotTestProject,
+    inner: CotProject,
     binary_path: PathBuf,
     release: bool,
 }
@@ -784,15 +784,15 @@ impl CompiledCotProject {
     }
 }
 
-/// A lazily-compiled standard project shared across all tests in a process.
+/// A lazily-compiled standard project cot project.
 ///
 /// Compiling the same project for every test function would be prohibitively
 /// slow. For tests that don't need a custom project structure, use this
 /// instead.
 ///
-/// # Usage
+/// # Examples
 ///
-/// ```no_run
+/// ```
 /// # use cot_cli::test_harness::standard_project;
 /// let project = standard_project().unwrap();
 /// let output = project.cot_cmd(&["check"]).output().unwrap();
@@ -815,14 +815,14 @@ pub fn standard_project(cot_binary: PathBuf) -> Result<&'static CompiledCotProje
         .migrations("cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)")
         .build();
 
-    match CotProjectHarness::new(cot_binary)
+    match CotProjectBuilder::new(cot_binary)
         .project_name("cot_test_standard")
         .app(standard_app)
         .extra_code(extra_code)
         .register_task(FROBNICATE_REGISTER)
         .register_task(GROUPED_REGISTER)
         .build()
-        .and_then(CotTestProject::compile)
+        .and_then(CotProject::compile)
     {
         Ok(proj) => {
             let _ = PROJECT.set(proj);

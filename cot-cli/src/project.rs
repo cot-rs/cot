@@ -354,7 +354,7 @@ fn load_or_refresh_metadata(
                 StatusType::Warning,
                 &format!(
                     "the `{}` binary doesn't recognize a flag `cot` uses to discover the binary's cli commands, \
-                 so they won't be listed in `cot --help`. This usually means the binary \
+                 so they won't be listed when you run `cot --help`. This usually means the binary \
                  was built against an older version of `cot`. To fix this, update your `cot`version",
                     binary_path.display(),
                 ),

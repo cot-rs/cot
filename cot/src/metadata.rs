@@ -23,12 +23,15 @@ pub struct ProjectMetadata {
 impl ProjectMetadata {
     /// Create new Project metadata
     pub fn new(cmd: &Command) -> Self {
+        let mut cmd = cmd.clone();
+        cmd.build();
+
         ProjectMetadata {
             version: METADATA_SCHEMA_VERSION,
             binary_name: cmd.get_name().to_string(),
             commands: cmd
                 .get_subcommands()
-                .filter(|subcmd| !subcmd.is_hide_set())
+                .filter(|subcmd| !subcmd.is_hide_set() && subcmd.get_name() != "help")
                 .map(CommandMeta::from)
                 .collect(),
         }
@@ -103,7 +106,7 @@ impl From<&Command> for CommandMeta {
             aliases: cmd.get_all_aliases().map(ToString::to_string).collect(),
             subcommands: cmd
                 .get_subcommands()
-                .filter(|subcmd| !subcmd.is_hide_set())
+                .filter(|subcmd| !subcmd.is_hide_set() && subcmd.get_name() != "help")
                 .map(CommandMeta::from)
                 .collect(),
             args: cmd
@@ -202,18 +205,19 @@ mod tests {
 
     #[test]
     fn command_meta_from_excludes_help_and_version_ids() {
-        let command = Command::new("demo").subcommand(
-            Command::new("sub")
-                .arg(Arg::new("help").long("help"))
-                .arg(Arg::new("version").long("version"))
-                .arg(Arg::new("real").long("real")),
-        );
+        let command =
+            Command::new("demo").subcommand(Command::new("sub").arg(Arg::new("real").long("real")));
 
         let metadata = ProjectMetadata::from(&command);
         let sub = &metadata.commands[0];
 
         assert_eq!(sub.args.len(), 1);
         assert_eq!(sub.args[0].name, "real");
+        assert!(
+            !sub.args
+                .iter()
+                .any(|a| a.name == "help" || a.name == "version")
+        );
     }
 
     #[test]
@@ -241,5 +245,43 @@ mod tests {
         assert!(meta.is_positional);
         assert!(meta.required);
         assert_eq!(meta.value_name.as_deref(), Some("PATH"));
+    }
+
+    #[test]
+    fn positional_arg_without_explicit_num_args_reports_takes_value() {
+        let command = Command::new("demo").subcommand(
+            Command::new("frobnicate")
+                .arg(Arg::new("target").required(true).help("What to frobnicate")),
+        );
+
+        let metadata = ProjectMetadata::from(&command);
+        let target = &metadata.commands[0].args[0];
+
+        assert!(target.is_positional);
+        assert!(target.takes_value);
+    }
+
+    #[test]
+    fn subcommand_required_group_excludes_injected_help_subcommand() {
+        let command = Command::new("demo").subcommand(
+            Command::new("group")
+                .subcommand_required(true)
+                .arg_required_else_help(true)
+                .subcommand(Command::new("sub-a"))
+                .subcommand(Command::new("sub-b")),
+        );
+
+        let metadata = ProjectMetadata::from(&command);
+        let group = &metadata.commands[0];
+
+        assert!(!group.subcommands.iter().any(|sc| sc.name == "help"));
+        assert_eq!(
+            group
+                .subcommands
+                .iter()
+                .map(|sc| sc.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["sub-a", "sub-b"]
+        );
     }
 }

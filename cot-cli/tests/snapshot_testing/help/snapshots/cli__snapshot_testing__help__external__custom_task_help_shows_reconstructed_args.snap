@@ -6,12 +6,20 @@ info:
     - frobnicate
     - "--help"
 ---
-success: false
-exit_code: 101
+success: true
+exit_code: 0
 ----- stdout -----
+Frobnicates the target
+
+Usage: cot frobnicate [OPTIONS] <target>
+
+Arguments:
+  <target>  What to frobnicate
+
+Options:
+      --intensity <intensity>  How hard to frobnicate
+      --build                  Simulated flag colliding with cot-cli's own --build
+  -h, --help                   Print help
+
 
 ----- stderr -----
-
-thread 'main' (6739824) panicked at /Users/eli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.5/src/builder/debug_asserts.rs:746:9:
-Argument 'target' is positional and it must take a value but action is SetTrue
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

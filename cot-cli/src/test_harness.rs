@@ -166,7 +166,7 @@ fn default_migrations_rs() -> String {
 
 fn render_cargo_toml(project_name: &str, features: &[String], extra: &str) -> String {
     let features_str = if features.is_empty() {
-        r#"["db", "json", "sqlite"]"#.to_owned()
+        r#"["default"]"#.to_owned()
     } else {
         format!(
             "[{}]",
@@ -692,8 +692,8 @@ impl CotProject {
         }
 
         // Bridge the binary into the project's own target tree so that
-        // `cot-cli`'s `resolve_target_dir` (which walks up from CWD) can find
-        // it. On Unix we symlink (zero-cost); on Windows we copy.
+        // `cot-cli`'s `resolve_target_dir` can find it.
+        // On Unix we create a symlink, on Windows we copy.
         let project_target_dir = self.project_dir.join("target").join(profile);
         std::fs::create_dir_all(&project_target_dir)
             .context("failed to create project target directory")?;
@@ -757,7 +757,7 @@ impl CompiledCotProject {
         cmd
     }
 
-    /// Build a `cot` CLI command *without* any automatic flags.
+    /// Build a `cot` CLI command without any automatic flags.
     ///
     /// Use this when you want to control `--release` manually or test
     /// the error path where the wrong profile binary is specified.

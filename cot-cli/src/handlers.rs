@@ -189,7 +189,7 @@ fn exec(proj: &ProjectBinary, args: &[OsString]) -> anyhow::Result<()> {
         eprintln!("child stderr: {:?}", output.stderr);
 
         std::process::exit(output.status.code().unwrap_or(1));
-        std::process::exit(status.code().unwrap_or(1));
+        // std::process::exit(status.code().unwrap_or(1));
     }
 }
 

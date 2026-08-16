@@ -794,9 +794,10 @@ impl CompiledCotProject {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use std::path::PathBuf;
 /// # use cot_cli::test_harness::standard_project;
-/// let project = standard_project().unwrap();
+/// let project = standard_project(PathBuf::from("path/to/cot/bin")).unwrap();
 /// let output = project.cot_cmd(&["check"]).output().unwrap();
 /// ```
 pub fn standard_project(cot_binary: PathBuf) -> Result<&'static CompiledCotProject> {

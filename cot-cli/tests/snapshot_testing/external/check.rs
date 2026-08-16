@@ -34,15 +34,9 @@ fn double_dash_delimiter_fails_with_unsupported_flag_name_mule() {
     println!("stdout bytes: {:?}", output.stdout);
     println!("stderr bytes: {:?}", output.stderr);
 
-    println!(
-        "stdout:\n{}",
-        String::from_utf8_lossy(&output.stdout)
-    );
+    println!("stdout:\n{}", String::from_utf8_lossy(&output.stdout));
 
-    println!(
-        "stderr:\n{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    println!("stderr:\n{}", String::from_utf8_lossy(&output.stderr));
 }
 
 #[test]

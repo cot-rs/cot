@@ -180,9 +180,7 @@ fn exec(proj: &ProjectBinary, args: &[OsString]) -> anyhow::Result<()> {
         // process in place. The best we can do is spawn the binary as a
         // child and block here until it exits
         // let status = std::process::Command::new(&proj.path).args(args).status()?;
-        let output = std::process::Command::new(&proj.path)
-            .args(args)
-            .output()?;
+        let output = std::process::Command::new(&proj.path).args(args).output()?;
 
         eprintln!("child status: {:?}", output.status);
         eprintln!("child stdout: {:?}", output.stdout);

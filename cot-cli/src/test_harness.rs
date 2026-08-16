@@ -177,6 +177,9 @@ fn render_cargo_toml(project_name: &str, features: &[String], extra: &str) -> St
                 .join(", ")
         )
     };
+    // normalize path separator
+    let cot_path = cot_crate_path().display().to_string().replace('\\', "/");
+
     format!(
         r#"[package]
 name = "{project_name}"
@@ -188,7 +191,6 @@ cot = {{ path = "{cot_path}", features = {features_str} }}
 async-trait = "0.1"
 {extra}
 "#,
-        cot_path = cot_crate_path().display(),
     )
 }
 

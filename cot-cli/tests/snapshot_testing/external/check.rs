@@ -8,7 +8,7 @@ fn check_forwards_to_project_binary() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "check"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["check"])) }
     );
 }
 
@@ -26,7 +26,7 @@ fn unrecognized_command_reports_unknown_command() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "banana"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["banana"])) }
     );
 }
 

@@ -290,11 +290,10 @@ fn load_or_refresh_metadata(
     }
 
     // slow path
-    // Both stderr and stdout are piped, to avoid deadlock. Pipe buffers
-    // are a fixed OS size, so if the child fills one while we're still
-    // waiting to read the other, its write call blocks and it can never
-    // finish producing output (or exit) for us to read. To avoid this we
-    // drain stdout and stderr on separate threads concurrently.
+    // stdout/stderr are piped and drained on separate threads to avoid a
+    // deadlock. Pipe buffers are OS-bounded, so if the child fills one
+    // while we're blocked waiting to timeout in `wait_timeout` or reading the other
+    // output, its write blocks and deadlocks.
     // https://doc.rust-lang.org/std/process/index.html#handling-io
     // https://docs.rs/os_pipe/latest/os_pipe/#common-deadlocks-related-to-pipes
     let mut child = std::process::Command::new(binary_path)
@@ -346,6 +345,7 @@ fn load_or_refresh_metadata(
     if !status.success() {
         let stderr_str = String::from_utf8_lossy(&stderr);
 
+        // check for previous cot versions(<=0.7.0) without metadata support.
         let is_legacy_binary = status.code() == Some(2)
             && stderr_str.contains(&format!("unexpected argument '{METADATA_FLAG}'"));
 
@@ -559,6 +559,10 @@ edition = "2024"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_reads_debug_binary_metadata_and_writes_cache() {
         let temp_dir = TempDir::new().unwrap();
@@ -579,6 +583,10 @@ edition = "2024"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_uses_release_profile_when_requested() {
         let temp_dir = TempDir::new().unwrap();
@@ -592,6 +600,10 @@ edition = "2024"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_uses_single_named_bin_target() {
         let temp_dir = TempDir::new().unwrap();
@@ -614,6 +626,10 @@ path = "src/server.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_uses_metadata_binary_override_before_bin_targets() {
         let temp_dir = TempDir::new().unwrap();
@@ -667,6 +683,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_falls_back_to_no_metadata_on_command_failure() {
         let temp_dir = TempDir::new().unwrap();
@@ -683,6 +703,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_falls_back_to_no_metadata_on_invalid_json() {
         let temp_dir = TempDir::new().unwrap();
@@ -696,6 +720,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_or_refresh_metadata_reports_command_failure_with_output() {
         let temp_dir = TempDir::new().unwrap();
@@ -716,6 +744,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_or_refresh_metadata_reports_invalid_json() {
         let temp_dir = TempDir::new().unwrap();
@@ -731,6 +763,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_or_refresh_metadata_returns_none_for_legacy_binary() {
         let temp_dir = TempDir::new().unwrap();
@@ -801,6 +837,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn workspace_root_uses_selected_package_and_workspace_target_dir() {
         let temp_dir = TempDir::new().unwrap();
@@ -819,6 +859,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn workspace_member_directory_uses_current_package_without_flag() {
         let temp_dir = TempDir::new().unwrap();
@@ -838,6 +882,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_reuses_valid_cache_without_spawning_binary() {
         let temp_dir = TempDir::new().unwrap();
@@ -860,6 +908,10 @@ path = "src/worker.rs"
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn load_refreshes_stale_cache() {
         let temp_dir = TempDir::new().unwrap();

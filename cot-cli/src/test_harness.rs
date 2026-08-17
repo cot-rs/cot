@@ -5,6 +5,8 @@ use std::sync::OnceLock;
 use anyhow::{Context, Result, bail};
 use tempfile::TempDir;
 
+use crate::args::{BUILD_FLAG, RELEASE_FLAG};
+
 pub const FROBNICATE_TASK_SOURCE: &str = r#"
 struct Frobnicate;
 
@@ -748,21 +750,21 @@ impl CompiledCotProject {
     /// Build a `cot` CLI proxy command configured to run in this project's
     /// directory.
     ///
-    /// Automatically appends `--release` if the project was compiled in release
-    /// mode so `cot-cli` resolves the correct binary.
+    /// Automatically adds the `--release` arg if the project was compiled in
+    /// release mode so `cot-cli` resolves the correct binary.
     #[must_use]
     pub fn cot_cmd(&self, args: &[&str]) -> Command {
-        let mut cmd = self.inner.cot_cmd(args);
+        // ensure that the binary always exists before invoking it
+        let mut final_args = vec![BUILD_FLAG];
         if self.release {
-            cmd.arg("--release");
+            final_args.push(RELEASE_FLAG);
         }
-        cmd
+        final_args.extend_from_slice(args);
+
+        self.inner.cot_cmd(&final_args)
     }
 
     /// Build a `cot` CLI command without any automatic flags.
-    ///
-    /// Use this when you want to control `--release` manually or test
-    /// the error path where the wrong profile binary is specified.
     #[must_use]
     pub fn cot_cmd_raw(&self, args: &[&str]) -> Command {
         self.inner.cot_cmd(args)
@@ -798,7 +800,7 @@ impl CompiledCotProject {
 /// # use std::path::PathBuf;
 /// # use cot_cli::test_harness::standard_project;
 /// let project = standard_project(PathBuf::from("path/to/cot/bin")).unwrap();
-/// let output = project.cot_cmd(&["check"]).output().unwrap();
+/// let output = project.cot_cmd_(&["check"]).output().unwrap();
 /// ```
 pub fn standard_project(cot_binary: PathBuf) -> Result<&'static CompiledCotProject> {
     static PROJECT: OnceLock<CompiledCotProject> = OnceLock::new();

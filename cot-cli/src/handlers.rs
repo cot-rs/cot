@@ -447,6 +447,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `execvp` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn known_nested_command_attempts_exec_and_fails_when_binary_missing() {
         let project = ProjectBinary {
@@ -482,6 +486,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `execvp` on OS `linux`"
+    )]
     #[cfg(unix)]
     fn missing_metadata_forwards_blindly_and_attempts_exec() {
         let project = ProjectBinary {

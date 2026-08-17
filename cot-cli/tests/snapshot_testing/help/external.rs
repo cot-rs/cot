@@ -8,7 +8,7 @@ fn top_level_help_merges_real_project_commands() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["--help"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "--help"])) }
     );
 }
 
@@ -17,7 +17,7 @@ fn migration_help_merges_real_rollback_subcommand() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["migration", "--help"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "migration", "--help"])) }
     );
 }
 
@@ -26,7 +26,7 @@ fn migration_rollback_help_succeeds_proving_command_is_reachable() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["migration", "rollback", "--help"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "migration", "rollback", "--help"])) }
     );
 }
 
@@ -35,7 +35,7 @@ fn migration_unknown_subcommand_fails_cleanly() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["migration", "unknown", "--help"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "migration", "unknown", "--help"])) }
     );
 }
 
@@ -53,7 +53,7 @@ fn custom_registered_task_appears_in_top_level_help() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["--help"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "--help"])) }
     );
 }
 
@@ -62,7 +62,7 @@ fn custom_task_help_shows_reconstructed_args() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["frobnicate", "--help"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "frobnicate", "--help"])) }
     );
 }
 
@@ -71,6 +71,6 @@ fn nested_custom_group_help_merges_correctly() {
     let project = standard_project(cot_cli_path()).unwrap();
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(project.cot_cmd(&["fixture-group", "--help"])) }
+        { assert_cmd_snapshot!(project.cot_cmd(&["--build", "fixture-group", "--help"])) }
     );
 }

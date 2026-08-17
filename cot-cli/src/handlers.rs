@@ -182,9 +182,9 @@ fn exec(proj: &ProjectBinary, args: &[OsString]) -> anyhow::Result<()> {
         // let status = std::process::Command::new(&proj.path).args(args).status()?;
         let output = std::process::Command::new(&proj.path).args(args).output()?;
 
-        eprintln!("child status: {:?}", output.status);
-        eprintln!("child stdout: {:?}", output.stdout);
-        eprintln!("child stderr: {:?}", output.stderr);
+        // eprintln!("child status: {:?}", output.status);
+        // eprintln!("child stdout: {:?}", output.stdout);
+        // eprintln!("child stderr: {:?}", output.stderr);
 
         std::process::exit(output.status.code().unwrap_or(1));
         // std::process::exit(status.code().unwrap_or(1));

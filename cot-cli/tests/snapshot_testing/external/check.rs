@@ -20,22 +20,22 @@ fn double_dash_delimiter_fails_with_unsupported_flag_name() {
         { assert_cmd_snapshot!(project.cot_cmd(&["check", "--", "--build"])) }
     );
 }
-// 
+//
 // #[test]
 // fn double_dash_delimiter_fails_with_unsupported_flag_name_mule() {
 //     let project = standard_project(cot_cli_path()).unwrap();
-// 
+//
 //     let output = project
 //         .cot_cmd(&["check", "--", "--build"])
 //         .output()
 //         .unwrap();
-// 
+//
 //     println!("status: {:?}", output.status);
 //     println!("stdout bytes: {:?}", output.stdout);
 //     println!("stderr bytes: {:?}", output.stderr);
-// 
+//
 //     println!("stdout:\n{}", String::from_utf8_lossy(&output.stdout));
-// 
+//
 //     println!("stderr:\n{}", String::from_utf8_lossy(&output.stderr));
 // }
 

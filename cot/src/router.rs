@@ -36,11 +36,13 @@ use tracing::debug;
 use crate::error::NotFound;
 use crate::request::{PathParams, Request, RequestExt, RequestHead};
 use crate::response::Response;
-use crate::router::path::{PathMatcher, PathPart, ReverseParamMap};
+use crate::router::path::{PathMatcher, ReverseParamMap};
+use crate::router::tree::{Entry, RouteTrie};
 use crate::{Error, ProjectContext, Result};
 
 pub mod method;
 pub mod path;
+mod tree;
 
 /// A router that can be used to route requests to their respective views.
 ///
@@ -66,7 +68,7 @@ pub struct Router {
     app_name: Option<AppName>,
     urls: Vec<Route>,
     names: HashMap<RouteName, Arc<PathMatcher>>,
-    route_tree: RouteTree,
+    route_tree: RouteTrie,
 }
 
 impl Router {
@@ -101,6 +103,10 @@ impl Router {
     ///
     /// let router = Router::with_urls([Route::with_handler_and_name("/", home, "home")]);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics when a url string could not be parsed into a [`Route`]
     #[must_use]
     pub fn with_urls<T: Into<Vec<Route>>>(urls: T) -> Self {
         match Self::try_with_urls(urls) {
@@ -110,7 +116,7 @@ impl Router {
     }
 
     /// Create a router with the given routes. This is a fallible version
-    /// of [Self::with_urls]
+    /// of [`Self::with_urls`]
     ///
     /// # Examples
     ///
@@ -125,6 +131,10 @@ impl Router {
     ///
     /// let router = Router::try_with_urls([Route::with_handler_and_name("/", home, "home")]).unwrap();
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// This method fails when the underlying trie fails to build.
     pub fn try_with_urls<T: Into<Vec<Route>>>(urls: T) -> Result<Self> {
         let urls = urls.into();
         let mut names = HashMap::new();
@@ -134,7 +144,7 @@ impl Router {
                 names.insert(name.clone(), url.url.clone());
             }
         }
-        let route_tree = RouteTree::from_routes(&urls)?;
+        let route_tree = RouteTrie::build(&urls)?;
         Ok(Self {
             app_name: None,
             urls,
@@ -170,7 +180,66 @@ impl Router {
     }
 
     fn get_handler(&self, request_path: &str) -> Option<HandlerFound<'_>> {
-        self.route_tree.find(self, request_path)
+        let m = self.route_tree.at(request_path)?;
+
+        let (route_index, remaining_path) = match m.value {
+            // For `Entry::Combined` (cases where a handler overlaps a router for the same
+            // route/path, the handler takes precedence.
+            Entry::Handler(idx) | Entry::Combined { handler: idx, .. } => (*idx, String::new()),
+            Entry::Router(idx) => {
+                let rest = m.params.get(tree::NESTED_ROUTER_PARAM).unwrap_or("");
+                let remaining = if rest.is_empty() {
+                    String::new()
+                } else {
+                    format!("/{rest}")
+                };
+                (*idx, remaining)
+            }
+        };
+
+        let params: Vec<(String, String)> = m
+            .params
+            .iter()
+            .filter(|(key, _)| *key != tree::NESTED_ROUTER_PARAM)
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+
+        Self::route_to_handler(self, route_index, &remaining_path, &params)
+    }
+
+    fn route_to_handler<'a>(
+        router: &'a Router,
+        route_index: usize,
+        remaining_path: &str,
+        params: &[(String, String)],
+    ) -> Option<HandlerFound<'a>> {
+        let route = &router.urls[route_index];
+
+        match &route.view {
+            RouteInner::Handler(handler) => Some(HandlerFound {
+                handler: &**handler,
+                app_name: router.app_name.clone(),
+                name: route.name.clone(),
+                params: params.to_vec(),
+            }),
+            RouteInner::Router(nested_router) => {
+                nested_router.get_handler(remaining_path).map(|mut found| {
+                    found.app_name = found.app_name.or_else(|| router.app_name.clone());
+                    found.params.extend(params.iter().cloned());
+                    found
+                })
+            }
+            #[cfg(feature = "openapi")]
+            RouteInner::ApiHandler(handler) => {
+                let handler: &(dyn BoxRequestHandler + Send + Sync) = &**handler;
+                Some(HandlerFound {
+                    handler,
+                    app_name: router.app_name.clone(),
+                    name: route.name.clone(),
+                    params: params.to_vec(),
+                })
+            }
+        }
     }
 
     /// Handle a request.
@@ -424,7 +493,6 @@ struct NoViewToReverse {
 }
 impl_into_cot_error!(NoViewToReverse);
 
-type RouteNodeResult<T> = std::result::Result<T, RouteConflictError>;
 const ERROR_PREFIX: &str = "route conflict error:";
 #[derive(Debug, thiserror::Error)]
 enum RouteConflictError {
@@ -468,328 +536,10 @@ enum RouteConflictError {
          wildcard route `{existing}`"
     )]
     DuplicateWildcard { existing: String, new: String },
+    #[error("{ERROR_PREFIX} error while inserting route")]
+    RouteInsert(#[from] matchit::InsertError),
 }
 impl_into_cot_error!(RouteConflictError);
-
-#[derive(Debug, Clone)]
-struct RouteTree {
-    root: RouteNode,
-}
-
-impl RouteTree {
-    fn from_routes(routes: &[Route]) -> Result<Self> {
-        let mut tree = Self {
-            root: RouteNode::default(),
-        };
-        for (index, route) in routes.iter().enumerate() {
-            tree.root.insert(route.url.parts(), index, routes)?;
-        }
-
-        Ok(tree)
-    }
-
-    fn find<'a>(&'a self, router: &'a Router, path: &str) -> Option<HandlerFound<'a>> {
-        let mut params = Vec::new();
-        self.root.find(router, path, &mut params)
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-struct RouteNode {
-    prefix: String,
-    static_children: Vec<RouteNode>,
-    param_child: Option<Box<ParamRouteNode>>,
-    wildcard_child: Option<WildcardRouteNode>,
-    handler_route: Option<usize>,
-    router_route: Option<usize>,
-}
-
-impl RouteNode {
-    fn insert(
-        &mut self,
-        parts: &[PathPart],
-        route_index: usize,
-        routes: &[Route],
-    ) -> RouteNodeResult<()> {
-        if let Some((part, rest)) = parts.split_first() {
-            match part {
-                PathPart::Literal(literal) => {
-                    self.insert_static(literal, rest, route_index, routes)
-                }
-                PathPart::Param { name } => self.insert_param(name, rest, route_index, routes),
-                PathPart::Wildcard { name } => {
-                    self.insert_wildcard(name, rest, route_index, routes)
-                }
-            }
-        } else {
-            self.insert_route(route_index, routes)
-        }
-    }
-
-    fn insert_static(
-        &mut self,
-        literal: &str,
-        rest: &[PathPart],
-        route_index: usize,
-        routes: &[Route],
-    ) -> RouteNodeResult<()> {
-        if literal.is_empty() {
-            return self.insert(rest, route_index, routes);
-        }
-
-        for child in &mut self.static_children {
-            let common = common_prefix_len(&child.prefix.as_bytes(), literal.as_bytes());
-            if common == 0 {
-                continue;
-            }
-            if common < child.prefix.len() {
-                child.split_at(common);
-            }
-            return if common == literal.len() {
-                child.insert(rest, route_index, routes)
-            } else {
-                child.insert_static(&literal[common..], rest, route_index, routes)
-            };
-        }
-
-        let mut child = Self {
-            prefix: literal.to_string(),
-            ..Self::default()
-        };
-        child.insert(rest, route_index, routes)?;
-        self.static_children.push(child);
-        Ok(())
-    }
-
-    fn insert_param(
-        &mut self,
-        name: &str,
-        rest: &[PathPart],
-        route_index: usize,
-        routes: &[Route],
-    ) -> RouteNodeResult<()> {
-        if let Some(param_child) = &mut self.param_child {
-            if param_child.name != name {
-                return Err(RouteConflictError::ConflictingParamName {
-                    existing: routes[param_child.origin_route].url(),
-                    existing_name: param_child.name.clone(),
-                    new: routes[route_index].url(),
-                    new_name: name.to_string(),
-                });
-            }
-            return param_child.node.insert(rest, route_index, routes);
-        }
-
-        let mut node = RouteNode::default();
-        node.insert(rest, route_index, routes)?;
-        self.param_child = Some(Box::new(ParamRouteNode {
-            name: name.to_string(),
-            node,
-            origin_route: route_index,
-        }));
-        Ok(())
-    }
-
-    fn insert_wildcard(
-        &mut self,
-        name: &str,
-        rest: &[PathPart],
-        route_index: usize,
-        routes: &[Route],
-    ) -> RouteNodeResult<()> {
-        debug_assert!(
-            rest.is_empty(),
-            "wildcard should always be the final segment"
-        );
-
-        if let Some(wildcard_child) = &self.wildcard_child {
-            return Err(if wildcard_child.name != name {
-                RouteConflictError::ConflictingWildcardName {
-                    existing: routes[wildcard_child.route_index].url(),
-                    existing_name: wildcard_child.name.clone(),
-                    new: routes[route_index].url(),
-                    new_name: name.to_string(),
-                }
-            } else {
-                RouteConflictError::DuplicateWildcard {
-                    existing: routes[wildcard_child.route_index].url(),
-                    new: routes[route_index].url(),
-                }
-            });
-        }
-
-        self.wildcard_child = Some(WildcardRouteNode {
-            name: name.to_string(),
-            route_index,
-        });
-        Ok(())
-    }
-
-    fn insert_route(&mut self, route_index: usize, routes: &[Route]) -> RouteNodeResult<()> {
-        match routes[route_index].kind() {
-            RouteKind::Handler => {
-                if let Some(existing) = self.handler_route {
-                    return Err(RouteConflictError::DuplicateHandler {
-                        existing: routes[existing].url(),
-                        new: routes[route_index].url(),
-                    });
-                }
-                self.handler_route = Some(route_index);
-            }
-            RouteKind::Router => {
-                if let Some(existing) = self.router_route {
-                    return Err(RouteConflictError::DuplicateRouter {
-                        existing: routes[existing].url(),
-                        new: routes[route_index].url(),
-                    });
-                }
-                self.router_route = Some(route_index);
-            }
-        }
-        Ok(())
-    }
-
-    fn split_at(&mut self, index: usize) {
-        let child = Self {
-            prefix: self.prefix[index..].to_string(),
-            static_children: std::mem::take(&mut self.static_children),
-            param_child: self.param_child.take(),
-            wildcard_child: self.wildcard_child.take(),
-            handler_route: self.handler_route.take(),
-            router_route: self.router_route.take(),
-        };
-
-        self.prefix.truncate(index);
-        self.static_children.push(child);
-    }
-
-    fn find<'a>(
-        &'a self,
-        router: &'a Router,
-        path: &str,
-        params: &mut Vec<(String, String)>,
-    ) -> Option<HandlerFound<'a>> {
-        if !path.starts_with(&self.prefix) {
-            return None;
-        }
-
-        let remaining_path = &path[self.prefix.len()..];
-        if remaining_path.is_empty()
-            && let Some(found) = self.find_handler_route(router, params)
-        {
-            return Some(found);
-        }
-
-        for child in &self.static_children {
-            let checkpoint = params.len();
-            if let Some(found) = child.find(router, remaining_path, params) {
-                return Some(found);
-            }
-            params.truncate(checkpoint);
-        }
-
-        if let Some(param_child) = &self.param_child {
-            let segment_end = remaining_path.find('/').unwrap_or(remaining_path.len());
-            if segment_end > 0 {
-                let (value, path_after_param) = remaining_path.split_at(segment_end);
-                params.push((param_child.name.clone(), value.to_string()));
-                if let Some(found) = param_child.node.find(router, path_after_param, params) {
-                    return Some(found);
-                }
-                params.pop();
-            }
-        }
-
-        if let Some(wildcard_child) = &self.wildcard_child
-            && !remaining_path.is_empty()
-        {
-            params.push((wildcard_child.name.clone(), remaining_path.to_string()));
-            if let Some(found) =
-                Self::route_to_handler(router, wildcard_child.route_index, "", params)
-            {
-                return Some(found);
-            }
-            params.pop();
-        }
-
-        if let Some(found) = self.find_router_route(router, remaining_path, params) {
-            return Some(found);
-        }
-
-        None
-    }
-
-    fn find_handler_route<'a>(
-        &'a self,
-        router: &'a Router,
-        params: &[(String, String)],
-    ) -> Option<HandlerFound<'a>> {
-        let route_index = self.handler_route?;
-        Self::route_to_handler(router, route_index, "", params)
-    }
-
-    fn find_router_route<'a>(
-        &'a self,
-        router: &'a Router,
-        remaining_path: &str,
-        params: &[(String, String)],
-    ) -> Option<HandlerFound<'a>> {
-        let route_index = self.router_route?;
-        Self::route_to_handler(router, route_index, remaining_path, params)
-    }
-
-    fn route_to_handler<'a>(
-        router: &'a Router,
-        route_index: usize,
-        remaining_path: &str,
-        params: &[(String, String)],
-    ) -> Option<HandlerFound<'a>> {
-        let route = &router.urls[route_index];
-
-        match &route.view {
-            RouteInner::Handler(handler) => Some(HandlerFound {
-                handler: &**handler,
-                app_name: router.app_name.clone(),
-                name: route.name.clone(),
-                params: params.iter().rev().cloned().collect(),
-            }),
-            RouteInner::Router(nested_router) => {
-                nested_router.get_handler(remaining_path).map(|mut result| {
-                    result.app_name = result.app_name.or_else(|| router.app_name.clone());
-                    result.params.extend(params.iter().rev().cloned());
-                    result
-                })
-            }
-            #[cfg(feature = "openapi")]
-            RouteInner::ApiHandler(handler) => {
-                let handler: &(dyn BoxRequestHandler + Send + Sync) = &**handler;
-                Some(HandlerFound {
-                    handler,
-                    app_name: router.app_name.clone(),
-                    name: route.name.clone(),
-                    params: params.iter().rev().cloned().collect(),
-                })
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct ParamRouteNode {
-    name: String,
-    node: RouteNode,
-    origin_route: usize,
-}
-
-#[derive(Debug, Clone)]
-struct WildcardRouteNode {
-    name: String,
-    route_index: usize,
-}
-
-fn common_prefix_len(a: &[u8], b: &[u8]) -> usize {
-    a.iter().zip(b).take_while(|(a, b)| a == b).count()
-}
 
 #[derive(Debug)]
 struct HandlerFound<'a> {
@@ -1046,7 +796,7 @@ impl Route {
     pub fn with_router(url: &str, router: Router) -> Self {
         Self {
             url: Arc::new(PathMatcher::new(url)),
-            view: RouteInner::Router(router),
+            view: RouteInner::Router(Arc::new(router)),
             name: None,
         }
     }
@@ -1105,9 +855,9 @@ impl Route {
     }
 
     #[must_use]
-    pub(crate) fn router(&self) -> Option<&Router> {
+    pub(crate) fn router(&self) -> Option<Arc<Router>> {
         match &self.view {
-            RouteInner::Router(router) => Some(router),
+            RouteInner::Router(router) => Some(router.clone()),
             RouteInner::Handler(_) => None,
             #[cfg(feature = "openapi")]
             RouteInner::ApiHandler(_) => None,
@@ -1124,7 +874,7 @@ pub(crate) enum RouteKind {
 #[derive(Clone)]
 enum RouteInner {
     Handler(Arc<dyn BoxRequestHandler + Send + Sync>),
-    Router(Router),
+    Router(Arc<Router>),
     #[cfg(feature = "openapi")]
     ApiHandler(Arc<dyn crate::openapi::BoxApiEndpointRequestHandler + Send + Sync>),
 }

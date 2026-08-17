@@ -133,7 +133,7 @@ impl ErrorPageTemplateBuilder {
 
     fn build_route_data(
         route_data: &mut Vec<RouteData>,
-        router: &Router,
+        router: &Arc<Router>,
         url_prefix: &str,
         index_prefix: &str,
     ) {
@@ -156,7 +156,7 @@ impl ErrorPageTemplateBuilder {
             if let Some(inner_router) = route.router() {
                 Self::build_route_data(
                     route_data,
-                    inner_router,
+                    &inner_router,
                     &format!("{}{}", url_prefix, route.url()),
                     &format!("{index_prefix}{index}."),
                 );
@@ -588,7 +588,9 @@ mod tests {
         let mut route_data = Vec::new();
         let sub_sub_router = Router::with_urls(vec![]);
         let sub_router = Router::with_urls(vec![Route::with_router("/bar", sub_sub_router)]);
-        let router = Router::with_urls(vec![Route::with_router("/foo", sub_router)]);
+        let router = Arc::new(Router::with_urls(vec![Route::with_router(
+            "/foo", sub_router,
+        )]));
 
         ErrorPageTemplateBuilder::build_route_data(&mut route_data, &router, "", "");
 

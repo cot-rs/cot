@@ -3,10 +3,11 @@
 //! This module provides a path matcher that can be used to match paths against
 //! a given pattern. It also provides a way to reverse paths to their original
 //! form given a set of parameters.
-
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{Display, Write};
+use std::sync::Arc;
 
+use cot::router::tree::MatchitPattern;
 use cot_core::error::impl_into_cot_error;
 use thiserror::Error;
 
@@ -62,6 +63,8 @@ pub(super) enum PathMatcherError {
     )]
     #[non_exhaustive]
     WildcardNotAtEnd { pattern: String, name: String },
+    #[error("{PATH_MATCHER_ERROR_PREFIX} unsupported brace")]
+    UnsupportedLiteralBrace { pattern: String },
 }
 impl_into_cot_error!(PathMatcherError);
 
@@ -226,7 +229,7 @@ impl PathMatcher {
         Ok(result)
     }
 
-    #[allow(dead_code, reason = "used by OpenAPI route generation")]
+    #[expect(dead_code, reason = "used by OpenAPI route generation")]
     pub(super) fn param_names(&self) -> impl Iterator<Item = &str> {
         self.parts.iter().filter_map(|part| match part {
             PathPart::Literal(..) => None,
@@ -236,6 +239,32 @@ impl PathMatcher {
 
     pub(super) fn parts(&self) -> &[PathPart] {
         &self.parts
+    }
+}
+
+impl TryFrom<Arc<PathMatcher>> for MatchitPattern {
+    type Error = PathMatcherError;
+
+    fn try_from(value: Arc<PathMatcher>) -> Result<Self, Self::Error> {
+        let mut pattern = String::new();
+        for part in &value.parts {
+            match part {
+                PathPart::Literal(s) if s.contains(['{', '}']) => {
+                    return Err(PathMatcherError::UnsupportedLiteralBrace {
+                        pattern: value.to_string(),
+                    });
+                }
+                PathPart::Literal(s) => pattern.push_str(s),
+                PathPart::Param { name } => {
+                    let _ = write!(pattern, "{{{name}}}");
+                }
+                PathPart::Wildcard { name } => {
+                    let _ = write!(pattern, "{{*{name}}}");
+                }
+            }
+        }
+
+        Ok(MatchitPattern::new(pattern))
     }
 }
 

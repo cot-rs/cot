@@ -43,6 +43,7 @@ idna = { workspace = true, optional = true }
 indexmap.workspace = true
 is_terminal_polyfill.workspace = true
 lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"], optional = true }
+matchit.workspace = true
 mime.workspace = true
 mime_guess.workspace = true
 multer.workspace = true

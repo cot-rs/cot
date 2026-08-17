@@ -18,55 +18,95 @@ const PATH_MATCHER_ERROR_PREFIX: &str = "route conflict error:";
 pub(super) enum PathMatcherError {
     /// Two parameters appear consecutively with no literal text between them,
     #[error(
-        "{PATH_MATCHER_ERROR_PREFIX} consecutive parameters are not allowed in pattern `{pattern}` (at position {position})"
+        "{PATH_MATCHER_ERROR_PREFIX} consecutive parameters are not allowed in pattern `{pattern}`"
     )]
     #[non_exhaustive]
-    ConsecutiveParams { pattern: String, position: usize },
-
+    ConsecutiveParams { pattern: String },
     /// A `{` was opened but never closed with a matching `}`.
     #[error(
-        "{PATH_MATCHER_ERROR_PREFIX} unclosed parameter `{{{name}` in pattern `{pattern}` -- expected a closing `}}`"
+        "{PATH_MATCHER_ERROR_PREFIX} unclosed parameter `{{{name}` in pattern `{pattern}`; expected a closing `}}`"
     )]
     #[non_exhaustive]
     UnclosedParam { pattern: String, name: String },
-
     /// A `}` appeared without a preceding `{` to open it.
     #[error(
-        "{PATH_MATCHER_ERROR_PREFIX} closing brace `}}` without a matching opening `{{` in pattern `{pattern}` \
-         (at position {position})"
+        "{PATH_MATCHER_ERROR_PREFIX} closing brace `}}` without a matching opening `{{` in pattern `{pattern}`"
     )]
     #[non_exhaustive]
-    UnmatchedClosingBrace { pattern: String, position: usize },
-
+    UnmatchedClosingBrace { pattern: String },
     /// A parameter name is empty or contains characters other than
     /// alphanumerics/underscore, or starts with a digit.
     #[error(
-        "{PATH_MATCHER_ERROR_PREFIX} invalid parameter name `{name}` in pattern `{pattern}` -- parameter names must start \
+        "{PATH_MATCHER_ERROR_PREFIX} invalid parameter name `{name}` in pattern `{pattern}`; parameter names must start \
          with a letter or underscore and contain only letters, digits, or underscores"
     )]
     #[non_exhaustive]
     InvalidParamName { pattern: String, name: String },
-
     /// Same as `InvalidParamName`, but for the name following a `*` in a
     /// wildcard segment.
     #[error(
-        "{PATH_MATCHER_ERROR_PREFIX} invalid wildcard name `{name}` in pattern `{pattern}` -- wildcard names must start \
+        "{PATH_MATCHER_ERROR_PREFIX} invalid wildcard name `{name}` in pattern `{pattern}`; wildcard names must start \
          with a letter or underscore and contain only letters, digits, or underscores"
     )]
     #[non_exhaustive]
     InvalidWildcardName { pattern: String, name: String },
-
     /// A wildcard segment (`{*name}`) was followed by more path segments,
     #[error(
-        "{PATH_MATCHER_ERROR_PREFIX} wildcard parameter `{{*{name}}}` must be the last segment of pattern `{pattern}` -- \
+        "{PATH_MATCHER_ERROR_PREFIX} wildcard parameter `{{*{name}}}` must be the last segment of pattern `{pattern}`; \
          a wildcard consumes the rest of the path, so nothing can follow it"
     )]
     #[non_exhaustive]
     WildcardNotAtEnd { pattern: String, name: String },
-    #[error("{PATH_MATCHER_ERROR_PREFIX} unsupported brace")]
+    #[error("{PATH_MATCHER_ERROR_PREFIX} unsupported brace in {pattern}")]
     UnsupportedLiteralBrace { pattern: String },
 }
 impl_into_cot_error!(PathMatcherError);
+
+/// An absolute route path.
+///
+/// The path is normalized to always begin with `/` and allows paths to be
+/// joined without introducing duplicate `/` separators.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AbsolutePath(String);
+
+impl AbsolutePath {
+    #[must_use]
+    pub(crate) fn new<S: Into<String>>(s: S) -> Self {
+        let mut s = s.into();
+        if !s.starts_with('/') {
+            s.insert(0, '/');
+        }
+        Self(s)
+    }
+
+    #[must_use]
+    pub(crate) fn root() -> Self {
+        Self(String::from("/"))
+    }
+
+    #[must_use]
+    pub(crate) fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    #[must_use]
+    pub(crate) fn join(&self, suffix: &AbsolutePath) -> AbsolutePath {
+        let trimmed = self.0.strip_suffix('/').unwrap_or(&self.0);
+        AbsolutePath(format!("{trimmed}{}", suffix.0))
+    }
+}
+
+impl Display for AbsolutePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<AbsolutePath> for String {
+    fn from(value: AbsolutePath) -> Self {
+        value.0
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(super) struct PathMatcher {
@@ -90,7 +130,7 @@ impl PathMatcher {
         }
 
         let mut path_pattern = path_pattern.into();
-        if !path_pattern.is_empty() && !path_pattern.starts_with('/') {
+        if !path_pattern.starts_with('/') {
             path_pattern.insert(0, '/');
         }
 
@@ -110,7 +150,6 @@ impl PathMatcher {
                         if index != 0 && ch.is_some() {
                             return Err(PathMatcherError::ConsecutiveParams {
                                 pattern: path_pattern.clone(),
-                                position: index,
                             });
                         }
                     } else {
@@ -142,7 +181,6 @@ impl PathMatcher {
                     } else {
                         return Err(PathMatcherError::UnmatchedClosingBrace {
                             pattern: path_pattern.clone(),
-                            position: index,
                         });
                     }
                 }
@@ -468,67 +506,89 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Consecutive parameters are not allowed")]
+    #[should_panic(
+        expected = "route conflict error: consecutive parameters are not allowed in pattern `/users/{id}{post_id}`"
+    )]
     fn path_parser_consecutive_params() {
         let _ = PathMatcher::new("/users/{id}{post_id}");
     }
 
     #[test]
-    #[should_panic(expected = "Invalid parameter name: ``")]
+    #[should_panic(
+        expected = "route conflict error: invalid parameter name `` in pattern `/users/{}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
+    )]
     fn path_parser_invalid_name_empty() {
         let _ = PathMatcher::new("/users/{}");
     }
 
     #[test]
-    #[should_panic(expected = "Invalid parameter name: `123`")]
+    #[should_panic(
+        expected = "route conflict error: invalid parameter name `123` in pattern `/users/{123}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
+    )]
     fn path_parser_invalid_name_numeric() {
         let _ = PathMatcher::new("/users/{123}");
     }
 
     #[test]
-    #[should_panic(expected = "Invalid parameter name: `abc#$%`")]
+    #[should_panic(
+        expected = "route conflict error: invalid parameter name `abc#$%` in pattern `/users/{abc#$%}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
+    )]
     fn path_parser_invalid_name_non_alphanumeric() {
         let _ = PathMatcher::new("/users/{abc#$%}");
     }
 
     #[test]
-    #[should_panic(expected = "Invalid wildcard name: ``")]
+    #[should_panic(
+        expected = "route conflict error: invalid wildcard name `` in pattern `/users/{*}`; wildcard names must start with a letter or underscore and contain only letters, digits, or underscores"
+    )]
     fn path_parser_invalid_wildcard_name_empty() {
         let _ = PathMatcher::new("/users/{*}");
     }
 
     #[test]
-    #[should_panic(expected = "Wildcard parameters are only allowed at the end of a route")]
+    #[should_panic(
+        expected = "route conflict error: wildcard parameter `{*path}` must be the last segment of pattern `/users/{*path}/edit`; a wildcard consumes the rest of the path, so nothing can follow it"
+    )]
     fn path_parser_wildcard_not_at_end() {
         let _ = PathMatcher::new("/users/{*path}/edit");
     }
 
     #[test]
-    #[should_panic(expected = "Unclosed parameter: `foo`")]
+    #[should_panic(
+        expected = "route conflict error: unclosed parameter `{foo` in pattern `/users/{foo`; expected a closing `}`"
+    )]
     fn path_parser_unclosed() {
         let _ = PathMatcher::new("/users/{foo");
     }
 
     #[test]
-    #[should_panic(expected = "Closing brace encountered without opening brace")]
+    #[should_panic(
+        expected = "route conflict error: closing brace `}` without a matching opening `{` in pattern `/users/foo}`"
+    )]
     fn path_parser_missing_opening_brace() {
         let _ = PathMatcher::new("/users/foo}");
     }
 
     #[test]
-    #[should_panic(expected = "Unclosed parameter: `foo`")]
+    #[should_panic(
+        expected = "route conflict error: unclosed parameter `{foo` in pattern `/users/{foo/bar`; expected a closing `}`"
+    )]
     fn path_parser_unclosed_slash() {
         let _ = PathMatcher::new("/users/{foo/bar");
     }
 
     #[test]
-    #[should_panic(expected = "Unclosed parameter: `foo`")]
+    #[should_panic(
+        expected = "route conflict error: unclosed parameter `{foo` in pattern `/users/{foo{bar`; expected a closing `}`"
+    )]
     fn path_parser_unclosed_double() {
         let _ = PathMatcher::new("/users/{foo{bar");
     }
 
     #[test]
-    #[should_panic(expected = "Closing brace encountered without opening brace")]
+    #[should_panic(
+        expected = "route conflict error: closing brace `}` without a matching opening `{` in pattern `/users/{{{foo}}/bar`"
+    )]
     fn path_parser_escaping_unclosed() {
         let _ = PathMatcher::new("/users/{{{foo}}/bar");
     }
@@ -590,5 +650,38 @@ mod tests {
         let path_parser = PathMatcher::new("/café/test");
         let params = ReverseParamMap::new();
         assert_eq!(path_parser.reverse(&params).unwrap(), "/café/test");
+    }
+
+    #[test]
+    fn absolute_path_join_root_with_root() {
+        assert_eq!(
+            AbsolutePath::root().join(&AbsolutePath::root()).as_str(),
+            "/"
+        );
+    }
+
+    #[test]
+    fn absolute_path_join_root_is_identity() {
+        let x = AbsolutePath::new("/foo/bar");
+        assert_eq!(AbsolutePath::root().join(&x), x);
+    }
+
+    #[test]
+    fn absolute_path_join_trims_doubled_slash() {
+        let prefix = AbsolutePath::new("/api/");
+        let suffix = AbsolutePath::new("/inner");
+        assert_eq!(prefix.join(&suffix).as_str(), "/api/inner");
+    }
+
+    #[test]
+    fn absolute_path_join_no_trailing_slash_on_prefix() {
+        let prefix = AbsolutePath::new("/api");
+        let suffix = AbsolutePath::new("/inner");
+        assert_eq!(prefix.join(&suffix).as_str(), "/api/inner");
+    }
+
+    #[test]
+    fn absolute_path_new_normalizes_missing_leading_slash() {
+        assert_eq!(AbsolutePath::new("foo").as_str(), "/foo");
     }
 }

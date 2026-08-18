@@ -267,7 +267,7 @@ impl PathMatcher {
         Ok(result)
     }
 
-    #[expect(dead_code, reason = "used by OpenAPI route generation")]
+    #[cfg(feature = "openapi")]
     pub(super) fn param_names(&self) -> impl Iterator<Item = &str> {
         self.parts.iter().filter_map(|part| match part {
             PathPart::Literal(..) => None,

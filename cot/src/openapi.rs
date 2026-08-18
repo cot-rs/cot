@@ -95,7 +95,7 @@
 //! # async fn main() -> cot::Result<()> {
 //! #     let mut client = cot::test::Client::new(ApiProject).await;
 //! #
-//! #     let response = client.get("/swagger/").await?;
+//! #     let response = client.get("/swagger").await?;
 //! #     assert_eq!(response.status(), StatusCode::OK);
 //! #
 //! #     Ok(())

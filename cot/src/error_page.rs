@@ -130,7 +130,6 @@ impl ErrorPageTemplateBuilder {
             &AbsolutePath::root(),
             "",
         );
-        println!("\n\nroute_data: {:?}\n\n", self.route_data);
         self.request_data = diagnostics
             .request_head
             .as_ref()

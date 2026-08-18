@@ -27,7 +27,9 @@ use thiserror::Error;
 
 use crate::config::SecretKey;
 #[cfg(feature = "db")]
-use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
+use crate::db::{
+    ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, TextField, ToDbValue,
+};
 use crate::request::{Request, RequestExt};
 use crate::session::Session;
 
@@ -729,6 +731,9 @@ impl ToDbValue for Option<PasswordHash> {
         }
     }
 }
+
+#[cfg(feature = "db")]
+impl TextField for PasswordHash {}
 
 /// Authentication helper structure.
 ///

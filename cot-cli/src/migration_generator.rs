@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, bail};
 use cot::db::migrations::{DynMigration, MigrationEngine};
+use cot::utils::cli::{StatusType, print_status_msg};
 use cot_codegen::model::{Field, Model, ModelArgs, ModelOpts, ModelType};
 use cot_codegen::symbol_resolver::SymbolResolver;
 use darling::FromMeta;
@@ -18,7 +19,7 @@ use quote::{ToTokens, format_ident, quote};
 use syn::{Meta, parse_quote};
 use tracing::{debug, trace};
 
-use crate::utils::{CargoTomlManager, PackageManager, StatusType, print_status_msg};
+use crate::utils::{CargoTomlManager, PackageManager};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
     let Some(manager) = CargoTomlManager::from_path(path)? else {

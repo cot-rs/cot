@@ -6,8 +6,7 @@ use cot::error::handler::DynErrorPageHandler;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::static_files::StaticFilesMiddleware;
 use cot::{AppBuilder, Project};
-use cot_site::{CotSiteApp, cot_site_common, cot_site_handle_error, md_page, GuideItem};
-
+use cot_site::{CotSiteApp, GuideItem, cot_site_common, cot_site_handle_error, md_page};
 
 struct CotSiteProject;
 
@@ -43,6 +42,7 @@ impl Project for CotSiteProject {
                             pages: vec![
                                 md_page!("databases/overview"),
                                 md_page!("databases/queries"),
+                                md_page!("databases/transactions"),
                             ],
                         },
                         GuideItem::Page(md_page!("admin-panel")),
@@ -54,13 +54,14 @@ impl Project for CotSiteProject {
                         GuideItem::Page(md_page!("testing")),
                     ],
                 ),
-                ("Upgrading", vec![
-                    GuideItem::Page(md_page!("upgrade-guide"))
-                ]
+                (
+                    "Upgrading",
+                    vec![GuideItem::Page(md_page!("upgrade-guide"))],
                 ),
-                ("About", vec![
-                    GuideItem::Page(md_page!("framework-comparison"))
-                ]),
+                (
+                    "About",
+                    vec![GuideItem::Page(md_page!("framework-comparison"))],
+                ),
             ]),
             "",
         );

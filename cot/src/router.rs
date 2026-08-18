@@ -239,6 +239,10 @@ impl Router {
         }
     }
 
+    pub(crate) fn has_route(&self, request_path: &str) -> bool {
+        self.get_handler(request_path).is_some()
+    }
+
     /// Handle a request.
     ///
     /// This method is called by the [`CotApp`](crate::App) to handle
@@ -1172,6 +1176,16 @@ mod tests {
         }
     }
 
+    fn assert_params(mut actual: Vec<(String, String)>, expected: &[(&str, &str)]) {
+        let mut expected = expected
+            .iter()
+            .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+            .collect::<Vec<_>>();
+        actual.sort();
+        expected.sort();
+        assert_eq!(actual, expected);
+    }
+
     #[test]
     fn route_inner_debug() {
         let route = Route::with_handler("/test", MockHandler);
@@ -1781,15 +1795,5 @@ mod tests {
 
     fn test_request() -> Request {
         TestRequestBuilder::get("/test").build()
-    }
-
-    fn assert_params(mut actual: Vec<(String, String)>, expected: &[(&str, &str)]) {
-        let mut expected = expected
-            .iter()
-            .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
-            .collect::<Vec<_>>();
-        actual.sort();
-        expected.sort();
-        assert_eq!(actual, expected);
     }
 }

@@ -80,7 +80,7 @@ pub mod session;
 pub mod static_files;
 #[cfg(feature = "test")]
 pub mod test;
-pub(crate) mod utils;
+pub mod utils;
 
 #[cfg(feature = "openapi")]
 pub use aide;

@@ -4,7 +4,9 @@ use cot::auth::db::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
 use cot::html::Html;
-use cot::middleware::{AuthMiddleware, LiveReloadMiddleware, SessionMiddleware};
+use cot::middleware::{
+    AuthMiddleware, LiveReloadMiddleware, SessionMiddleware, TrailingSlashMiddleware,
+};
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::request::extractors::StaticFiles;
 use cot::router::{Route, Router};
@@ -68,6 +70,7 @@ impl Project for {{ project_struct_name }} {
             .middleware(AuthMiddleware::new())
             .middleware(SessionMiddleware::from_context(context))
             .middleware(LiveReloadMiddleware::from_context(context))
+            .middleware(TrailingSlashMiddleware::from_context(context))
             .build()
     }
 }

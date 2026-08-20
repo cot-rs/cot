@@ -152,6 +152,12 @@ pub struct CompletionsArgs {
 pub fn extract_package_arg(raw: &[String]) -> Option<String> {
     let mut iter = raw.iter();
     while let Some(arg) = iter.next() {
+        if arg == "--" {
+            // all args before the double dash delimeter is used internally per convention
+            // and any arg after the delimeter is forwarded to the binary, so we
+            // stop here
+            return None;
+        }
         if let Some(value) = arg.strip_prefix(&format!("{PACKAGE_LONG_FLAG}=")) {
             return Some(value.to_string());
         }
@@ -210,5 +216,17 @@ mod tests {
         let raw = args(&["cot", "--release", "check"]);
 
         assert_eq!(extract_package_arg(&raw), None);
+    }
+
+    #[test]
+    fn extract_package_arg_stops_scanning_at_double_dash() {
+        let raw = args(&["cot", "check", "--", "-p", "package"]);
+        assert_eq!(extract_package_arg(&raw), None);
+    }
+
+    #[test]
+    fn extract_package_arg_found_before_double_dash_ignores_forwarded_content() {
+        let raw = args(&["cot", "-p", "real", "check", "--", "-p", "forwarded"]);
+        assert_eq!(extract_package_arg(&raw), Some("real".to_string()));
     }
 }

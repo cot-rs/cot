@@ -940,7 +940,14 @@ impl Bootstrapper<Uninitialized> {
         cli.set_metadata(self.project.cli_metadata());
         self.project.register_tasks(&mut cli);
 
-        if std::env::args().any(|arg| arg == METADATA_FLAG) {
+        let args = std::env::args().collect::<Vec<_>>();
+        // get all args before any double dash(--)
+        let cot_args = match args.iter().position(|a| a == "--") {
+            Some(idx) => &args[..idx],
+            None => args.as_slice(),
+        };
+
+        if cot_args.iter().any(|arg| arg == METADATA_FLAG) {
             let meta = ProjectMetadata::from(cli.command());
 
             println!(

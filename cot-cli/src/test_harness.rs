@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use anyhow::{Context, Result, bail};
+use heck::ToPascalCase;
 use tempfile::TempDir;
 
 use crate::args::{BUILD_FLAG, RELEASE_FLAG};
@@ -92,7 +94,7 @@ fn default_main_rs(
     register_calls: &[String],
     apps: &[CotApp],
 ) -> String {
-    let struct_name = to_pascal_case(project_name);
+    let struct_name = project_name.to_pascal_case();
     let register_tasks_body = register_calls.join("\n\t\t");
     let app_definitions = apps
         .iter()
@@ -197,7 +199,6 @@ async-trait = "0.1"
 }
 
 fn unique_project_name() -> String {
-    use std::sync::atomic::{AtomicU32, Ordering};
     static COUNTER: AtomicU32 = AtomicU32::new(0);
     let count = COUNTER.fetch_add(1, Ordering::Relaxed);
     // Use process ID + counter so parallel test processes don't collide.
@@ -305,7 +306,7 @@ impl CotApp {
     /// Render this app as Rust source implementing `cot::App`.
     #[must_use]
     pub fn render(&self) -> String {
-        let struct_name = format!("{}App", to_pascal_case(&self.name));
+        let struct_name = format!("{}App", &self.name.to_pascal_case());
 
         let init = self.render_init();
         let router = self.render_router();
@@ -433,7 +434,7 @@ impl cot::App for {struct_name} {{
     /// project.
     #[must_use]
     pub fn render_registration(&self) -> String {
-        let struct_name = format!("{}App", to_pascal_case(&self.name));
+        let struct_name = format!("{}App", &self.name.to_pascal_case());
 
         format!("\t\tapps.register({struct_name});")
     }
@@ -868,7 +869,7 @@ fn link_or_copy(src: &Path, dst: &Path) -> Result<()> {
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(src, dst)
-            .with_context(|| format!("failed to symlink {} → {}", src.display(), dst.display()))
+            .with_context(|| format!("failed to symlink {} -> {}", src.display(), dst.display()))
     }
 
     #[cfg(not(unix))]
@@ -877,16 +878,4 @@ fn link_or_copy(src: &Path, dst: &Path) -> Result<()> {
             .with_context(|| format!("failed to copy {} → {}", src.display(), dst.display()))
             .map(|_| ())
     }
-}
-
-fn to_pascal_case(s: &str) -> String {
-    s.split(['-', '_'])
-        .map(|part| {
-            let mut chars = part.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-            }
-        })
-        .collect()
 }

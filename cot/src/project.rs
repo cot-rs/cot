@@ -943,7 +943,10 @@ impl Bootstrapper<Uninitialized> {
         if std::env::args().any(|arg| arg == METADATA_FLAG) {
             let meta = ProjectMetadata::from(cli.command());
 
-            println!("{}", serde_json::to_string_pretty(&meta).unwrap());
+            println!(
+                "{}",
+                serde_json::to_string(&meta).expect("parsing metadata to string should not fail.")
+            );
             std::process::exit(0);
         }
 

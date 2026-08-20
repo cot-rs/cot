@@ -76,6 +76,7 @@ backtrace = "0.3.76"
 blake3 = "1.8.5"
 bytes = "1.12"
 cargo_toml = "1.0"
+cargo_metadata = "0.23.1"
 chrono = { version = "0.4.45", default-features = false }
 chrono-tz = { version = "0.10", default-features = false }
 clap = { version = "4.6", features = ["deprecated"] }

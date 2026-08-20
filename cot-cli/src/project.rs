@@ -1,35 +1,19 @@
-use std::fmt::Write;
-use std::io::Read;
+//! Functionality to locate, build (only if necessary), and query a Cot-compiled
+//! binary.
+mod build;
+mod cache;
+mod discovery;
+
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use std::time::SystemTime;
 
-use anyhow::{Context, bail};
-use cargo_toml::Manifest;
-use cot::metadata::{METADATA_FLAG, ProjectMetadata};
+use anyhow::bail;
+use cot::metadata::ProjectMetadata;
 use cot::utils::cli::{StatusType, print_status_msg};
-use serde::{Deserialize, Serialize};
-use wait_timeout::ChildExt;
 
-use crate::args::{BINARY_FLAG, PACKAGE_SHORT_FLAG, RELEASE_FLAG};
-use crate::utils::{CargoTomlManager, PackageManager, WorkspaceManager};
+use crate::project::discovery::ResolvedBinary;
 
 const RELEASE_PROFILE: &str = "release";
 const DEBUG_PROFILE: &str = "debug";
-const METADATA_TIMEOUT: core::time::Duration = core::time::Duration::from_secs(5);
-
-#[derive(Serialize, Deserialize)]
-struct Cache {
-    binary_mtime_secs: u64,
-    metadata: ProjectMetadata,
-}
-
-const COT_DIR_NAME: &str = ".cot";
-const CACHE_FILE_NAME: &str = "command-cache.json";
-
-fn command_cache_path(project_dir: &Path) -> PathBuf {
-    project_dir.join(COT_DIR_NAME).join(CACHE_FILE_NAME)
-}
 
 #[derive(Debug)]
 pub struct ProjectBinary {
@@ -49,41 +33,23 @@ pub fn load(
     package: Option<&str>,
     build: bool,
 ) -> anyhow::Result<Option<ProjectBinary>> {
-    let Some(manager) = CargoTomlManager::from_path(path)? else {
+    let Some(resolved) = discovery::resolve(path, release, package)? else {
         return Ok(None);
     };
 
-    let (package_manager, target_dir_root): (&PackageManager, PathBuf) = match &manager {
-        CargoTomlManager::Package(pm) => {
-            let dir = pm.get_package_path().to_path_buf();
-            (pm, dir)
-        }
-        CargoTomlManager::Workspace(wm) => {
-            let pm = resolve_workspace_package(wm, package)?;
-            (pm, wm.get_workspace_root().to_path_buf())
-        }
-    };
-
-    let project_dir = package_manager.get_package_path();
-    let binary_name = resolve_binary_name(package_manager)?;
-    let target_dir = resolve_target_dir(&target_dir_root);
-    let profile = if release {
-        RELEASE_PROFILE
-    } else {
-        DEBUG_PROFILE
-    };
-
-    #[cfg(target_os = "windows")]
-    let binary_name = format!("{binary_name}.exe");
-
-    let binary_path = target_dir.join(profile).join(&binary_name);
+    let ResolvedBinary {
+        binary_path,
+        project_dir,
+        package_name,
+        binary_name,
+    } = resolved;
 
     if !binary_path.exists() {
         if !build {
             return Ok(None);
         }
 
-        build_binary(package_manager.get_package_name(), &binary_name, release)?;
+        build::build_binary(&package_name, &binary_name, release)?;
         if !binary_path.exists() {
             bail!(
                 "`cargo build` succeeded but `{}` still wasn't found at the expected path, \
@@ -98,12 +64,12 @@ pub fn load(
     // binary is the current executable. Querying it for `--metadata` would
     // either recurse or fail: only cot application binaries implement that
     // flag, not the CLI proxy.
-    if is_current_executable(&binary_path) {
+    if discovery::is_current_executable(&binary_path) {
         return Ok(None);
     }
 
-    let cache_path = command_cache_path(project_dir);
-    let metadata = match load_or_refresh_metadata(&binary_path, &cache_path) {
+    let cache_path = cache::command_cache_path(&project_dir);
+    let metadata = match cache::load_or_refresh(&binary_path, &cache_path) {
         Ok(meta) => meta,
         Err(e) => {
             print_status_msg(
@@ -124,329 +90,6 @@ pub fn load(
     }))
 }
 
-fn build_binary(package_name: &str, binary_name: &str, release: bool) -> anyhow::Result<()> {
-    print_status_msg(
-        StatusType::Notice,
-        &format!("no existing binary found for `{binary_name}`, building it now"),
-    );
-
-    let mut cmd = std::process::Command::new("cargo");
-    cmd.args([
-        "build",
-        PACKAGE_SHORT_FLAG,
-        package_name,
-        BINARY_FLAG,
-        binary_name,
-    ]);
-    if release {
-        cmd.arg(RELEASE_FLAG);
-    }
-
-    let status = cmd.status().context("failed to spawn `cargo build`")?;
-
-    anyhow::ensure!(
-        status.success(),
-        "`cargo build` failed for `{package_name}`"
-    );
-    Ok(())
-}
-
-fn is_current_executable(binary_path: &Path) -> bool {
-    let Ok(current_exe) = std::env::current_exe() else {
-        return false;
-    };
-
-    let Ok(binary_path) = binary_path.canonicalize() else {
-        return false;
-    };
-    let Ok(current_exe) = current_exe.canonicalize() else {
-        return false;
-    };
-
-    binary_path == current_exe
-}
-
-fn resolve_workspace_package<'a>(
-    wm: &'a WorkspaceManager,
-    package: Option<&str>,
-) -> anyhow::Result<&'a PackageManager> {
-    if let Some(name) = package {
-        return wm.get_package_manager(name).with_context(|| {
-            format!(
-                "package `{name}` not found in workspace.\nAvailable packages: {}",
-                available_packages(wm)
-            )
-        });
-    }
-
-    if let Some(pm) = wm.get_current_package_manager() {
-        return Ok(pm);
-    }
-
-    bail!(
-        "multiple packages found in the workspace; specify which one to use with `-p <PACKAGE>`.\n\n\
-         Available packages: {}",
-        available_packages(wm)
-    )
-}
-
-fn available_packages(wm: &WorkspaceManager) -> String {
-    wm.get_packages()
-        .iter()
-        .map(|p| p.get_package_name())
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-/// Resolve the binary name for a package:
-///
-/// 1. If the package has a `[package.metadata.cot.binary]` entry (typically as
-///    a result of disambiguating multiple binaries), use that.
-/// 2. If the package has a single `[[bin]]` explicitly in `Cargo.toml`, use
-///    that.
-/// 3. Otherwise, use the package name.
-fn resolve_binary_name(package_manager: &PackageManager) -> anyhow::Result<String> {
-    let manifest: &Manifest = package_manager.get_manifest();
-
-    if let Some(package) = &manifest.package
-        && let Some(metadata) = &package.metadata
-        && let Some(name) = metadata
-            .get("cot")
-            .and_then(|c| c.get("binary"))
-            .and_then(|b| b.as_str())
-    {
-        return Ok(name.to_string());
-    }
-
-    let named_bins: Vec<&str> = manifest
-        .bin
-        .iter()
-        .filter_map(|b| b.name.as_deref())
-        .collect();
-
-    match named_bins.len() {
-        0 => {}
-        1 => return Ok(named_bins[0].to_string()),
-        _ => {
-            // if a default-run field exists lets use that
-            // https://doc.rust-lang.org/cargo/reference/manifest.html#the-default-run-field
-            if let Some(default_run) = manifest
-                .package
-                .as_ref()
-                .and_then(|p| p.default_run.as_deref())
-            {
-                return Ok(default_run.to_string());
-            }
-
-            bail!(
-                "package `{}` has multiple [[bin]] targets.\n\
-             Specify which one `cot` should use by adding to its Cargo.toml:\n\
-             \n\
-             [package.metadata.cot]\n\
-             binary = \"your-binary-name\"",
-                package_manager.get_package_name(),
-            )
-        }
-    }
-
-    manifest
-        .package
-        .as_ref()
-        .map(|p| p.name.clone())
-        .context("Cargo.toml has no [package] section and no [[bin]] targets")
-}
-
-fn resolve_target_dir(start_dir: &Path) -> PathBuf {
-    if let Ok(dir) = std::env::var("CARGO_TARGET_DIR") {
-        return PathBuf::from(dir);
-    }
-
-    let mut dir = start_dir;
-    loop {
-        let candidate = dir.join("target");
-        if candidate.exists() {
-            return candidate;
-        }
-        match dir.parent() {
-            Some(parent) => dir = parent,
-            None => break,
-        }
-    }
-    start_dir.join("target")
-}
-
-fn load_or_refresh_metadata(
-    binary_path: &Path,
-    cache_path: &Path,
-) -> anyhow::Result<Option<ProjectMetadata>> {
-    let current_mtime_secs = mtime_secs(binary_path)?;
-
-    // Fast path if we hit the cache
-    if let Ok(bytes) = std::fs::read(cache_path)
-        && let Ok(cache) = serde_json::from_slice::<Cache>(&bytes)
-        && cache.binary_mtime_secs == current_mtime_secs
-    {
-        return Ok(Some(cache.metadata));
-    }
-
-    // slow path
-    // stdout/stderr are piped and drained on separate threads to avoid a
-    // deadlock. Pipe buffers are OS-bounded, so if the child fills one
-    // while we're blocked waiting to timeout in `wait_timeout` or reading the other
-    // output, its write blocks and deadlocks.
-    // https://doc.rust-lang.org/std/process/index.html#handling-io
-    // https://docs.rs/os_pipe/latest/os_pipe/#common-deadlocks-related-to-pipes
-    let mut child = std::process::Command::new(binary_path)
-        .arg(METADATA_FLAG)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .with_context(|| format!("Failed to spawn {}", binary_path.display()))?;
-
-    let mut std_err_piped = child.stderr.take().expect("Stderr should be piped");
-    let mut std_out_piped = child.stdout.take().expect("Stdout should be piped");
-
-    let std_err_thread = std::thread::spawn(move || {
-        let mut buf = Vec::new();
-        std_err_piped
-            .read_to_end(&mut buf)
-            .expect("reading to buffer should not fail");
-        buf
-    });
-
-    let std_out_thread = std::thread::spawn(move || {
-        let mut buf = Vec::new();
-        std_out_piped
-            .read_to_end(&mut buf)
-            .expect("reading to buffer should not fail");
-        buf
-    });
-
-    let Some(status) = child
-        .wait_timeout(METADATA_TIMEOUT)
-        .with_context(|| format!("Failed to wait on {}", binary_path.display()))?
-    else {
-        let _ = child.kill();
-        let _ = child.wait();
-        bail!(
-            "the `{}` binary did not respond within {:?} when queried for metadata.",
-            binary_path.display(),
-            METADATA_TIMEOUT
-        );
-    };
-
-    let stdout = std_out_thread
-        .join()
-        .expect("joining thread handle should not fail");
-    let stderr = std_err_thread
-        .join()
-        .expect("joining stderr thread should not fail");
-
-    if !status.success() {
-        let stderr_str = String::from_utf8_lossy(&stderr);
-
-        // check for previous cot versions(<=0.7.0) without metadata support.
-        let is_legacy_binary = status.code() == Some(2)
-            && stderr_str.contains(&format!("unexpected argument '{METADATA_FLAG}'"));
-
-        if is_legacy_binary {
-            print_status_msg(
-                StatusType::Warning,
-                &format!(
-                    "the `{}` binary doesn't recognize a flag `cot` uses to discover the binary's cli commands, \
-                 so they won't be listed when you run `cot --help`. This usually means the binary \
-                 was built against an older version of `cot`. To fix this, update your `cot`version",
-                    binary_path.display(),
-                ),
-            );
-            return Ok(None);
-        }
-
-        let mut msg = format!(
-            "the `{}` binary exited unexpectedly while `cot` was trying to determine the binary's cli commands.",
-            binary_path.display(),
-        );
-        if !stderr_str.trim().is_empty() {
-            let _ = write!(msg, "\n\nstderr:\n{}", stderr_str.trim());
-        }
-        let stdout_str = String::from_utf8_lossy(&stdout);
-        if !stdout_str.trim().is_empty() {
-            let _ = write!(msg, "\n\nstdout:\n{}", stdout_str.trim());
-        }
-        bail!(msg);
-    }
-
-    if stdout.is_empty() {
-        // The binary ran but the metadata flag was ignored
-        bail!(
-            "the `{}` binary produced no output for {METADATA_FLAG}",
-            binary_path.display(),
-        );
-    }
-
-    let metadata = parse_metadata(&stdout, binary_path)?;
-
-    write_cache(
-        cache_path,
-        &Cache {
-            binary_mtime_secs: current_mtime_secs,
-            metadata: metadata.clone(),
-        },
-    )?;
-
-    Ok(Some(metadata))
-}
-
-#[derive(Deserialize)]
-struct MetadataVersionProbe {
-    version: u32,
-}
-
-fn parse_metadata(bytes: &[u8], binary_path: &Path) -> anyhow::Result<ProjectMetadata> {
-    // check the version first before attempting to deserialize so we can show a
-    // clearer error message instead of the generic serde error message
-    let probe: MetadataVersionProbe = serde_json::from_slice(bytes).with_context(|| {
-        format!(
-            "the `{}` binary returned metadata with no readable version field.",
-            binary_path.display()
-        )
-    })?;
-
-    anyhow::ensure!(
-        probe.version == cot::metadata::METADATA_SCHEMA_VERSION,
-        "the `{}` binary was built against a `cot` version with metadata schema v{}, \
-         but this `cot-cli` expects v{}. Try updating cot-cli (`cargo install --locked cot-cli`) \
-         or rebuilding the project.",
-        binary_path.display(),
-        probe.version,
-        cot::metadata::METADATA_SCHEMA_VERSION,
-    );
-
-    serde_json::from_slice(bytes).with_context(|| {
-        format!(
-            "Binary `{}` returned invalid JSON for {METADATA_FLAG}\n\nstdout:\n{}",
-            binary_path.display(),
-            String::from_utf8_lossy(bytes).trim(),
-        )
-    })
-}
-
-fn mtime_secs(path: &Path) -> anyhow::Result<u64> {
-    let metadata = path.metadata()?;
-    Ok(metadata
-        .modified()?
-        .duration_since(SystemTime::UNIX_EPOCH)?
-        .as_secs())
-}
-
-fn write_cache(cache_path: &Path, cache: &Cache) -> anyhow::Result<()> {
-    if let Some(parent) = cache_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(cache_path, serde_json::to_string(cache)?)?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -457,8 +100,15 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::project::cache::command_cache_path;
 
-    fn write_package_manifest(package_dir: &Path, package_name: &str, extra: &str) {
+    pub(crate) fn canonical_temp_dir() -> (TempDir, PathBuf) {
+        let temp_dir = TempDir::new().unwrap();
+        let tmp_path = temp_dir.path().canonicalize().unwrap();
+        (temp_dir, tmp_path)
+    }
+
+    pub(crate) fn write_package_manifest(package_dir: &Path, package_name: &str, extra: &str) {
         fs::create_dir_all(package_dir).unwrap();
         fs::write(
             package_dir.join("Cargo.toml"),
@@ -472,9 +122,15 @@ edition = "2024"
             ),
         )
         .unwrap();
+
+        if !extra.contains("[[bin]]") {
+            let src_dir = package_dir.join("src");
+            fs::create_dir_all(&src_dir).unwrap();
+            fs::write(src_dir.join("main.rs"), "fn main() {}\n").unwrap();
+        }
     }
 
-    fn write_workspace_manifest(workspace_dir: &Path, members: &[&str]) {
+    pub(crate) fn write_workspace_manifest(workspace_dir: &Path, members: &[&str]) {
         fs::write(
             workspace_dir.join("Cargo.toml"),
             format!(
@@ -499,7 +155,7 @@ edition = "2024"
         }
     }
 
-    fn metadata(binary_name: &str, command_names: &[&str]) -> ProjectMetadata {
+    pub(crate) fn metadata(binary_name: &str, command_names: &[&str]) -> ProjectMetadata {
         ProjectMetadata {
             version: cot::metadata::METADATA_SCHEMA_VERSION,
             binary_name: binary_name.to_string(),
@@ -508,13 +164,13 @@ edition = "2024"
     }
 
     #[cfg(unix)]
-    fn write_metadata_script(path: &Path, metadata: &ProjectMetadata) {
+    pub(crate) fn write_metadata_script(path: &Path, metadata: &ProjectMetadata) {
         let json = serde_json::to_string(metadata).unwrap();
         write_shell_script(path, &format!("printf '%s\\n' '{json}'\n"));
     }
 
     #[cfg(unix)]
-    fn write_shell_script(path: &Path, body: &str) {
+    pub(crate) fn write_shell_script(path: &Path, body: &str) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).unwrap();
         }
@@ -526,18 +182,18 @@ edition = "2024"
 
     #[test]
     fn load_returns_none_without_cargo_manifest() {
-        let temp_dir = TempDir::new().unwrap();
+        let (_guard, temp_dir) = canonical_temp_dir();
 
-        let result = load(temp_dir.path(), false, None, true).unwrap();
+        let result = load(&temp_dir, false, None, true).unwrap();
 
         assert!(result.is_none());
     }
 
     #[test]
     fn load_errors_when_start_path_does_not_exist() {
-        let temp_dir = TempDir::new().unwrap();
+        let (_guard, temp_dir) = canonical_temp_dir();
 
-        let result = load(&temp_dir.path().join("missing"), false, None, true);
+        let result = load(&temp_dir.join("missing"), false, None, true);
 
         assert!(result.is_err());
         assert!(
@@ -550,10 +206,11 @@ edition = "2024"
 
     #[test]
     fn load_returns_none_when_expected_binary_is_missing() {
-        let temp_dir = TempDir::new().unwrap();
-        write_package_manifest(temp_dir.path(), "demo", "");
+        let (_guard, temp_dir) = canonical_temp_dir();
 
-        let result = load(temp_dir.path(), false, None, false).unwrap();
+        write_package_manifest(&temp_dir, "demo", "");
+
+        let result = load(&temp_dir, false, None, false).unwrap();
 
         assert!(result.is_none());
     }
@@ -565,12 +222,13 @@ edition = "2024"
     )]
     #[cfg(unix)]
     fn load_reads_debug_binary_metadata_and_writes_cache() {
-        let temp_dir = TempDir::new().unwrap();
-        write_package_manifest(temp_dir.path(), "demo", "");
-        let binary_path = temp_dir.path().join("target/debug/demo");
+        let (_guard, temp_dir) = canonical_temp_dir();
+
+        write_package_manifest(&temp_dir, "demo", "");
+        let binary_path = temp_dir.join("target/debug/demo");
         write_metadata_script(&binary_path, &metadata("demo", &["serve"]));
 
-        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
+        let project = load(&temp_dir, false, None, true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
         assert!(project.metadata.is_some());
@@ -579,7 +237,7 @@ edition = "2024"
 
         assert_eq!(metadata.binary_name, "demo");
         assert_eq!(metadata.commands[0].name, "serve");
-        assert!(command_cache_path(temp_dir.path()).exists());
+        assert!(command_cache_path(&temp_dir).exists());
     }
 
     #[test]
@@ -589,12 +247,13 @@ edition = "2024"
     )]
     #[cfg(unix)]
     fn load_uses_release_profile_when_requested() {
-        let temp_dir = TempDir::new().unwrap();
-        write_package_manifest(temp_dir.path(), "demo", "");
-        let binary_path = temp_dir.path().join("target/release/demo");
+        let (_guard, temp_dir) = canonical_temp_dir();
+
+        write_package_manifest(&temp_dir, "demo", "");
+        let binary_path = temp_dir.join("target/release/demo");
         write_metadata_script(&binary_path, &metadata("demo", &["serve"]));
 
-        let project = load(temp_dir.path(), true, None, true).unwrap().unwrap();
+        let project = load(&temp_dir, true, None, true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
     }
@@ -606,19 +265,20 @@ edition = "2024"
     )]
     #[cfg(unix)]
     fn load_uses_single_named_bin_target() {
-        let temp_dir = TempDir::new().unwrap();
+        let (_guard, temp_dir) = canonical_temp_dir();
+
         write_package_manifest(
-            temp_dir.path(),
+            &temp_dir,
             "demo",
             r#"[[bin]]
 name = "server"
 path = "src/server.rs"
 "#,
         );
-        let binary_path = temp_dir.path().join("target/debug/server");
+        let binary_path = temp_dir.join("target/debug/server");
         write_metadata_script(&binary_path, &metadata("server", &["serve"]));
 
-        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
+        let project = load(&temp_dir, false, None, true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
         assert!(project.metadata.is_some());
@@ -632,9 +292,10 @@ path = "src/server.rs"
     )]
     #[cfg(unix)]
     fn load_uses_metadata_binary_override_before_bin_targets() {
-        let temp_dir = TempDir::new().unwrap();
+        let (_guard, temp_dir) = canonical_temp_dir();
+
         write_package_manifest(
-            temp_dir.path(),
+            &temp_dir,
             "demo",
             r#"[package.metadata.cot]
 binary = "api"
@@ -648,10 +309,10 @@ name = "worker"
 path = "src/worker.rs"
 "#,
         );
-        let binary_path = temp_dir.path().join("target/debug/api");
+        let binary_path = temp_dir.join("target/debug/api");
         write_metadata_script(&binary_path, &metadata("api", &["serve"]));
 
-        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
+        let project = load(&temp_dir, false, None, true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
         assert!(project.metadata.is_some());
@@ -660,9 +321,10 @@ path = "src/worker.rs"
 
     #[test]
     fn load_errors_on_multiple_bin_targets_without_override() {
-        let temp_dir = TempDir::new().unwrap();
+        let (_guard, temp_dir) = canonical_temp_dir();
+
         write_package_manifest(
-            temp_dir.path(),
+            &temp_dir,
             "demo",
             r#"[[bin]]
 name = "api"
@@ -674,7 +336,7 @@ path = "src/worker.rs"
 "#,
         );
 
-        let result = load(temp_dir.path(), false, None, true);
+        let result = load(&temp_dir, false, None, true);
 
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
@@ -689,15 +351,15 @@ path = "src/worker.rs"
     )]
     #[cfg(unix)]
     fn load_falls_back_to_no_metadata_on_command_failure() {
-        let temp_dir = TempDir::new().unwrap();
-        write_package_manifest(temp_dir.path(), "demo", "");
-        let binary_path = temp_dir.path().join("target/debug/demo");
+        let (_guard, temp_dir) = canonical_temp_dir();
+        write_package_manifest(&temp_dir, "demo", "");
+        let binary_path = temp_dir.join("target/debug/demo");
         write_shell_script(
             &binary_path,
             "echo stdout message\necho stderr message >&2\nexit 42\n",
         );
 
-        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
+        let project = load(&temp_dir, false, None, true).unwrap().unwrap();
 
         assert!(project.metadata.is_none());
     }
@@ -709,109 +371,24 @@ path = "src/worker.rs"
     )]
     #[cfg(unix)]
     fn load_falls_back_to_no_metadata_on_invalid_json() {
-        let temp_dir = TempDir::new().unwrap();
-        write_package_manifest(temp_dir.path(), "demo", "");
-        let binary_path = temp_dir.path().join("target/debug/demo");
+        let (_guard, temp_dir) = canonical_temp_dir();
+        write_package_manifest(&temp_dir, "demo", "");
+        let binary_path = temp_dir.join("target/debug/demo");
         write_shell_script(&binary_path, "echo 'not json'\n");
 
-        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
+        let project = load(&temp_dir, false, None, true).unwrap().unwrap();
 
         assert!(project.metadata.is_none());
     }
 
     #[test]
-    #[cfg_attr(
-        miri,
-        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
-    )]
-    #[cfg(unix)]
-    fn load_or_refresh_metadata_reports_command_failure_with_output() {
-        let temp_dir = TempDir::new().unwrap();
-        let binary_path = temp_dir.path().join("demo");
-        write_shell_script(
-            &binary_path,
-            "echo stdout message\necho stderr message >&2\nexit 42\n",
-        );
-        let cache_path = command_cache_path(temp_dir.path());
-
-        let result = load_or_refresh_metadata(&binary_path, &cache_path);
-
-        assert!(result.is_err());
-        let message = format!("{:#}", result.unwrap_err());
-        assert!(message.contains("exited unexpectedly"));
-        assert!(message.contains("stdout message"));
-        assert!(message.contains("stderr message"));
-    }
-
-    #[test]
-    #[cfg_attr(
-        miri,
-        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
-    )]
-    #[cfg(unix)]
-    fn load_or_refresh_metadata_reports_invalid_json() {
-        let temp_dir = TempDir::new().unwrap();
-        let binary_path = temp_dir.path().join("demo");
-        write_shell_script(&binary_path, "echo 'not json'\n");
-        let cache_path = command_cache_path(temp_dir.path());
-
-        let result = load_or_refresh_metadata(&binary_path, &cache_path);
-
-        assert!(result.is_err());
-        let message = format!("{:#}", result.unwrap_err());
-        assert!(message.contains("no readable version field"));
-    }
-
-    #[test]
-    #[cfg_attr(
-        miri,
-        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
-    )]
-    #[cfg(unix)]
-    fn load_or_refresh_metadata_returns_none_for_legacy_binary() {
-        let temp_dir = TempDir::new().unwrap();
-        let binary_path = temp_dir.path().join("demo");
-        write_shell_script(
-            &binary_path,
-            &format!("echo \"error: unexpected argument '{METADATA_FLAG}'\" >&2\nexit 2\n"),
-        );
-        let cache_path = command_cache_path(temp_dir.path());
-
-        let result = load_or_refresh_metadata(&binary_path, &cache_path).unwrap();
-
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn parse_metadata_reports_schema_version_mismatch() {
-        let bytes = br#"{"version":999,"binary_name":"demo","commands":[]}"#;
-
-        let result = parse_metadata(bytes, &PathBuf::from("target/debug/demo"));
-
-        assert!(result.is_err());
-        let message = result.unwrap_err().to_string();
-        assert!(message.contains("metadata schema v999"));
-        assert!(message.contains("cargo install --locked cot-cli"));
-    }
-
-    #[test]
-    fn parse_metadata_succeeds_on_matching_shape() {
-        let meta = metadata("demo", &["serve"]);
-        let bytes = serde_json::to_vec(&meta).unwrap();
-
-        let result = parse_metadata(&bytes, &PathBuf::from("target/debug/demo"));
-
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn workspace_root_requires_package_when_ambiguous() {
-        let temp_dir = TempDir::new().unwrap();
-        write_workspace_manifest(temp_dir.path(), &["api", "web"]);
-        write_package_manifest(&temp_dir.path().join("api"), "api", "");
-        write_package_manifest(&temp_dir.path().join("web"), "web", "");
+        let (_guard, temp_dir) = canonical_temp_dir();
+        write_workspace_manifest(&temp_dir, &["api", "web"]);
+        write_package_manifest(&temp_dir.join("api"), "api", "");
+        write_package_manifest(&temp_dir.join("web"), "web", "");
 
-        let result = load(temp_dir.path(), false, None, true);
+        let result = load(&temp_dir, false, None, true);
 
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
@@ -822,12 +399,12 @@ path = "src/worker.rs"
 
     #[test]
     fn workspace_package_flag_must_match_member() {
-        let temp_dir = TempDir::new().unwrap();
-        write_workspace_manifest(temp_dir.path(), &["api", "web"]);
-        write_package_manifest(&temp_dir.path().join("api"), "api", "");
-        write_package_manifest(&temp_dir.path().join("web"), "web", "");
+        let (_guard, temp_dir) = canonical_temp_dir();
+        write_workspace_manifest(&temp_dir, &["api", "web"]);
+        write_package_manifest(&temp_dir.join("api"), "api", "");
+        write_package_manifest(&temp_dir.join("web"), "web", "");
 
-        let result = load(temp_dir.path(), false, Some("missing"), true);
+        let result = load(&temp_dir, false, Some("missing"), true);
 
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
@@ -843,19 +420,17 @@ path = "src/worker.rs"
     )]
     #[cfg(unix)]
     fn workspace_root_uses_selected_package_and_workspace_target_dir() {
-        let temp_dir = TempDir::new().unwrap();
-        write_workspace_manifest(temp_dir.path(), &["api", "web"]);
-        write_package_manifest(&temp_dir.path().join("api"), "api", "");
-        write_package_manifest(&temp_dir.path().join("web"), "web", "");
-        let binary_path = temp_dir.path().join("target/debug/api");
+        let (_guard, temp_dir) = canonical_temp_dir();
+        write_workspace_manifest(&temp_dir, &["api", "web"]);
+        write_package_manifest(&temp_dir.join("api"), "api", "");
+        write_package_manifest(&temp_dir.join("web"), "web", "");
+        let binary_path = temp_dir.join("target/debug/api");
         write_metadata_script(&binary_path, &metadata("api", &["check"]));
 
-        let project = load(temp_dir.path(), false, Some("api"), true)
-            .unwrap()
-            .unwrap();
+        let project = load(&temp_dir, false, Some("api"), true).unwrap().unwrap();
 
         assert_eq!(project.path, binary_path);
-        assert!(temp_dir.path().join("api").exists());
+        assert!(&temp_dir.join("api").exists());
     }
 
     #[test]
@@ -865,82 +440,19 @@ path = "src/worker.rs"
     )]
     #[cfg(unix)]
     fn workspace_member_directory_uses_current_package_without_flag() {
-        let temp_dir = TempDir::new().unwrap();
-        write_workspace_manifest(temp_dir.path(), &["api", "web"]);
-        write_package_manifest(&temp_dir.path().join("api"), "api", "");
-        write_package_manifest(&temp_dir.path().join("web"), "web", "");
-        let binary_path = temp_dir.path().join("target/debug/web");
+        let (_guard, temp_dir) = canonical_temp_dir();
+        write_workspace_manifest(&temp_dir, &["api", "web"]);
+        write_package_manifest(&temp_dir.join("api"), "api", "");
+        write_package_manifest(&temp_dir.join("web"), "web", "");
+        let binary_path = temp_dir.join("target/debug/web");
         write_metadata_script(&binary_path, &metadata("web", &["check"]));
 
-        let project = load(&temp_dir.path().join("web"), false, None, true)
+        let project = load(&temp_dir.join("web"), false, None, true)
             .unwrap()
             .unwrap();
 
         assert_eq!(project.path, binary_path);
         assert!(project.metadata.is_some());
         assert_eq!(project.metadata.unwrap().binary_name, "web");
-    }
-
-    #[test]
-    #[cfg_attr(
-        miri,
-        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
-    )]
-    #[cfg(unix)]
-    fn load_reuses_valid_cache_without_spawning_binary() {
-        let temp_dir = TempDir::new().unwrap();
-        write_package_manifest(temp_dir.path(), "demo", "");
-        let binary_path = temp_dir.path().join("target/debug/demo");
-        write_shell_script(
-            &binary_path,
-            "echo 'binary should not be queried' >&2\nexit 42\n",
-        );
-        let cache = Cache {
-            binary_mtime_secs: mtime_secs(&binary_path).unwrap(),
-            metadata: metadata("demo", &["cached"]),
-        };
-        write_cache(&command_cache_path(temp_dir.path()), &cache).unwrap();
-
-        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
-
-        assert!(project.metadata.is_some());
-        assert_eq!(project.metadata.unwrap().commands[0].name, "cached");
-    }
-
-    #[test]
-    #[cfg_attr(
-        miri,
-        ignore = "can't call foreign function `posix_spawnattr_init` on OS `linux`"
-    )]
-    #[cfg(unix)]
-    fn load_refreshes_stale_cache() {
-        let temp_dir = TempDir::new().unwrap();
-        write_package_manifest(temp_dir.path(), "demo", "");
-        let binary_path = temp_dir.path().join("target/debug/demo");
-        write_metadata_script(&binary_path, &metadata("demo", &["fresh"]));
-        let cache = Cache {
-            binary_mtime_secs: 0,
-            metadata: metadata("demo", &["stale"]),
-        };
-        write_cache(&command_cache_path(temp_dir.path()), &cache).unwrap();
-
-        let project = load(temp_dir.path(), false, None, true).unwrap().unwrap();
-
-        assert!(project.metadata.is_some());
-        assert_eq!(project.metadata.unwrap().commands[0].name, "fresh");
-    }
-
-    #[test]
-    fn current_executable_matches_current_process() {
-        let current_exe = std::env::current_exe().unwrap();
-
-        assert!(is_current_executable(&current_exe));
-    }
-
-    #[test]
-    fn current_executable_does_not_match_missing_path() {
-        let missing = std::env::temp_dir().join("cot-cli-missing-test-binary");
-
-        assert!(!is_current_executable(&missing));
     }
 }

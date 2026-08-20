@@ -181,6 +181,31 @@ fn router(&self) -> Router {
 
 Now, when you visit [`localhost:8000/hello/John/Smith/`](http://localhost:8000/hello/John), you should see `Hello, John Smith!` displayed on the page!
 
+Cot also supports wildcard parameters to match all sub-paths within a route segment.
+
+```rust
+# struct MyApp;
+async fn wildcard_path(Path(path): Path<String>) -> cot::Result<Html> {
+    Ok(Html::new(format!("Passed path: {path}")))
+}
+
+// inside `impl App`:
+# impl App for MyApp {
+fn router(&self) -> Router {
+    Router::with_urls([
+        // ...
+        Route::with_handler_and_name("/wildcard/{*path}", wildcard_path, "wildcard_path"),
+    ])
+}
+#   fn name(&self) -> &str { todo!() }
+# }
+```
+
+Prefixing the parameter name with an asterisk (`*`) designates it as a wildcard.
+
+In this case, it matches `/wildcard/foo`, `/wildcard/foo/bar` and so on, but it won't match `/wildcard/`.
+Also note that, wildcard param can only be used on the end of path pattern.
+
 ## Project structure
 
 ### App

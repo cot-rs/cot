@@ -42,15 +42,15 @@ pub(super) enum PathMatcherError {
     )]
     #[non_exhaustive]
     InvalidParamName { pattern: String, name: String },
-    /// Same as `InvalidParamName`, but for the name following a `*` in a
-    /// wildcard segment.
+    /// Same as [`PathMatcherError::InvalidParamName`], but for the name
+    /// following a `*` in a wildcard segment.
     #[error(
         "{PATH_MATCHER_ERROR_PREFIX} invalid wildcard name `{name}` in pattern `{pattern}`; wildcard names must start \
          with a letter or underscore and contain only letters, digits, or underscores"
     )]
     #[non_exhaustive]
     InvalidWildcardName { pattern: String, name: String },
-    /// A wildcard segment (`{*name}`) was followed by more path segments,
+    /// A wildcard segment was followed by more path segments,
     #[error(
         "{PATH_MATCHER_ERROR_PREFIX} wildcard parameter `{{*{name}}}` must be the last segment of pattern `{pattern}`; \
          a wildcard consumes the rest of the path, so nothing can follow it"
@@ -196,13 +196,12 @@ impl PathMatcher {
                         }
 
                         let next_char = char_iter.peek().map(|(_, ch)| *ch).unwrap_or_default();
-                        if next_char.is_some(){
+                        if next_char.is_some() {
                             return Err(PathMatcherError::WildcardNotAtEnd {
                                 pattern: path_pattern.clone(),
                                 name: wildcard_name.to_string(),
                             });
                         }
-                    }
 
                         parts.push(PathPart::Wildcard {
                             name: wildcard_name.to_string(),
@@ -213,7 +212,7 @@ impl PathMatcher {
                                 pattern: path_pattern.clone(),
                                 name: param_name.to_string(),
                             });
-                }
+                        }
 
                         parts.push(PathPart::Param {
                             name: param_name.to_string(),
@@ -248,49 +247,6 @@ impl PathMatcher {
             }
         }
         true
-    }
-
-    #[must_use]
-    pub(crate) fn capture<'matcher, 'path>(
-        &'matcher self,
-        path: &'path str,
-    ) -> Option<CaptureResult<'matcher, 'path>> {
-        debug!("Matching path `{}` against pattern `{}`", path, self);
-
-        let mut current_path = path;
-        let mut params = Vec::with_capacity(self.param_len());
-        for part in &self.parts {
-            match part {
-                PathPart::Literal(s) => {
-                    if !current_path.starts_with(s) {
-                        return None;
-                    }
-                    current_path = &current_path[s.len()..];
-                }
-                PathPart::Wildcard { name } => {
-                    if current_path.is_empty() {
-                        return None;
-                    }
-                    params.push(PathParam::new(name, current_path));
-                    current_path = "";
-                }
-                PathPart::Param { name } => {
-                    let next_slash = current_path.find('/');
-                    let value = if let Some(next_slash) = next_slash {
-                        &current_path[..next_slash]
-                    } else {
-                        current_path
-                    };
-                    if value.is_empty() {
-                        return None;
-                    }
-                    params.push(PathParam::new(name, value));
-                    current_path = &current_path[value.len()..];
-                }
-            }
-        }
-
-        Some(CaptureResult::new(params, current_path))
     }
 
     pub(crate) fn reverse(&self, params: &ReverseParamMap) -> Result<String, ReverseError> {
@@ -448,27 +404,6 @@ pub enum ReverseError {
 }
 impl_into_cot_error!(ReverseError);
 
-#[derive(Debug, PartialEq, Eq)]
-pub(super) struct CaptureResult<'matcher, 'path> {
-    pub(super) params: Vec<PathParam<'matcher>>,
-    pub(super) remaining_path: &'path str,
-}
-
-impl<'matcher, 'path> CaptureResult<'matcher, 'path> {
-    #[must_use]
-    fn new(params: Vec<PathParam<'matcher>>, remaining_path: &'path str) -> Self {
-        Self {
-            params,
-            remaining_path,
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn matches_fully(&self) -> bool {
-        self.remaining_path.is_empty()
-    }
-}
-
 #[derive(Debug, Clone)]
 pub(super) enum PathPart {
     Literal(String),
@@ -485,22 +420,6 @@ impl Display for PathPart {
             }
             PathPart::Param { name } => write!(f, "{{{name}}}"),
             PathPart::Wildcard { name } => write!(f, "{{*{name}}}"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct PathParam<'a> {
-    pub(super) name: &'a str,
-    pub(super) value: String,
-}
-
-impl<'a> PathParam<'a> {
-    #[must_use]
-    pub(crate) fn new(name: &'a str, value: &str) -> Self {
-        Self {
-            name,
-            value: value.to_string(),
         }
     }
 }
@@ -571,22 +490,6 @@ mod tests {
     }
 
     #[test]
-    fn path_parser_wildcard() {
-        let path_parser = PathMatcher::new("/static/{*path}");
-        assert_eq!(path_parser.to_string(), "/static/{*path}");
-        assert_eq!(path_parser.param_names().collect::<Vec<_>>(), vec!["path"]);
-    }
-
-    #[test]
-    fn reverse_with_wildcard() {
-        let path_parser = PathMatcher::new("/static/{*path}");
-        let mut params = ReverseParamMap::new();
-        params.insert("path", "css/app.css");
-
-        assert_eq!(path_parser.reverse(&params).unwrap(), "/static/css/app.css");
-    }
-
-    #[test]
     #[should_panic(
         expected = "route conflict error: consecutive parameters are not allowed in pattern `/users/{id}{post_id}`"
     )]
@@ -616,22 +519,6 @@ mod tests {
     )]
     fn path_parser_invalid_name_non_alphanumeric() {
         let _ = PathMatcher::new("/users/{abc#$%}");
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "route conflict error: invalid wildcard name `` in pattern `/users/{*}`; wildcard names must start with a letter or underscore and contain only letters, digits, or underscores"
-    )]
-    fn path_parser_invalid_wildcard_name_empty() {
-        let _ = PathMatcher::new("/users/{*}");
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "route conflict error: wildcard parameter `{*path}` must be the last segment of pattern `/users/{*path}/edit`; a wildcard consumes the rest of the path, so nothing can follow it"
-    )]
-    fn path_parser_wildcard_not_at_end() {
-        let _ = PathMatcher::new("/users/{*path}/edit");
     }
 
     #[test]
@@ -734,54 +621,43 @@ mod tests {
     }
 
     #[test]
-    fn path_parser_wildcard_root() {
-        let path_parser = PathMatcher::new("/{*path}");
-        assert_eq!(
-            path_parser.capture("/foo/bar"),
-            Some(CaptureResult::new(
-                vec![PathParam::new("path", "foo/bar")],
-                ""
-            ))
-        );
+    fn path_parser_wildcard() {
+        let path_parser = PathMatcher::new("/static/{*path}");
+        assert_eq!(path_parser.to_string(), "/static/{*path}");
+        assert_eq!(path_parser.param_names().collect::<Vec<_>>(), vec!["path"]);
     }
 
     #[test]
-    fn path_parser_wildcard_single_segment() {
-        let path_parser = PathMatcher::new("/users/rand/{*path}");
-        assert_eq!(
-            path_parser.capture("/users/rand/foo"),
-            Some(CaptureResult::new(vec![PathParam::new("path", "foo")], ""))
-        );
+    fn reverse_with_wildcard() {
+        let path_parser = PathMatcher::new("/static/{*path}");
+        let mut params = ReverseParamMap::new();
+        params.insert("path", "css/app.css");
+
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/static/css/app.css");
     }
 
     #[test]
-    fn path_parser_wildcard_multi_segment() {
-        let path_parser = PathMatcher::new("/users/rand/{*path}");
-        assert_eq!(
-            path_parser.capture("/users/rand/foo/bar"),
-            Some(CaptureResult::new(
-                vec![PathParam::new("path", "foo/bar")],
-                ""
-            ))
-        );
-    }
-
-    #[test]
-    fn path_parser_wildcard_no_match() {
-        let path_parser = PathMatcher::new("/prefix/{*path}");
-        assert_eq!(path_parser.capture("/other/foo"), None);
-    }
-
-    #[test]
-    fn path_parser_wildcard_empty_not_allowed() {
-        let path_parser = PathMatcher::new("/users/rand/{*path}");
-        assert_eq!(path_parser.capture("/users/rand/"), None);
-    }
-
-    #[test]
-    #[should_panic(expected = "Wildcard must be the last part of the path: `/users/{*rest}/`")]
+    #[should_panic(
+        expected = "route conflict error: wildcard parameter `{*rest}` must be the last segment of pattern `/users/{*rest}/edit`; a wildcard consumes the rest of the path, so nothing can follow it"
+    )]
     fn path_parser_no_path_allowed_after_wildcard() {
+        let _ = PathMatcher::new("/users/{*rest}/edit");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "route conflict error: wildcard parameter `{*rest}` must be the last segment of pattern `/users/{*rest}/`; a wildcard consumes the rest of the path, so nothing can follow it"
+    )]
+    fn path_parser_trail_slash_not_allowed_after_wildcard() {
         let _ = PathMatcher::new("/users/{*rest}/");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "route conflict error: invalid wildcard name `` in pattern `/users/{*}`; wildcard names must start with a letter or underscore and contain only letters, digits, or underscores"
+    )]
+    fn path_parser_invalid_wildcard_name_empty() {
+        let _ = PathMatcher::new("/users/{*}");
     }
 
     #[test]

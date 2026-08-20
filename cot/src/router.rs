@@ -1418,31 +1418,60 @@ mod tests {
     }
 
     #[test]
-    fn router_wildcard_route_captures_remaining_path() {
+    fn router_wildcard_root() {
         let router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/static/{*path}",
+            "/{*path}",
             MockHandler,
-            "static_asset",
+            "users",
         )]);
 
-        let found = router.get_handler("/static/css/app.css").unwrap();
+        let found = router.get_handler("/foo/bar").unwrap();
 
-        assert_eq!(found.name, Some(RouteName("static_asset".to_string())));
+        assert_eq!(found.name, Some(RouteName("users".to_string())));
         assert_eq!(
             found.params,
-            vec![("path".to_string(), "css/app.css".to_string())]
+            vec![("path".to_string(), "foo/bar".to_string())]
+        );
+    }
+    #[test]
+    fn router_wildcard_single_segment() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users/rand/{*path}",
+            MockHandler,
+            "users",
+        )]);
+
+        let found = router.get_handler("/users/rand/foo").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("users".to_string())));
+        assert_eq!(found.params, vec![("path".to_string(), "foo".to_string())]);
+    }
+    #[test]
+    fn router_wildcard_multi_segment() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/users/rand/{*path}",
+            MockHandler,
+            "users",
+        )]);
+
+        let found = router.get_handler("/users/rand/foo/bar").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("users".to_string())));
+        assert_eq!(
+            found.params,
+            vec![("path".to_string(), "foo/bar".to_string())]
         );
     }
 
     #[test]
-    fn router_wildcard_route_rejects_empty_remaining_path() {
+    fn router_wildcard_empty_not_allowed() {
         let router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/static/{*path}",
+            "/users/rand/{*path}",
             MockHandler,
-            "static_asset",
+            "users",
         )]);
 
-        assert!(router.get_handler("/static/").is_none());
+        assert!(router.get_handler("/users/rand").is_none());
     }
 
     #[test]

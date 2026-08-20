@@ -8,6 +8,7 @@ use tracing::{Level, error, warn};
 use crate::config::ProjectConfig;
 use crate::error::NotFound;
 use crate::router::Router;
+use crate::router::path::AbsolutePath;
 use crate::{Error, Result, StatusCode, Template};
 
 #[derive(Debug)]
@@ -123,7 +124,12 @@ impl ErrorPageTemplateBuilder {
     fn diagnostics(&mut self, diagnostics: &Diagnostics) -> &mut Self {
         self.project_config = format!("{:#?}", diagnostics.project_config);
         self.route_data.clear();
-        Self::build_route_data(&mut self.route_data, &diagnostics.router, "", "");
+        Self::build_route_data(
+            &mut self.route_data,
+            &diagnostics.router,
+            &AbsolutePath::root(),
+            "",
+        );
         self.request_data = diagnostics
             .request_head
             .as_ref()
@@ -133,14 +139,16 @@ impl ErrorPageTemplateBuilder {
 
     fn build_route_data(
         route_data: &mut Vec<RouteData>,
-        router: &Router,
-        url_prefix: &str,
+        router: &Arc<Router>,
+        url_prefix: &AbsolutePath,
         index_prefix: &str,
     ) {
         for (index, route) in router.routes().iter().enumerate() {
+            let full_path = url_prefix.join(&AbsolutePath::new(route.url()));
+
             route_data.push(RouteData {
                 index: format!("{index_prefix}{index}"),
-                path: format!("{url_prefix}{}", route.url()),
+                path: full_path.to_string(),
                 kind: match route.kind() {
                     crate::router::RouteKind::Router => if route_data.is_empty() {
                         "Root Router"
@@ -156,8 +164,8 @@ impl ErrorPageTemplateBuilder {
             if let Some(inner_router) = route.router() {
                 Self::build_route_data(
                     route_data,
-                    inner_router,
-                    &format!("{}{}", url_prefix, route.url()),
+                    &inner_router,
+                    &full_path,
                     &format!("{index_prefix}{index}."),
                 );
             }
@@ -453,6 +461,10 @@ mod tests {
     use std::panic;
     use std::sync::Arc;
 
+    use cot_core::handler::RequestHandler;
+    use cot_core::html::Html;
+    use cot_core::request::Request;
+    use cot_core::response::{IntoResponse, Response};
     use tracing_test::traced_test;
 
     use super::*;
@@ -465,6 +477,14 @@ mod tests {
             url: "/test".to_string(),
             protocol_version: "HTTP/1.1".to_string(),
             headers: vec![("content-type".to_string(), "text/plain".to_string())],
+        }
+    }
+
+    struct MockHandler;
+
+    impl RequestHandler for MockHandler {
+        async fn handle(&self, _request: Request) -> Result<Response> {
+            Html::new("OK").into_response()
         }
     }
 
@@ -588,9 +608,16 @@ mod tests {
         let mut route_data = Vec::new();
         let sub_sub_router = Router::with_urls(vec![]);
         let sub_router = Router::with_urls(vec![Route::with_router("/bar", sub_sub_router)]);
-        let router = Router::with_urls(vec![Route::with_router("/foo", sub_router)]);
+        let router = Arc::new(Router::with_urls(vec![Route::with_router(
+            "/foo", sub_router,
+        )]));
 
-        ErrorPageTemplateBuilder::build_route_data(&mut route_data, &router, "", "");
+        ErrorPageTemplateBuilder::build_route_data(
+            &mut route_data,
+            &router,
+            &AbsolutePath::root(),
+            "",
+        );
 
         assert_eq!(
             route_data,
@@ -609,6 +636,47 @@ mod tests {
                 }
             ]
         );
+    }
+
+    #[test]
+    fn build_route_data_root_mount_no_double_slash() {
+        let mut route_data = Vec::new();
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "index",
+        )]);
+        let router = Arc::new(Router::with_urls(vec![Route::with_router("/", sub_router)]));
+
+        ErrorPageTemplateBuilder::build_route_data(
+            &mut route_data,
+            &router,
+            &AbsolutePath::root(),
+            "",
+        );
+
+        assert_eq!(route_data[0].path, "/");
+        assert_eq!(route_data[1].path, "/");
+    }
+
+    #[test]
+    fn build_route_data_root_mount_with_nested_static_route() {
+        let mut route_data = Vec::new();
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/nested",
+            MockHandler,
+            "nested",
+        )]);
+        let router = Arc::new(Router::with_urls(vec![Route::with_router("/", sub_router)]));
+
+        ErrorPageTemplateBuilder::build_route_data(
+            &mut route_data,
+            &router,
+            &AbsolutePath::root(),
+            "",
+        );
+
+        assert_eq!(route_data[1].path, "/nested");
     }
 
     #[test]

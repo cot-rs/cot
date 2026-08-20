@@ -102,7 +102,7 @@ async fn cot_router_reverse_local() {
 
         fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
             apps.register_with_views(App1, "");
-            apps.register_with_views(App2, "");
+            apps.register_with_views(App2, "/foo");
         }
     }
 
@@ -114,9 +114,9 @@ async fn cot_router_reverse_local() {
         Bytes::from("/index1")
     );
 
-    let response = client.get("/index2").await.unwrap();
+    let response = client.get("/foo/index2").await.unwrap();
     assert_eq!(
         response.into_body().into_bytes().await.unwrap(),
-        Bytes::from("/index2")
+        Bytes::from("/foo/index2")
     );
 }

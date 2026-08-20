@@ -185,7 +185,8 @@ impl PathMatcher {
                     }
                 }
                 (Some('}'), State::Param { start }) => {
-                    let param_name = path_pattern[start..index].trim();
+                    let param_name = &path_pattern[start..index].trim();
+
                     if let Some(wildcard_name) = param_name.strip_prefix('*') {
                         if !Self::is_param_name_valid(wildcard_name) {
                             return Err(PathMatcherError::InvalidWildcardName {
@@ -193,15 +194,15 @@ impl PathMatcher {
                                 name: wildcard_name.to_string(),
                             });
                         }
-                        if char_iter
-                            .peek()
-                            .is_some_and(|(_, next_char)| next_char.is_some())
-                        {
+
+                        let next_char = char_iter.peek().map(|(_, ch)| *ch).unwrap_or_default();
+                        if next_char.is_some(){
                             return Err(PathMatcherError::WildcardNotAtEnd {
                                 pattern: path_pattern.clone(),
                                 name: wildcard_name.to_string(),
                             });
                         }
+                    }
 
                         parts.push(PathPart::Wildcard {
                             name: wildcard_name.to_string(),
@@ -212,7 +213,7 @@ impl PathMatcher {
                                 pattern: path_pattern.clone(),
                                 name: param_name.to_string(),
                             });
-                        }
+                }
 
                         parts.push(PathPart::Param {
                             name: param_name.to_string(),
@@ -247,6 +248,49 @@ impl PathMatcher {
             }
         }
         true
+    }
+
+    #[must_use]
+    pub(crate) fn capture<'matcher, 'path>(
+        &'matcher self,
+        path: &'path str,
+    ) -> Option<CaptureResult<'matcher, 'path>> {
+        debug!("Matching path `{}` against pattern `{}`", path, self);
+
+        let mut current_path = path;
+        let mut params = Vec::with_capacity(self.param_len());
+        for part in &self.parts {
+            match part {
+                PathPart::Literal(s) => {
+                    if !current_path.starts_with(s) {
+                        return None;
+                    }
+                    current_path = &current_path[s.len()..];
+                }
+                PathPart::Wildcard { name } => {
+                    if current_path.is_empty() {
+                        return None;
+                    }
+                    params.push(PathParam::new(name, current_path));
+                    current_path = "";
+                }
+                PathPart::Param { name } => {
+                    let next_slash = current_path.find('/');
+                    let value = if let Some(next_slash) = next_slash {
+                        &current_path[..next_slash]
+                    } else {
+                        current_path
+                    };
+                    if value.is_empty() {
+                        return None;
+                    }
+                    params.push(PathParam::new(name, value));
+                    current_path = &current_path[value.len()..];
+                }
+            }
+        }
+
+        Some(CaptureResult::new(params, current_path))
     }
 
     pub(crate) fn reverse(&self, params: &ReverseParamMap) -> Result<String, ReverseError> {
@@ -404,6 +448,27 @@ pub enum ReverseError {
 }
 impl_into_cot_error!(ReverseError);
 
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct CaptureResult<'matcher, 'path> {
+    pub(super) params: Vec<PathParam<'matcher>>,
+    pub(super) remaining_path: &'path str,
+}
+
+impl<'matcher, 'path> CaptureResult<'matcher, 'path> {
+    #[must_use]
+    fn new(params: Vec<PathParam<'matcher>>, remaining_path: &'path str) -> Self {
+        Self {
+            params,
+            remaining_path,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn matches_fully(&self) -> bool {
+        self.remaining_path.is_empty()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) enum PathPart {
     Literal(String),
@@ -420,6 +485,22 @@ impl Display for PathPart {
             }
             PathPart::Param { name } => write!(f, "{{{name}}}"),
             PathPart::Wildcard { name } => write!(f, "{{*{name}}}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct PathParam<'a> {
+    pub(super) name: &'a str,
+    pub(super) value: String,
+}
+
+impl<'a> PathParam<'a> {
+    #[must_use]
+    pub(crate) fn new(name: &'a str, value: &str) -> Self {
+        Self {
+            name,
+            value: value.to_string(),
         }
     }
 }
@@ -650,6 +731,57 @@ mod tests {
         let path_parser = PathMatcher::new("/café/test");
         let params = ReverseParamMap::new();
         assert_eq!(path_parser.reverse(&params).unwrap(), "/café/test");
+    }
+
+    #[test]
+    fn path_parser_wildcard_root() {
+        let path_parser = PathMatcher::new("/{*path}");
+        assert_eq!(
+            path_parser.capture("/foo/bar"),
+            Some(CaptureResult::new(
+                vec![PathParam::new("path", "foo/bar")],
+                ""
+            ))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_single_segment() {
+        let path_parser = PathMatcher::new("/users/rand/{*path}");
+        assert_eq!(
+            path_parser.capture("/users/rand/foo"),
+            Some(CaptureResult::new(vec![PathParam::new("path", "foo")], ""))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_multi_segment() {
+        let path_parser = PathMatcher::new("/users/rand/{*path}");
+        assert_eq!(
+            path_parser.capture("/users/rand/foo/bar"),
+            Some(CaptureResult::new(
+                vec![PathParam::new("path", "foo/bar")],
+                ""
+            ))
+        );
+    }
+
+    #[test]
+    fn path_parser_wildcard_no_match() {
+        let path_parser = PathMatcher::new("/prefix/{*path}");
+        assert_eq!(path_parser.capture("/other/foo"), None);
+    }
+
+    #[test]
+    fn path_parser_wildcard_empty_not_allowed() {
+        let path_parser = PathMatcher::new("/users/rand/{*path}");
+        assert_eq!(path_parser.capture("/users/rand/"), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "Wildcard must be the last part of the path: `/users/{*rest}/`")]
+    fn path_parser_no_path_allowed_after_wildcard() {
+        let _ = PathMatcher::new("/users/{*rest}/");
     }
 
     #[test]

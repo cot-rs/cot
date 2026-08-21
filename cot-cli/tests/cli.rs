@@ -65,9 +65,10 @@ fn discovery_honors_global_cargo_config() {
 
     let fake_cargo_home = TempDir::new().unwrap();
     let custom_target = fake_cargo_home.path().join("shared-target");
+    let normalized_target_path = custom_target.display().to_string().replace('\\', "/");
     std::fs::write(
         fake_cargo_home.path().join("config.toml"),
-        format!("[build]\ntarget-dir = \"{}\"\n", custom_target.display()),
+        format!("[build]\ntarget-dir = \"{normalized_target_path}\"\n"),
     )
     .unwrap();
 

@@ -5,9 +5,11 @@ use tempfile::TempDir;
 #[cfg(not(miri))]
 mod snapshot_testing;
 
+#[cfg(not(miri))]
 use snapshot_testing::cot_cli_path;
 
 #[test]
+#[cfg(not(miri))]
 fn discovery_honors_cargo_target_dir_env_var() {
     let project = CotProjectBuilder::new(cot_cli_path())
         .build()
@@ -32,6 +34,7 @@ fn discovery_honors_cargo_target_dir_env_var() {
 }
 
 #[test]
+#[cfg(not(miri))]
 fn discovery_honors_project_level_cargo_config() {
     let project = CotProjectBuilder::new(cot_cli_path())
         .with_file(
@@ -56,6 +59,7 @@ fn discovery_honors_project_level_cargo_config() {
 }
 
 #[test]
+#[cfg(not(miri))]
 fn discovery_honors_global_cargo_config() {
     let project = CotProjectBuilder::new(cot_cli_path())
         .build()
@@ -88,6 +92,7 @@ fn discovery_honors_global_cargo_config() {
 }
 
 #[test]
+#[cfg(not(miri))]
 fn cargo_target_dir_env_wins_over_project_config() {
     let project = CotProjectBuilder::new(cot_cli_path())
         .with_file(

@@ -787,6 +787,23 @@ impl CompiledCotProject {
     pub fn cargo_cmd(&self, subcommand: &str, args: &[&str]) -> Command {
         self.inner.cargo_cmd(subcommand, args)
     }
+
+    /// Symlinks (or copies, on non-Unix) the already-compiled binary into
+    /// a custom-specified target dir, so that a later `cargo metadata`
+    /// invocation by the cot-cli will find it.
+    ///
+    /// We use this typically in testing various target dir discovery use cases.
+    pub fn bridge_binary_to(&self, target_root: &Path) -> Result<PathBuf> {
+        let profile = if self.release { "release" } else { "debug" };
+        let dir = target_root.join(profile);
+        std::fs::create_dir_all(&dir)
+            .context("failed to create target directory for bridged binary")?;
+
+        let binary_name = platform_binary_name(self.name());
+        let dest = dir.join(&binary_name);
+        link_or_copy(&self.binary_path, &dest)?;
+        Ok(dest)
+    }
 }
 
 /// A lazily-compiled standard project cot project.

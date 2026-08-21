@@ -218,10 +218,9 @@ pub(crate) fn parse_metadata(bytes: &[u8], binary_path: &Path) -> anyhow::Result
 mod tests {
     use super::*;
     use crate::project::load;
-    use crate::project::tests::{
-        canonical_temp_dir, metadata, write_metadata_script, write_package_manifest,
-        write_shell_script,
-    };
+    use crate::project::tests::{canonical_temp_dir, metadata, write_package_manifest};
+    #[cfg(unix)]
+    use crate::project::tests::{write_metadata_script, write_shell_script};
 
     #[test]
     #[cfg_attr(

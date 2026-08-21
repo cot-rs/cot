@@ -193,7 +193,6 @@ fn current_package<'a>(metadata: &'a Metadata, path: &Path) -> Option<&'a Packag
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn current_executable_matches_current_process() {
         let current_exe = std::env::current_exe().unwrap();

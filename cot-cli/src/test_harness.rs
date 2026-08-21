@@ -202,7 +202,7 @@ fn unique_project_name() -> String {
     static COUNTER: AtomicU32 = AtomicU32::new(0);
     let count = COUNTER.fetch_add(1, Ordering::Relaxed);
     // Use process ID + counter so parallel test processes don't collide.
-    format!("cot-test-{}-{count}", std::process::id())
+    format!("cot-cli-test-{}-{count}", std::process::id())
 }
 
 /// Builder for a generated Cot application.
@@ -839,7 +839,6 @@ pub fn standard_project(cot_binary: PathBuf) -> Result<&'static CompiledCotProje
         .build();
 
     match CotProjectBuilder::new(cot_binary)
-        .project_name("cot_test_standard")
         .app(standard_app)
         .extra_code(extra_code)
         .register_task(FROBNICATE_REGISTER)

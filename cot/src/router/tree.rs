@@ -47,7 +47,20 @@ impl RouteTrie {
         let mut pattern_map: HashMap<MatchitPattern, (Option<usize>, Option<usize>)> =
             HashMap::new();
         for (i, route) in routes.iter().enumerate() {
-            let pattern = MatchitPattern::try_from(route.url.clone())?;
+            let pattern = if route.kind() == RouteKind::Router {
+                // normalize path of sub-routers since we will attach an internal wildcard
+                // sentinel. This should also allow us reject routes for
+                // routers(sub-routers) who's version without a trailing slash
+                // already exist. (eg. `foo` and `foo/`cannot overlap as sub-routers)
+                let url = route.url();
+                let trimmed = url
+                    .strip_suffix('/')
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(&url);
+                MatchitPattern::new(trimmed)
+            } else {
+                MatchitPattern::try_from(route.url.clone())?
+            };
             let entry = pattern_map.entry(pattern).or_default();
             match route.kind() {
                 RouteKind::Handler => {
@@ -81,7 +94,7 @@ impl RouteTrie {
                 .expect("route index should exist")
         });
 
-        for (pattern, (handler_idx, router_idx)) in entries {
+        for (_, (handler_idx, router_idx)) in entries {
             let value = match (handler_idx, router_idx) {
                 (Some(h), None) => Entry::Handler(h),
                 (None, Some(r)) => Entry::Router(r),
@@ -94,9 +107,14 @@ impl RouteTrie {
             let route_idx = handler_idx
                 .or(router_idx)
                 .expect("route index should exist");
+
+            // we insert the original path, not the (possibly trimmed) deduped route so that
+            // routers(sub-routers) that were mounted/declared with trailing slashes still
+            // match.
+            let insertion_pattern = MatchitPattern::try_from(routes[route_idx].url.clone())?;
             Self::insert_or_diagnose(
                 &mut inner,
-                pattern.clone(),
+                insertion_pattern,
                 value,
                 &routes[route_idx],
                 routes,
@@ -106,7 +124,7 @@ impl RouteTrie {
             // and keep a sentinel there so we can use that to find what sub router to
             // search at lookup time.
             if let Some(r) = router_idx {
-                let prefix = AbsolutePath::new(pattern.as_str());
+                let prefix = AbsolutePath::new(routes[route_idx].url());
                 let wildcard_suffix = AbsolutePath::new(format!("{{*{NESTED_ROUTER_PARAM}}}"));
                 let wildcard = prefix.join(&wildcard_suffix);
 
@@ -372,5 +390,25 @@ mod tests {
         let pattern = MatchitPattern::new("/users");
         let s: String = pattern.into();
         assert_eq!(s, "/users");
+    }
+
+    #[test]
+    fn build_root_mounted_router_pattern_not_trimmed_to_empty() {
+        let sub_router = Router::with_urls(vec![route("/inner")]);
+        let routes = vec![Route::with_router("/", sub_router)];
+        let trie = RouteTrie::build(&routes).unwrap();
+        assert!(trie.at("/inner").is_some());
+    }
+
+    #[test]
+    fn build_router_mount_slash_and_no_slash_variants_conflict_with_clear_error() {
+        let router1 = Router::with_urls(vec![route("/foo")]);
+        let router2 = Router::with_urls(vec![route("/bar")]);
+        let routes = vec![
+            Route::with_router("/admin", router1),
+            Route::with_router("/admin/", router2),
+        ];
+        let err = RouteTrie::build(&routes).unwrap_err();
+        assert!(err.to_string().contains("duplicate nested router"));
     }
 }

@@ -163,7 +163,7 @@ impl Router {
 
         if let Some(result) = self.get_handler(request_path) {
             let mut path_params = PathParams::new();
-            for (key, value) in result.params.iter().rev() {
+            for (key, value) in &result.params {
                 path_params.insert(key.clone(), value.clone());
             }
             request.extensions_mut().insert(path_params);
@@ -222,7 +222,10 @@ impl Router {
             RouteInner::Router(nested_router) => {
                 nested_router.get_handler(remaining_path).map(|mut found| {
                     found.app_name = found.app_name.or_else(|| router.app_name.clone());
-                    found.params.extend(params.iter().cloned());
+
+                    let mut combined = params.to_vec();
+                    combined.extend(found.params);
+                    found.params = combined;
                     found
                 })
             }
@@ -334,7 +337,17 @@ impl Router {
             {
                 let prefix = AbsolutePath::new(route.url.reverse(params)?);
                 let suffix = AbsolutePath::new(url);
-                return Ok(Some(prefix.join(&suffix).into()));
+
+                // we are in a sub-router, and if its parent does not end in a trailing slash
+                // (eg. `foo`) and the found route is the sub-router's root
+                // (`/`), then we can safely assume that the trailing-slash
+                // version (eg. `foo/`) does not exist. We return its parent and must not join
+                let combined = if !prefix.as_str().ends_with('/') && suffix.as_str() == "/" {
+                    prefix
+                } else {
+                    prefix.join(&suffix)
+                };
+                return Ok(Some(combined.into()));
             }
         }
         Ok(None)
@@ -1820,6 +1833,131 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
         assert_eq!(response.headers().get("location").unwrap(), "/test/123");
+    }
+
+    #[test]
+    fn router_reverse_of_nested_index_uses_bare_mount_path() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "index",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/admin", sub_router)]);
+
+        let url = router
+            .reverse(None, "index", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/admin");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_reverse_slash_mounted_root_route_keeps_slash() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "index",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/admin/", sub_router)]);
+
+        let url = router
+            .reverse(None, "index", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/admin/");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_reverse_slash_mounted_non_root_route_unaffected() {
+        let nested_sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/bar/{buz}",
+            MockHandler,
+            "bar",
+        )]);
+        let sub_router = Router::with_urls(vec![
+            Route::with_handler_and_name("/foo", MockHandler, "foo"),
+            Route::with_router("/fab", nested_sub_router),
+        ]);
+        let router = Router::with_urls(vec![Route::with_router("/admin/", sub_router)]);
+
+        let url = router
+            .reverse(None, "foo", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/admin/foo");
+        assert!(router.has_route(&url));
+
+        let mut params = ReverseParamMap::new();
+        params.insert("buz", "random");
+        let url = router.reverse(None, "bar", &params).unwrap();
+        assert_eq!(url, "/admin/fab/bar/random");
+    }
+
+    #[test]
+    fn router_single_pattern_multi_param_order_preserved() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{model_name}/{pk}/edit/",
+            MockHandler,
+            "edit",
+        )]);
+
+        let found = router.get_handler("/database_user/1/edit/").unwrap();
+
+        assert_eq!(
+            found.params,
+            vec![
+                ("model_name".to_string(), "database_user".to_string()),
+                ("pk".to_string(), "1".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn router_nested_mount_and_leaf_param_order_preserved() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{model_name}/{pk}/edit/",
+            MockHandler,
+            "edit",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/admin", sub_router)]);
+
+        let found = router.get_handler("/admin/database_user/1/edit/").unwrap();
+
+        assert_eq!(
+            found.params,
+            vec![
+                ("model_name".to_string(), "database_user".to_string()),
+                ("pk".to_string(), "1".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn router_very_nested_mount_and_leaf_param_order_preserved() {
+        let nested_sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/foo/{bar}/{*baz}",
+            MockHandler,
+            "edit",
+        )]);
+
+        let sub_router = Router::with_urls(vec![Route::with_router(
+            "/{model_name}/{pk}/edit/",
+            nested_sub_router,
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/admin", sub_router)]);
+
+        let found = router
+            .get_handler("/admin/database_user/1/edit/foo/jon/2/doe")
+            .unwrap();
+
+        assert_eq!(
+            found.params,
+            vec![
+                ("model_name".to_string(), "database_user".to_string()),
+                ("pk".to_string(), "1".to_string()),
+                ("bar".to_string(), "jon".to_string()),
+                ("baz".to_string(), "2/doe".to_string())
+            ]
+        );
     }
 
     fn test_request() -> Request {

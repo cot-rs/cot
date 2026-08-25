@@ -306,7 +306,7 @@ impl CotApp {
     /// Render this app as Rust source implementing `cot::App`.
     #[must_use]
     pub fn render(&self) -> String {
-        let struct_name = format!("{}App", &self.name.to_pascal_case());
+        let struct_name = self.name.to_pascal_case();
 
         let init = self.render_init();
         let router = self.render_router();
@@ -434,7 +434,7 @@ impl cot::App for {struct_name} {{
     /// project.
     #[must_use]
     pub fn render_registration(&self) -> String {
-        let struct_name = format!("{}App", &self.name.to_pascal_case());
+        let struct_name = self.name.to_pascal_case();
 
         format!("\t\tapps.register({struct_name});")
     }

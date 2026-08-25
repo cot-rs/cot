@@ -79,6 +79,7 @@ use crate::router::Urls;
 use crate::session::Session;
 
 impl FromRequestHead for Urls {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         Ok(Self::from_parts(head))
     }
@@ -141,6 +142,7 @@ impl<F: Form> FromRequest for RequestForm<F> {
 
 #[cfg(feature = "db")]
 impl FromRequestHead for crate::db::Database {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         Ok(head.context().database().clone())
     }
@@ -148,6 +150,7 @@ impl FromRequestHead for crate::db::Database {
 
 #[cfg(feature = "cache")]
 impl FromRequestHead for crate::cache::Cache {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         Ok(head.context().cache().clone())
     }
@@ -155,6 +158,7 @@ impl FromRequestHead for crate::cache::Cache {
 
 #[cfg(feature = "email")]
 impl FromRequestHead for crate::email::Email {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         Ok(head.context().email().clone())
     }
@@ -259,6 +263,7 @@ pub enum StaticFilesGetError {
 impl_into_cot_error!(StaticFilesGetError);
 
 impl FromRequestHead for StaticFiles {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         Ok(StaticFiles {
             inner: head
@@ -271,12 +276,14 @@ impl FromRequestHead for StaticFiles {
 }
 
 impl FromRequestHead for Session {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         Ok(Session::from_extensions(&head.extensions).clone())
     }
 }
 
 impl FromRequestHead for Auth {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         let auth = head
             .extensions

@@ -86,6 +86,7 @@ impl Default for Console {
 }
 
 impl Transport for Console {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn send(&self, messages: &[EmailMessage]) -> TransportResult<()> {
         let mut out = io::stdout().lock();
         for msg in messages {

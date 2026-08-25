@@ -189,6 +189,10 @@ impl Router {
         None
     }
 
+    pub(crate) fn has_route(&self, request_path: &str) -> bool {
+        self.get_handler(request_path).is_some()
+    }
+
     fn matches_to_path_params(
         matches: &CaptureResult<'_, '_>,
         mut path_params: Vec<(String, String)>,
@@ -1063,6 +1067,7 @@ mod tests {
     struct MockHandler;
 
     impl RequestHandler for MockHandler {
+        #[expect(clippy::unused_async_trait_impl)]
         async fn handle(&self, _request: Request) -> Result<Response> {
             Html::new("OK").into_response()
         }

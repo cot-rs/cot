@@ -17,7 +17,7 @@ env:
 
   _RUST_STABLE: &rust_stable stable
   # Pinning the nightly version to a "stable" version to avoid CI breakages.
-  _RUST_NIGHTLY: &rust_nightly nightly-2026-06-20
+  _RUST_NIGHTLY: &rust_nightly nightly-2026-08-08
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
@@ -49,7 +49,7 @@ jobs:
           cache-bin: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run cargo check
         run: cargo check --all-targets --all-features
@@ -88,10 +88,14 @@ jobs:
           cache-bin: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          # Pinned: sccache >= 0.17.0 expands rustc @argfiles and breaks Windows'
+          # 32K command line limit: https://github.com/mozilla/sccache/issues/2397
+          version: "v0.16.0"
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.4
         with:
           tool: nextest
 
@@ -134,7 +138,7 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run clippy
         run: cargo clippy --no-deps --all-targets -- -D warnings
@@ -163,10 +167,10 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.4
         with:
           tool: nextest
 
@@ -218,7 +222,7 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run the external dependencies
         run: docker compose up -d
@@ -270,7 +274,7 @@ jobs:
           save-if: 'false'
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run fmt
         run: cargo fmt --all -- --check
@@ -323,7 +327,7 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run cargo check with minimal versions
         run: |
@@ -360,7 +364,7 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Run cargo check with every combination of features
         run: cargo hack check --feature-powerset --depth 3 --exclude-features db --no-dev-deps
@@ -390,7 +394,7 @@ jobs:
           save-if: 'false'
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.4
         with:
           tool: nextest
 
@@ -418,7 +422,8 @@ jobs:
         with:
           log-level: warn
           command: check licenses
-          command-arguments: --config .cargo/deny.toml
+          arguments: --config .cargo/deny.toml
+          command-arguments: licenses bans sources
   semver-check:
     if: github.event_name == 'pull_request'
     name: Semver compatibility check

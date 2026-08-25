@@ -88,11 +88,11 @@ The guide served at the [official website](https://cot.rs/guide/latest/) is buil
 
 ## Star History
 
-<a href="https://star-history.com/#cot-rs/cot&Date">
+<a href="https://www.star-history.com/?repos=cot-rs%2Fcot&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=cot-rs/cot&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=cot-rs/cot&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=cot-rs/cot&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&theme=dark&legend=top-left&sealed_token=f19Y88C-akDqgnKA83bdAa2kynB_tXjd24Q542FijwbM42YmtFImSQGoX7W2L6bGYDRbk-U4lm2J8mSWGPCx0klmHDV2wXPyrtnevwonQLDUfxbffHYedBjMxwQpyoIH8f-966Nuf4sZV00_51frhUQnDvNCrrm0qiiL5fZSURKzGzENMyzi_pFk5-f8" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&legend=top-left&sealed_token=f19Y88C-akDqgnKA83bdAa2kynB_tXjd24Q542FijwbM42YmtFImSQGoX7W2L6bGYDRbk-U4lm2J8mSWGPCx0klmHDV2wXPyrtnevwonQLDUfxbffHYedBjMxwQpyoIH8f-966Nuf4sZV00_51frhUQnDvNCrrm0qiiL5fZSURKzGzENMyzi_pFk5-f8" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&legend=top-left&sealed_token=f19Y88C-akDqgnKA83bdAa2kynB_tXjd24Q542FijwbM42YmtFImSQGoX7W2L6bGYDRbk-U4lm2J8mSWGPCx0klmHDV2wXPyrtnevwonQLDUfxbffHYedBjMxwQpyoIH8f-966Nuf4sZV00_51frhUQnDvNCrrm0qiiL5fZSURKzGzENMyzi_pFk5-f8" />
  </picture>
 </a>
 

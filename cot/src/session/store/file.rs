@@ -194,7 +194,7 @@ impl SessionStore for FileStore {
         if let Err(e) = res
             && e.kind() != io::ErrorKind::NotFound
         {
-            return Err(FileStoreError::Io(Box::new(e)))?;
+            Err(FileStoreError::Io(Box::new(e)))?;
         }
         Ok(())
     }

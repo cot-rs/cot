@@ -51,6 +51,9 @@ use crate::session::Session;
 use crate::static_files::{StaticFile, StaticFiles};
 use crate::{Body, Bootstrapper, Project, ProjectContext, Result};
 
+pub(crate) const DEFAULT_POSTGRES_TEST_URL: &str = "postgresql://cot:cot@localhost";
+pub(crate) const DEFAULT_MYSQL_TEST_URL: &str = "mysql://root:@localhost";
+
 /// A test client for making requests to a Cot project.
 ///
 /// This client is useful for end-to-end testing of Cot projects.
@@ -987,8 +990,8 @@ impl TestDatabase {
     /// # }
     /// ```
     pub async fn new_postgres(test_name: &str) -> Result<Self> {
-        let db_url = std::env::var("POSTGRES_URL")
-            .unwrap_or_else(|_| "postgresql://cot:cot@localhost".to_string());
+        let db_url =
+            std::env::var("POSTGRES_URL").unwrap_or_else(|_| DEFAULT_POSTGRES_TEST_URL.to_string());
         let database = Database::new(format!("{db_url}/postgres")).await?;
 
         let test_database_name = format!("test_cot__{test_name}");
@@ -1056,7 +1059,7 @@ impl TestDatabase {
     /// ```
     pub async fn new_mysql(test_name: &str) -> Result<Self> {
         let db_url =
-            std::env::var("MYSQL_URL").unwrap_or_else(|_| "mysql://root:@localhost".to_string());
+            std::env::var("MYSQL_URL").unwrap_or_else(|_| DEFAULT_MYSQL_TEST_URL.to_string());
         let database = Database::new(format!("{db_url}/mysql")).await?;
 
         let test_database_name = format!("test_cot__{test_name}");

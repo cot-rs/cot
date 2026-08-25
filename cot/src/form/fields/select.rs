@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use askama::filters::HtmlSafe;
+use cot::form::fields::impl_field_options_builder;
 /// Derive helper that implements `AsFormField` for select-like enums and common
 /// collections.
 ///
@@ -131,6 +132,7 @@ pub use cot_macros::SelectAsFormField;
 /// [`SelectField`]: cot::form::fields::SelectField
 /// [`SelectMultipleField`]: cot::form::fields::SelectMultipleField
 pub use cot_macros::SelectChoice;
+use derive_builder::Builder;
 use indexmap::IndexSet;
 
 use crate::form::fields::impl_form_field;
@@ -183,7 +185,10 @@ pub(crate) use impl_as_form_field_mult_collection;
 impl_form_field!(SelectField, SelectFieldOptions, "a dropdown list", T: SelectChoice + Send);
 
 /// Custom options for a [`SelectField`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct SelectFieldOptions<T> {
     /// The list of available choices for the select field.
     /// If not set, the default choices from [`SelectChoice::default_choices`]
@@ -281,7 +286,10 @@ impl<T: SelectChoice + Send> FormField for SelectMultipleField<T> {
 }
 
 /// Custom options for a [`SelectMultipleField`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct SelectMultipleFieldOptions<T> {
     /// The list of available choices for the multi-select field.
     /// If not set, the default choices from [`SelectChoice::default_choices`]
@@ -621,6 +629,8 @@ pub trait SelectChoice {
     fn to_string(&self) -> String;
 }
 
+impl_field_options_builder!(SelectFieldOptions<T>, SelectFieldOptionsBuilder<T>{choices, none_option});
+impl_field_options_builder!(SelectMultipleFieldOptions<T>, SelectMultipleFieldOptionsBuilder<T>{choices, size});
 #[cfg(test)]
 mod tests {
     use std::collections::{HashSet, LinkedList, VecDeque};
@@ -671,11 +681,11 @@ mod tests {
     #[test]
     fn select_field_render_default() {
         let field = SelectField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_select".to_owned(),
-                name: "test_select".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("test_select".to_owned())
+                .name("test_select".to_owned())
+                .required(false)
+                .build(),
             SelectFieldOptions::default(),
         );
         let html = field.to_string();
@@ -696,11 +706,11 @@ mod tests {
     #[test]
     fn select_field_render_required() {
         let field = SelectField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_select".to_owned(),
-                name: "test_select".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test_select".to_owned())
+                .name("test_select".to_owned())
+                .required(true)
+                .build(),
             SelectFieldOptions::default(),
         );
         let html = field.to_string();
@@ -712,15 +722,14 @@ mod tests {
     #[test]
     fn select_field_render_custom_none_option() {
         let field = SelectField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_select".to_owned(),
-                name: "test_select".to_owned(),
-                required: false,
-            },
-            SelectFieldOptions {
-                choices: None,
-                none_option: Some("Please select...".to_string()),
-            },
+            FormFieldOptions::builder()
+                .id("test_select".to_owned())
+                .name("test_select".to_owned())
+                .required(false)
+                .build(),
+            SelectFieldOptions::builder()
+                .none_option("Please select...".to_owned())
+                .build(),
         );
         let html = field.to_string();
 
@@ -731,15 +740,14 @@ mod tests {
     #[test]
     fn select_field_render_custom_choices() {
         let field = SelectField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_select".to_owned(),
-                name: "test_select".to_owned(),
-                required: false,
-            },
-            SelectFieldOptions {
-                choices: Some(vec![TestChoice::Option1, TestChoice::Option3]),
-                none_option: None,
-            },
+            FormFieldOptions::builder()
+                .id("test_select".to_owned())
+                .name("test_select".to_owned())
+                .required(false)
+                .build(),
+            SelectFieldOptions::builder()
+                .choices(vec![TestChoice::Option1, TestChoice::Option3])
+                .build(),
         );
         let html = field.to_string();
 
@@ -751,11 +759,11 @@ mod tests {
     #[cot::test]
     async fn select_field_with_value() {
         let mut field = SelectField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_select".to_owned(),
-                name: "test_select".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("test_select".to_owned())
+                .name("test_select".to_owned())
+                .required(false)
+                .build(),
             SelectFieldOptions::default(),
         );
 
@@ -771,11 +779,11 @@ mod tests {
     #[test]
     fn select_multiple_field_render_default() {
         let field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_multi".to_owned(),
-                name: "test_multi".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("test_multi".to_owned())
+                .name("test_multi".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
         let html = field.to_string();
@@ -793,15 +801,12 @@ mod tests {
     #[test]
     fn select_multiple_field_render_with_size() {
         let field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_multi".to_owned(),
-                name: "test_multi".to_owned(),
-                required: false,
-            },
-            SelectMultipleFieldOptions {
-                choices: None,
-                size: Some(5),
-            },
+            FormFieldOptions::builder()
+                .id("test_multi".to_owned())
+                .name("test_multi".to_owned())
+                .required(false)
+                .build(),
+            SelectMultipleFieldOptions::builder().size(5).build(),
         );
         let html = field.to_string();
 
@@ -811,11 +816,11 @@ mod tests {
     #[test]
     fn select_multiple_field_render_required() {
         let field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_multi".to_owned(),
-                name: "test_multi".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test_multi".to_owned())
+                .name("test_multi".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
         let html = field.to_string();
@@ -826,11 +831,11 @@ mod tests {
     #[cot::test]
     async fn select_multiple_field_with_values() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test_multi".to_owned(),
-                name: "test_multi".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("test_multi".to_owned())
+                .name("test_multi".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -877,11 +882,11 @@ mod tests {
     #[test]
     fn check_required_multiple_empty() {
         let field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -892,11 +897,11 @@ mod tests {
     #[cot::test]
     async fn check_required_multiple_with_values() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -915,11 +920,11 @@ mod tests {
     #[cot::test]
     async fn select_multiple_field_values_iterator() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -948,11 +953,11 @@ mod tests {
     #[cot::test]
     async fn vec_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "choices".to_owned(),
-                name: "choices".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("choices".to_owned())
+                .name("choices".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -972,11 +977,11 @@ mod tests {
     #[cot::test]
     async fn vec_as_form_field_required_empty() {
         let field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "choices".to_owned(),
-                name: "choices".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("choices".to_owned())
+                .name("choices".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -987,11 +992,11 @@ mod tests {
     #[cot::test]
     async fn vec_as_form_field_invalid_value() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "choices".to_owned(),
-                name: "choices".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("choices".to_owned())
+                .name("choices".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -1020,11 +1025,11 @@ mod tests {
     #[cot::test]
     async fn vec_deque_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "choices".to_owned(),
-                name: "choices".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("choices".to_owned())
+                .name("choices".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -1045,11 +1050,11 @@ mod tests {
     #[cot::test]
     async fn linked_list_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "choices".to_owned(),
-                name: "choices".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("choices".to_owned())
+                .name("choices".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -1066,11 +1071,11 @@ mod tests {
     #[cot::test]
     async fn hash_set_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "choices".to_owned(),
-                name: "choices".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("choices".to_owned())
+                .name("choices".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -1096,11 +1101,11 @@ mod tests {
     #[cot::test]
     async fn index_set_as_form_field_preserves_order() {
         let mut field = SelectMultipleField::<TestChoice>::with_options(
-            FormFieldOptions {
-                id: "choices".to_owned(),
-                name: "choices".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("choices".to_owned())
+                .name("choices".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -1137,11 +1142,11 @@ mod tests {
     #[test]
     fn select_as_form_field_render() {
         let field = SelectField::<DerivedStatus>::with_options(
-            FormFieldOptions {
-                id: "status".to_owned(),
-                name: "status".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("status".to_owned())
+                .name("status".to_owned())
+                .required(false)
+                .build(),
             SelectFieldOptions::default(),
         );
         let html = field.to_string();
@@ -1160,11 +1165,11 @@ mod tests {
     #[cot::test]
     async fn select_as_form_field_clean_value_valid() {
         let mut field = SelectField::<DerivedStatus>::with_options(
-            FormFieldOptions {
-                id: "status".to_owned(),
-                name: "status".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("status".to_owned())
+                .name("status".to_owned())
+                .required(true)
+                .build(),
             SelectFieldOptions::default(),
         );
 
@@ -1180,11 +1185,11 @@ mod tests {
     #[cot::test]
     async fn select_as_form_field_clean_value_required_empty() {
         let mut field = SelectField::<DerivedStatus>::with_options(
-            FormFieldOptions {
-                id: "status".to_owned(),
-                name: "status".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("status".to_owned())
+                .name("status".to_owned())
+                .required(true)
+                .build(),
             SelectFieldOptions::default(),
         );
 
@@ -1197,11 +1202,11 @@ mod tests {
     #[cot::test]
     async fn select_as_form_field_clean_value_invalid() {
         let mut field = SelectField::<DerivedStatus>::with_options(
-            FormFieldOptions {
-                id: "status".to_owned(),
-                name: "status".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("status".to_owned())
+                .name("status".to_owned())
+                .required(false)
+                .build(),
             SelectFieldOptions::default(),
         );
 

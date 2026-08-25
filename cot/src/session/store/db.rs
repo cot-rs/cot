@@ -29,7 +29,7 @@ use thiserror::Error;
 use tower_sessions::session::{Id, Record};
 use tower_sessions::{SessionStore, session_store};
 
-use crate::db::{Auto, Database, DatabaseError, Model, query};
+use crate::db::{Auto, Database, DatabaseBackend, DatabaseError, Model, query};
 use crate::session::db::Session;
 use crate::session::store::{ERROR_PREFIX, MAX_COLLISION_RETRIES};
 use crate::utils::chrono::DateTimeWithOffsetAdapter;
@@ -112,27 +112,16 @@ impl DbStore {
     pub fn new(connection: Database) -> DbStore {
         DbStore { connection }
     }
-}
 
-#[async_trait]
-impl SessionStore for DbStore {
-    async fn create(&self, record: &mut Record) -> session_store::Result<()> {
+    async fn create_in_executor<DB: DatabaseBackend>(
+        &self,
+        mut db: DB,
+        record: &mut Record,
+    ) -> session_store::Result<()> {
         for _ in 0..=MAX_COLLISION_RETRIES {
-            let key = record.id.to_string();
+            let mut model = Self::build_session_model(record)?;
 
-            let data = serde_json::to_string(&record.data).unwrap();
-            let expiry = DateTimeWithOffsetAdapter::try_from(record.expiry_date)
-                .expect("Failed to convert expiry date to a valid datetime")
-                .into_chrono_db_safe();
-
-            let mut model = Session {
-                id: Auto::auto(),
-                key,
-                data,
-                expiry,
-            };
-
-            let res = self.connection.insert(&mut model).await;
+            let res = db.insert(&mut model).await;
             match res {
                 Ok(()) => {
                     return Ok(());
@@ -147,26 +136,102 @@ impl SessionStore for DbStore {
         Err(DbStoreError::TooManyIdCollisions(MAX_COLLISION_RETRIES))?
     }
 
-    async fn save(&self, record: &Record) -> session_store::Result<()> {
-        // TODO: use transactions when implemented
+    fn build_session_model(record: &Record) -> session_store::Result<Session> {
         let key = record.id.to_string();
         let data = serde_json::to_string(&record.data)
             .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
+        let expiry = DateTimeWithOffsetAdapter::try_from(record.expiry_date)
+            .map_err(|err| session_store::Error::Backend(err.to_string()))?
+            .into_chrono_db_safe();
 
-        let query = query!(Session, $key == key)
-            .get(&self.connection)
+        Ok(Session {
+            id: Auto::auto(),
+            key,
+            data,
+            expiry,
+        })
+    }
+
+    async fn update_session_model<DB: DatabaseBackend>(
+        db: DB,
+        mut model: Session,
+        record: &Record,
+    ) -> session_store::Result<()> {
+        model.data = serde_json::to_string(&record.data)
+            .map_err(|err| DbStoreError::Serialize(Box::new(err)))?;
+        model.expiry = DateTimeWithOffsetAdapter::try_from(record.expiry_date)
+            .map_err(|err| session_store::Error::Backend(err.to_string()))?
+            .into_chrono_db_safe();
+        model
+            .update(db)
             .await
             .map_err(DbStoreError::DatabaseError)?;
-        if let Some(mut model) = query {
-            model.data = data;
-            model
-                .update(&self.connection)
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl SessionStore for DbStore {
+    async fn create(&self, record: &mut Record) -> session_store::Result<()> {
+        self.create_in_executor(&self.connection, record).await
+    }
+
+    async fn save(&self, record: &Record) -> session_store::Result<()> {
+        let mut transaction = self
+            .connection
+            .begin()
+            .await
+            .map_err(DbStoreError::DatabaseError)?;
+
+        let key = record.id.to_string();
+        let query = query!(Session, $key == key.clone())
+            .get(&mut transaction)
+            .await
+            .map_err(DbStoreError::DatabaseError)?;
+        if let Some(model) = query {
+            Self::update_session_model(&mut transaction, model, record).await?;
+        } else {
+            let mut model = Self::build_session_model(record)?;
+            // Insert inside a savepoint: on PostgreSQL, a failed statement
+            // aborts the whole enclosing transaction unless it's isolated in
+            // a savepoint, so we need one to be able to recover and fall
+            // back to an update below.
+            let mut savepoint = transaction
+                .begin()
                 .await
                 .map_err(DbStoreError::DatabaseError)?;
-        } else {
-            let mut record = record.clone();
-            self.create(&mut record).await?;
+            match savepoint.insert(&mut model).await {
+                Ok(()) => {
+                    savepoint
+                        .commit()
+                        .await
+                        .map_err(DbStoreError::DatabaseError)?;
+                }
+                Err(DatabaseError::UniqueViolation) => {
+                    // Another writer created a session with this key
+                    // concurrently; fall back to updating it instead.
+                    savepoint
+                        .rollback()
+                        .await
+                        .map_err(DbStoreError::DatabaseError)?;
+                    let model = query!(Session, $key == key)
+                        .get(&mut transaction)
+                        .await
+                        .map_err(DbStoreError::DatabaseError)?
+                        .expect(
+                            "row must exist after a unique key violation on insert with the \
+                            same key",
+                        );
+                    Self::update_session_model(&mut transaction, model, record).await?;
+                }
+                Err(err) => return Err(DbStoreError::DatabaseError(err))?,
+            }
         }
+
+        transaction
+            .commit()
+            .await
+            .map_err(DbStoreError::DatabaseError)?;
         Ok(())
     }
 

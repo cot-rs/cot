@@ -10,16 +10,18 @@ use std::num::{
 };
 
 use askama::filters::HtmlSafe;
-pub use attrs::Step;
+pub use attrs::{AutoCapitalize, AutoComplete, Capture, Dir, List, Step};
 pub use chrono::{
-    DateField, DateFieldOptions, DateTimeField, DateTimeFieldOptions, DateTimeWithTimezoneField,
-    DateTimeWithTimezoneFieldOptions, TimeField, TimeFieldOptions,
+    DateField, DateFieldOptions, DateFieldOptionsBuilder, DateTimeField, DateTimeFieldOptions,
+    DateTimeFieldOptionsBuilder, DateTimeWithTimezoneField, DateTimeWithTimezoneFieldOptions,
+    DateTimeWithTimezoneFieldOptionsBuilder, TimeField, TimeFieldOptions, TimeFieldOptionsBuilder,
 };
-pub use files::{FileField, FileFieldOptions, InMemoryUploadedFile};
+use derive_builder::Builder;
+pub use files::{FileField, FileFieldOptions, FileFieldOptionsBuilder, InMemoryUploadedFile};
 pub(crate) use select::check_required_multiple;
 pub use select::{
-    SelectAsFormField, SelectChoice, SelectField, SelectFieldOptions, SelectMultipleField,
-    SelectMultipleFieldOptions,
+    SelectAsFormField, SelectChoice, SelectField, SelectFieldOptions, SelectFieldOptionsBuilder,
+    SelectMultipleField, SelectMultipleFieldOptions, SelectMultipleFieldOptionsBuilder,
 };
 
 use crate::auth::PasswordHash;
@@ -68,16 +70,127 @@ macro_rules! impl_form_field {
         }
     };
 }
+
+macro_rules! impl_field_options_builder {
+    (
+        $ty:ident < $($gen:ident),+ >,
+        $builder:ident < $($gen2:ident),+ >
+        { $($field:ident),+ $(,)? }
+    ) => {
+        impl<$($gen: Clone),+> $ty<$($gen),+> {
+            #[doc = concat!(
+                "Creates a new [`", stringify!($builder), "`] to build a ",
+                "[`", stringify!($ty), "`].\n\n",
+                "# Examples\n\n",
+                "```\n",
+                "# use cot::form::fields::", stringify!($ty), ";\n",
+                "let options = ", stringify!($ty), "::<i32>::builder().build();\n",
+                "```",
+            )]
+            #[must_use]
+            pub fn builder() -> $builder<$($gen),+> {
+                $builder::default()
+            }
+        }
+
+        impl<$($gen2: Clone),+> $builder<$($gen2),+> {
+            #[doc = concat!(
+                "Builds the [`", stringify!($ty), "`], falling back to ",
+                "defaults for any field that wasn't explicitly set.\n\n",
+                "# Examples\n\n",
+                "```\n",
+                "# use cot::form::fields::", stringify!($ty), ";\n",
+                "let options = ", stringify!($ty), "::<i32>::builder().build();\n",
+                "```",
+            )]
+            #[must_use]
+            pub fn build(&self) -> $ty<$($gen2),+> {
+                $ty {
+                    $( $field: self.$field.clone().unwrap_or_default(), )+
+                }
+            }
+        }
+    };
+
+    ($ty:ident, $builder:ident { $($field:ident),+ $(,)? }) => {
+        impl $ty {
+            #[doc = concat!(
+                "Creates a new [`", stringify!($builder), "`] to build a ",
+                "[`", stringify!($ty), "`].\n\n",
+                "# Examples\n\n",
+                "```\n",
+                "# use cot::form::fields::", stringify!($ty), ";\n",
+                "let options = ", stringify!($ty), "::builder().build();\n",
+                "```",
+            )]
+            #[must_use]
+            pub fn builder() -> $builder {
+                $builder::default()
+            }
+        }
+
+        impl $builder {
+            #[doc = concat!(
+                "Builds the [`", stringify!($ty), "`], falling back to ",
+                "defaults for any field that wasn't explicitly set.\n\n",
+                "# Examples\n\n",
+                "```\n",
+                "# use cot::form::fields::", stringify!($ty), ";\n",
+                "let options = ", stringify!($ty), "::builder().build();\n",
+                "```",
+            )]
+            #[must_use]
+            pub fn build(&self) -> $ty {
+                $ty {
+                    $( $field: self.$field.clone().unwrap_or_default(), )+
+                }
+            }
+        }
+    };
+}
+
+pub(crate) use impl_field_options_builder;
 pub(crate) use impl_form_field;
 
 impl_form_field!(StringField, StringFieldOptions, "a string");
 
 /// Custom options for a [`StringField`].
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct StringFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
     pub max_length: Option<u32>,
+    /// The minimum length of the field. Used to set the `minlength` attribute
+    /// in the HTML input element.
+    pub min_length: Option<u32>,
+    /// The size of the field. Used to set the `size` attribute in the HTML
+    /// input element.
+    pub size: Option<u32>,
+    /// Corresponds to  the [`AutoCapitalize`] attribute in the HTML input
+    /// element.
+    pub autocapitalize: Option<AutoCapitalize>,
+    /// Corresponds to the [`AutoComplete`] attribute in the HTML input element.
+    pub autocomplete: Option<AutoComplete>,
+    /// The direction of the text input, which can be set to `ltr`
+    /// (left-to-right) or `rtl` (right-to-left). This corresponds to the
+    /// [`Dir`] attribute in the HTML input element.
+    pub dir: Option<Dir>,
+    /// The [`dirname`] attribute in the HTML input element, which is used to
+    /// specify the direction of the text input.
+    ///
+    /// [`dirname`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#dirname
+    pub dirname: Option<String>,
+    /// A [`List`] of options for the `datalist` element, which can be used to
+    /// provide predefined options for the input.
+    pub list: Option<List>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
+    pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
+    pub readonly: Option<bool>,
 }
 
 impl Display for StringField {
@@ -91,6 +204,48 @@ impl Display for StringField {
         if let Some(max_length) = self.custom_options.max_length {
             tag.attr("maxlength", max_length.to_string());
         }
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", min_length.to_string());
+        }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
+        if let Some(autocapitalize) = &self.custom_options.autocapitalize {
+            tag.attr("autocapitalize", autocapitalize.to_string());
+        }
+
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
+        if let Some(dir) = &self.custom_options.dir {
+            tag.attr("dir", dir.as_str());
+        }
+
+        if let Some(dirname) = &self.custom_options.dirname {
+            tag.attr("dirname", dirname);
+        }
+
+        if let Some(list) = &self.custom_options.list {
+            let list_id = format!("__{}_datalist", self.id());
+            tag.attr("list", &list_id);
+
+            let data_list = HtmlTag::data_list(list.clone(), &list_id);
+            tag.push_tag(data_list);
+        }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -143,11 +298,29 @@ impl<const LEN: u32> AsFormField for LimitedString<LEN> {
 impl_form_field!(PasswordField, PasswordFieldOptions, "a password");
 
 /// Custom options for a [`PasswordField`].
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct PasswordFieldOptions {
     /// The maximum length of the field. Used to set the `maxlength` attribute
     /// in the HTML input element.
     pub max_length: Option<u32>,
+    /// The minimum length of the field. Used to set the `minlength` attribute
+    /// in the HTML input element.
+    pub min_length: Option<u32>,
+    /// The size of the field. Used to set the [`size`] attribute in the HTML
+    /// input element.
+    ///
+    /// [`size`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#size
+    pub size: Option<u32>,
+    /// Corresponds to the [`AutoComplete`] attribute in the HTML input element.
+    pub autocomplete: Option<AutoComplete>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
+    pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
+    pub readonly: Option<bool>,
 }
 
 impl Display for PasswordField {
@@ -161,6 +334,28 @@ impl Display for PasswordField {
         if let Some(max_length) = self.custom_options.max_length {
             tag.attr("maxlength", max_length.to_string());
         }
+
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", min_length.to_string());
+        }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
+        }
+
         // we don't set the value attribute for password fields
         // to avoid leaking the password in the HTML
 
@@ -218,7 +413,10 @@ impl AsFormField for PasswordHash {
 impl_form_field!(EmailField, EmailFieldOptions, "an email");
 
 /// Custom options for [`EmailField`]
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct EmailFieldOptions {
     /// The maximum length of the field used to set the `maxlength` attribute
     /// in the HTML input element.
@@ -226,11 +424,38 @@ pub struct EmailFieldOptions {
     /// The minimum length of the field used to set the `minlength` attribute
     /// in the HTML input element.
     pub min_length: Option<u32>,
+    /// The size of the field used to set the [`size`] attribute in the HTML
+    /// input element.
+    ///
+    /// [`size`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#size
+    pub size: Option<u32>,
+    /// Corresponds to the [`AutoCapitalize`] attribute in the HTML input
+    /// element.
+    pub autocomplete: Option<AutoComplete>,
+    /// The direction of the text input, which can be set to `ltr`
+    /// (left-to-right) or `rtl` (right-to-left). This corresponds to the
+    /// [`Dir`] attribute in the HTML input element.
+    pub dir: Option<Dir>,
+    /// The [`dirname`] attribute in the HTML input element, which is used to
+    /// specify the direction of the text input.
+    ///
+    /// [`dirname`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#dirname
+    pub dirname: Option<String>,
+    /// A [`List`] of options for the `datalist` element, which can be used to
+    /// provide predefined options for the input.
+    pub list: Option<List>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
+    pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
+    pub readonly: Option<bool>,
 }
 
 impl Display for EmailField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("email");
+        let mut data_list: Option<HtmlTag> = None;
+
         tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
@@ -242,10 +467,51 @@ impl Display for EmailField {
         if let Some(min_length) = self.custom_options.min_length {
             tag.attr("minlength", min_length.to_string());
         }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
+        if let Some(dir) = &self.custom_options.dir {
+            tag.attr("dir", dir.as_str());
+        }
+
+        if let Some(dirname) = &self.custom_options.dirname {
+            tag.attr("dirname", dirname);
+        }
+
+        if let Some(list) = &self.custom_options.list {
+            let list_id = format!("__{}_datalist", self.id());
+            tag.attr("list", &list_id);
+
+            data_list = Some(HtmlTag::data_list(list.clone(), &list_id));
+        }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
 
+        if let Some(data_list) = data_list {
+            let mut wrapper = HtmlTag::new("div");
+            wrapper
+                .attr("id", format!("__{}_datalist_wrapper", self.id()))
+                .push_tag(tag)
+                .push_tag(data_list);
+            return write!(f, "{}", wrapper.render());
+        }
         write!(f, "{}", tag.render())
     }
 }
@@ -290,10 +556,13 @@ impl AsFormField for Email {
 
 impl HtmlSafe for EmailField {}
 
-impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer);
+impl_form_field!(IntegerField, IntegerFieldOptions, "an integer", T: Integer + Display);
 
 /// Custom options for a [`IntegerField`].
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct IntegerFieldOptions<T> {
     /// The minimum value of the field. Used to set the `min` attribute in the
     /// HTML input element.
@@ -301,6 +570,14 @@ pub struct IntegerFieldOptions<T> {
     /// The maximum value of the field. Used to set the `max` attribute in the
     /// HTML input element.
     pub max: Option<T>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
+    pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
+    pub readonly: Option<bool>,
+    /// The step size for the field. Used to set the [`Step`] attribute in the
+    /// HTML input element.
+    pub step: Option<Step<T>>,
 }
 
 impl<T: Integer> Default for IntegerFieldOptions<T> {
@@ -308,11 +585,14 @@ impl<T: Integer> Default for IntegerFieldOptions<T> {
         Self {
             min: T::MIN,
             max: T::MAX,
+            placeholder: None,
+            readonly: None,
+            step: None,
         }
     }
 }
 
-impl<T: Integer> Display for IntegerField<T> {
+impl<T: Integer + Display> Display for IntegerField<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag = HtmlTag::input("number");
         tag.attr("name", self.id());
@@ -326,6 +606,19 @@ impl<T: Integer> Display for IntegerField<T> {
         if let Some(max) = &self.custom_options.max {
             tag.attr("max", max.to_string());
         }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
+        }
+        if let Some(step) = &self.custom_options.step {
+            tag.attr("step", step.to_string());
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -334,7 +627,7 @@ impl<T: Integer> Display for IntegerField<T> {
     }
 }
 
-impl<T: Integer> HtmlSafe for IntegerField<T> {}
+impl<T: Integer + Display> HtmlSafe for IntegerField<T> {}
 
 /// A trait for numerical types that optionally have minimum and maximum values.
 ///
@@ -465,7 +758,10 @@ impl_integer_as_form_field!(NonZeroUsize);
 impl_form_field!(BoolField, BoolFieldOptions, "a boolean");
 
 /// Custom options for a [`BoolField`].
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct BoolFieldOptions {
     /// If `true`, the field must be checked to be considered valid.
     pub must_be_true: Option<bool>,
@@ -647,10 +943,13 @@ pub(crate) fn check_required<T: FormField>(field: &T) -> Result<&str, FormFieldV
     }
 }
 
-impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float);
+impl_form_field!(FloatField, FloatFieldOptions, "a float",  T: Float + Display);
 
 /// Custom options for a [`FloatField`].
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct FloatFieldOptions<T> {
     /// The minimum value of the field. Used to set the `min` attribute in the
     /// HTML input element.
@@ -658,6 +957,14 @@ pub struct FloatFieldOptions<T> {
     /// The maximum value of the field. Used to set the `max` attribute in the
     /// HTML input element.
     pub max: Option<T>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
+    pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
+    pub readonly: Option<bool>,
+    /// The step size for the field. Used to set the [`Step`] attribute in the
+    /// HTML input element.
+    pub step: Option<Step<T>>,
 }
 
 impl<T: Float> Default for FloatFieldOptions<T> {
@@ -665,11 +972,14 @@ impl<T: Float> Default for FloatFieldOptions<T> {
         Self {
             min: T::MIN,
             max: T::MAX,
+            placeholder: None,
+            readonly: None,
+            step: None,
         }
     }
 }
 
-impl<T: Float> Display for FloatField<T> {
+impl<T: Float + Display> Display for FloatField<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut tag: HtmlTag = HtmlTag::input("number");
         tag.attr("name", self.id());
@@ -684,6 +994,17 @@ impl<T: Float> Display for FloatField<T> {
         if let Some(max) = &self.custom_options.max {
             tag.attr("max", max.to_string());
         }
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
+        }
+        if let Some(step) = &self.custom_options.step {
+            tag.attr("step", step.to_string());
+        }
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -692,7 +1013,7 @@ impl<T: Float> Display for FloatField<T> {
     }
 }
 
-impl<T: Float> HtmlSafe for FloatField<T> {}
+impl<T: Float + Display> HtmlSafe for FloatField<T> {}
 
 /// A trait for types that can be represented as a float.
 ///
@@ -777,19 +1098,92 @@ impl_float_as_form_field!(f64);
 impl_form_field!(UrlField, UrlFieldOptions, "a URL");
 
 /// Custom options for a [`UrlField`].
-#[derive(Debug, Default, Copy, Clone)]
-pub struct UrlFieldOptions;
+#[derive(Debug, Default, Clone, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
+pub struct UrlFieldOptions {
+    /// The maximum length of the field. Used to set the `maxlength` attribute
+    /// in the HTML input element.
+    pub max_length: Option<u32>,
+    /// The minimum length of the field. Used to set the `minlength` attribute
+    /// in the HTML input element.
+    pub min_length: Option<u32>,
+    /// The size of the field. Used to set the [`size`]attribute in the HTML
+    /// input element.
+    ///
+    /// [`size`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#size
+    pub size: Option<u32>,
+    /// The [`AutoComplete`] attribute in the HTML input element, which is used
+    /// to specify how the browser should handle autocomplete for the input.
+    pub autocomplete: Option<AutoComplete>,
+    /// The direction of the text input, which can be set to `ltr`
+    /// (left-to-right) or `rtl` (right-to-left). This corresponds to the
+    /// [`Dir`] attribute in the HTML input element.
+    pub dir: Option<Dir>,
+    /// The [`dirname`] attribute in the HTML input element, which is used to
+    /// specify the direction of the text input.
+    ///
+    /// [`dirname`]: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input#dirname
+    pub dirname: Option<String>,
+    /// The [`List`] of options for the `datalist` element, which can be used to
+    /// provide predefined options for the input.
+    pub list: Option<List>,
+    /// The placeholder text for the input field, which is displayed when the
+    /// field is empty.
+    pub placeholder: Option<String>,
+    /// If `true`, the field is read-only and cannot be modified by the user.
+    pub readonly: Option<bool>,
+}
 
 impl Display for UrlField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // no custom options
-        let _ = self.custom_options;
         let mut tag = HtmlTag::input("url");
         tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
             tag.bool_attr("required");
         }
+        if let Some(max_length) = self.custom_options.max_length {
+            tag.attr("maxlength", max_length.to_string());
+        }
+        if let Some(min_length) = self.custom_options.min_length {
+            tag.attr("minlength", min_length.to_string());
+        }
+
+        if let Some(size) = self.custom_options.size {
+            tag.attr("size", size.to_string());
+        }
+
+        if let Some(autocomplete) = &self.custom_options.autocomplete {
+            tag.attr("autocomplete", autocomplete.to_string());
+        }
+
+        if let Some(dir) = &self.custom_options.dir {
+            tag.attr("dir", dir.as_str());
+        }
+
+        if let Some(dirname) = &self.custom_options.dirname {
+            tag.attr("dirname", dirname);
+        }
+
+        if let Some(list) = &self.custom_options.list {
+            let list_id = format!("__{}_datalist", self.id());
+            tag.attr("list", &list_id);
+
+            let data_list = HtmlTag::data_list(list, &list_id);
+            tag.push_tag(data_list);
+        }
+
+        if let Some(placeholder) = &self.custom_options.placeholder {
+            tag.attr("placeholder", placeholder);
+        }
+        if let Some(readonly) = self.custom_options.readonly
+            && readonly
+        {
+            tag.bool_attr("readonly");
+        }
+
         if let Some(value) = &self.value {
             tag.attr("value", value);
         }
@@ -817,6 +1211,64 @@ impl AsFormField for Url {
     }
 }
 
+impl_field_options_builder!(
+    StringFieldOptions,
+    StringFieldOptionsBuilder {
+        max_length,
+        min_length,
+        size,
+        autocapitalize,
+        autocomplete,
+        dir,
+        dirname,
+        list,
+        placeholder,
+        readonly
+    }
+);
+impl_field_options_builder!(
+    PasswordFieldOptions,
+    PasswordFieldOptionsBuilder {
+        max_length,
+        min_length,
+        size,
+        autocomplete,
+        placeholder,
+        readonly
+    }
+);
+impl_field_options_builder!(
+    EmailFieldOptions,
+    EmailFieldOptionsBuilder {
+        max_length,
+        min_length,
+        size,
+        autocomplete,
+        dir,
+        dirname,
+        list,
+        placeholder,
+        readonly
+    }
+);
+impl_field_options_builder!(IntegerFieldOptions<T>, IntegerFieldOptionsBuilder<T>{min, max, placeholder, readonly, step});
+impl_field_options_builder!(FloatFieldOptions<T>, FloatFieldOptionsBuilder<T>{min, max, placeholder, readonly, step});
+impl_field_options_builder!(
+    UrlFieldOptions,
+    UrlFieldOptionsBuilder {
+        max_length,
+        min_length,
+        size,
+        autocomplete,
+        dir,
+        dirname,
+        list,
+        placeholder,
+        readonly
+    }
+);
+impl_field_options_builder!(BoolFieldOptions, BoolFieldOptionsBuilder { must_be_true });
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -825,32 +1277,49 @@ mod tests {
     #[test]
     fn string_field_render() {
         let field = StringField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            StringFieldOptions {
-                max_length: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            StringFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .size(15)
+                .autocapitalize(AutoCapitalize::Words)
+                .autocomplete(AutoComplete::Value("foo bar".to_string()))
+                .dir(Dir::Ltr)
+                .dirname("dir".to_string())
+                .list(List::new(["bar", "baz"]))
+                .placeholder("Enter text".to_string())
+                .readonly(true)
+                .build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"text\""));
+        assert!(html.contains("name=\"test\""));
+        assert!(html.contains("id=\"test\""));
         assert!(html.contains("required"));
         assert!(html.contains("maxlength=\"10\""));
+        assert!(html.contains("minlength=\"5\""));
+        assert!(html.contains("size=\"15\""));
+        assert!(html.contains("autocomplete=\"foo bar\""));
+        assert!(html.contains("dir=\"ltr\""));
+        assert!(html.contains("dirname=\"dir\""));
+        assert!(html.contains("placeholder=\"Enter text\""));
+        assert!(html.contains("readonly"));
+        assert!(html.contains("<datalist id=\"__test_datalist\"><option value=\"bar\"/><option value=\"baz\"/></datalist>"));
     }
 
     #[cot::test]
     async fn string_field_clean_value() {
         let mut field = StringField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            StringFieldOptions {
-                max_length: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            StringFieldOptions::builder().max_length(10).build(),
         );
         field
             .set_value(FormFieldValue::new_text("test"))
@@ -863,14 +1332,12 @@ mod tests {
     #[cot::test]
     async fn string_field_clean_required() {
         let mut field = StringField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            StringFieldOptions {
-                max_length: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            StringFieldOptions::builder().max_length(10).build(),
         );
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
         let value = String::clean_value(&field);
@@ -880,31 +1347,38 @@ mod tests {
     #[test]
     fn password_field_render() {
         let field = PasswordField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            PasswordFieldOptions {
-                max_length: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            PasswordFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .size(15)
+                .autocomplete(AutoComplete::Value("foo bar".to_string()))
+                .placeholder("Enter password".to_string())
+                .readonly(false)
+                .build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"password\""));
         assert!(html.contains("required"));
         assert!(html.contains("maxlength=\"10\""));
+        assert!(html.contains("minlength=\"5\""));
+        assert!(html.contains("autocomplete=\"foo bar\""));
+        assert!(html.contains("placeholder=\"Enter password\""));
     }
+
     #[cot::test]
     async fn password_field_clean_value() {
         let mut field = PasswordField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            PasswordFieldOptions {
-                max_length: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            PasswordFieldOptions::builder().max_length(10).build(),
         );
         field
             .set_value(FormFieldValue::new_text("password"))
@@ -917,38 +1391,53 @@ mod tests {
     #[test]
     fn email_field_render() {
         let field = EmailField::with_options(
-            FormFieldOptions {
-                id: "test_id".to_owned(),
-                name: "test_name".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(10),
-                max_length: Some(50),
-            },
+            FormFieldOptions::builder()
+                .id("test_id".to_owned())
+                .name("test_name".to_owned())
+                .required(true)
+                .build(),
+            EmailFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .size(15)
+                .autocomplete(AutoComplete::Value("foo bar".to_string()))
+                .dir(Dir::Ltr)
+                .dirname("dir".to_string())
+                .list(List::new(["foo@example.com", "baz@example.com"]))
+                .placeholder("Enter text".to_string())
+                .readonly(true)
+                .build(),
         );
 
         let html = field.to_string();
+
         assert!(html.contains("type=\"email\""));
         assert!(html.contains("required"));
-        assert!(html.contains("minlength=\"10\""));
-        assert!(html.contains("maxlength=\"50\""));
+        assert!(html.contains("minlength=\"5\""));
+        assert!(html.contains("maxlength=\"10\""));
         assert!(html.contains("name=\"test_id\""));
         assert!(html.contains("id=\"test_id\""));
+        assert!(html.contains("placeholder=\"Enter text\""));
+        assert!(html.contains("readonly"));
+        assert!(html.contains("autocomplete=\"foo bar\""));
+        assert!(html.contains("dir=\"ltr\""));
+        assert!(html.contains("dirname=\"dir\""));
+        assert!(html.contains("list=\"__test_id_datalist\""));
+        assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com"/><option value="baz@example.com"/></datalist>"#));
     }
 
     #[cot::test]
     async fn email_field_clean_valid() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(10),
-                max_length: Some(50),
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
+            EmailFieldOptions::builder()
+                .max_length(50)
+                .min_length(10)
+                .build(),
         );
 
         field
@@ -963,15 +1452,15 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_invalid_format() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(10),
-                max_length: Some(50),
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
+            EmailFieldOptions::builder()
+                .max_length(50)
+                .min_length(10)
+                .build(),
         );
 
         field
@@ -986,15 +1475,15 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_exceeds_max_length() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(5),
-                max_length: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
+            EmailFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .build(),
         );
 
         field
@@ -1012,15 +1501,15 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_below_min_length() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(5),
-                max_length: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
+            EmailFieldOptions::builder()
+                .max_length(10)
+                .min_length(5)
+                .build(),
         );
 
         field
@@ -1038,15 +1527,15 @@ mod tests {
     #[cot::test]
     async fn email_field_clean_invalid_length_options() {
         let mut field = EmailField::with_options(
-            FormFieldOptions {
-                id: "email_test".to_owned(),
-                name: "email_test".to_owned(),
-                required: true,
-            },
-            EmailFieldOptions {
-                min_length: Some(50),
-                max_length: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("email_test".to_owned())
+                .name("email_test".to_owned())
+                .required(true)
+                .build(),
+            EmailFieldOptions::builder()
+                .max_length(10)
+                .min_length(50)
+                .build(),
         );
 
         field
@@ -1065,35 +1554,41 @@ mod tests {
     #[test]
     fn integer_field_render() {
         let field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            IntegerFieldOptions {
-                min: Some(1),
-                max: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            IntegerFieldOptions::builder()
+                .max(10)
+                .min(1)
+                .placeholder("Enter text".to_string())
+                .readonly(false)
+                .step(Step::Value(10))
+                .build(),
         );
         let html = field.to_string();
+
         assert!(html.contains("type=\"number\""));
         assert!(html.contains("required"));
         assert!(html.contains("min=\"1\""));
         assert!(html.contains("max=\"10\""));
+        assert!(html.contains("step=\"10\""));
+        assert!(html.contains("placeholder=\"Enter text\""));
+        assert!(html.contains("name=\"test\""));
+        assert!(html.contains("id=\"test\""));
+        assert!(!html.contains("readonly"));
     }
 
     #[cot::test]
     async fn integer_field_clean_value() {
         let mut field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            IntegerFieldOptions {
-                min: Some(1),
-                max: Some(10),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            IntegerFieldOptions::builder().max(10).min(1).build(),
         );
         field
             .set_value(FormFieldValue::new_text("5"))
@@ -1106,15 +1601,12 @@ mod tests {
     #[cot::test]
     async fn integer_field_clean_value_below_min_value() {
         let mut field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            IntegerFieldOptions {
-                min: Some(10),
-                max: Some(50),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            IntegerFieldOptions::builder().min(10).max(50).build(),
         );
         field
             .set_value(FormFieldValue::new_text("5"))
@@ -1130,15 +1622,12 @@ mod tests {
     #[cot::test]
     async fn integer_field_clean_value_above_max_value() {
         let mut field = IntegerField::<i32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            IntegerFieldOptions {
-                min: Some(10),
-                max: Some(50),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            IntegerFieldOptions::builder().min(10).max(50).build(),
         );
         field
             .set_value(FormFieldValue::new_text("100"))
@@ -1154,14 +1643,12 @@ mod tests {
     #[test]
     fn bool_field_render() {
         let field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            BoolFieldOptions {
-                must_be_true: Some(false),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            BoolFieldOptions::builder().must_be_true(false).build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"checkbox\""));
@@ -1172,14 +1659,12 @@ mod tests {
     #[test]
     fn bool_field_render_must_be_true() {
         let field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            BoolFieldOptions {
-                must_be_true: Some(true),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            BoolFieldOptions::builder().must_be_true(true).build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"checkbox\""));
@@ -1190,14 +1675,12 @@ mod tests {
     #[cot::test]
     async fn bool_field_clean_value() {
         let mut field = BoolField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            BoolFieldOptions {
-                must_be_true: Some(true),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            BoolFieldOptions::builder().must_be_true(false).build(),
         );
         field
             .set_value(FormFieldValue::new_text("true"))
@@ -1210,36 +1693,42 @@ mod tests {
     #[test]
     fn float_field_render() {
         let field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FloatFieldOptions {
-                min: Some(1.5),
-                max: Some(10.7),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            FloatFieldOptions::builder()
+                .min(1.5)
+                .max(10.7)
+                .step(Step::Any)
+                .placeholder("Enter text".to_string())
+                .readonly(true)
+                .build(),
         );
         let html = field.to_string();
+
         assert!(html.contains("type=\"number\""));
         assert!(html.contains("required"));
         assert!(html.contains("min=\"1.5\""));
         assert!(html.contains("max=\"10.7\""));
+        assert!(html.contains("step=\"any\""));
+        assert!(html.contains("placeholder=\"Enter text\""));
+        assert!(html.contains("name=\"test\""));
+        assert!(html.contains("id=\"test\""));
+        assert!(html.contains("readonly"));
     }
 
     #[cot::test]
     #[expect(clippy::float_cmp)]
     async fn float_field_clean_value() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FloatFieldOptions {
-                min: Some(1.0),
-                max: Some(10.0),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         field
             .set_value(FormFieldValue::new_text("5.0"))
@@ -1252,15 +1741,12 @@ mod tests {
     #[cot::test]
     async fn float_field_clean_value_min_value_not_met() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FloatFieldOptions {
-                min: Some(5.0),
-                max: Some(10.0),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            FloatFieldOptions::builder().min(5.0).max(10.0).build(),
         );
         field
             .set_value(FormFieldValue::new_text("2.0"))
@@ -1276,15 +1762,12 @@ mod tests {
     #[cot::test]
     async fn float_field_clean_value_max_value_exceeded() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FloatFieldOptions {
-                min: Some(5.0),
-                max: Some(10.0),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            FloatFieldOptions::builder().min(5.0).max(10.0).build(),
         );
         field
             .set_value(FormFieldValue::new_text("20.0"))
@@ -1300,15 +1783,12 @@ mod tests {
     #[cot::test]
     async fn float_field_clean_value_nan_and_inf() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FloatFieldOptions {
-                min: Some(1.0),
-                max: Some(10.0),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         let bad_inputs = ["NaN", "inf"];
 
@@ -1330,15 +1810,12 @@ mod tests {
     #[cot::test]
     async fn float_field_clean_required() {
         let mut field = FloatField::<f32>::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            FloatFieldOptions {
-                min: Some(1.0),
-                max: Some(10.0),
-            },
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            FloatFieldOptions::builder().min(1.0).max(10.0).build(),
         );
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
         let value = f32::clean_value(&field);
@@ -1348,17 +1825,29 @@ mod tests {
     #[cot::test]
     async fn url_field_clean_value() {
         let mut field = UrlField::with_options(
-            FormFieldOptions {
-                id: "test".to_owned(),
-                name: "test".to_owned(),
-                required: true,
-            },
-            UrlFieldOptions,
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .required(true)
+                .build(),
+            UrlFieldOptions::builder()
+                .max_length(100)
+                .min_length(5)
+                .size(30)
+                .autocomplete(AutoComplete::Value("url".to_string()))
+                .dir(Dir::Ltr)
+                .dirname("dir".to_string())
+                .list(List::new(["http:://example.com"]))
+                .placeholder("Enter URL".to_string())
+                .readonly(true)
+                .build(),
         );
+
         field
             .set_value(FormFieldValue::new_text("https://example.com"))
             .await
             .unwrap();
+
         let value = Url::clean_value(&field).unwrap();
         assert_eq!(
             value.as_str(),
@@ -1369,34 +1858,69 @@ mod tests {
     #[cot::test]
     async fn url_field_render() {
         let mut field = UrlField::with_options(
-            FormFieldOptions {
-                id: "id_url".to_owned(),
-                name: "url".to_owned(),
-                required: true,
-            },
-            UrlFieldOptions,
+            FormFieldOptions::builder()
+                .id("id_url".to_owned())
+                .name("url".to_owned())
+                .required(true)
+                .build(),
+            UrlFieldOptions::builder()
+                .max_length(120)
+                .min_length(10)
+                .size(40)
+                .list(List::new(["http://example.com", "https://example.org"]))
+                .dir(Dir::Ltr)
+                .dirname("lang".to_owned())
+                .autocomplete(AutoComplete::Value("url".to_owned()))
+                .placeholder("Paste link".to_owned())
+                .readonly(true)
+                .build(),
         );
+
         field
             .set_value(FormFieldValue::new_text("http://example.com"))
             .await
             .unwrap();
+
         let html = field.to_string();
+
         assert!(html.contains("type=\"url\""));
+        assert!(html.contains("id=\"id_url\""));
+        assert!(html.contains("name=\"id_url\""));
         assert!(html.contains("required"));
         assert!(html.contains("value=\"http://example.com\""));
+        assert!(html.contains("maxlength=\"120\""));
+        assert!(html.contains("minlength=\"10\""));
+        assert!(html.contains("size=\"40\""));
+        assert!(html.contains("placeholder=\"Paste link\""));
+        assert!(html.contains("autocomplete=\"url\""));
+        assert!(html.contains("dir=\"ltr\""));
+        assert!(html.contains("dirname=\"lang\""));
+        assert!(html.contains("readonly"));
+        assert!(html.contains("<datalist"));
     }
 
     #[cot::test]
     async fn url_field_clean_required() {
         let mut field = UrlField::with_options(
-            FormFieldOptions {
-                id: "id_url".to_owned(),
-                name: "url".to_owned(),
-                required: true,
-            },
-            UrlFieldOptions,
+            FormFieldOptions::builder()
+                .id("id_url".to_owned())
+                .name("url".to_owned())
+                .required(true)
+                .build(),
+            UrlFieldOptions::builder()
+                .max_length(120)
+                .min_length(10)
+                .size(40)
+                .dir(Dir::Ltr)
+                .dirname("rtl".to_owned())
+                .autocomplete(AutoComplete::Value("url".to_owned()))
+                .placeholder("Enter a link".to_owned())
+                .readonly(false)
+                .build(),
         );
+
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
+
         let value = Url::clean_value(&field);
         assert_eq!(value, Err(FormFieldValidationError::Required));
     }

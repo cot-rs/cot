@@ -9,8 +9,11 @@ use chrono_tz::Tz;
 use cot::form::FormField;
 use cot::form::fields::impl_form_field;
 use cot::html::HtmlTag;
+use derive_builder::Builder;
 
-use crate::form::fields::{SelectChoice, SelectField, Step, check_required};
+use crate::form::fields::{
+    SelectChoice, SelectField, Step, check_required, impl_field_options_builder,
+};
 use crate::form::{AsFormField, FormFieldValidationError};
 
 impl AsFormField for Weekday {
@@ -126,23 +129,26 @@ impl_form_field!(DateTimeField, DateTimeFieldOptions, "a datetime");
 /// let now = chrono::Local::now().naive_local();
 /// let in_two_days = now + Duration::hours(48);
 ///
-/// let options = DateTimeFieldOptions {
-///     min: Some(now),
-///     max: Some(in_two_days),
-///     readonly: Some(true),
-///     step: Some(Step::Value(Duration::seconds(300))),
-/// };
+/// let options = DateTimeFieldOptions::builder()
+///     .min(now)
+///     .max(in_two_days)
+///     .readonly(true)
+///     .step(Step::Value(Duration::seconds(300)))
+///     .build();
 ///
 /// let field = DateTimeField::with_options(
-///     FormFieldOptions {
-///         id: "event_time".into(),
-///         name: "event_time".into(),
-///         required: true,
-///     },
+///     FormFieldOptions::builder()
+///         .id("event_time".into())
+///         .name("event_time".into())
+///         .required(true)
+///         .build(),
 ///     options,
 /// );
 /// ```
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Builder)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct DateTimeFieldOptions {
     /// The maximum datetime value of the field used to set the `max` attribute
     /// in the HTML input element.
@@ -271,26 +277,25 @@ impl From<ParseError> for FormFieldValidationError {
 /// // we choose the later offset (i.e. `prefer_latest = true`).
 /// let tz: Tz = "America/New_York".parse().unwrap();
 ///
-/// let options = DateTimeWithTimezoneFieldOptions {
-///     min: None,
-///     max: None,
-///     readonly: Some(false),
-///     step: Some(Step::Value(Duration::seconds(60))),
-///     timezone: Some(tz),
+/// let options = DateTimeWithTimezoneFieldOptions::builder()
+///     .timezone(tz)
 ///     // If the given local time is ambiguous (DST fall‐back), pick the later of the two possibilities.
-///     prefer_latest: Some(true),
-/// };
+///     .prefer_latest(true)
+///     .build();
 ///
 /// let field = DateTimeWithTimezoneField::with_options(
-///     FormFieldOptions {
-///         id: "dt".into(),
-///         name: "dt".into(),
-///         required: true,
-///     },
+///     FormFieldOptions::builder()
+///         .id("dt".into())
+///         .name("dt".into())
+///         .required(true)
+///         .build(),
 ///     options,
 /// );
 /// ```
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Builder)]
+#[builder(build_fn(skip, error= std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct DateTimeWithTimezoneFieldOptions {
     /// The maximum allowed datetime (with offset) for this field.
     ///
@@ -459,23 +464,26 @@ impl_form_field!(TimeField, TimeFieldOptions, "a time");
 /// use cot::form::fields::{Step, TimeField, TimeFieldOptions};
 /// use cot::form::{FormField, FormFieldOptions};
 ///
-/// let options = TimeFieldOptions {
-///     min: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
-///     max: Some(NaiveTime::from_hms_opt(17, 0, 0).unwrap()),
-///     readonly: Some(true),
-///     step: Some(Step::Value(Duration::seconds(900))),
-/// };
+/// let options = TimeFieldOptions::builder()
+///     .min(NaiveTime::from_hms_opt(9, 0, 0).unwrap())
+///     .max(NaiveTime::from_hms_opt(17, 0, 0).unwrap())
+///     .readonly(true)
+///     .step(Step::Value(Duration::seconds(900)))
+///     .build();
 ///
 /// let field = TimeField::with_options(
-///     FormFieldOptions {
-///         id: "event_time".into(),
-///         name: "event_time".into(),
-///         required: true,
-///     },
+///     FormFieldOptions::builder()
+///         .id("event_time".into())
+///         .name("event_time".into())
+///         .required(true)
+///         .build(),
 ///     options,
 /// );
 /// ```
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Builder)]
+#[builder(build_fn(skip, error= std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct TimeFieldOptions {
     /// The maximum time value of the field used to set the `max` attribute
     /// in the HTML input element.
@@ -580,23 +588,26 @@ impl_form_field!(DateField, DateFieldOptions, "a date");
 /// use cot::form::fields::{DateField, DateFieldOptions, Step};
 /// use cot::form::{FormField, FormFieldOptions};
 ///
-/// let options = DateFieldOptions {
-///     min: Some(NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
-///     max: Some(NaiveDate::from_ymd_opt(2025, 12, 31).unwrap()),
-///     readonly: None,
-///     step: Some(Step::Value(Duration::days(7))),
-/// };
+/// let options = DateFieldOptions::builder()
+///     .min(NaiveDate::from_ymd_opt(2025, 1, 1).unwrap())
+///     .max(NaiveDate::from_ymd_opt(2025, 12, 31).unwrap())
+///     .readonly(true)
+///     .step(Step::Value(Duration::days(7)))
+///     .build();
 ///
 /// let field = DateField::with_options(
-///     FormFieldOptions {
-///         id: "event_time".into(),
-///         name: "event_time".into(),
-///         required: true,
-///     },
+///     FormFieldOptions::builder()
+///         .id("event_time".into())
+///         .name("event_time".into())
+///         .required(true)
+///         .build(),
 ///     options,
 /// );
 /// ```
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Builder)]
+#[builder(build_fn(skip, error= std::convert::Infallible))]
+#[builder(setter(strip_option))]
+#[non_exhaustive]
 pub struct DateFieldOptions {
     /// The maximum date value of the field used to set the `max` attribute
     /// in the HTML input element.
@@ -688,6 +699,45 @@ impl AsFormField for NaiveDate {
 
 impl HtmlSafe for DateField {}
 
+impl_field_options_builder!(
+    DateTimeFieldOptions,
+    DateTimeFieldOptionsBuilder {
+        max,
+        min,
+        readonly,
+        step
+    }
+);
+impl_field_options_builder!(
+    DateTimeWithTimezoneFieldOptions,
+    DateTimeWithTimezoneFieldOptionsBuilder {
+        max,
+        min,
+        readonly,
+        step,
+        timezone,
+        prefer_latest
+    }
+);
+impl_field_options_builder!(
+    TimeFieldOptions,
+    TimeFieldOptionsBuilder {
+        max,
+        min,
+        readonly,
+        step
+    }
+);
+impl_field_options_builder!(
+    DateFieldOptions,
+    DateFieldOptionsBuilder {
+        max,
+        min,
+        readonly,
+        step
+    }
+);
+
 #[cfg(test)]
 mod tests {
     use std::collections::{HashSet, LinkedList, VecDeque};
@@ -772,11 +822,11 @@ mod tests {
     #[cot::test]
     async fn weekday_as_form_field_clean_value() {
         let mut field = SelectField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekday".to_owned(),
-                name: "weekday".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("weekday".to_owned())
+                .name("weekday".to_owned())
+                .required(true)
+                .build(),
             SelectFieldOptions::default(),
         );
 
@@ -792,11 +842,11 @@ mod tests {
     #[cot::test]
     async fn weekday_as_form_field_clean_value_invalid() {
         let mut field = SelectField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekday".to_owned(),
-                name: "weekday".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("weekday".to_owned())
+                .name("weekday".to_owned())
+                .required(true)
+                .build(),
             SelectFieldOptions::default(),
         );
 
@@ -817,11 +867,11 @@ mod tests {
     #[cot::test]
     async fn weekday_as_form_field_clean_value_required_empty() {
         let mut field = SelectField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekday".to_owned(),
-                name: "weekday".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("weekday".to_owned())
+                .name("weekday".to_owned())
+                .required(true)
+                .build(),
             SelectFieldOptions::default(),
         );
 
@@ -841,11 +891,11 @@ mod tests {
     #[cot::test]
     async fn weekday_vec_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -872,11 +922,11 @@ mod tests {
     #[cot::test]
     async fn weekday_vec_as_form_field_clean_value_empty_required() {
         let field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: true,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(true)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -887,11 +937,11 @@ mod tests {
     #[cot::test]
     async fn weekday_vec_as_form_field_clean_value_invalid() {
         let mut field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -922,11 +972,11 @@ mod tests {
     #[cot::test]
     async fn weekday_hash_set_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -948,11 +998,11 @@ mod tests {
     #[cot::test]
     async fn weekday_vec_deque_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -974,11 +1024,11 @@ mod tests {
     #[cot::test]
     async fn weekday_linked_list_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -995,11 +1045,11 @@ mod tests {
     #[cot::test]
     async fn weekday_index_set_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -1025,11 +1075,11 @@ mod tests {
     #[cot::test]
     async fn weekday_set_as_form_field_clean_value() {
         let mut field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -1065,11 +1115,11 @@ mod tests {
     #[test]
     fn weekday_select_field_render() {
         let field = SelectField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekday".to_owned(),
-                name: "weekday".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("weekday".to_owned())
+                .name("weekday".to_owned())
+                .required(false)
+                .build(),
             SelectFieldOptions::default(),
         );
 
@@ -1096,11 +1146,11 @@ mod tests {
     #[test]
     fn weekday_select_multiple_field_render() {
         let field = SelectMultipleField::<Weekday>::with_options(
-            FormFieldOptions {
-                id: "weekdays".to_owned(),
-                name: "weekdays".to_owned(),
-                required: false,
-            },
+            FormFieldOptions::builder()
+                .id("weekdays".to_owned())
+                .name("weekdays".to_owned())
+                .required(false)
+                .build(),
             SelectMultipleFieldOptions::default(),
         );
 
@@ -1117,23 +1167,23 @@ mod tests {
     #[test]
     fn datetime_field_render() {
         let field = DateTimeField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeFieldOptions {
-                min: Some(
-                    NaiveDateTime::parse_from_str("2025-05-27T00:00:00", "%Y-%m-%dT%H:%M:%S")
-                        .unwrap(),
-                ),
-                max: Some(
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeFieldOptions::builder()
+                .max(
                     NaiveDateTime::parse_from_str("2025-05-28T00:00:00", "%Y-%m-%dT%H:%M:%S")
                         .unwrap(),
-                ),
-                readonly: Some(true),
-                step: Some(Step::Value(Duration::seconds(60))),
-            },
+                )
+                .min(
+                    NaiveDateTime::parse_from_str("2025-05-27T00:00:00", "%Y-%m-%dT%H:%M:%S")
+                        .unwrap(),
+                )
+                .readonly(true)
+                .step(Step::Value(Duration::seconds(60)))
+                .build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"datetime-local\""));
@@ -1148,23 +1198,22 @@ mod tests {
     #[cot::test]
     async fn datetime_field_clean_valid() {
         let mut field = DateTimeField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeFieldOptions {
-                min: Some(
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeFieldOptions::builder()
+                .min(
                     NaiveDateTime::parse_from_str("2025-05-27T00:00:00", "%Y-%m-%dT%H:%M:%S")
                         .unwrap(),
-                ),
-                max: Some(
+                )
+                .max(
                     NaiveDateTime::parse_from_str("2025-05-28T00:00:00", "%Y-%m-%dT%H:%M:%S")
                         .unwrap(),
-                ),
-                readonly: None,
-                step: Some(Step::Value(Duration::seconds(60))),
-            },
+                )
+                .step(Step::Value(Duration::seconds(60)))
+                .build(),
         );
 
         for &dt in &["2025-05-27T12:34", "2025-05-27T12:34:00"] {
@@ -1177,20 +1226,18 @@ mod tests {
     #[cot::test]
     async fn datetime_field_clean_below_min() {
         let mut field = DateTimeField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeFieldOptions {
-                min: Some(
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeFieldOptions::builder()
+                .min(
                     NaiveDateTime::parse_from_str("2025-05-27T10:00:00", "%Y-%m-%dT%H:%M:%S")
                         .unwrap(),
-                ),
-                max: None,
-                readonly: None,
-                step: Some(Step::Value(Duration::seconds(60))),
-            },
+                )
+                .step(Step::Value(Duration::seconds(60)))
+                .build(),
         );
         for &dt in &["2025-05-27T09:59", "2025-05-27T09:59:00"] {
             field.set_value(FormFieldValue::new_text(dt)).await.unwrap();
@@ -1205,20 +1252,18 @@ mod tests {
     #[cot::test]
     async fn datetime_field_clean_above_max() {
         let mut field = DateTimeField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeFieldOptions {
-                min: None,
-                max: Some(
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeFieldOptions::builder()
+                .max(
                     NaiveDateTime::parse_from_str("2025-05-27T10:00:00", "%Y-%m-%dT%H:%M:%S")
                         .unwrap(),
-                ),
-                readonly: None,
-                step: Some(Step::Value(Duration::seconds(60))),
-            },
+                )
+                .step(Step::Value(Duration::seconds(60)))
+                .build(),
         );
         for &dt in &["2025-05-27T10:01", "2025-05-27T10:01:00"] {
             field.set_value(FormFieldValue::new_text(dt)).await.unwrap();
@@ -1233,25 +1278,29 @@ mod tests {
     #[test]
     fn datetime_with_tz_field_render() {
         let field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: Some(
-                    DateTime::parse_from_str("2025-05-27T00:00:00 +0000", "%Y-%m-%dT%H:%M:%S %z")
-                        .unwrap(),
-                ),
-                max: Some(
-                    DateTime::parse_from_str("2025-05-28T00:00:00 +0000", "%Y-%m-%dT%H:%M:%S %z")
-                        .unwrap(),
-                ),
-                readonly: Some(true),
-                step: Some(Step::Value(Duration::seconds(60))),
-                timezone: None,
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .min(
+                    DateTime::<FixedOffset>::parse_from_str(
+                        "2025-05-27T00:00:00 +0000",
+                        "%Y-%m-%dT%H:%M:%S %z",
+                    )
+                    .unwrap(),
+                )
+                .max(
+                    DateTime::<FixedOffset>::parse_from_str(
+                        "2025-05-28T00:00:00 +0000",
+                        "%Y-%m-%dT%H:%M:%S %z",
+                    )
+                    .unwrap(),
+                )
+                .readonly(true)
+                .step(Step::Value(Duration::seconds(60)))
+                .build(),
         );
         let html = field.to_string();
         assert_eq!(
@@ -1263,19 +1312,12 @@ mod tests {
     #[cot::test]
     async fn datetime_with_tz_clean_valid_default_utc() {
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: None,
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder().build(),
         );
         field
             .set_value(FormFieldValue::new_text("2025-05-27T12:34"))
@@ -1290,19 +1332,14 @@ mod tests {
     async fn datetime_with_tz_clean_valid_custom_offset() {
         let offset = Tz::America__New_York;
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: Some(offset),
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .timezone(offset)
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2025-05-27T01:23"))
@@ -1317,19 +1354,15 @@ mod tests {
     async fn datetime_with_tz_clean_ambiguous_time_prefer_earliest() {
         let offset = Tz::America__New_York;
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: Some(offset),
-                prefer_latest: Some(false),
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .timezone(offset)
+                .prefer_latest(false)
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2024-11-03T01:30"))
@@ -1344,19 +1377,15 @@ mod tests {
     async fn datetime_with_tz_clean_ambiguous_time_prefer_latest() {
         let offset = Tz::America__New_York;
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: Some(offset),
-                prefer_latest: Some(true),
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .timezone(offset)
+                .prefer_latest(true)
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2024-11-03T01:30"))
@@ -1371,19 +1400,14 @@ mod tests {
     async fn datetime_with_tz_clean_ambiguous_time_unhandled() {
         let offset = Tz::America__New_York;
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: Some(offset),
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .timezone(offset)
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2024-11-03T01:30"))
@@ -1400,19 +1424,14 @@ mod tests {
     async fn datetime_with_tz_clean_non_existent_local_time() {
         let offset = Tz::America__New_York;
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: Some(offset),
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .timezone(offset)
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2024-03-10T02:30"))
@@ -1431,19 +1450,14 @@ mod tests {
         let min_dt =
             DateTime::parse_from_str("2025-05-27T10:00:00 +0000", "%Y-%m-%dT%H:%M:%S %z").unwrap();
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: Some(min_dt),
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: None,
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .min(min_dt)
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2025-05-27T09:59"))
@@ -1461,19 +1475,14 @@ mod tests {
         let max_dt =
             DateTime::parse_from_str("2025-05-27T10:00:00 +0000", "%Y-%m-%dT%H:%M:%S %z").unwrap();
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: Some(max_dt),
-                readonly: None,
-                step: None,
-                timezone: None,
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .max(max_dt)
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2025-05-27T10:01"))
@@ -1489,19 +1498,12 @@ mod tests {
     #[cot::test]
     async fn datetime_with_tz_clean_invalid_format() {
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: None,
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder().build(),
         );
         field
             .set_value(FormFieldValue::new_text("not-a-valid-datetime"))
@@ -1515,19 +1517,12 @@ mod tests {
     #[cot::test]
     async fn datetime_with_tz_clean_required() {
         let mut field = DateTimeWithTimezoneField::with_options(
-            FormFieldOptions {
-                id: "dt".into(),
-                name: "dt".into(),
-                required: true,
-            },
-            DateTimeWithTimezoneFieldOptions {
-                min: None,
-                max: None,
-                readonly: None,
-                step: None,
-                timezone: None,
-                prefer_latest: None,
-            },
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder().build(),
         );
 
         field.set_value(FormFieldValue::new_text("")).await.unwrap();
@@ -1538,17 +1533,17 @@ mod tests {
     #[test]
     fn time_field_render() {
         let field = TimeField::with_options(
-            FormFieldOptions {
-                id: "time".into(),
-                name: "time".into(),
-                required: true,
-            },
-            TimeFieldOptions {
-                min: Some(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap()),
-                max: Some(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap()),
-                readonly: Some(false),
-                step: Some(Step::Value(Duration::seconds(60))),
-            },
+            FormFieldOptions::builder()
+                .id("time".into())
+                .name("time".into())
+                .required(true)
+                .build(),
+            TimeFieldOptions::builder()
+                .min(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap())
+                .max(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap())
+                .step(Step::Value(Duration::seconds(60)))
+                .readonly(false)
+                .build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"time\""));
@@ -1562,17 +1557,17 @@ mod tests {
     #[cot::test]
     async fn time_field_clean_valid() {
         let mut field = TimeField::with_options(
-            FormFieldOptions {
-                id: "t".into(),
-                name: "t".into(),
-                required: true,
-            },
-            TimeFieldOptions {
-                min: Some(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap()),
-                max: Some(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap()),
-                readonly: Some(false),
-                step: Some(Step::Value(Duration::seconds(60))),
-            },
+            FormFieldOptions::builder()
+                .id("t".into())
+                .name("t".into())
+                .required(true)
+                .build(),
+            TimeFieldOptions::builder()
+                .min(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap())
+                .max(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap())
+                .step(Step::Value(Duration::seconds(60)))
+                .readonly(false)
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("12:30"))
@@ -1585,17 +1580,16 @@ mod tests {
     #[cot::test]
     async fn time_field_clean_below_min() {
         let mut field = TimeField::with_options(
-            FormFieldOptions {
-                id: "t".into(),
-                name: "t".into(),
-                required: true,
-            },
-            TimeFieldOptions {
-                min: Some(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap()),
-                max: None,
-                readonly: Some(false),
-                step: Some(Step::Value(Duration::seconds(60))),
-            },
+            FormFieldOptions::builder()
+                .id("t".into())
+                .name("t".into())
+                .required(true)
+                .build(),
+            TimeFieldOptions::builder()
+                .min(NaiveTime::parse_from_str("09:00:00", "%H:%M:%S").unwrap())
+                .step(Step::Value(Duration::seconds(60)))
+                .readonly(false)
+                .build(),
         );
         for &time in &["08:59:00", "08:59"] {
             field
@@ -1613,17 +1607,16 @@ mod tests {
     #[cot::test]
     async fn time_field_clean_above_max() {
         let mut field = TimeField::with_options(
-            FormFieldOptions {
-                id: "t".into(),
-                name: "t".into(),
-                required: true,
-            },
-            TimeFieldOptions {
-                min: None,
-                max: Some(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap()),
-                readonly: Some(false),
-                step: Some(Step::Value(Duration::seconds(60))),
-            },
+            FormFieldOptions::builder()
+                .id("t".into())
+                .name("t".into())
+                .required(true)
+                .build(),
+            TimeFieldOptions::builder()
+                .max(NaiveTime::parse_from_str("17:00:00", "%H:%M:%S").unwrap())
+                .step(Step::Value(Duration::seconds(60)))
+                .readonly(false)
+                .build(),
         );
 
         for &time in &["17:01:00", "17:01"] {
@@ -1642,17 +1635,16 @@ mod tests {
     #[test]
     fn date_field_render() {
         let field = DateField::with_options(
-            FormFieldOptions {
-                id: "d".into(),
-                name: "d".into(),
-                required: true,
-            },
-            DateFieldOptions {
-                min: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
-                max: Some(NaiveDate::parse_from_str("2025-05-28", "%Y-%m-%d").unwrap()),
-                readonly: None,
-                step: Some(Step::Value(Duration::days(1))),
-            },
+            FormFieldOptions::builder()
+                .id("d".into())
+                .name("d".into())
+                .required(true)
+                .build(),
+            DateFieldOptions::builder()
+                .min(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap())
+                .max(NaiveDate::parse_from_str("2025-05-28", "%Y-%m-%d").unwrap())
+                .step(Step::Value(Duration::days(1)))
+                .build(),
         );
         let html = field.to_string();
         assert!(html.contains("type=\"date\""));
@@ -1664,17 +1656,16 @@ mod tests {
     #[cot::test]
     async fn date_field_clean_valid() {
         let mut field = DateField::with_options(
-            FormFieldOptions {
-                id: "d".into(),
-                name: "d".into(),
-                required: true,
-            },
-            DateFieldOptions {
-                min: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
-                max: Some(NaiveDate::parse_from_str("2025-05-28", "%Y-%m-%d").unwrap()),
-                readonly: None,
-                step: Some(Step::Value(Duration::days(1))),
-            },
+            FormFieldOptions::builder()
+                .id("d".into())
+                .name("d".into())
+                .required(true)
+                .build(),
+            DateFieldOptions::builder()
+                .min(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap())
+                .max(NaiveDate::parse_from_str("2025-05-28", "%Y-%m-%d").unwrap())
+                .step(Step::Value(Duration::days(1)))
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2025-05-27"))
@@ -1687,17 +1678,15 @@ mod tests {
     #[cot::test]
     async fn date_field_clean_below_min() {
         let mut field = DateField::with_options(
-            FormFieldOptions {
-                id: "d".into(),
-                name: "d".into(),
-                required: true,
-            },
-            DateFieldOptions {
-                min: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
-                max: None,
-                readonly: None,
-                step: Some(Step::Value(Duration::days(1))),
-            },
+            FormFieldOptions::builder()
+                .id("d".into())
+                .name("d".into())
+                .required(true)
+                .build(),
+            DateFieldOptions::builder()
+                .min(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap())
+                .step(Step::Value(Duration::days(1)))
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2025-05-26"))
@@ -1713,17 +1702,15 @@ mod tests {
     #[cot::test]
     async fn date_field_clean_above_max() {
         let mut field = DateField::with_options(
-            FormFieldOptions {
-                id: "d".into(),
-                name: "d".into(),
-                required: true,
-            },
-            DateFieldOptions {
-                min: None,
-                max: Some(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap()),
-                readonly: None,
-                step: Some(Step::Value(Duration::days(1))),
-            },
+            FormFieldOptions::builder()
+                .id("d".into())
+                .name("d".into())
+                .required(true)
+                .build(),
+            DateFieldOptions::builder()
+                .max(NaiveDate::parse_from_str("2025-05-27", "%Y-%m-%d").unwrap())
+                .step(Step::Value(Duration::days(1)))
+                .build(),
         );
         field
             .set_value(FormFieldValue::new_text("2025-05-28"))

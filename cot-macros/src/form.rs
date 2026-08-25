@@ -135,11 +135,12 @@ impl FormDeriveBuilder {
                 Vec::new()
             };
             quote!(#field_ident: {
-                let options = #crate_ident::form::FormFieldOptions {
-                    id: stringify!(#field_ident).to_owned(),
-                    name: #name.to_owned(),
-                    required: true,
-                };
+                let options = #crate_ident::form::FormFieldOptions::builder()
+                .id(stringify!(#field_ident).to_owned())
+                .name(#name.to_owned())
+                .required(true)
+                .build();
+
                 type Field = <#ty as #crate_ident::form::AsFormField>::Type;
                 type CustomOptions = <Field as #crate_ident::form::FormField>::CustomOptions;
                 let mut custom_options: CustomOptions = ::core::default::Default::default();

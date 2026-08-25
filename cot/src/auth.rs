@@ -27,7 +27,9 @@ use thiserror::Error;
 
 use crate::config::SecretKey;
 #[cfg(feature = "db")]
-use crate::db::{ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
+use crate::db::{
+    ColumnType, DatabaseField, DbValue, FromDbValue, SqlxValueRef, TextField, ToDbValue,
+};
 use crate::request::{Request, RequestExt};
 use crate::session::Session;
 
@@ -730,6 +732,9 @@ impl ToDbValue for Option<PasswordHash> {
     }
 }
 
+#[cfg(feature = "db")]
+impl TextField for PasswordHash {}
+
 /// Authentication helper structure.
 ///
 /// This is an object that provides methods to sign users in and out, by using
@@ -1307,7 +1312,7 @@ mod tests {
         let id_2 = session.id();
 
         assert!(id_2.is_some());
-        assert!(id_1 != id_2);
+        assert_ne!(id_1, id_2);
     }
 
     /// Test that the user is logged out when there is an invalid user ID in the

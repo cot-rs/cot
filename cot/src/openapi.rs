@@ -1360,7 +1360,7 @@ mod tests {
                 panic!("Expected object schema");
             }
         } else {
-            panic!("Expected request body: {:?}", &operation.request_body);
+            panic!("Expected request body: {:?}", operation.request_body);
         }
     }
 
@@ -1430,7 +1430,7 @@ mod tests {
                 panic!("Expected object schema");
             }
         } else {
-            panic!("Expected request body: {:?}", &operation.request_body);
+            panic!("Expected request body: {:?}", operation.request_body);
         }
     }
 

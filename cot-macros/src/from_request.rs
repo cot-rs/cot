@@ -45,6 +45,7 @@ pub(super) fn impl_from_request_head_for_struct(
     quote! {
         #[automatically_derived]
         impl #cot::request::extractors::FromRequestHead for #struct_name {
+            #[expect(clippy::unused_async_trait_impl, clippy::unused_async)]
             async fn from_request_head(
                 head: &#cot::request::RequestHead,
             ) -> #cot::Result<Self> {

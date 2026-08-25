@@ -71,6 +71,7 @@ pub trait FromRequest: Sized {
 }
 
 impl FromRequest for Request {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request(head: &RequestHead, body: Body) -> crate::Result<Self> {
         Ok(Request::from_parts(head.clone(), body))
     }
@@ -132,6 +133,7 @@ pub trait FromRequestHead: Sized {
 pub struct Path<D>(pub D);
 
 impl<D: DeserializeOwned> FromRequestHead for Path<D> {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         let params = head
             .extensions
@@ -189,6 +191,7 @@ impl<D: DeserializeOwned> FromRequestHead for UrlQuery<D>
 where
     D: DeserializeOwned,
 {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         let query = head.uri.query().unwrap_or_default();
 
@@ -291,12 +294,14 @@ impl_into_cot_error!(JsonDeserializeError, BAD_REQUEST);
 
 // extractor impls for existing types
 impl FromRequestHead for RequestHead {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         Ok(head.clone())
     }
 }
 
 impl FromRequestHead for Method {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         Ok(head.method.clone())
     }

@@ -1246,10 +1246,49 @@ mod tests {
     }
 
     #[test]
-    fn router_with_urls() {
+    fn route_with_handler() {
+        let route = Route::with_handler("/test", MockHandler);
+        assert_eq!(route.url.to_string(), "/test");
+    }
+
+    #[test]
+    fn route_with_handler_and_params() {
+        let route = Route::with_handler("/test/{id}", MockHandler);
+        assert_eq!(route.url.to_string(), "/test/{id}");
+    }
+
+    #[test]
+    fn route_with_handler_and_name() {
+        let route = Route::with_handler_and_name("/test", MockHandler, "test");
+        assert_eq!(route.url.to_string(), "/test");
+        assert_eq!(route.name, Some(RouteName("test".to_string())));
+    }
+
+    #[test]
+    fn route_with_router() {
+        let sub_route = Route::with_handler("/sub", MockHandler);
+        let sub_router = Router::with_urls(vec![sub_route]);
+        let route = Route::with_router("/test", sub_router);
+        assert_eq!(route.url.to_string(), "/test");
+    }
+
+    #[test]
+    fn router_is_empty() {
+        let router = Router::with_urls(vec![]);
+        assert!(router.is_empty());
+    }
+
+    #[test]
+    fn router_routes() {
         let route = Route::with_handler("/test", MockHandler);
         let router = Router::with_urls(vec![route.clone()]);
         assert_eq!(router.routes().len(), 1);
+    }
+
+    #[test]
+    fn router_empty_returns_no_handler() {
+        let router = Router::empty();
+        assert!(router.get_handler("/").is_none());
     }
 
     #[cot::test]
@@ -1302,25 +1341,6 @@ mod tests {
     }
 
     #[test]
-    fn router_reverse() {
-        let route = Route::with_handler_and_name("/test", MockHandler, "test");
-        let router = Router::with_urls(vec![route.clone()]);
-        let params = ReverseParamMap::new();
-        let url = router.reverse(None, "test", &params).unwrap();
-        assert_eq!(url, "/test");
-    }
-
-    #[test]
-    fn router_reverse_with_param() {
-        let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
-        let router = Router::with_urls(vec![route.clone()]);
-        let mut params = ReverseParamMap::new();
-        params.insert("id", "123");
-        let url = router.reverse(None, "test", &params).unwrap();
-        assert_eq!(url, "/test/123");
-    }
-
-    #[test]
     fn router_no_param_route_matches_exact_path() {
         let router = Router::with_urls(vec![Route::with_handler_and_name(
             "/users",
@@ -1343,6 +1363,29 @@ mod tests {
         )]);
 
         assert!(router.get_handler("/test").is_none());
+    }
+
+    #[test]
+    fn router_routes_with_common_static_prefixes_match_independently() {
+        let router = Router::with_urls(vec![
+            Route::with_handler_and_name("/car", MockHandler, "car"),
+            Route::with_handler_and_name("/cart", MockHandler, "cart"),
+            Route::with_handler_and_name("/catalog", MockHandler, "catalog"),
+        ]);
+
+        assert_eq!(
+            router.get_handler("/car").unwrap().name,
+            Some(RouteName("car".to_string()))
+        );
+        assert_eq!(
+            router.get_handler("/cart").unwrap().name,
+            Some(RouteName("cart".to_string()))
+        );
+        assert_eq!(
+            router.get_handler("/catalog").unwrap().name,
+            Some(RouteName("catalog".to_string()))
+        );
+        assert!(router.get_handler("/cartographer").is_none());
     }
 
     #[test]
@@ -1396,29 +1439,6 @@ mod tests {
     }
 
     #[test]
-    fn router_routes_with_common_static_prefixes_match_independently() {
-        let router = Router::with_urls(vec![
-            Route::with_handler_and_name("/car", MockHandler, "car"),
-            Route::with_handler_and_name("/cart", MockHandler, "cart"),
-            Route::with_handler_and_name("/catalog", MockHandler, "catalog"),
-        ]);
-
-        assert_eq!(
-            router.get_handler("/car").unwrap().name,
-            Some(RouteName("car".to_string()))
-        );
-        assert_eq!(
-            router.get_handler("/cart").unwrap().name,
-            Some(RouteName("cart".to_string()))
-        );
-        assert_eq!(
-            router.get_handler("/catalog").unwrap().name,
-            Some(RouteName("catalog".to_string()))
-        );
-        assert!(router.get_handler("/cartographer").is_none());
-    }
-
-    #[test]
     fn router_static_route_takes_priority_over_dynamic_route() {
         let router = Router::with_urls(vec![
             Route::with_handler_and_name("/users/{id}", MockHandler, "dynamic"),
@@ -1428,6 +1448,25 @@ mod tests {
         let found = router.get_handler("/users/new").unwrap();
 
         assert_eq!(found.name, Some(RouteName("static".to_string())));
+    }
+
+    #[test]
+    fn router_single_pattern_multi_param_order_preserved() {
+        let router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{model_name}/{pk}/edit/",
+            MockHandler,
+            "edit",
+        )]);
+
+        let found = router.get_handler("/database_user/1/edit/").unwrap();
+
+        assert_eq!(
+            found.params,
+            vec![
+                ("model_name".to_string(), "database_user".to_string()),
+                ("pk".to_string(), "1".to_string()),
+            ]
+        );
     }
 
     #[test]
@@ -1446,6 +1485,7 @@ mod tests {
             vec![("path".to_string(), "foo/bar".to_string())]
         );
     }
+
     #[test]
     fn router_wildcard_single_segment() {
         let router = Router::with_urls(vec![Route::with_handler_and_name(
@@ -1459,6 +1499,7 @@ mod tests {
         assert_eq!(found.name, Some(RouteName("users".to_string())));
         assert_eq!(found.params, vec![("path".to_string(), "foo".to_string())]);
     }
+
     #[test]
     fn router_wildcard_multi_segment() {
         let router = Router::with_urls(vec![Route::with_handler_and_name(
@@ -1500,6 +1541,220 @@ mod tests {
     }
 
     #[test]
+    fn router_root_mount_matches_root_path() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "index",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("", sub_router)]);
+
+        let found = router.get_handler("/").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("index".to_string())));
+    }
+
+    #[test]
+    fn router_exact_mount_match_routes_to_nested_root_not_empty_path() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "sub_index",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/api", sub_router)]);
+
+        let found = router.get_handler("/api").unwrap();
+
+        assert_eq!(found.name, Some(RouteName("sub_index".to_string())));
+    }
+
+    #[test]
+    fn router_root_mounted_nested_router() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/inner",
+            MockHandler,
+            "inner",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/", sub_router)]);
+
+        let found = router.get_handler("/inner").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+    }
+
+    #[test]
+    fn router_root_mounted_nested_router_empty() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "",
+            MockHandler,
+            "inner",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/outer", sub_router)]);
+
+        let found = router.get_handler("/outer").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        assert!(router.get_handler("/outer/").is_none());
+        assert!(router.get_handler("outer/").is_none());
+        assert!(router.get_handler("outer").is_none());
+
+        let url = router
+            .reverse(None, "inner", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/outer");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_root_mounted_nested_router_empty_and_root_without_slash() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "",
+            MockHandler,
+            "inner",
+        )]);
+        // this should normalize to `/outer`
+        let router = Router::with_urls(vec![Route::with_router("outer", sub_router)]);
+
+        let found = router.get_handler("/outer").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        assert!(router.get_handler("/outer/").is_none());
+        assert!(router.get_handler("outer/").is_none());
+        assert!(router.get_handler("outer").is_none());
+
+        let url = router
+            .reverse(None, "inner", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/outer");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_root_mounted_nested_router_empty_root() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "inner",
+            MockHandler,
+            "inner",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("", sub_router)]);
+
+        let found = router.get_handler("/inner").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+        // remaining path becomes "/inner/", sub-router only registered "/inner"
+        assert!(router.get_handler("/inner/").is_none());
+        assert!(router.get_handler("inner").is_none());
+        assert!(router.get_handler("inner/").is_none());
+
+        let url = router
+            .reverse(None, "inner", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/inner");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_root_mounted_nested_router_empty_root_empty_nested() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "",
+            MockHandler,
+            "inner",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("", sub_router)]);
+
+        // exact match at the mount point, remaining defaults to root "/"
+        let found = router.get_handler("/").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        // wildcard sentinel capturing a literal "/" (non-empty, so legal). remaining "/"
+        let found = router.get_handler("//").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        let url = router
+            .reverse(None, "inner", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_root_mounted_nested_router_slash_root_slash_nested() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "inner",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/", sub_router)]);
+
+        let found = router.get_handler("/").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        let found = router.get_handler("//").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        let url = router
+            .reverse(None, "inner", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_root_mounted_nested_router_slash_root_empty_nested() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "",
+            MockHandler,
+            "inner",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/", sub_router)]);
+
+        let found = router.get_handler("/").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        let found = router.get_handler("//").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        let url = router
+            .reverse(None, "inner", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_root_mounted_nested_router_empty_root_slash_nested() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "inner",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("", sub_router)]);
+
+        let found = router.get_handler("/").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        let found = router.get_handler("//").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+
+        let url = router
+            .reverse(None, "inner", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_nested_router_trailing_slash_prefix() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/inner",
+            MockHandler,
+            "inner",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/api/", sub_router)]);
+
+        let found = router.get_handler("/api/inner").unwrap();
+        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+    }
+
+    #[test]
     fn router_nested_router_consumes_remaining_path() {
         let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
             "/posts/{post_id}",
@@ -1512,6 +1767,153 @@ mod tests {
 
         assert_eq!(found.name, Some(RouteName("post_detail".to_string())));
         assert_params(found.params, &[("id", "123"), ("post_id", "456")]);
+    }
+
+    #[test]
+    fn router_param_mount_param_nested_captures_both_in_order() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{sub_id}",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/{id}", sub_router)]);
+
+        let found = router.get_handler("/123/456").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_eq!(
+            found.params,
+            vec![
+                ("id".to_string(), "123".to_string()),
+                ("sub_id".to_string(), "456".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn router_param_mount_wildcard_nested_exact_match_fails_deep_match_works() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{*rest}",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/{id}", sub_router)]);
+
+        assert!(router.get_handler("/123").is_none());
+
+        let found = router.get_handler("/123/a/b").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_params(found.params, &[("id", "123"), ("rest", "a/b")]);
+    }
+
+    #[test]
+    fn router_param_mount_trailing_slash_empty_nested_captures_param() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/{id}/", sub_router)]);
+
+        let found = router.get_handler("/123/").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_eq!(found.params, vec![("id".to_string(), "123".to_string())]);
+    }
+
+    #[test]
+    fn router_param_mount_trailing_slash_bare_path_fails() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/{id}/", sub_router)]);
+        assert!(router.get_handler("/123").is_none());
+    }
+
+    #[test]
+    fn router_duplicate_param_name_across_nesting_levels_allowed() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{id}",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/{id}", sub_router)]);
+
+        let found = router.get_handler("/1/2").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_eq!(
+            found.params,
+            vec![
+                ("id".to_string(), "1".to_string()),
+                ("id".to_string(), "2".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn router_bare_mount_match_fails_when_nested_is_wildcard_only() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{*rest}",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/api", sub_router)]);
+
+        // exact mount match -> remaining defaults to "/" -> nested catch-all can't match it.
+        assert!(router.get_handler("/api").is_none());
+
+        let found = router.get_handler("/api/x/y").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_params(found.params, &[("rest", "x/y")]);
+    }
+
+    #[test]
+    fn router_multi_segment_mount_with_wildcard_nested() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{*rest}",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/a/b", sub_router)]);
+
+        assert!(router.get_handler("/a/b").is_none());
+        let found = router.get_handler("/a/b/c/d").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_params(found.params, &[("rest", "c/d")]);
+    }
+
+    #[test]
+    fn router_slash_mount_wildcard_nested_bare_slash_fails() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{*path}",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/files/", sub_router)]);
+
+        assert!(router.get_handler("/files/").is_none()); // remaining "/" vs catch-all
+        assert!(router.get_handler("/files").is_none()); // no trailing slash, no match at all
+
+        let found = router.get_handler("/files/x").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_params(found.params, &[("path", "x")]);
+    }
+
+    #[test]
+    fn router_multi_segment_slash_mount_param_nested() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{id}",
+            MockHandler,
+            "leaf",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/a/b/", sub_router)]);
+
+        assert!(router.get_handler("/a/b").is_none());
+        assert!(router.get_handler("/a/b/").is_none());
+
+        let found = router.get_handler("/a/b/42").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_params(found.params, &[("id", "42")]);
     }
 
     #[test]
@@ -1532,6 +1934,88 @@ mod tests {
     }
 
     #[test]
+    fn router_static_nested_mount_priority_over_sibling_wildcard_mount() {
+        let generic_sub = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{*rest}",
+            MockHandler,
+            "generic",
+        )]);
+        let specific_sub = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{*rest}",
+            MockHandler,
+            "specific",
+        )]);
+        let router = Router::with_urls(vec![
+            Route::with_router("/admin", generic_sub),
+            Route::with_router("/admin/extra", specific_sub),
+        ]);
+
+        let found = router.get_handler("/admin/extra/more").unwrap();
+        assert_eq!(found.name, Some(RouteName("specific".to_string())));
+        assert_params(found.params, &[("rest", "more")]);
+
+        let found = router.get_handler("/admin/other/thing").unwrap();
+        assert_eq!(found.name, Some(RouteName("generic".to_string())));
+        assert_params(found.params, &[("rest", "other/thing")]);
+    }
+
+    #[test]
+    fn router_handler_priority_swallows_routers_own_trailing_slash_exact_entry() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{*rest}",
+            MockHandler,
+            "sub_catch_all",
+        )]);
+        let router = Router::with_urls(vec![
+            Route::with_handler_and_name("/users", MockHandler, "handler"),
+            Route::with_router("/users/", sub_router),
+        ]);
+
+        let found = router.get_handler("/users").unwrap();
+        assert_eq!(found.name, Some(RouteName("handler".to_string())));
+        assert!(router.get_handler("/users/").is_none());
+
+        let found = router.get_handler("/users/anything").unwrap();
+        assert_eq!(found.name, Some(RouteName("sub_catch_all".to_string())));
+        assert_params(found.params, &[("rest", "anything")]);
+    }
+
+    #[test]
+    fn router_triple_nested_all_empty_mounts_reachable_via_single_slash() {
+        let leaf = Router::with_urls(vec![Route::with_handler_and_name(
+            "",
+            MockHandler,
+            "leaf",
+        )]);
+        let mid = Router::with_urls(vec![Route::with_router("", leaf)]);
+        let router = Router::with_urls(vec![Route::with_router("", mid)]);
+
+        let found = router.get_handler("/").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+    }
+
+    #[test]
+    fn router_triple_nested_param_then_empty_then_param() {
+        let leaf = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{b}",
+            MockHandler,
+            "leaf",
+        )]);
+        let mid = Router::with_urls(vec![Route::with_router("", leaf)]);
+        let router = Router::with_urls(vec![Route::with_router("/{a}", mid)]);
+
+        let found = router.get_handler("/1/2").unwrap();
+        assert_eq!(found.name, Some(RouteName("leaf".to_string())));
+        assert_eq!(
+            found.params,
+            vec![
+                ("a".to_string(), "1".to_string()),
+                ("b".to_string(), "2".to_string()),
+            ]
+        );
+    }
+
+    #[test]
     #[should_panic(
         expected = "route conflict error: duplicate route: `/users` conflicts with an already registered handler route `/users` (both fully match the same path)"
     )]
@@ -1544,11 +2028,44 @@ mod tests {
 
     #[test]
     #[should_panic(
+        expected = "route conflict error: duplicate route: `/users/` conflicts with an already registered handler route `/users/` (both fully match the same path)"
+    )]
+    fn router_duplicate_handler_routes_with_trailing_slash_panic() {
+        let _ = Router::with_urls(vec![
+            Route::with_handler("/users/", MockHandler),
+            Route::with_handler("/users/", MockHandler),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(
         expected = "route conflict error: duplicate nested router: `/users` conflicts with an already registered nested router mounted at `/users`"
     )]
     fn router_duplicate_nested_router_routes_panic() {
         let _ = Router::with_urls(vec![
             Route::with_router("/users", Router::empty()),
+            Route::with_router("/users", Router::empty()),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "route conflict error: duplicate nested router: `/users/` conflicts with an already registered nested router mounted at `/users/`"
+    )]
+    fn router_duplicate_nested_router_routes_trailing_slash_panic() {
+        let _ = Router::with_urls(vec![
+            Route::with_router("/users/", Router::empty()),
+            Route::with_router("/users/", Router::empty()),
+        ]);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "route conflict error: duplicate nested router: `/users` conflicts with an already registered nested router mounted at `/users/`"
+    )]
+    fn router_duplicate_with_trailing_slash_diff_panic() {
+        let _ = Router::with_urls(vec![
+            Route::with_router("/users/", Router::empty()),
             Route::with_router("/users", Router::empty()),
         ]);
     }
@@ -1607,35 +2124,89 @@ mod tests {
     }
 
     #[test]
-    fn router_empty_returns_no_handler() {
-        let router = Router::empty();
-        assert!(router.get_handler("/").is_none());
+    #[should_panic(expected = "route conflict error")]
+    fn router_wildcard_mount_with_static_nested_errors() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/leaf",
+            MockHandler,
+            "leaf",
+        )]);
+        let _ = Router::with_urls(vec![Route::with_router("/{*rest}", sub_router)]);
     }
 
     #[test]
-    fn router_root_mounted_nested_router() {
+    #[should_panic(expected = "route conflict error")]
+    fn router_wildcard_mount_with_param_nested_errors() {
         let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/inner",
+            "/{id}",
             MockHandler,
-            "inner",
+            "leaf",
         )]);
-        let router = Router::with_urls(vec![Route::with_router("/", sub_router)]);
-
-        let found = router.get_handler("/inner").unwrap();
-        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+        let _ = Router::with_urls(vec![Route::with_router("/{*rest}", sub_router)]);
     }
 
     #[test]
-    fn router_nested_router_trailing_slash_prefix() {
+    #[should_panic(expected = "route conflict error")]
+    fn router_wildcard_mount_with_empty_nested_errors() {
         let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/inner",
+            "",
             MockHandler,
-            "inner",
+            "leaf",
         )]);
-        let router = Router::with_urls(vec![Route::with_router("/api/", sub_router)]);
+        let _ = Router::with_urls(vec![Route::with_router("/{*rest}", sub_router)]);
+    }
 
-        let found = router.get_handler("/api/inner").unwrap();
-        assert_eq!(found.name, Some(RouteName("inner".to_string())));
+    #[test]
+    #[should_panic(expected = "route conflict error")]
+    fn router_wildcard_mount_with_wildcard_nested_errors() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/{*rest}",
+            MockHandler,
+            "leaf",
+        )]);
+        let _ = Router::with_urls(vec![Route::with_router("/{*outer}", sub_router)]);
+    }
+
+    #[test]
+    #[should_panic(expected = "route conflict error")]
+    fn router_prefixed_wildcard_mount_errors() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "",
+            MockHandler,
+            "leaf",
+        )]);
+        let _ = Router::with_urls(vec![Route::with_router("/files/{*path}", sub_router)]);
+    }
+
+    #[test]
+    fn router_reverse() {
+        let route = Route::with_handler_and_name("/test", MockHandler, "test");
+        let router = Router::with_urls(vec![route.clone()]);
+        let params = ReverseParamMap::new();
+        let url = router.reverse(None, "test", &params).unwrap();
+        assert_eq!(url, "/test");
+    }
+
+    #[test]
+    fn router_reverse_with_param() {
+        let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
+        let router = Router::with_urls(vec![route.clone()]);
+        let mut params = ReverseParamMap::new();
+        params.insert("id", "123");
+        let url = router.reverse(None, "test", &params).unwrap();
+        assert_eq!(url, "/test/123");
+    }
+
+    #[test]
+    fn router_reverse_option() {
+        let route = Route::with_handler_and_name("/test", MockHandler, "test");
+        let router = Router::with_urls(vec![route.clone()]);
+        let params = ReverseParamMap::new();
+        let url = router
+            .reverse_option(None, "test", &params)
+            .unwrap()
+            .unwrap();
+        assert_eq!(url, "/test");
     }
 
     #[test]
@@ -1654,36 +2225,25 @@ mod tests {
     #[test]
     fn router_reverse_missing_view_returns_error() {
         let router = Router::empty();
+
         let result = router.reverse(None, "missing", &ReverseParamMap::new());
         assert!(result.is_err());
     }
 
     #[test]
-    fn router_root_mount_matches_root_path() {
+    fn router_reverse_of_nested_index_uses_bare_mount_path() {
         let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
             "/",
             MockHandler,
             "index",
         )]);
-        let router = Router::with_urls(vec![Route::with_router("", sub_router)]);
+        let router = Router::with_urls(vec![Route::with_router("/admin", sub_router)]);
 
-        let found = router.get_handler("/").unwrap();
-
-        assert_eq!(found.name, Some(RouteName("index".to_string())));
-    }
-
-    #[test]
-    fn router_exact_mount_match_routes_to_nested_root_not_empty_path() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/",
-            MockHandler,
-            "sub_index",
-        )]);
-        let router = Router::with_urls(vec![Route::with_router("/api", sub_router)]);
-
-        let found = router.get_handler("/api").unwrap();
-
-        assert_eq!(found.name, Some(RouteName("sub_index".to_string())));
+        let url = router
+            .reverse(None, "index", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/admin");
+        assert!(router.has_route(&url));
     }
 
     #[test]
@@ -1727,6 +2287,54 @@ mod tests {
     }
 
     #[test]
+    fn router_reverse_slash_mounted_root_route_keeps_slash() {
+        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/",
+            MockHandler,
+            "index",
+        )]);
+        let router = Router::with_urls(vec![Route::with_router("/admin/", sub_router)]);
+
+        let url = router
+            .reverse(None, "index", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/admin/");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
+    fn router_reverse_slash_mounted_non_root_route_unaffected() {
+        let nested_sub_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/bar/{buz}",
+            MockHandler,
+            "biz",
+        )]);
+        let sub_router = Router::with_urls(vec![
+            Route::with_handler_and_name("/foo", MockHandler, "foo"),
+            Route::with_router("/fab", nested_sub_router),
+            Route::with_handler_and_name("/bar/", MockHandler, "bar")
+        ]);
+        let router = Router::with_urls(vec![Route::with_router("/admin/", sub_router)]);
+
+        let url = router
+            .reverse(None, "foo", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/admin/foo");
+        assert!(router.has_route(&url));
+
+        let mut params = ReverseParamMap::new();
+        params.insert("buz", "random");
+        let url = router.reverse(None, "biz", &params).unwrap();
+        assert_eq!(url, "/admin/fab/bar/random");
+
+        let url = router
+            .reverse(None, "bar", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/admin/bar/");
+        assert!(router.has_route(&url));
+    }
+
+    #[test]
     fn router_reverse_app_name() {
         let route = Route::with_handler_and_name("/test", MockHandler, "test");
         let mut router_1 = Router::with_urls(vec![route.clone()]);
@@ -1758,157 +2366,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(url, "/subsub/sub/test");
-    }
-
-    #[test]
-    fn router_reverse_option() {
-        let route = Route::with_handler_and_name("/test", MockHandler, "test");
-        let router = Router::with_urls(vec![route.clone()]);
-        let params = ReverseParamMap::new();
-        let url = router
-            .reverse_option(None, "test", &params)
-            .unwrap()
-            .unwrap();
-        assert_eq!(url, "/test");
-    }
-
-    #[test]
-    fn router_routes() {
-        let route = Route::with_handler("/test", MockHandler);
-        let router = Router::with_urls(vec![route.clone()]);
-        assert_eq!(router.routes().len(), 1);
-    }
-
-    #[test]
-    fn router_is_empty() {
-        let router = Router::with_urls(vec![]);
-        assert!(router.is_empty());
-    }
-
-    #[test]
-    fn route_with_handler() {
-        let route = Route::with_handler("/test", MockHandler);
-        assert_eq!(route.url.to_string(), "/test");
-    }
-
-    #[test]
-    fn route_with_handler_and_params() {
-        let route = Route::with_handler("/test/{id}", MockHandler);
-        assert_eq!(route.url.to_string(), "/test/{id}");
-    }
-
-    #[test]
-    fn route_with_handler_and_name() {
-        let route = Route::with_handler_and_name("/test", MockHandler, "test");
-        assert_eq!(route.url.to_string(), "/test");
-        assert_eq!(route.name, Some(RouteName("test".to_string())));
-    }
-
-    #[test]
-    fn route_with_router() {
-        let sub_route = Route::with_handler("/sub", MockHandler);
-        let sub_router = Router::with_urls(vec![sub_route]);
-        let route = Route::with_router("/test", sub_router);
-        assert_eq!(route.url.to_string(), "/test");
-    }
-
-    #[test]
-    fn test_reverse_macro() {
-        let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
-        let router = Router::with_urls(vec![route]);
-
-        let request = TestRequestBuilder::get("/").router(router).build();
-        let url = reverse!(request, "test", id = 123).unwrap();
-
-        assert_eq!(url, "/test/123");
-    }
-
-    #[test]
-    fn test_reverse_redirect_macro() {
-        let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
-        let router = Router::with_urls(vec![route]);
-
-        let request = TestRequestBuilder::get("/").router(router).build();
-        let response = cot::reverse_redirect!(request, "test", id = 123).unwrap();
-
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get("location").unwrap(), "/test/123");
-    }
-
-    #[test]
-    fn router_reverse_of_nested_index_uses_bare_mount_path() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/",
-            MockHandler,
-            "index",
-        )]);
-        let router = Router::with_urls(vec![Route::with_router("/admin", sub_router)]);
-
-        let url = router
-            .reverse(None, "index", &ReverseParamMap::new())
-            .unwrap();
-        assert_eq!(url, "/admin");
-        assert!(router.has_route(&url));
-    }
-
-    #[test]
-    fn router_reverse_slash_mounted_root_route_keeps_slash() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/",
-            MockHandler,
-            "index",
-        )]);
-        let router = Router::with_urls(vec![Route::with_router("/admin/", sub_router)]);
-
-        let url = router
-            .reverse(None, "index", &ReverseParamMap::new())
-            .unwrap();
-        assert_eq!(url, "/admin/");
-        assert!(router.has_route(&url));
-    }
-
-    #[test]
-    fn router_reverse_slash_mounted_non_root_route_unaffected() {
-        let nested_sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/bar/{buz}",
-            MockHandler,
-            "bar",
-        )]);
-        let sub_router = Router::with_urls(vec![
-            Route::with_handler_and_name("/foo", MockHandler, "foo"),
-            Route::with_router("/fab", nested_sub_router),
-        ]);
-        let router = Router::with_urls(vec![Route::with_router("/admin/", sub_router)]);
-
-        let url = router
-            .reverse(None, "foo", &ReverseParamMap::new())
-            .unwrap();
-        assert_eq!(url, "/admin/foo");
-        assert!(router.has_route(&url));
-
-        let mut params = ReverseParamMap::new();
-        params.insert("buz", "random");
-        let url = router.reverse(None, "bar", &params).unwrap();
-        assert_eq!(url, "/admin/fab/bar/random");
-    }
-
-    #[test]
-    fn router_single_pattern_multi_param_order_preserved() {
-        let router = Router::with_urls(vec![Route::with_handler_and_name(
-            "/{model_name}/{pk}/edit/",
-            MockHandler,
-            "edit",
-        )]);
-
-        let found = router.get_handler("/database_user/1/edit/").unwrap();
-
-        assert_eq!(
-            found.params,
-            vec![
-                ("model_name".to_string(), "database_user".to_string()),
-                ("pk".to_string(), "1".to_string()),
-            ]
-        );
     }
 
     #[test]
@@ -1958,6 +2415,29 @@ mod tests {
                 ("baz".to_string(), "2/doe".to_string())
             ]
         );
+    }
+
+    #[test]
+    fn test_reverse_macro() {
+        let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
+        let router = Router::with_urls(vec![route]);
+
+        let request = TestRequestBuilder::get("/").router(router).build();
+        let url = reverse!(request, "test", id = 123).unwrap();
+
+        assert_eq!(url, "/test/123");
+    }
+
+    #[test]
+    fn test_reverse_redirect_macro() {
+        let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
+        let router = Router::with_urls(vec![route]);
+
+        let request = TestRequestBuilder::get("/").router(router).build();
+        let response = cot::reverse_redirect!(request, "test", id = 123).unwrap();
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get("location").unwrap(), "/test/123");
     }
 
     fn test_request() -> Request {

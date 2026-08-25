@@ -1655,8 +1655,7 @@ mod tests {
         let found = router.get_handler("/").unwrap();
         assert_eq!(found.name, Some(RouteName("inner".to_string())));
 
-        // wildcard sentinel capturing a literal "/" (non-empty, so legal). remaining
-        // "/"
+        // wildcard sentinel capturing a literal "/", so this is legal
         let found = router.get_handler("//").unwrap();
         assert_eq!(found.name, Some(RouteName("inner".to_string())));
 
@@ -1842,8 +1841,6 @@ mod tests {
         )]);
         let router = Router::with_urls(vec![Route::with_router("/api", sub_router)]);
 
-        // exact mount match -> remaining defaults to "/" -> nested catch-all can't
-        // match it.
         assert!(router.get_handler("/api").is_none());
 
         let found = router.get_handler("/api/x/y").unwrap();
@@ -1875,8 +1872,8 @@ mod tests {
         )]);
         let router = Router::with_urls(vec![Route::with_router("/files/", sub_router)]);
 
-        assert!(router.get_handler("/files/").is_none()); // remaining "/" vs catch-all
-        assert!(router.get_handler("/files").is_none()); // no trailing slash, no match at all
+        assert!(router.get_handler("/files/").is_none());
+        assert!(router.get_handler("/files").is_none());
 
         let found = router.get_handler("/files/x").unwrap();
         assert_eq!(found.name, Some(RouteName("leaf".to_string())));

@@ -1307,6 +1307,7 @@ impl Bootstrapper<WithDatabase> {
     /// # }
     /// ```
     #[allow(
+        clippy::unused_async_trait_impl,
         clippy::unused_async,
         clippy::allow_attributes,
         reason = "see https://github.com/cot-rs/cot/pull/399#discussion_r2430379966"
@@ -1374,6 +1375,7 @@ impl Bootstrapper<WithCache> {
         clippy::unused_async,
         reason = "for consistency with other Bootstrapper::boot methods"
     )]
+    #[expect(clippy::unused_async_trait_impl)]
     pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler_builder = RootHandlerBuilder {

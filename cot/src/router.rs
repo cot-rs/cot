@@ -1583,11 +1583,8 @@ mod tests {
 
     #[test]
     fn router_root_mounted_nested_router_empty() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "inner",
-        )]);
+        let sub_router =
+            Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "inner")]);
         let router = Router::with_urls(vec![Route::with_router("/outer", sub_router)]);
 
         let found = router.get_handler("/outer").unwrap();
@@ -1606,11 +1603,8 @@ mod tests {
 
     #[test]
     fn router_root_mounted_nested_router_empty_and_root_without_slash() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "inner",
-        )]);
+        let sub_router =
+            Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "inner")]);
         // this should normalize to `/outer`
         let router = Router::with_urls(vec![Route::with_router("outer", sub_router)]);
 
@@ -1653,18 +1647,16 @@ mod tests {
 
     #[test]
     fn router_root_mounted_nested_router_empty_root_empty_nested() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "inner",
-        )]);
+        let sub_router =
+            Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "inner")]);
         let router = Router::with_urls(vec![Route::with_router("", sub_router)]);
 
         // exact match at the mount point, remaining defaults to root "/"
         let found = router.get_handler("/").unwrap();
         assert_eq!(found.name, Some(RouteName("inner".to_string())));
 
-        // wildcard sentinel capturing a literal "/" (non-empty, so legal). remaining "/"
+        // wildcard sentinel capturing a literal "/" (non-empty, so legal). remaining
+        // "/"
         let found = router.get_handler("//").unwrap();
         assert_eq!(found.name, Some(RouteName("inner".to_string())));
 
@@ -1699,11 +1691,8 @@ mod tests {
 
     #[test]
     fn router_root_mounted_nested_router_slash_root_empty_nested() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "inner",
-        )]);
+        let sub_router =
+            Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "inner")]);
         let router = Router::with_urls(vec![Route::with_router("/", sub_router)]);
 
         let found = router.get_handler("/").unwrap();
@@ -1807,11 +1796,8 @@ mod tests {
 
     #[test]
     fn router_param_mount_trailing_slash_empty_nested_captures_param() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "leaf",
-        )]);
+        let sub_router =
+            Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "leaf")]);
         let router = Router::with_urls(vec![Route::with_router("/{id}/", sub_router)]);
 
         let found = router.get_handler("/123/").unwrap();
@@ -1821,11 +1807,8 @@ mod tests {
 
     #[test]
     fn router_param_mount_trailing_slash_bare_path_fails() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "leaf",
-        )]);
+        let sub_router =
+            Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "leaf")]);
         let router = Router::with_urls(vec![Route::with_router("/{id}/", sub_router)]);
         assert!(router.get_handler("/123").is_none());
     }
@@ -1859,7 +1842,8 @@ mod tests {
         )]);
         let router = Router::with_urls(vec![Route::with_router("/api", sub_router)]);
 
-        // exact mount match -> remaining defaults to "/" -> nested catch-all can't match it.
+        // exact mount match -> remaining defaults to "/" -> nested catch-all can't
+        // match it.
         assert!(router.get_handler("/api").is_none());
 
         let found = router.get_handler("/api/x/y").unwrap();
@@ -1982,11 +1966,7 @@ mod tests {
 
     #[test]
     fn router_triple_nested_all_empty_mounts_reachable_via_single_slash() {
-        let leaf = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "leaf",
-        )]);
+        let leaf = Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "leaf")]);
         let mid = Router::with_urls(vec![Route::with_router("", leaf)]);
         let router = Router::with_urls(vec![Route::with_router("", mid)]);
 
@@ -2148,11 +2128,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "route conflict error")]
     fn router_wildcard_mount_with_empty_nested_errors() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "leaf",
-        )]);
+        let sub_router =
+            Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "leaf")]);
         let _ = Router::with_urls(vec![Route::with_router("/{*rest}", sub_router)]);
     }
 
@@ -2170,11 +2147,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "route conflict error")]
     fn router_prefixed_wildcard_mount_errors() {
-        let sub_router = Router::with_urls(vec![Route::with_handler_and_name(
-            "",
-            MockHandler,
-            "leaf",
-        )]);
+        let sub_router =
+            Router::with_urls(vec![Route::with_handler_and_name("", MockHandler, "leaf")]);
         let _ = Router::with_urls(vec![Route::with_router("/files/{*path}", sub_router)]);
     }
 
@@ -2312,7 +2286,7 @@ mod tests {
         let sub_router = Router::with_urls(vec![
             Route::with_handler_and_name("/foo", MockHandler, "foo"),
             Route::with_router("/fab", nested_sub_router),
-            Route::with_handler_and_name("/bar/", MockHandler, "bar")
+            Route::with_handler_and_name("/bar/", MockHandler, "bar"),
         ]);
         let router = Router::with_urls(vec![Route::with_router("/admin/", sub_router)]);
 

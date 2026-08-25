@@ -771,7 +771,7 @@ impl Cache {
     /// # Ok(())
     /// # }
     /// ```
-    #[expect(clippy::unused_async)]
+    #[expect(clippy::unused_async_trait_impl, clippy::unused_async)]
     pub async fn from_config(config: &CacheConfig) -> CacheResult<Self> {
         let store_cfg = &config.store;
 

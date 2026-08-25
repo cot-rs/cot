@@ -11,7 +11,7 @@ impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::pos
 impl_sea_query_transaction_backend!(DatabasePostgres, TransactionPostgres: sqlx::postgres::Postgres, PostgresRow, sea_query::PostgresQueryBuilder);
 
 impl DatabasePostgres {
-    #[expect(clippy::unused_async)]
+    #[expect(clippy::unused_async_trait_impl, clippy::unused_async)]
     async fn init(&self) -> crate::db::Result<()> {
         Ok(())
     }

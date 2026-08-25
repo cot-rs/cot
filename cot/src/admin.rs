@@ -383,6 +383,7 @@ fn get_manager(
 struct AdminModelManagers(Vec<Box<dyn AdminModelManager>>);
 
 impl FromRequestHead for AdminModelManagers {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         let managers = head
             .context()

@@ -1,5 +1,6 @@
 //! Database expressions.
 pub mod like;
+mod order_by;
 
 use std::marker::PhantomData;
 
@@ -7,6 +8,7 @@ use cot::db::query::{IntoField, QueryBuildingError};
 use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, ToDbFieldValue};
 pub use like::ExprLike;
 use like::{CaseSensitivity, LikeExprBuilder, LikeMode};
+pub use order_by::{ExprSort, NullsOrder, OrderByExpr, SortOrder};
 use sea_query::{ExprTrait, IntoColumnRef, SimpleExpr};
 
 /// An expression that can be used to filter, update, or delete rows.
@@ -1315,6 +1317,10 @@ impl<T> FieldRef<T> {
     #[must_use]
     pub fn as_expr(&self) -> Expr {
         Expr::Field(self.identifier)
+    }
+
+    pub(crate) fn identifier(&self) -> Identifier {
+        self.identifier
     }
 }
 

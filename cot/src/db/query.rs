@@ -5,12 +5,11 @@ pub mod expr;
 use std::marker::PhantomData;
 
 use derive_more::with_trait::Debug;
-use sea_query::{ExprTrait, IntoColumnRef, Order};
 use thiserror::Error;
 
 use crate::db;
-use crate::db::query::expr::SqlQueryBuilder;
 pub use crate::db::query::expr::{Expr, ExprAdd, ExprDiv, ExprMul, ExprOrd, ExprSub};
+use crate::db::query::expr::{OrderByExpr, SqlQueryBuilder};
 use crate::db::{Auto, DatabaseBackend, ForeignKey, Model, StatementResult, ToDbFieldValue};
 const ERROR_PREFIX: &str = "expression error:";
 
@@ -48,7 +47,7 @@ pub enum QueryBuildingError {
 pub struct Query<T> {
     filter: Option<Expr>,
     limit: Option<u64>,
-    order_by: Option<(FieldRef<T>, Order)>,
+    order_by: Vec<OrderByExpr>,
     offset: Option<u64>,
     phantom_data: PhantomData<fn() -> T>,
 }
@@ -115,7 +114,7 @@ impl<T: Model> Query<T> {
         Self {
             filter: None,
             limit: None,
-            order_by: None,
+            order_by: Vec::new(),
             offset: None,
             phantom_data: PhantomData,
         }
@@ -184,8 +183,8 @@ impl<T: Model> Query<T> {
     ///
     /// let query = Query::<User>::new().order_by(User::age, Order::Asc); // or Order::Desc
     /// ```
-    pub fn order_by(&mut self, order_by: (FieldRef<T>, Order)) -> &mut Self {
-        self.order_by = Some(order_by);
+    pub fn order_by(&mut self, order_by: impl IntoIterator<Item = OrderByExpr>) -> &mut Self {
+        self.order_by = order_by.into_iter().collect();
         self
     }
 
@@ -276,9 +275,8 @@ impl<T: Model> Query<T> {
     }
 
     pub(super) fn add_order_by_to_statement(&self, statement: &mut sea_query::SelectStatement) {
-        if let Some(order_by) = self.order_by {
-            let column_name = order_by.0.identifier;
-            statement.order_by(column_name, order_by.1);
+        for order_by in &self.order_by {
+            order_by.add_to_statement(statement);
         }
     }
 

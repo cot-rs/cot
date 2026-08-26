@@ -2572,6 +2572,7 @@ impl Database {
         let mut select = sea_query::Query::select();
         select.columns(columns_to_get).from(T::TABLE_NAME);
         query.add_filter_to_statement(&mut select, executor.as_sql_query_builder())?;
+        query.add_order_by_to_statement(&mut select);
         query.add_limit_to_statement(&mut select);
         query.add_offset_to_statement(&mut select);
 

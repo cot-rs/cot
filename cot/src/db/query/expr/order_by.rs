@@ -1,20 +1,26 @@
-use crate::db::Identifier;
+use cot::db::{DbFieldValue, ToDbFieldValue};
+use sea_query::Values;
+
 use crate::db::query::expr::FieldRef;
+use crate::db::{DbValues, Identifier, ToDbValue};
 
 /// Ordering Options
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SortOrder {
     /// Sort in Ascending order.
     Asc,
     /// Sort in Descending Order.
     Desc,
+
+    Custom(DbValues),
 }
 
-impl From<SortOrder> for sea_query::Order {
-    fn from(value: SortOrder) -> Self {
+impl From<&SortOrder> for sea_query::Order {
+    fn from(value: &SortOrder) -> Self {
         match value {
             SortOrder::Asc => sea_query::Order::Asc,
             SortOrder::Desc => sea_query::Order::Desc,
+            SortOrder::Custom(v) => sea_query::Order::Field(v.clone()),
         }
     }
 }
@@ -77,39 +83,69 @@ impl OrderByExpr {
 
     #[must_use]
     pub fn nulls_first(mut self) -> Self {
-        self.nulls = Some(NullsOrder::First);
+        self.set_nulls(NullsOrder::First);
         self
     }
 
     #[must_use]
     pub fn nulls_last(mut self) -> Self {
-        self.nulls = Some(NullsOrder::Last);
+        self.set_nulls(NullsOrder::Last);
         self
     }
 
+    #[track_caller]
+    fn set_nulls(&mut self, nulls: NullsOrder) {
+        match &mut self.order {
+            SortOrder::Asc | SortOrder::Desc => self.nulls = Some(nulls),
+            SortOrder::Custom(_) => panic!(
+                "`nulls_first`/`nulls_last` can't be combined with `custom_order`: a custom-order term never produces \
+                 a NULL sort key, so an explicit NULLS placement would have no effect"
+            ),
+        }
+    }
+
     pub(crate) fn add_to_statement(&self, statement: &mut sea_query::SelectStatement) {
-        match self.nulls {
-            None => {
-                statement.order_by(self.field, self.order.into());
-            }
-            Some(nulls) => {
-                statement.order_by_with_nulls(self.field, self.order.into(), nulls.into());
-            }
+        let order: sea_query::Order = (&self.order).into();
+        if let Some(nulls) = self.nulls {
+            let nulls: sea_query::NullOrdering = nulls.into();
+            statement.order_by_with_nulls(self.field, order, nulls);
+        } else {
+            statement.order_by(self.field, order);
         };
     }
 }
 
-pub trait ExprSort {
+pub trait ExprSort<T> {
     fn asc(&self) -> OrderByExpr;
     fn desc(&self) -> OrderByExpr;
+
+    fn custom<I>(&self, values: I) -> OrderByExpr
+    where
+        I: IntoIterator,
+        I::Item: ToDbValue;
 }
 
-impl<T> ExprSort for FieldRef<T> {
+impl<T: ToDbValue + 'static> ExprSort<T> for FieldRef<T> {
     fn asc(&self) -> OrderByExpr {
         OrderByExpr::new(self.identifier(), SortOrder::Asc)
     }
 
     fn desc(&self) -> OrderByExpr {
         OrderByExpr::new(self.identifier(), SortOrder::Desc)
+    }
+
+    fn custom<I>(&self, values: I) -> OrderByExpr
+    where
+        I: IntoIterator,
+        I::Item: ToDbValue,
+    {
+        let values = values
+            .into_iter()
+            .map(|v| match v.to_db_field_value() {
+                DbFieldValue::Value(value) => value,
+                DbFieldValue::Auto => panic!("Cannot order by a non-value field"),
+            })
+            .collect::<Vec<_>>();
+        OrderByExpr::new(self.identifier(), SortOrder::Custom(Values(values)))
     }
 }

@@ -1019,6 +1019,9 @@ pub trait FromDbValue {
 /// An alias for the value type internally used by the [`sea_query`] crate.
 pub type DbValue = sea_query::Value;
 
+/// An alias for the values type internally used the [`sea_query`] crate.
+pub type DbValues = sea_query::Values;
+
 /// A trait for converting a Rust value to a database value.
 pub trait ToDbValue: Send + Sync {
     /// Converts the Rust value to a `sea_query` value.

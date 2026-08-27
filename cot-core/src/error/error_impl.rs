@@ -304,11 +304,11 @@ mod tests {
 
     #[derive(Debug, thiserror::Error)]
     #[error("outer error")]
-    struct OuterError(#[source] std::io::Error);
+    struct OuterError(#[source] io::Error);
 
     #[test]
     fn error_new() {
-        let inner = std::io::Error::other("server error");
+        let inner = io::Error::other("server error");
         let error = Error::wrap(inner);
 
         assert!(StdError::source(&error).is_none());
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn error_display() {
-        let inner = std::io::Error::other("server error");
+        let inner = io::Error::other("server error");
         let error = Error::internal(inner);
 
         let display = format!("{error}");
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn error_wrap_and_is_wrapper() {
-        let inner = std::io::Error::other("wrapped");
+        let inner = io::Error::other("wrapped");
         let error = Error::wrap(inner);
 
         assert!(error.is_wrapper());
@@ -378,7 +378,7 @@ mod tests {
 
     #[test]
     fn error_from_template_render() {
-        let askama_err = askama::Error::Custom(Box::new(std::io::Error::other("fail")));
+        let askama_err = askama::Error::Custom(Box::new(io::Error::other("fail")));
         let error: Error = askama_err.into();
 
         assert!(error.to_string().contains("failed to render template"));
@@ -410,10 +410,10 @@ mod tests {
         let err = Error::with_status("root error", StatusCode::BAD_REQUEST);
         assert_snapshot!(format!("{err:?}"), @"root error");
 
-        let err = Error::wrap(std::io::Error::other("io error"));
+        let err = Error::wrap(io::Error::other("io error"));
         assert_snapshot!(format!("{err:?}"), @"io error");
 
-        let io_err = std::io::Error::other("inner io error");
+        let io_err = io::Error::other("inner io error");
         let err = Error::wrap(OuterError(io_err));
         assert_snapshot!(format!("{err:?}"), @r###"
         outer error
@@ -422,7 +422,7 @@ mod tests {
            0: inner io error
         "###);
 
-        let err = Error::internal(OuterError(std::io::Error::other("inner io error")));
+        let err = Error::internal(OuterError(io::Error::other("inner io error")));
         assert_snapshot!(format!("{err:?}"), @r###"
         outer error
 
@@ -441,9 +441,7 @@ mod tests {
         #[error("wrapper error")]
         struct WrapperError(#[source] OuterError);
 
-        let err = Error::internal(WrapperError(OuterError(std::io::Error::other(
-            "inner io error",
-        ))));
+        let err = Error::internal(WrapperError(OuterError(io::Error::other("inner io error"))));
 
         assert_snapshot!(format!("{err:?}"), @"
         wrapper error
@@ -461,7 +459,7 @@ mod tests {
     )]
     fn error_debug_printing_alternate() {
         let err = Error::with_status(
-            OuterError(std::io::Error::other("inner io error")),
+            OuterError(io::Error::other("inner io error")),
             StatusCode::INTERNAL_SERVER_ERROR,
         );
         assert_snapshot!(format!("{err:#?}"), @r#"

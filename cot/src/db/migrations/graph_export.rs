@@ -323,6 +323,43 @@ mod tests {
     }
 
     #[test]
+    fn escape_dot_empty_string() {
+        assert_eq!(escape_dot(""), "");
+    }
+
+    #[test]
+    fn escape_dot_backslash_only() {
+        assert_eq!(escape_dot(r"a\b"), r"a\\b");
+    }
+
+    #[test]
+    fn escape_dot_backslash_and_quote_combined() {
+        let input = "a\\\"b";
+        let escaped = escape_dot(input);
+
+        assert_eq!(escaped.matches('\\').count(), 3);
+        assert_eq!(escaped.matches('"').count(), 1);
+        assert!(escaped.starts_with('a'));
+        assert!(escaped.ends_with('b'));
+    }
+
+    #[test]
+    fn escape_mermaid_empty_string() {
+        assert_eq!(escape_mermaid(""), "");
+    }
+
+    #[test]
+    fn escape_mermaid_multiple_quotes() {
+        let input = "\"a\""; // "a"
+        assert_eq!(escape_mermaid(input), "&quot;a&quot;");
+    }
+
+    #[test]
+    fn escape_mermaid_does_not_touch_backslashes() {
+        assert_eq!(escape_mermaid(r"a\b"), r"a\b");
+    }
+
+    #[test]
     fn wrap_label_short_label_unchanged() {
         assert_eq!(wrap_label("m_0001_initial"), vec!["m_0001_initial"]);
     }
@@ -359,5 +396,245 @@ mod tests {
 
         let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
         assert!(mermaid.contains("<br/>"));
+    }
+
+    #[test]
+    fn dot_render_empty_migrations() {
+        let migrations: Vec<MigrationWrapper> = Vec::new();
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        assert!(dot.starts_with("digraph migrations {"));
+        assert!(dot.trim_end().ends_with('}'));
+        assert!(!dot.contains("subgraph"));
+        assert!(!dot.contains("->"));
+    }
+
+    #[test]
+    fn mermaid_render_empty_migrations() {
+        let migrations: Vec<MigrationWrapper> = Vec::new();
+        let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
+
+        assert!(mermaid.contains("flowchart LR"));
+        assert!(!mermaid.contains("subgraph"));
+        assert!(!mermaid.contains("-->"));
+        assert!(!mermaid.contains("n0"));
+    }
+
+    #[test]
+    fn dot_single_migration_no_edges() {
+        let migrations = wrap(vec![TestMigration::new("solo", "m1", [], [])]);
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        assert!(dot.contains("subgraph cluster_0"));
+        assert!(dot.contains("n0 [label=\"m1\"];"));
+        assert!(!dot.contains("->"));
+    }
+
+    #[test]
+    fn mermaid_single_migration_no_edges() {
+        let migrations = wrap(vec![TestMigration::new("solo", "m1", [], [])]);
+        let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
+
+        assert!(mermaid.contains("n0[\"m1\"]"));
+        assert!(mermaid.contains("class n0 migration;"));
+        assert!(!mermaid.contains("-->"));
+    }
+
+    #[test]
+    fn dot_clusters_sorted_alphabetically_by_app() {
+        let migrations = wrap(vec![
+            TestMigration::new("zeta", "m1", [], []),
+            TestMigration::new("alpha", "m1", [], []),
+        ]);
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        let alpha_pos = dot.find("label=\"alpha\";").expect("alpha cluster present");
+        let zeta_pos = dot.find("label=\"zeta\";").expect("zeta cluster present");
+        assert!(alpha_pos < zeta_pos);
+    }
+
+    #[test]
+    fn mermaid_clusters_sorted_alphabetically_by_app() {
+        let migrations = wrap(vec![
+            TestMigration::new("zeta", "m1", [], []),
+            TestMigration::new("alpha", "m1", [], []),
+        ]);
+        let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
+
+        let alpha_pos = mermaid
+            .find("[\"alpha\"]")
+            .expect("alpha subgraph should be present");
+        let zeta_pos = mermaid
+            .find("[\"zeta\"]")
+            .expect("zeta subgraph should be present");
+        assert!(alpha_pos < zeta_pos);
+    }
+
+    #[test]
+    fn dot_multiple_migrations_same_app_share_one_cluster() {
+        let migrations = wrap(vec![
+            TestMigration::new("app1", "m1", [], []),
+            TestMigration::new(
+                "app1",
+                "m2",
+                [MigrationDependency::migration("app1", "m1")],
+                [],
+            ),
+        ]);
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        assert_eq!(dot.matches("subgraph cluster_").count(), 1);
+    }
+
+    #[test]
+    fn node_ids_assigned_in_input_order_not_sorted_order() {
+        let migrations = wrap(vec![
+            TestMigration::new("zeta", "first", [], []),
+            TestMigration::new("alpha", "second", [], []),
+        ]);
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        assert!(dot.contains("n0 [label=\"first\"];"));
+        assert!(dot.contains("n1 [label=\"second\"];"));
+    }
+
+    #[test]
+    fn dot_diamond_dependency_all_edges_rendered() {
+        let migrations = wrap(vec![
+            TestMigration::new("diamond", "a", [], []),
+            TestMigration::new(
+                "diamond",
+                "b",
+                [MigrationDependency::migration("diamond", "a")],
+                [],
+            ),
+            TestMigration::new(
+                "diamond",
+                "c",
+                [MigrationDependency::migration("diamond", "a")],
+                [],
+            ),
+            TestMigration::new(
+                "diamond",
+                "d",
+                [
+                    MigrationDependency::migration("diamond", "b"),
+                    MigrationDependency::migration("diamond", "c"),
+                ],
+                [],
+            ),
+        ]);
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        assert!(dot.contains("n0 -> n1;"));
+        assert!(dot.contains("n0 -> n2;"));
+        assert!(dot.contains("n1 -> n3;"));
+        assert!(dot.contains("n2 -> n3;"));
+        assert_eq!(dot.matches("->").count(), 4);
+    }
+
+    #[test]
+    fn mermaid_diamond_dependency_all_edges_rendered() {
+        let migrations = wrap(vec![
+            TestMigration::new("diamond", "a", [], []),
+            TestMigration::new(
+                "diamond",
+                "b",
+                [MigrationDependency::migration("diamond", "a")],
+                [],
+            ),
+            TestMigration::new(
+                "diamond",
+                "c",
+                [MigrationDependency::migration("diamond", "a")],
+                [],
+            ),
+            TestMigration::new(
+                "diamond",
+                "d",
+                [
+                    MigrationDependency::migration("diamond", "b"),
+                    MigrationDependency::migration("diamond", "c"),
+                ],
+                [],
+            ),
+        ]);
+        let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
+
+        assert!(mermaid.contains("n0 --> n1"));
+        assert!(mermaid.contains("n0 --> n2"));
+        assert!(mermaid.contains("n1 --> n3"));
+        assert!(mermaid.contains("n2 --> n3"));
+        assert_eq!(mermaid.matches("-->").count(), 4);
+    }
+
+    #[test]
+    fn dot_cross_app_dependency_edge_render() {
+        let migrations = wrap(vec![
+            TestMigration::new("upstream", "m1", [], []),
+            TestMigration::new(
+                "downstream",
+                "m1",
+                [MigrationDependency::migration("upstream", "m1")],
+                [],
+            ),
+        ]);
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        assert!(dot.contains("n0 -> n1;"));
+        assert_eq!(dot.matches("subgraph cluster_").count(), 2);
+    }
+
+    #[test]
+    fn dot_render_does_not_fail_on_cyclic_dependencies() {
+        let migrations = wrap(vec![
+            TestMigration::new(
+                "cyclic",
+                "a",
+                [MigrationDependency::migration("cyclic", "b")],
+                [],
+            ),
+            TestMigration::new(
+                "cyclic",
+                "b",
+                [MigrationDependency::migration("cyclic", "a")],
+                [],
+            ),
+        ]);
+
+        let result = render(&migrations, GraphFormat::Dot);
+        assert!(result.is_ok());
+        let dot = result.unwrap();
+        assert!(dot.contains("n0 -> n1;"));
+        assert!(dot.contains("n1 -> n0;"));
+    }
+
+    #[test]
+    fn dot_escapes_quotes_in_app_name_cluster_label() {
+        let migrations = wrap(vec![TestMigration::new("weird\"app", "m1", [], [])]);
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        assert!(dot.contains("weird\\\"app"));
+    }
+
+    #[test]
+    fn mermaid_escapes_quotes_in_app_name_subgraph_label() {
+        let migrations = wrap(vec![TestMigration::new("weird\"app", "m1", [], [])]);
+        let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
+
+        assert!(mermaid.contains("weird&quot;app"));
+    }
+
+    #[test]
+    fn render_dispatches_dot_vs_mermaid() {
+        let migrations = wrap(vec![TestMigration::new("app", "m1", [], [])]);
+
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+        let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
+
+        assert!(dot.contains("digraph migrations"));
+        assert!(!dot.contains("flowchart"));
+        assert!(mermaid.contains("flowchart LR"));
+        assert!(!mermaid.contains("digraph"));
     }
 }

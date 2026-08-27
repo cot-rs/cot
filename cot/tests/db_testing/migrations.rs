@@ -1,8 +1,8 @@
 use cot::App;
 use cot::auth::db::DatabaseUserApp;
 use cot::db::migrations::{
-    Field, Migration, MigrationDependency, MigrationEngine, Operation, SyncDynMigration,
-    wrap_migrations,
+    Field, GraphFormat, Migration, MigrationDependency, MigrationEngine, Operation,
+    SyncDynMigration, wrap_migrations,
 };
 use cot::db::{Auto, Database, DatabaseField, Identifier};
 use cot::session::db::SessionApp;
@@ -436,4 +436,70 @@ async fn test_migration_engine_rollback_zero(test_db: &mut TestDatabase) {
         ],
     )
     .await;
+}
+
+#[test]
+fn test_migration_graph_single_app() {
+    #[expect(trivial_casts)]
+    let engine = MigrationEngine::new([
+        &RollbackApp1Initial as &SyncDynMigration,
+        &RollbackApp10002 as &SyncDynMigration,
+        &RollbackApp1003 as &SyncDynMigration,
+    ])
+    .unwrap();
+    let dot = engine.to_graph(GraphFormat::Dot).unwrap();
+    insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+        insta::assert_snapshot!("migration_graph_dot_single_app", dot);
+    });
+
+    let mermaid = engine.to_graph(GraphFormat::Mermaid).unwrap();
+    insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+        insta::assert_snapshot!("migration_graph_mermaid_single_app", mermaid);
+    });
+}
+
+#[test]
+fn test_migration_graph_unrelated_apps() {
+    let mut migrations = DatabaseUserApp::new().migrations();
+
+    #[expect(trivial_casts)]
+    migrations.extend(wrap_migrations(&[
+        &RollbackApp1Initial as &SyncDynMigration,
+        &RollbackApp10002 as &SyncDynMigration,
+        &RollbackApp2Initial as &SyncDynMigration,
+    ]));
+    migrations.extend(SessionApp::new().migrations());
+
+    let engine = MigrationEngine::new(migrations).unwrap();
+
+    let dot = engine.to_graph(GraphFormat::Dot).unwrap();
+    insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+        insta::assert_snapshot!("migration_graph_dot_unrelated_apps", dot);
+    });
+
+    let mermaid = engine.to_graph(GraphFormat::Mermaid).unwrap();
+    insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+        insta::assert_snapshot!("migration_graph_mermaid_unrelated_apps", mermaid);
+    });
+}
+
+#[test]
+fn test_migration_graph_dependent_apps() {
+    #[expect(trivial_casts)]
+    let engine = MigrationEngine::new([
+        &RollbackApp1Initial as &SyncDynMigration,
+        &RollbackApp10002 as &SyncDynMigration,
+        &RollbackDependentInitial as &SyncDynMigration,
+        &RollbackApp2Initial as &SyncDynMigration,
+    ])
+    .unwrap();
+    let dot = engine.to_graph(GraphFormat::Dot).unwrap();
+    insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+        insta::assert_snapshot!("migration_graph_dot_dependent_apps", dot);
+    });
+
+    let mermaid = engine.to_graph(GraphFormat::Mermaid).unwrap();
+    insta::with_settings!({snapshot_path => SNAPSHOT_RELATIVE_PATH}, {
+        insta::assert_snapshot!("migration_graph_mermaid_dependent_apps", mermaid);
+    });
 }

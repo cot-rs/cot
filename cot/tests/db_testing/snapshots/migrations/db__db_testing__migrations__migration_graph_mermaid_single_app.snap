@@ -1,0 +1,20 @@
+---
+source: cot/tests/db_testing/migrations.rs
+expression: mermaid
+---
+%%{init: {'theme': 'base', 'themeVariables': {'background': 'transparent'}}}%%
+flowchart LR
+  classDef migration fill:#eef2ff,stroke:#4c51bf,stroke-width:1px,color:#1e1b4b,font-size:12px,rx:6,ry:6;
+
+  subgraph cluster0["rollback_app1"]
+    n0["m_0001_initial"]
+    n1["m_0002_second"]
+    n2["m_0003_third"]
+  end
+
+  n0 --> n1
+  n1 --> n2
+
+  class n0,n1,n2 migration;
+  style cluster0 fill:#f9fafb,stroke:#d1d5db,stroke-width:1px
+  linkStyle default stroke:#9aa5b1,stroke-width:1.5px

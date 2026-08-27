@@ -8,7 +8,7 @@ use async_trait::async_trait;
 pub use clap;
 use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
 #[cfg(feature = "db")]
-use cot::db::migrations::{MigrationEngine, SyncDynMigration};
+use cot::db::migrations::{GraphFormat, MigrationEngine, SyncDynMigration};
 use cot::project::BootstrappedProject;
 use derive_more::Debug;
 
@@ -740,7 +740,6 @@ macro_rules! metadata {
 
 pub use metadata;
 
-use crate::db::migrations::GraphFormat;
 use crate::project::{StartServerError, WithConfig};
 use crate::static_files::StaticFiles;
 

@@ -1,0 +1,363 @@
+use std::collections::HashMap;
+use std::fmt::Write;
+
+use cot::db::migrations::MigrationEngineError;
+
+use crate::db::migrations::sorter::MigrationSorter;
+use crate::db::migrations::{DynMigration, MigrationWrapper};
+use crate::utils::graph::Graph;
+
+/// The output format for a rendered migration dependency graph.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GraphFormat {
+    /// [Graphviz DOT](https://graphviz.org/doc/info/lang.html) format.
+    Dot,
+    /// [Mermaid](https://mermaid.js.org/syntax/flowchart.html) flowchart syntax.
+    Mermaid,
+}
+
+mod style {
+    /// Node fill color.
+    pub(super) const NODE_FILL: &str = "#eef2ff";
+    /// Node border color.
+    pub(super) const NODE_STROKE: &str = "#4c51bf";
+    /// Node label text color.
+    pub(super) const NODE_TEXT: &str = "#1e1b4b";
+
+    /// Cluster (app group) fill color.
+    pub(super) const CLUSTER_FILL: &str = "#f9fafb";
+    /// Cluster border color.
+    pub(super) const CLUSTER_STROKE: &str = "#d1d5db";
+    /// Cluster title text color.
+    pub(super) const CLUSTER_TEXT: &str = "#374151";
+
+    /// Edge/arrow color.
+    pub(super) const EDGE_COLOR: &str = "#9aa5b1";
+
+    /// Font family used for node and cluster labels (DOT only; Mermaid picks
+    /// up the surrounding theme's font).
+    pub(super) const FONT_FAMILY: &str = "Helvetica,Arial,sans-serif";
+
+    /// Maximum label line length before we wrap to the next line.
+    pub(super) const LABEL_WRAP_WIDTH: usize = 16;
+}
+
+#[derive(Debug)]
+struct Node<'a> {
+    id: String,
+    app: &'a str,
+    label: &'a str,
+}
+
+pub(super) fn render(
+    migrations: &[MigrationWrapper],
+    format: GraphFormat,
+) -> super::Result<String> {
+    let graph = MigrationSorter::generate_graph(migrations).map_err(|e| {
+        MigrationEngineError::Custom(format!("Failed to generate migration graph: {e}"))
+    })?;
+
+    let nodes = migrations
+        .iter()
+        .enumerate()
+        .map(|(i, m)| Node {
+            id: format!("n{i}"),
+            app: m.app_name(),
+            label: m.name(),
+        })
+        .collect::<Vec<_>>();
+
+    Ok(match format {
+        GraphFormat::Dot => render_dot(&nodes, &graph),
+        GraphFormat::Mermaid => render_mermaid(&nodes, &graph),
+    })
+}
+
+fn wrap_label(label: &str) -> Vec<String> {
+    if label.len() <= style::LABEL_WRAP_WIDTH {
+        return vec![label.to_owned()];
+    }
+
+    let mut lines = Vec::new();
+    let mut current = String::new();
+
+    for segment in label.split('_') {
+        let candidate_len = if current.is_empty() {
+            segment.len()
+        } else {
+            current.len() + 1 + segment.len()
+        };
+
+        if candidate_len > style::LABEL_WRAP_WIDTH && !current.is_empty() {
+            lines.push(std::mem::take(&mut current));
+        }
+
+        if !current.is_empty() {
+            current.push('_');
+        }
+        current.push_str(segment);
+
+        // A single segment longer than the wrap width on its own: emit it as
+        // its own line rather than trying to split mid-word.
+        if current.len() > style::LABEL_WRAP_WIDTH {
+            lines.push(std::mem::take(&mut current));
+        }
+    }
+
+    if !current.is_empty() {
+        lines.push(current);
+    }
+
+    lines
+}
+
+fn group_by_app<'a>(nodes: &[Node<'a>]) -> Vec<(&'a str, Vec<usize>)> {
+    let mut groups: HashMap<&str, Vec<usize>> = HashMap::new();
+
+    for (i, node) in nodes.iter().enumerate() {
+        groups.entry(node.app).or_default().push(i);
+    }
+    let mut ord = groups.into_iter().collect::<Vec<_>>();
+    ord.sort();
+    ord
+}
+
+fn render_dot(nodes: &[Node<'_>], graph: &Graph) -> String {
+    let mut out = String::new();
+    let _ = writeln!(out, "digraph migrations {{");
+    let _ = writeln!(out, "  rankdir=LR;");
+    let _ = writeln!(out, "  splines=spline;");
+    let _ = writeln!(out, "  nodesep=0.4;");
+    let _ = writeln!(out, "  ranksep=0.6;");
+    let _ = writeln!(out, "  bgcolor=\"transparent\";\n");
+
+    let _ = writeln!(out, "  graph [fontname=\"{}\"];", style::FONT_FAMILY);
+    let _ = writeln!(
+        out,
+        "  node  [fontname=\"{}\", fontsize=11];",
+        style::FONT_FAMILY
+    );
+    let _ = writeln!(
+        out,
+        "  edge  [fontname=\"{}\", fontsize=9];\n",
+        style::FONT_FAMILY
+    );
+
+    let _ = writeln!(out, "  node [");
+    let _ = writeln!(out, "    shape=box,");
+    let _ = writeln!(out, "    style=\"rounded,filled\",");
+    let _ = writeln!(out, "    fillcolor=\"{}\",", style::NODE_FILL);
+    let _ = writeln!(out, "    color=\"{}\",", style::NODE_STROKE);
+    let _ = writeln!(out, "    fontcolor=\"{}\",", style::NODE_TEXT);
+    let _ = writeln!(out, "    penwidth=1,");
+    let _ = writeln!(out, "    margin=\"0.18,0.12\"");
+    let _ = writeln!(out, "  ];\n");
+
+    let _ = writeln!(out, "  edge [");
+    let _ = writeln!(out, "    color=\"{}\",", style::EDGE_COLOR);
+    let _ = writeln!(out, "    penwidth=1.2,");
+    let _ = writeln!(out, "    arrowsize=0.8");
+    let _ = writeln!(out, "  ];\n");
+
+    for (cluster_index, (app, indices)) in group_by_app(nodes).into_iter().enumerate() {
+        let _ = writeln!(out, "  subgraph cluster_{cluster_index} {{");
+        let _ = writeln!(out, "    label=\"{}\";", escape_dot(app));
+        let _ = writeln!(out, "    style=\"rounded,filled\";");
+        let _ = writeln!(out, "    color=\"{}\";", style::CLUSTER_STROKE);
+        let _ = writeln!(out, "    fillcolor=\"{}\";", style::CLUSTER_FILL);
+        let _ = writeln!(out, "    fontcolor=\"{}\";", style::CLUSTER_TEXT);
+        let _ = writeln!(out, "    fontsize=12;");
+        let _ = writeln!(out, "    margin=12;");
+        for i in indices {
+            let dot_label = wrap_label(nodes[i].label)
+                .iter()
+                .map(|line| escape_dot(line))
+                .collect::<Vec<_>>()
+                .join("\\n");
+            let _ = writeln!(out, "    {} [label=\"{}\"];", nodes[i].id, dot_label);
+        }
+        let _ = writeln!(out, "  }}");
+    }
+    out.push('\n');
+
+    for (index, node) in nodes.iter().enumerate() {
+        for &dependent in graph.get_edges(index) {
+            let _ = writeln!(out, "  {} -> {};", node.id, nodes[dependent].id);
+        }
+    }
+
+    out.push_str("}\n");
+    out
+}
+
+fn render_mermaid(nodes: &[Node<'_>], graph: &Graph) -> String {
+    let mut out = String::new();
+
+    // Transparent background so the diagram doesn't carry a hardcoded white
+    // canvas regardless of where it's rendered.
+    let _ = writeln!(
+        out,
+        "%%{{init: {{'theme': 'base', 'themeVariables': {{'background': 'transparent'}}}}}}%%"
+    );
+    let _ = writeln!(out, "flowchart LR");
+    let _ = writeln!(
+        out,
+        "  classDef migration fill:{},stroke:{},stroke-width:1px,color:{},font-size:12px,rx:6,ry:6;\n",
+        style::NODE_FILL,
+        style::NODE_STROKE,
+        style::NODE_TEXT
+    );
+
+    let mut all_node_ids = Vec::new();
+    let clusters = group_by_app(nodes);
+
+    for (cluster_index, (app, indices)) in clusters.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "  subgraph cluster{cluster_index}[\"{}\"]",
+            escape_mermaid(app)
+        );
+        for &i in indices {
+            let mermaid_label = wrap_label(nodes[i].label)
+                .iter()
+                .map(|line| escape_mermaid(line))
+                .collect::<Vec<_>>()
+                .join("<br/>");
+            let _ = writeln!(out, "    {}[\"{}\"]", nodes[i].id, mermaid_label);
+            all_node_ids.push(nodes[i].id.clone());
+        }
+        let _ = writeln!(out, "  end");
+    }
+    out.push('\n');
+
+    for (index, node) in nodes.iter().enumerate() {
+        for &dependent in graph.get_edges(index) {
+            let _ = writeln!(out, "  {} --> {}", node.id, nodes[dependent].id);
+        }
+    }
+    out.push('\n');
+
+    if !all_node_ids.is_empty() {
+        let _ = writeln!(out, "  class {} migration;", all_node_ids.join(","));
+    }
+    for cluster_index in 0..clusters.len() {
+        let _ = writeln!(
+            out,
+            "  style cluster{cluster_index} fill:{},stroke:{},stroke-width:1px",
+            style::CLUSTER_FILL,
+            style::CLUSTER_STROKE
+        );
+    }
+    let _ = writeln!(
+        out,
+        "  linkStyle default stroke:{},stroke-width:1.5px",
+        style::EDGE_COLOR
+    );
+
+    out
+}
+
+fn escape_dot(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn escape_mermaid(s: &str) -> String {
+    s.replace('"', "&quot;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::migrations::MigrationDependency;
+    use crate::test::TestMigration;
+
+    fn wrap(migrations: Vec<TestMigration>) -> Vec<MigrationWrapper> {
+        migrations.into_iter().map(MigrationWrapper::new).collect()
+    }
+
+    #[test]
+    fn dot_contains_edge_and_cluster() {
+        let migrations = wrap(vec![
+            TestMigration::new("app1", "m1", [], []),
+            TestMigration::new(
+                "app1",
+                "m2",
+                [MigrationDependency::migration("app1", "m1")],
+                [],
+            ),
+        ]);
+
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+
+        assert!(dot.contains("digraph migrations"));
+        assert!(dot.contains("subgraph cluster_0"));
+        assert!(dot.contains("n0 -> n1;"));
+        assert!(dot.contains(style::NODE_FILL));
+    }
+
+    #[test]
+    fn mermaid_contains_edge_and_subgraph() {
+        let migrations = wrap(vec![
+            TestMigration::new("app1", "m1", [], []),
+            TestMigration::new(
+                "app1",
+                "m2",
+                [MigrationDependency::migration("app1", "m1")],
+                [],
+            ),
+        ]);
+
+        let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
+
+        assert!(mermaid.contains("flowchart LR"));
+        assert!(mermaid.contains("subgraph cluster0"));
+        assert!(mermaid.contains("n0 --> n1"));
+        assert!(mermaid.contains("background': 'transparent'"));
+        assert!(mermaid.contains("classDef migration"));
+    }
+
+    #[test]
+    fn escapes_quotes_in_labels() {
+        assert_eq!(escape_dot(r#"a"b"#), r#"a\"b"#);
+        assert_eq!(escape_mermaid(r#"a"b"#), "a&quot;b");
+    }
+
+    #[test]
+    fn wrap_label_short_label_unchanged() {
+        assert_eq!(wrap_label("m_0001_initial"), vec!["m_0001_initial"]);
+    }
+
+    #[test]
+    fn wrap_label_long_label_splits_on_underscore() {
+        let lines = wrap_label("m_0002_auto_20260527_004236");
+        assert!(lines.len() > 1);
+        assert!(lines.iter().all(|l| l.len() <= style::LABEL_WRAP_WIDTH + 8));
+        assert_eq!(lines.join("_"), "m_0002_auto_20260527_004236");
+    }
+
+    #[test]
+    fn dot_wraps_long_label_with_literal_newline() {
+        let migrations = wrap(vec![TestMigration::new(
+            "app1",
+            "m_0002_auto_20260527_004236",
+            [],
+            [],
+        )]);
+
+        let dot = render(&migrations, GraphFormat::Dot).unwrap();
+        assert!(dot.contains("\\n"));
+    }
+
+    #[test]
+    fn mermaid_wraps_long_label_with_br() {
+        let migrations = wrap(vec![TestMigration::new(
+            "app1",
+            "m_0002_auto_20260527_004236",
+            [],
+            [],
+        )]);
+
+        let mermaid = render(&migrations, GraphFormat::Mermaid).unwrap();
+        assert!(mermaid.contains("<br/>"));
+    }
+}

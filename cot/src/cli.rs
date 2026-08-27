@@ -21,6 +21,7 @@ const LISTEN_PARAM: &str = "listen";
 const COLLECT_STATIC_DIR_PARAM: &str = "dir";
 const MIGRATION_GROUP_SUBCOMMAND: &str = "migration";
 const MIGRATION_ROLLBACK_SUBCOMMAND: &str = "rollback";
+const MIGRATION_GRAPH_SUBCOMMAND: &str = "graph";
 
 /// A central point for configuring the default Command Line Interface (CLI) for
 /// Cot-powered projects.
@@ -101,6 +102,7 @@ impl Cli {
             let mut migration_group =
                 CliTaskGroup::new(MIGRATION_GROUP_SUBCOMMAND).about("Database migration commands");
             migration_group.add_task(MigrationRollback);
+            migration_group.add_task(MigrationGraph);
 
             cli.add_task(migration_group);
         }
@@ -655,6 +657,74 @@ impl CliTask for MigrationRollback {
     }
 }
 
+#[cfg(feature = "db")]
+struct MigrationGraph;
+
+#[cfg(feature = "db")]
+#[async_trait(?Send)]
+impl CliTask for MigrationGraph {
+    fn subcommand(&self) -> Command {
+        Command::new(MIGRATION_GRAPH_SUBCOMMAND)
+            .about("Export the migration dependency graph for visualization")
+            .arg(
+                Arg::new("format")
+                    .long("format")
+                    .value_name("FORMAT")
+                    .value_parser(["dot", "mermaid"])
+                    .default_value("dot")
+                    .help("Output format: dot (Graphviz) or mermaid"),
+            )
+            .arg(
+                Arg::new("output")
+                    .short('o')
+                    .long("output")
+                    .value_name("FILE")
+                    .value_parser(value_parser!(PathBuf))
+                    .required(false)
+                    .help("Write to a file instead of stdout"),
+            )
+    }
+
+    async fn execute(
+        &mut self,
+        matches: &ArgMatches,
+        bootstrapper: Bootstrapper<WithConfig>,
+    ) -> Result<()> {
+        let format = match matches.get_one::<String>("format").map(String::as_str) {
+            Some("mermaid") => GraphFormat::Mermaid,
+            _ => GraphFormat::Dot,
+        };
+
+        let bootstrapper = bootstrapper
+            .with_apps()
+            .with_database()
+            .await?
+            .boot()
+            .await?;
+
+        let BootstrappedProject {
+            context,
+            handler: _,
+            error_handler: _,
+        } = bootstrapper.finish();
+
+        let mut migrations: Vec<Box<SyncDynMigration>> = Vec::new();
+        for app in context.apps() {
+            migrations.extend(app.migrations());
+        }
+
+        let engine = MigrationEngine::new(migrations)?;
+        let rendered = engine.to_graph(format)?;
+
+        match matches.get_one::<PathBuf>("output") {
+            Some(path) => std::fs::write(path, rendered)?,
+            None => println!("{rendered}"),
+        }
+
+        Ok(())
+    }
+}
+
 /// A macro to generate a [`CliMetadata`] struct from the Cargo manifest.
 #[macro_export]
 macro_rules! metadata {
@@ -670,6 +740,7 @@ macro_rules! metadata {
 
 pub use metadata;
 
+use crate::db::migrations::GraphFormat;
 use crate::project::{StartServerError, WithConfig};
 use crate::static_files::StaticFiles;
 

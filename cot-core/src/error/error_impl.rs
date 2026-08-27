@@ -1,5 +1,6 @@
 use std::error::Error as StdError;
 use std::fmt::Display;
+use std::io;
 use std::ops::Deref;
 
 use derive_more::with_trait::Debug;
@@ -290,6 +291,8 @@ impl From<tower_sessions::session::Error> for Error {
         Error::from(SessionAccess(err))
     }
 }
+
+impl_into_cot_error!(io::Error);
 
 #[cfg(test)]
 mod tests {

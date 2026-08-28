@@ -9,6 +9,7 @@ use crate::utils::graph::Graph;
 
 /// The output format for a rendered migration dependency graph.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum GraphFormat {
     /// [Graphviz DOT](https://graphviz.org/doc/info/lang.html) format.
     Dot,

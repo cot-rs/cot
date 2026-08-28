@@ -439,6 +439,10 @@ async fn test_migration_engine_rollback_zero(test_db: &mut TestDatabase) {
 }
 
 #[test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: socketpair: type 0x5 is unsupported, only SOCK_STREAM, SOCK_CLOEXEC and SOCK_NONBLOCK are allowed"
+)]
 fn test_migration_graph_single_app() {
     #[expect(trivial_casts)]
     let engine = MigrationEngine::new([
@@ -459,6 +463,10 @@ fn test_migration_graph_single_app() {
 }
 
 #[test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: socketpair: type 0x5 is unsupported, only SOCK_STREAM, SOCK_CLOEXEC and SOCK_NONBLOCK are allowed"
+)]
 fn test_migration_graph_unrelated_apps() {
     let mut migrations = DatabaseUserApp::new().migrations();
 
@@ -484,6 +492,10 @@ fn test_migration_graph_unrelated_apps() {
 }
 
 #[test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: socketpair: type 0x5 is unsupported, only SOCK_STREAM, SOCK_CLOEXEC and SOCK_NONBLOCK are allowed"
+)]
 fn test_migration_graph_dependent_apps() {
     #[expect(trivial_casts)]
     let engine = MigrationEngine::new([

@@ -8,7 +8,7 @@ use async_trait::async_trait;
 pub use clap;
 use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
 #[cfg(feature = "db")]
-use cot::db::migrations::{GraphFormat, MigrationEngine, SyncDynMigration};
+use cot::db::migrations::{GraphExporter, GraphFormat, MigrationEngine, SyncDynMigration};
 use cot::project::BootstrappedProject;
 use derive_more::Debug;
 
@@ -714,7 +714,8 @@ impl CliTask for MigrationGraph {
         }
 
         let engine = MigrationEngine::new(migrations)?;
-        let rendered = engine.to_graph(format)?;
+        let exporter = GraphExporter::new(engine.migrations());
+        let rendered = exporter.export(format)?;
 
         match matches.get_one::<PathBuf>("output") {
             Some(path) => std::fs::write(path, rendered)?,

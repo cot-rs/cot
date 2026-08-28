@@ -10,7 +10,7 @@ use std::io::Write;
 use std::{fmt, io};
 
 pub use cot_macros::migration_op;
-pub use graph_export::GraphFormat;
+pub(crate) use graph_export::{GraphExporter, GraphFormat};
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::{Level, info};
@@ -488,14 +488,9 @@ impl MigrationEngine {
             .await?;
         Ok(())
     }
-    /// Renders the migration dependency graph in the given [`GraphFormat`]
-    /// for visualization with external tools (e.g. Graphviz `dot`, mermaid).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the dependency graph cannot be generated
-    pub fn to_graph(&self, format: GraphFormat) -> Result<String> {
-        graph_export::render(&self.migrations, format)
+
+    pub(crate) fn migrations(&self) -> &[MigrationWrapper] {
+        &self.migrations
     }
 }
 

@@ -1,27 +1,30 @@
 ---
-source: cot/tests/db_testing/migrations.rs
+source: cot/src/cli.rs
 expression: mermaid
 ---
 %%{init: {'theme': 'base', 'themeVariables': {'background': 'transparent'}}}%%
 flowchart LR
   classDef migration fill:#eef2ff,stroke:#4c51bf,stroke-width:1px,color:#1e1b4b,font-size:12px,rx:6,ry:6;
 
-  subgraph cluster0["rollback_app1"]
+  subgraph cluster0["app1"]
     n0["m_0001_initial"]
     n1["m_0002_second"]
   end
-  subgraph cluster1["rollback_app2"]
+  subgraph cluster1["app2"]
     n2["m_0001_initial"]
   end
-  subgraph cluster2["rollback_dependent"]
+  subgraph cluster2["cot"]
     n3["m_0001_initial"]
+  end
+  subgraph cluster3["cot_session"]
+    n4["m_0001_initial"]
   end
 
   n0 --> n1
-  n1 --> n3
 
-  class n0,n1,n2,n3 migration;
+  class n0,n1,n2,n3,n4 migration;
   style cluster0 fill:#f9fafb,stroke:#d1d5db,stroke-width:1px
   style cluster1 fill:#f9fafb,stroke:#d1d5db,stroke-width:1px
   style cluster2 fill:#f9fafb,stroke:#d1d5db,stroke-width:1px
+  style cluster3 fill:#f9fafb,stroke:#d1d5db,stroke-width:1px
   linkStyle default stroke:#9aa5b1,stroke-width:1.5px

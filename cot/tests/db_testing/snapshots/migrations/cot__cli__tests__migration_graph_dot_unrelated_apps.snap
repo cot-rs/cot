@@ -1,5 +1,5 @@
 ---
-source: cot/tests/db_testing/migrations.rs
+source: cot/src/cli.rs
 expression: dot
 ---
 digraph migrations {
@@ -30,7 +30,7 @@ digraph migrations {
   ];
 
   subgraph cluster_0 {
-    label="rollback_app1";
+    label="app1";
     style="rounded,filled";
     color="#d1d5db";
     fillcolor="#f9fafb";
@@ -39,9 +39,37 @@ digraph migrations {
     margin=12;
     n0 [label="m_0001_initial"];
     n1 [label="m_0002_second"];
-    n2 [label="m_0003_third"];
+  }
+  subgraph cluster_1 {
+    label="app2";
+    style="rounded,filled";
+    color="#d1d5db";
+    fillcolor="#f9fafb";
+    fontcolor="#374151";
+    fontsize=12;
+    margin=12;
+    n2 [label="m_0001_initial"];
+  }
+  subgraph cluster_2 {
+    label="cot";
+    style="rounded,filled";
+    color="#d1d5db";
+    fillcolor="#f9fafb";
+    fontcolor="#374151";
+    fontsize=12;
+    margin=12;
+    n3 [label="m_0001_initial"];
+  }
+  subgraph cluster_3 {
+    label="cot_session";
+    style="rounded,filled";
+    color="#d1d5db";
+    fillcolor="#f9fafb";
+    fontcolor="#374151";
+    fontsize=12;
+    margin=12;
+    n4 [label="m_0001_initial"];
   }
 
   n0 -> n1;
-  n1 -> n2;
 }

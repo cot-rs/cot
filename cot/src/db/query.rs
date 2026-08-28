@@ -57,6 +57,7 @@ impl<T> Debug for Query<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Query")
             .field("filter", &self.filter)
+            .field("order_by", &self.order_by)
             .field("limit", &self.limit)
             .field("offset", &self.offset)
             .field("phantom_data", &self.phantom_data)
@@ -183,8 +184,12 @@ impl<T: Model> Query<T> {
     ///
     /// let query = Query::<User>::new().order_by(User::age, Order::Asc); // or Order::Desc
     /// ```
-    pub fn order_by(&mut self, order_by: impl IntoIterator<Item = OrderByExpr>) -> &mut Self {
-        self.order_by = order_by.into_iter().collect();
+    pub fn order_by<I, O>(&mut self, order_by: I) -> &mut Self
+    where
+        O: Into<OrderByExpr>,
+        I: IntoIterator<Item = O>,
+    {
+        self.order_by = order_by.into_iter().map(Into::into).collect();
         self
     }
 
@@ -274,10 +279,15 @@ impl<T: Model> Query<T> {
         }
     }
 
-    pub(super) fn add_order_by_to_statement(&self, statement: &mut sea_query::SelectStatement) {
+    pub(super) fn add_order_by_to_statement(
+        &self,
+        statement: &mut sea_query::SelectStatement,
+        sql_builder: &dyn SqlQueryBuilder,
+    ) -> Result<(), QueryBuildingError> {
         for order_by in &self.order_by {
-            order_by.add_to_statement(statement);
+            order_by.add_to_statement(statement, sql_builder)?;
         }
+        Ok(())
     }
 
     pub(super) fn add_offset_to_statement(&self, statement: &mut sea_query::SelectStatement) {

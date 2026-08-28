@@ -3,13 +3,17 @@ pub mod like;
 mod order_by;
 
 use std::marker::PhantomData;
+use std::ops::Add;
 
 use cot::db::query::{IntoField, QueryBuildingError};
-use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, ToDbFieldValue};
+use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, LimitedString, ToDbFieldValue};
 pub use like::ExprLike;
 use like::{CaseSensitivity, LikeExprBuilder, LikeMode};
 pub use order_by::{ExprSort, NullsOrder, OrderByExpr, SortOrder};
 use sea_query::{ExprTrait, IntoColumnRef, SimpleExpr};
+
+use crate::db::ToDbValue;
+use crate::db::query::expr::order_by::OrderTarget;
 
 /// An expression that can be used to filter, update, or delete rows.
 ///
@@ -1199,6 +1203,38 @@ impl Expr {
         Self::RawLike(Box::new(lhs), Box::new(rhs), CaseSensitivity::Insensitive)
     }
 
+    /// Builds an ascending `ORDER BY` term from this expression. See the
+    /// note on [`Query::filter`](crate::db::query::Query::filter) about
+    /// `Expr` not being restricted to field references — the same applies
+    /// here; ordering by a boolean-producing expression is legal SQL but
+    /// rarely what you want.
+    #[must_use]
+    pub fn asc(self) -> OrderByExpr {
+        OrderByExpr::directional(OrderTarget::Expression(self), SortOrder::Asc)
+    }
+
+    /// The descending counterpart of [`Self::asc`].
+    #[must_use]
+    pub fn desc(self) -> OrderByExpr {
+        OrderByExpr::directional(OrderTarget::Expression(self), SortOrder::Desc)
+    }
+
+    /// The [`ExprSort::custom`]-equivalent for a compound expression.
+    ///
+    /// Takes plain [`ToDbValue`] items rather than [`IntoField<T>`]: unlike
+    /// [`FieldRef<T>`], a general `Expr` isn't associated with one Rust
+    /// field type to convert against, so there's no `T` for `IntoField<T>`
+    /// to key off of.
+    #[must_use]
+    pub fn custom<I>(self, values: I) -> OrderByExpr
+    where
+        I: IntoIterator,
+        I::Item: ToDbValue,
+    {
+        let values = values.into_iter().map(|v| v.to_db_value()).collect();
+        OrderByExpr::custom(OrderTarget::Expression(self), sea_query::Values(values))
+    }
+
     /// Returns the expression as a [`sea_query::SimpleExpr`].
     ///
     /// # Example
@@ -1321,6 +1357,17 @@ impl<T> FieldRef<T> {
 
     pub(crate) fn identifier(&self) -> Identifier {
         self.identifier
+    }
+}
+
+impl<LHS, RHS> Add<FieldRef<RHS>> for FieldRef<LHS>
+where
+    FieldRef<LHS>: ExprAdd<FieldRef<RHS>>,
+{
+    type Output = Expr;
+
+    fn add(self, rhs: FieldRef<RHS>) -> Self::Output {
+        ExprAdd::add(self, rhs)
     }
 }
 
@@ -1651,6 +1698,20 @@ impl_num_expr!(u64);
 impl_num_expr!(f32);
 impl_num_expr!(f64);
 
+impl ExprAdd<String> for FieldRef<String> {
+    fn add<V: Into<String>>(self, other: V) -> Expr {
+        Expr::add(Expr::field(self.identifier()), Expr::value(other.into()))
+    }
+}
+
+impl<const LIMIT: u32> ExprAdd<FieldRef<LimitedString<LIMIT>>> for FieldRef<LimitedString<LIMIT>> {
+    fn add<V: Into<FieldRef<LimitedString<LIMIT>>>>(self, other: V) -> Expr {
+        Expr::add(
+            Expr::field(self.identifier()),
+            Expr::field(other.into().identifier()),
+        )
+    }
+}
 #[cfg(test)]
 mod test {
     use super::*;

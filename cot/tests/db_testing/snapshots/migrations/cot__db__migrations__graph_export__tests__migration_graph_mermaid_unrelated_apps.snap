@@ -1,5 +1,5 @@
 ---
-source: cot/src/cli.rs
+source: cot/src/db/migrations/graph_export.rs
 expression: mermaid
 ---
 %%{init: {'theme': 'base', 'themeVariables': {'background': 'transparent'}}}%%

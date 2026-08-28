@@ -1,8 +1,5 @@
 //! Rendering of the migration dependency graph for external visualization
-//! tools (Graphviz `dot`, Mermaid). Split into per-format submodules; this
-//! file only holds what's shared between them: node/cluster layout and
-//! label wrapping.
-
+//! tools (Graphviz `dot`, Mermaid).
 mod dot;
 mod mermaid;
 

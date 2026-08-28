@@ -84,7 +84,10 @@ impl<'a, T: DynMigration> GraphExporter<'a, T> {
 }
 
 fn wrap_label(label: &str) -> Vec<String> {
-    if label.len() <= style::LABEL_WRAP_WIDTH {
+    #[allow(clippy::allow_attributes, clippy::wildcard_imports)]
+    use style::*;
+
+    if label.len() <= LABEL_WRAP_WIDTH {
         return vec![label.to_owned()];
     }
 
@@ -98,7 +101,7 @@ fn wrap_label(label: &str) -> Vec<String> {
             current.len() + 1 + segment.len()
         };
 
-        if candidate_len > style::LABEL_WRAP_WIDTH && !current.is_empty() {
+        if candidate_len > LABEL_WRAP_WIDTH && !current.is_empty() {
             lines.push(std::mem::take(&mut current));
         }
 
@@ -107,7 +110,7 @@ fn wrap_label(label: &str) -> Vec<String> {
         }
         current.push_str(segment);
 
-        if current.len() > style::LABEL_WRAP_WIDTH {
+        if current.len() > LABEL_WRAP_WIDTH {
             lines.push(std::mem::take(&mut current));
         }
     }
@@ -139,6 +142,7 @@ mod tests {
     };
     use cot::db::{DatabaseField, Identifier};
     use cot::session::db::SessionApp;
+    use style::*;
 
     use super::*;
     use crate::App;
@@ -253,7 +257,7 @@ mod tests {
     fn wrap_label_long_label_splits_on_underscore() {
         let lines = wrap_label("m_0002_auto_20260527_004236");
         assert!(lines.len() > 1);
-        assert!(lines.iter().all(|l| l.len() <= style::LABEL_WRAP_WIDTH + 8));
+        assert!(lines.iter().all(|l| l.len() <= LABEL_WRAP_WIDTH + 8));
         assert_eq!(lines.join("_"), "m_0002_auto_20260527_004236");
     }
 

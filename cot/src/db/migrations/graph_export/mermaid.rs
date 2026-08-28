@@ -1,9 +1,12 @@
 use std::fmt::Write;
 
-use super::{Node, group_by_app, style, wrap_label};
+use super::{Node, group_by_app, wrap_label};
 use crate::utils::graph::Graph;
 
 pub(super) fn render(nodes: &[Node<'_>], graph: &Graph) -> String {
+    #[allow(clippy::allow_attributes, clippy::wildcard_imports)]
+    use super::style::*;
+
     let mut out = String::new();
 
     let _ = writeln!(
@@ -13,10 +16,7 @@ pub(super) fn render(nodes: &[Node<'_>], graph: &Graph) -> String {
     let _ = writeln!(out, "flowchart LR");
     let _ = writeln!(
         out,
-        "  classDef migration fill:{},stroke:{},stroke-width:1px,color:{},font-size:12px,rx:6,ry:6;\n",
-        style::NODE_FILL,
-        style::NODE_STROKE,
-        style::NODE_TEXT
+        "  classDef migration fill:{NODE_FILL},stroke:{NODE_STROKE},stroke-width:1px,color:{NODE_TEXT},font-size:12px,rx:6,ry:6;\n",
     );
 
     let mut all_node_ids = Vec::new();
@@ -54,15 +54,12 @@ pub(super) fn render(nodes: &[Node<'_>], graph: &Graph) -> String {
     for cluster_index in 0..clusters.len() {
         let _ = writeln!(
             out,
-            "  style cluster{cluster_index} fill:{},stroke:{},stroke-width:1px",
-            style::CLUSTER_FILL,
-            style::CLUSTER_STROKE
+            "  style cluster{cluster_index} fill:{CLUSTER_FILL},stroke:{CLUSTER_STROKE},stroke-width:1px",
         );
     }
     let _ = writeln!(
         out,
-        "  linkStyle default stroke:{},stroke-width:1.5px",
-        style::EDGE_COLOR
+        "  linkStyle default stroke:{EDGE_COLOR},stroke-width:1.5px",
     );
 
     out

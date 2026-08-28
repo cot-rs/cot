@@ -1,9 +1,12 @@
 use std::fmt::Write;
 
-use super::{Node, group_by_app, style, wrap_label};
+use super::{Node, group_by_app, wrap_label};
 use crate::utils::graph::Graph;
 
 pub(super) fn render(nodes: &[Node<'_>], graph: &Graph) -> String {
+    #[allow(clippy::allow_attributes, clippy::wildcard_imports)]
+    use super::style::*;
+
     let mut out = String::new();
     let _ = writeln!(out, "digraph migrations {{");
     let _ = writeln!(out, "  rankdir=LR;");
@@ -12,30 +15,22 @@ pub(super) fn render(nodes: &[Node<'_>], graph: &Graph) -> String {
     let _ = writeln!(out, "  ranksep=0.6;");
     let _ = writeln!(out, "  bgcolor=\"transparent\";\n");
 
-    let _ = writeln!(out, "  graph [fontname=\"{}\"];", style::FONT_FAMILY);
-    let _ = writeln!(
-        out,
-        "  node  [fontname=\"{}\", fontsize=11];",
-        style::FONT_FAMILY
-    );
-    let _ = writeln!(
-        out,
-        "  edge  [fontname=\"{}\", fontsize=9];\n",
-        style::FONT_FAMILY
-    );
+    let _ = writeln!(out, "  graph [fontname=\"{FONT_FAMILY}\"];");
+    let _ = writeln!(out, "  node  [fontname=\"{FONT_FAMILY}\", fontsize=11];");
+    let _ = writeln!(out, "  edge  [fontname=\"{FONT_FAMILY}\", fontsize=9];\n");
 
     let _ = writeln!(out, "  node [");
     let _ = writeln!(out, "    shape=box,");
     let _ = writeln!(out, "    style=\"rounded,filled\",");
-    let _ = writeln!(out, "    fillcolor=\"{}\",", style::NODE_FILL);
-    let _ = writeln!(out, "    color=\"{}\",", style::NODE_STROKE);
-    let _ = writeln!(out, "    fontcolor=\"{}\",", style::NODE_TEXT);
+    let _ = writeln!(out, "    fillcolor=\"{NODE_FILL}\",");
+    let _ = writeln!(out, "    color=\"{NODE_STROKE}\",");
+    let _ = writeln!(out, "    fontcolor=\"{NODE_TEXT}\",");
     let _ = writeln!(out, "    penwidth=1,");
     let _ = writeln!(out, "    margin=\"0.18,0.12\"");
     let _ = writeln!(out, "  ];\n");
 
     let _ = writeln!(out, "  edge [");
-    let _ = writeln!(out, "    color=\"{}\",", style::EDGE_COLOR);
+    let _ = writeln!(out, "    color=\"{EDGE_COLOR}\",");
     let _ = writeln!(out, "    penwidth=1.2,");
     let _ = writeln!(out, "    arrowsize=0.8");
     let _ = writeln!(out, "  ];\n");
@@ -44,9 +39,9 @@ pub(super) fn render(nodes: &[Node<'_>], graph: &Graph) -> String {
         let _ = writeln!(out, "  subgraph cluster_{cluster_index} {{");
         let _ = writeln!(out, "    label=\"{}\";", escape_dot(app));
         let _ = writeln!(out, "    style=\"rounded,filled\";");
-        let _ = writeln!(out, "    color=\"{}\";", style::CLUSTER_STROKE);
-        let _ = writeln!(out, "    fillcolor=\"{}\";", style::CLUSTER_FILL);
-        let _ = writeln!(out, "    fontcolor=\"{}\";", style::CLUSTER_TEXT);
+        let _ = writeln!(out, "    color=\"{CLUSTER_STROKE}\";");
+        let _ = writeln!(out, "    fillcolor=\"{CLUSTER_FILL}\";");
+        let _ = writeln!(out, "    fontcolor=\"{CLUSTER_TEXT}\";");
         let _ = writeln!(out, "    fontsize=12;");
         let _ = writeln!(out, "    margin=12;");
         for i in indices {
@@ -80,7 +75,8 @@ mod tests {
     use cot::db::migrations::GraphFormat;
     use cot::db::migrations::graph_export::GraphExporter;
 
-    use super::*;
+    use crate::db::migrations::graph_export::dot::escape_dot;
+    use crate::db::migrations::graph_export::style::*;
     use crate::db::migrations::{MigrationDependency, MigrationWrapper};
     use crate::test::TestMigration;
 
@@ -110,7 +106,7 @@ mod tests {
         assert!(dot.contains("digraph migrations"));
         assert!(dot.contains("subgraph cluster_0"));
         assert!(dot.contains("n0 -> n1;"));
-        assert!(dot.contains(style::NODE_FILL));
+        assert!(dot.contains(NODE_FILL));
     }
 
     #[test]

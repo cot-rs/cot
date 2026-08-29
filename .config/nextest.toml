@@ -7,3 +7,7 @@ doc-code-blocks = { max-threads = 1 }
 [[profile.default.overrides]]
 filter = 'package(cot-test)'
 test-group = 'doc-code-blocks'
+# Prioritize running the doc-code-blocks tests early to avoid a long
+# critical path. These tests must run sequentially, so starting them
+# as soon as possible avoids waiting for only them at the end.
+priority = 100

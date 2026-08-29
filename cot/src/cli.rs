@@ -1,6 +1,8 @@
 //! A command line interface for Cot-based applications.
 
 use std::collections::HashMap;
+#[cfg(feature = "db")]
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -20,6 +22,7 @@ const CHECK_SUBCOMMAND: &str = "check";
 const LISTEN_PARAM: &str = "listen";
 const COLLECT_STATIC_DIR_PARAM: &str = "dir";
 const MIGRATION_GROUP_SUBCOMMAND: &str = "migration";
+const MIGRATION_LIST_SUBCOMMAND: &str = "list";
 const MIGRATION_ROLLBACK_SUBCOMMAND: &str = "rollback";
 
 /// A central point for configuring the default Command Line Interface (CLI) for
@@ -100,6 +103,7 @@ impl Cli {
         {
             let mut migration_group =
                 CliTaskGroup::new(MIGRATION_GROUP_SUBCOMMAND).about("Database migration commands");
+            migration_group.add_task(MigrationList);
             migration_group.add_task(MigrationRollback);
 
             cli.add_task(migration_group);
@@ -574,6 +578,44 @@ impl CliTask for CliTaskGroup {
 }
 
 #[cfg(feature = "db")]
+struct MigrationList;
+
+#[cfg(feature = "db")]
+impl MigrationList {
+    fn write_migrations(
+        apps: &[Box<dyn crate::App>],
+        mut writer: impl Write,
+    ) -> std::io::Result<()> {
+        for app in apps {
+            for migration in app.migrations() {
+                writeln!(writer, "{}\t{}", migration.app_name(), migration.name())?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "db")]
+#[async_trait(?Send)]
+impl CliTask for MigrationList {
+    fn subcommand(&self) -> Command {
+        Command::new(MIGRATION_LIST_SUBCOMMAND)
+            .about("List all migrations registered by the project")
+    }
+
+    async fn execute(
+        &mut self,
+        _matches: &ArgMatches,
+        bootstrapper: Bootstrapper<WithConfig>,
+    ) -> Result<()> {
+        let bootstrapper = bootstrapper.with_apps();
+        Self::write_migrations(bootstrapper.context().apps(), std::io::stdout().lock())
+            .map_err(Error::internal)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "db")]
 struct MigrationRollback;
 
 #[cfg(feature = "db")]
@@ -678,6 +720,8 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use clap::Command;
+    #[cfg(feature = "db")]
+    use cot::db::migrations::{Migration, MigrationDependency, Operation, SyncDynMigration};
     use cot::test::serial_guard;
     use tempfile::tempdir;
 
@@ -745,7 +789,7 @@ mod tests {
     }
 
     #[test]
-    fn cli_new_includes_migration_rollback_group() {
+    fn cli_new_includes_migration_commands() {
         let cli = Cli::new();
 
         let migration_group = cli
@@ -754,10 +798,62 @@ mod tests {
             .find(|command| command.get_name() == MIGRATION_GROUP_SUBCOMMAND)
             .expect("migration group is registered");
 
-        assert!(
-            migration_group
-                .get_subcommands()
-                .any(|command| command.get_name() == MIGRATION_ROLLBACK_SUBCOMMAND)
+        let subcommands: Vec<_> = migration_group
+            .get_subcommands()
+            .map(clap::Command::get_name)
+            .collect();
+        assert!(subcommands.contains(&MIGRATION_ROLLBACK_SUBCOMMAND));
+        assert!(subcommands.contains(&"list"));
+    }
+
+    #[test]
+    #[cfg(feature = "db")]
+    fn migration_list_writes_migrations_from_every_registered_app() {
+        struct ProjectMigration;
+        impl Migration for ProjectMigration {
+            const APP_NAME: &'static str = "project";
+            const MIGRATION_NAME: &'static str = "m_0001_initial";
+            const DEPENDENCIES: &'static [MigrationDependency] = &[];
+            const OPERATIONS: &'static [Operation] = &[];
+        }
+
+        struct DependencyMigration;
+        impl Migration for DependencyMigration {
+            const APP_NAME: &'static str = "dependency";
+            const MIGRATION_NAME: &'static str = "m_0002_dependency";
+            const DEPENDENCIES: &'static [MigrationDependency] = &[];
+            const OPERATIONS: &'static [Operation] = &[];
+        }
+
+        struct ProjectApp;
+        impl App for ProjectApp {
+            fn name(&self) -> &'static str {
+                "project"
+            }
+
+            fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+                vec![Box::new(ProjectMigration)]
+            }
+        }
+
+        struct DependencyApp;
+        impl App for DependencyApp {
+            fn name(&self) -> &'static str {
+                "dependency"
+            }
+
+            fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+                vec![Box::new(DependencyMigration)]
+            }
+        }
+
+        let apps: Vec<Box<dyn App>> = vec![Box::new(ProjectApp), Box::new(DependencyApp)];
+        let mut output = Vec::new();
+        MigrationList::write_migrations(&apps, &mut output).unwrap();
+
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "project\tm_0001_initial\ndependency\tm_0002_dependency\n"
         );
     }
 

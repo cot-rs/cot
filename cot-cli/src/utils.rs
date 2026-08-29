@@ -221,6 +221,18 @@ impl PackageManager {
         self.package_root.as_path()
     }
 
+    pub(crate) fn is_runnable_cot_project(&self) -> bool {
+        let depends_on_cot = self.manifest.dependencies.iter().any(|(name, dependency)| {
+            name == "cot"
+                || dependency
+                    .detail()
+                    .and_then(|detail| detail.package.as_deref())
+                    == Some("cot")
+        });
+
+        depends_on_cot && self.package_root.join("src").join("main.rs").is_file()
+    }
+
     pub(crate) fn get_manifest_path(&self) -> PathBuf {
         let path = &self.get_package_path().join("Cargo.toml");
         path.to_owned()

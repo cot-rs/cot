@@ -9,6 +9,7 @@ use crate::args::{
 };
 use crate::migration_generator::{
     MigrationGeneratorOptions, create_new_migration, list_migrations, make_migrations,
+    try_list_project_migrations,
 };
 use crate::new_project::{CotSource, new_project};
 
@@ -37,6 +38,9 @@ pub fn handle_new_project(
 
 pub fn handle_migration_list(MigrationListArgs { path }: MigrationListArgs) -> anyhow::Result<()> {
     let path = path.unwrap_or(PathBuf::from("."));
+    if try_list_project_migrations(&path).with_context(|| "unable to list project migrations")? {
+        return Ok(());
+    }
     let migrations = list_migrations(&path).with_context(|| "unable to list migrations")?;
     for (app_name, migs) in migrations {
         for mig in migs {

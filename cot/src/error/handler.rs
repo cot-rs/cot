@@ -209,6 +209,7 @@ impl Display for RequestOuterError {
 }
 
 impl FromRequestHead for RequestOuterError {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         let error = head.extensions.get::<RequestOuterError>();
         error
@@ -245,6 +246,7 @@ impl Display for RequestError {
 }
 
 impl FromRequestHead for RequestError {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         let error = head.extensions.get::<RequestOuterError>();
         error

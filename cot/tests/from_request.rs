@@ -18,6 +18,7 @@ struct MyTupleStruct(DummyExtractor, DummyExtractor);
 struct DummyExtractor;
 
 impl FromRequestHead for DummyExtractor {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(_head: &RequestHead) -> cot::Result<Self> {
         Ok(Self)
     }

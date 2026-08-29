@@ -174,14 +174,14 @@ Migrations within the same app are always applied in the order their names sort 
 
 You'll see `cot migration make` add these automatically whenever a new foreign key points at a model that isn't being created in the very same migration. That's the most common reason you'd end up depending on another app: a `ForeignKey<Customer>` field pointing at a model whose migration lives elsewhere.
 
-If Cot ever detects a cycle in your migration dependencies, it will refuse to run and tell you so, both when generating new migrations and when booting the project.
+If Cot ever detects a cycle in your migration dependencies, it will refuse to run and tell you so, both when generating new migrations and when running the project.
 
 ## Rolling back migrations
 
-Rolling back migrations runs through your compiled project binary in the target dir, not the `cot` CLI:
+Rolling back migrations runs through your compiled project binary in the target dir, not the `cot` CLI and can be invoked via `cargo run`:
 
 ```bash
-./path/to/binary migration rollback <MIGRATION_NAME> [--app <APP>] [--dry-run]
+cargo run migration rollback <MIGRATION_NAME> [--app <APP>] [--dry-run]
 ```
 
 `<MIGRATION_NAME>` can be given a few different ways:
@@ -197,7 +197,7 @@ Rollbacks aren't limited to a single app either. If another app has a migration 
 Because rolling back can have a wider blast radius than expected once cross-app dependencies are involved, it's worth checking first with the `--dry-run` flag which shows a preview of what migrations will be undone:
 
 ```bash
-./target/debug/binary migration rollback <MIGRATION_NAME> --dry-run
+cargo run migration rollback <MIGRATION_NAME> --dry-run
 ```
 
 This prints the exact rollback plan without touching your database at all, something like:

@@ -185,11 +185,13 @@ macro_rules! impl_sea_query_db_backend {
 }
 
 pub(crate) fn map_sqlx_error(err: sqlx::Error) -> crate::db::DatabaseError {
-    if err
-        .as_database_error()
-        .is_some_and(sqlx::error::DatabaseError::is_unique_violation)
-    {
-        return crate::db::DatabaseError::UniqueViolation;
+    if let Some(database_error) = err.as_database_error() {
+        if database_error.is_unique_violation() {
+            return crate::db::DatabaseError::UniqueViolation;
+        }
+        if database_error.is_foreign_key_violation() {
+            return crate::db::DatabaseError::ForeignKeyViolation;
+        }
     }
 
     crate::db::DatabaseError::from(err)

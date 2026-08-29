@@ -58,6 +58,14 @@ async fn foreign_keys(db: &mut TestDatabase) {
 
     run_migrations!(db, CREATE_ARTIST, CREATE_TRACK);
 
+    let mut track = Track {
+        id: Auto::auto(),
+        artist: ForeignKey::PrimaryKey(Auto::fixed(42)),
+        name: "track".to_owned(),
+    };
+    let error = track.save(&**db).await.unwrap_err();
+    assert!(matches!(error, DatabaseError::ForeignKeyViolation));
+
     let mut artist = Artist {
         id: Auto::auto(),
         name: "artist".to_owned(),

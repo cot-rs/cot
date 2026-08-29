@@ -555,6 +555,9 @@ pub enum DatabaseError {
     /// was not found.
     #[error("{ERROR_PREFIX} error retrieving a Foreign Key from the database: record not found")]
     ForeignKeyNotFound,
+    /// Error when a foreign key constraint is violated in the database.
+    #[error("{ERROR_PREFIX} foreign key constraint violation")]
+    ForeignKeyViolation,
     /// Error when a unique constraint is violated in the database.
     #[error("{ERROR_PREFIX} unique constraint violation")]
     UniqueViolation,

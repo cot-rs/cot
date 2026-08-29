@@ -185,14 +185,24 @@ macro_rules! impl_sea_query_db_backend {
 }
 
 pub(crate) fn map_sqlx_error(err: sqlx::Error) -> crate::db::DatabaseError {
-    if err
-        .as_database_error()
-        .is_some_and(sqlx::error::DatabaseError::is_unique_violation)
-    {
-        return crate::db::DatabaseError::UniqueViolation;
+    if let Some(database_error) = err.as_database_error() {
+        if database_error.is_unique_violation() {
+            return crate::db::DatabaseError::UniqueViolation;
+        }
+        if is_foreign_key_violation(database_error) {
+            return crate::db::DatabaseError::ForeignKeyViolation;
+        }
     }
 
     crate::db::DatabaseError::from(err)
+}
+
+fn is_foreign_key_violation(error: &dyn sqlx::error::DatabaseError) -> bool {
+    error.is_foreign_key_violation()
+        // SQLite reports ON DELETE RESTRICT as SQLITE_CONSTRAINT_TRIGGER instead of
+        // SQLITE_CONSTRAINT_FOREIGNKEY.
+        || (error.code().as_deref() == Some("1811")
+            && error.message() == "FOREIGN KEY constraint failed")
 }
 
 pub(crate) use impl_sea_query_db_backend;

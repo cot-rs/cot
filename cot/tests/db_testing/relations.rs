@@ -87,8 +87,7 @@ async fn foreign_keys(db: &mut TestDatabase) {
         .delete(&**db)
         .await
         .unwrap_err();
-    // expected foreign key violation
-    assert!(matches!(error, DatabaseError::DatabaseEngineError(_)));
+    assert!(matches!(error, DatabaseError::ForeignKeyViolation));
 
     query!(Track, $artist == &artist)
         .delete(&**db)

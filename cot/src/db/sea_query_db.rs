@@ -189,12 +189,20 @@ pub(crate) fn map_sqlx_error(err: sqlx::Error) -> crate::db::DatabaseError {
         if database_error.is_unique_violation() {
             return crate::db::DatabaseError::UniqueViolation;
         }
-        if database_error.is_foreign_key_violation() {
+        if is_foreign_key_violation(database_error) {
             return crate::db::DatabaseError::ForeignKeyViolation;
         }
     }
 
     crate::db::DatabaseError::from(err)
+}
+
+fn is_foreign_key_violation(error: &dyn sqlx::error::DatabaseError) -> bool {
+    error.is_foreign_key_violation()
+        // SQLite reports ON DELETE RESTRICT as SQLITE_CONSTRAINT_TRIGGER instead of
+        // SQLITE_CONSTRAINT_FOREIGNKEY.
+        || (error.code().as_deref() == Some("1811")
+            && error.message() == "FOREIGN KEY constraint failed")
 }
 
 pub(crate) use impl_sea_query_db_backend;

@@ -559,6 +559,39 @@ mod tests {
             miri,
             ignore = "unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`"
         )]
+        fn runnable_cot_project_with_renamed_dependency() {
+            let (temp_dir, _) = get_package();
+            std::fs::write(
+                temp_dir.path().join("Cargo.toml"),
+                r#"
+                    [package]
+                    name = "renamed-cot-dependency"
+                    version = "0.1.0"
+                    edition = "2024"
+
+                    [dependencies]
+                    web-framework = { package = "cot", version = "0.7" }
+                "#,
+            )
+            .unwrap();
+
+            let CargoTomlManager::Package(manager) = CargoTomlManager::from_path(temp_dir.path())
+                .unwrap()
+                .unwrap()
+            else {
+                panic!("expected a package");
+            };
+            assert!(manager.is_runnable_cot_project());
+
+            std::fs::remove_file(temp_dir.path().join("src").join("main.rs")).unwrap();
+            assert!(!manager.is_runnable_cot_project());
+        }
+
+        #[test]
+        #[cfg_attr(
+            miri,
+            ignore = "unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`"
+        )]
         fn get_package_path() {
             let (temp_dir, manager) = get_package();
 

@@ -16,5 +16,11 @@ help: the trait `AdminModel` is implemented for `DatabaseUser`
   | #[derive(Debug, Clone, Form, AdminModel)]
   |                              ^^^^^^^^^^
   = note: required for `DefaultAdminModelManager<Model>` to implement `AdminModelManager`
+note: required because it appears within the type `DefaultAdminModelManager<Model>`
+ --> src/admin.rs
+  |
+  | pub struct DefaultAdminModelManager<T> {
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `Box<DefaultAdminModelManager<Model>>` to implement `CoerceUnsized<Box<dyn AdminModelManager>>`
   = note: required for the cast from `Box<DefaultAdminModelManager<Model>>` to `Box<dyn AdminModelManager>`
   = note: this error originates in the derive macro `AdminModel` (in Nightly builds, run with -Z macro-backtrace for more info)

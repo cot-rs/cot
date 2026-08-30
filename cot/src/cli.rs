@@ -858,6 +858,41 @@ mod tests {
     }
 
     #[cot::test]
+    #[cfg(feature = "db")]
+    async fn migration_list_execute_initializes_registered_apps() {
+        struct TestMigration;
+        impl Migration for TestMigration {
+            const APP_NAME: &'static str = "test";
+            const MIGRATION_NAME: &'static str = "m_0001_initial";
+            const DEPENDENCIES: &'static [MigrationDependency] = &[];
+            const OPERATIONS: &'static [Operation] = &[];
+        }
+
+        struct TestApp;
+        impl App for TestApp {
+            fn name(&self) -> &'static str {
+                "test"
+            }
+
+            fn migrations(&self) -> Vec<Box<SyncDynMigration>> {
+                vec![Box::new(TestMigration)]
+            }
+        }
+
+        struct TestProject;
+        impl cot::Project for TestProject {
+            fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+                apps.register(TestApp);
+            }
+        }
+
+        let matches = MigrationList.subcommand().get_matches_from(["list"]);
+        let bootstrapper = Bootstrapper::new(TestProject).with_config(ProjectConfig::default());
+
+        assert!(MigrationList.execute(&matches, bootstrapper).await.is_ok());
+    }
+
+    #[cot::test]
     async fn cli_task_group_dispatches_nested_task() {
         struct NestedTask;
         #[async_trait(?Send)]

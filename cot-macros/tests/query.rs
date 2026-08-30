@@ -414,6 +414,31 @@ fn test_query_string_method_string_concat_field_refs() {
 }
 
 #[test]
+fn test_query_string_concat_fields_and_literals() {
+    assert_eq!(
+        Query::<MyModel>::new().filter(Expr::eq(
+            Expr::concat(
+                <MyModel as cot::db::Model>::Fields::name.as_expr(),
+                <MyModel as cot::db::Model>::Fields::title.as_expr()
+            ),
+            Expr::value("firstlast")
+        )),
+        query!(MyModel, $name.concat($title) == "firstlast")
+    );
+
+    assert_eq!(
+        Query::<MyModel>::new().filter(Expr::eq(
+            Expr::concat(
+                <MyModel as cot::db::Model>::Fields::name.as_expr(),
+                Expr::value("-")
+            ),
+            Expr::value("first-")
+        )),
+        query!(MyModel, $name.concat("-") == "first-")
+    );
+}
+
+#[test]
 fn test_query_string_method_non_field_receiver_call() {
     let allowed_names = &["foo", "bar"];
     assert_eq!(

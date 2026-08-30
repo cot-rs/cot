@@ -1,4 +1,4 @@
-use cot_codegen::expr::Expr;
+use cot_codegen::expr::{Expr, ExprArgument};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::Token;
@@ -60,6 +60,10 @@ const FIELD_REF_METHODS: &[FieldRefMethod] = &[
     },
     FieldRefMethod {
         name: "iraw_like",
+        arity: 1,
+    },
+    FieldRefMethod {
+        name: "concat",
         arity: 1,
     },
 ];
@@ -201,7 +205,7 @@ fn handle_binary_comparison(
 fn handle_field_ref_method(
     model_name: &syn::Type,
     receiver: Expr,
-    args: &[syn::Expr],
+    args: &[ExprArgument],
     method: FieldRefMethod,
 ) -> TokenStream {
     let crate_name = cot_ident();
@@ -220,6 +224,10 @@ fn handle_field_ref_method(
             ),
         )
         .to_compile_error();
+    }
+
+    if method.name == "concat" {
+        return handle_concat(model_name, receiver, &args[0]);
     }
 
     if let Expr::FieldRef { ref field_name, .. } = receiver {
@@ -244,6 +252,44 @@ fn handle_field_ref_method(
     }
 }
 
+fn handle_concat(model_name: &syn::Type, receiver: Expr, argument: &ExprArgument) -> TokenStream {
+    let crate_name = cot_ident();
+
+    if let Expr::FieldRef { field_name, .. } = receiver {
+        return match argument {
+            ExprArgument::FieldRef {
+                field_name: argument_field,
+                ..
+            } => quote! {
+                #crate_name::db::query::expr::Expr::concat(
+                    <#model_name as #crate_name::db::Model>::Fields::#field_name.as_expr(),
+                    <#model_name as #crate_name::db::Model>::Fields::#argument_field.as_expr(),
+                )
+            },
+            ExprArgument::Value(value) => quote! {
+                #crate_name::db::query::expr::ExprConcat::concat(
+                    <#model_name as #crate_name::db::Model>::Fields::#field_name,
+                    #value,
+                )
+            },
+        };
+    }
+
+    let receiver_tokens = expr_to_tokens(model_name, receiver);
+    let argument_tokens = match argument {
+        ExprArgument::FieldRef { field_name, .. } => quote! {
+            <#model_name as #crate_name::db::Model>::Fields::#field_name.as_expr()
+        },
+        ExprArgument::Value(value) => {
+            quote!(#crate_name::db::query::expr::Expr::value(#value))
+        }
+    };
+
+    quote! {
+        #crate_name::db::query::expr::Expr::concat(#receiver_tokens, #argument_tokens)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,7 +297,7 @@ mod tests {
     #[test]
     fn test_field_ref_method_all_names() {
         let all_names = FieldRefMethod::all_names().collect::<Vec<_>>();
-        assert_eq!(all_names.len(), 8);
+        assert_eq!(all_names.len(), 9);
         assert_eq!(
             all_names,
             [
@@ -263,6 +309,7 @@ mod tests {
                 "iends_with",
                 "raw_like",
                 "iraw_like",
+                "concat",
             ]
         );
     }
@@ -323,6 +370,13 @@ mod tests {
                 "iraw_like",
                 Some(FieldRefMethod {
                     name: "iraw_like",
+                    arity: 1,
+                }),
+            ),
+            (
+                "concat",
+                Some(FieldRefMethod {
+                    name: "concat",
                     arity: 1,
                 }),
             ),

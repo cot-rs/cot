@@ -1377,22 +1377,28 @@ impl Bootstrapper<WithCache> {
     /// # }
     /// ```
     pub fn boot(self) -> impl Future<Output = cot::Result<Bootstrapper<Initialized>>> {
-        let router_service = RouterService::new(Arc::clone(&self.context.router));
-        let handler_builder = RootHandlerBuilder {
-            handler: router_service,
-            error_handler: self.project.error_handler(),
-        };
-        let handler = self.project.middlewares(handler_builder, &self.context);
+        let mut bootstrapper = Some(self);
+        poll_fn(move |_| {
+            let Some(this) = bootstrapper.take() else {
+                return core::task::Poll::Pending;
+            };
+            let router_service = RouterService::new(Arc::clone(&this.context.router));
+            let handler_builder = RootHandlerBuilder {
+                handler: router_service,
+                error_handler: this.project.error_handler(),
+            };
+            let handler = this.project.middlewares(handler_builder, &this.context);
 
-        let auth_backend = self.project.auth_backend(&self.context);
-        let context = self.context.with_auth(auth_backend);
+            let auth_backend = this.project.auth_backend(&this.context);
+            let context = this.context.with_auth(auth_backend);
 
-        core::future::ready(Ok(Bootstrapper {
-            project: self.project,
-            context,
-            handler: handler.handler,
-            error_handler: handler.error_handler,
-        }))
+            core::task::Poll::Ready(Ok(Bootstrapper {
+                project: this.project,
+                context,
+                handler: handler.handler,
+                error_handler: handler.error_handler,
+            }))
+        })
     }
 }
 impl Bootstrapper<Initialized> {
@@ -2591,6 +2597,44 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[cot::test]
+    async fn bootstrapper_with_cache_boot_is_lazy() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct LazyProject {
+            middleware_calls: Arc<AtomicUsize>,
+        }
+
+        impl Project for LazyProject {
+            fn middlewares(
+                &self,
+                handler: RootHandlerBuilder,
+                _context: &MiddlewareContext,
+            ) -> RootHandler {
+                self.middleware_calls.fetch_add(1, Ordering::SeqCst);
+                handler.build()
+            }
+        }
+
+        let middleware_calls = Arc::new(AtomicUsize::new(0));
+        let bootstrapper = Bootstrapper::new(LazyProject {
+            middleware_calls: Arc::clone(&middleware_calls),
+        })
+        .with_config(ProjectConfig::default())
+        .with_apps()
+        .with_database()
+        .await
+        .unwrap()
+        .with_cache()
+        .await
+        .unwrap();
+
+        let future = bootstrapper.boot();
+        assert_eq!(middleware_calls.load(Ordering::SeqCst), 0);
+        drop(future);
+        assert_eq!(middleware_calls.load(Ordering::SeqCst), 0);
     }
 
     #[cot::test]

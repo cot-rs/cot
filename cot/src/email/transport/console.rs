@@ -87,14 +87,17 @@ impl Default for Console {
 
 impl Transport for Console {
     fn send(&self, messages: &[EmailMessage]) -> impl Future<Output = TransportResult<()>> + Send {
-        core::future::ready((|| {
-            let mut out = io::stdout().lock();
-            for msg in messages {
-                writeln!(out, "{msg}").map_err(ConsoleError::Io)?;
-                writeln!(out, "{}", "─".repeat(60)).map_err(ConsoleError::Io)?;
-            }
-            Ok(())
-        })())
+        core::future::poll_fn(move |_| {
+            let result = (|| {
+                let mut out = io::stdout().lock();
+                for msg in messages {
+                    writeln!(out, "{msg}").map_err(ConsoleError::Io)?;
+                    writeln!(out, "{}", "─".repeat(60)).map_err(ConsoleError::Io)?;
+                }
+                Ok(())
+            })();
+            core::task::Poll::Ready(result)
+        })
     }
 }
 

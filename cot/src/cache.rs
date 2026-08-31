@@ -772,28 +772,30 @@ impl Cache {
     /// # }
     /// ```
     pub fn from_config(config: &CacheConfig) -> impl Future<Output = CacheResult<Self>> + Send {
-        core::future::ready((|| {
-            let store_cfg = &config.store;
+        core::future::poll_fn(move |_| {
+            core::task::Poll::Ready((|| {
+                let store_cfg = &config.store;
 
-            let this = {
-                match store_cfg.store_type {
-                    CacheStoreTypeConfig::Memory => {
-                        let mem_store = Memory::new();
-                        Self::new(mem_store, config.prefix.clone(), config.timeout)
+                let this = {
+                    match store_cfg.store_type {
+                        CacheStoreTypeConfig::Memory => {
+                            let mem_store = Memory::new();
+                            Self::new(mem_store, config.prefix.clone(), config.timeout)
+                        }
+                        #[cfg(feature = "redis")]
+                        CacheStoreTypeConfig::Redis { ref url, pool_size } => {
+                            let redis_store = Redis::new(url, pool_size)?;
+                            Self::new(redis_store, config.prefix.clone(), config.timeout)
+                        }
+                        _ => {
+                            unimplemented!();
+                        }
                     }
-                    #[cfg(feature = "redis")]
-                    CacheStoreTypeConfig::Redis { ref url, pool_size } => {
-                        let redis_store = Redis::new(url, pool_size)?;
-                        Self::new(redis_store, config.prefix.clone(), config.timeout)
-                    }
-                    _ => {
-                        unimplemented!();
-                    }
-                }
-            };
+                };
 
-            Ok(this)
-        })())
+                Ok(this)
+            })())
+        })
     }
 }
 
@@ -960,6 +962,25 @@ mod tests {
 
         cache.insert("existing", "value").await.unwrap();
         assert!(cache.contains_key("existing").await.unwrap());
+    }
+
+    #[test]
+    fn test_cache_from_config_is_lazy() {
+        use crate::config::CacheStoreConfig;
+
+        let config = CacheConfig::builder()
+            .store(
+                CacheStoreConfig::builder()
+                    .store_type(CacheStoreTypeConfig::File {
+                        path: std::path::PathBuf::from("unused"),
+                    })
+                    .build(),
+            )
+            .build();
+
+        let future = Cache::from_config(&config);
+
+        drop(future);
     }
 
     #[cfg(feature = "redis")]

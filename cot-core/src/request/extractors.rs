@@ -71,9 +71,11 @@ pub trait FromRequest: Sized {
 }
 
 impl FromRequest for Request {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request(head: &RequestHead, body: Body) -> crate::Result<Self> {
-        Ok(Request::from_parts(head.clone(), body))
+    fn from_request(
+        head: &RequestHead,
+        body: Body,
+    ) -> impl Future<Output = crate::Result<Self>> + Send {
+        core::future::ready(Ok(Request::from_parts(head.clone(), body)))
     }
 }
 
@@ -133,14 +135,17 @@ pub trait FromRequestHead: Sized {
 pub struct Path<D>(pub D);
 
 impl<D: DeserializeOwned> FromRequestHead for Path<D> {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        let params = head
-            .extensions
-            .get::<PathParams>()
-            .expect("PathParams extension missing")
-            .parse()?;
-        Ok(Self(params))
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = crate::Result<Self>> + Send {
+        core::future::poll_fn(move |_| {
+            core::task::Poll::Ready((|| {
+                let params = head
+                    .extensions
+                    .get::<PathParams>()
+                    .expect("PathParams extension missing")
+                    .parse()?;
+                Ok(Self(params))
+            })())
+        })
     }
 }
 
@@ -191,17 +196,20 @@ impl<D: DeserializeOwned> FromRequestHead for UrlQuery<D>
 where
     D: DeserializeOwned,
 {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        let query = head.uri.query().unwrap_or_default();
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = crate::Result<Self>> + Send {
+        core::future::poll_fn(move |_| {
+            core::task::Poll::Ready((|| {
+                let query = head.uri.query().unwrap_or_default();
 
-        let deserializer =
-            serde_html_form::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
+                let deserializer =
+                    serde_html_form::Deserializer::new(form_urlencoded::parse(query.as_bytes()));
 
-        let value =
-            serde_path_to_error::deserialize(deserializer).map_err(QueryParametersParseError)?;
+                let value = serde_path_to_error::deserialize(deserializer)
+                    .map_err(QueryParametersParseError)?;
 
-        Ok(UrlQuery(value))
+                Ok(UrlQuery(value))
+            })())
+        })
     }
 }
 
@@ -294,16 +302,14 @@ impl_into_cot_error!(JsonDeserializeError, BAD_REQUEST);
 
 // extractor impls for existing types
 impl FromRequestHead for RequestHead {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        Ok(head.clone())
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = crate::Result<Self>> + Send {
+        core::future::ready(Ok(head.clone()))
     }
 }
 
 impl FromRequestHead for Method {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        Ok(head.method.clone())
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = crate::Result<Self>> + Send {
+        core::future::ready(Ok(head.method.clone()))
     }
 }
 

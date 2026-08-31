@@ -79,9 +79,8 @@ use crate::router::Urls;
 use crate::session::Session;
 
 impl FromRequestHead for Urls {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        Ok(Self::from_parts(head))
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = cot::Result<Self>> + Send {
+        core::future::ready(Ok(Self::from_parts(head)))
     }
 }
 
@@ -142,25 +141,22 @@ impl<F: Form> FromRequest for RequestForm<F> {
 
 #[cfg(feature = "db")]
 impl FromRequestHead for crate::db::Database {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        Ok(head.context().database().clone())
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = cot::Result<Self>> + Send {
+        core::future::ready(Ok(head.context().database().clone()))
     }
 }
 
 #[cfg(feature = "cache")]
 impl FromRequestHead for crate::cache::Cache {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        Ok(head.context().cache().clone())
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = cot::Result<Self>> + Send {
+        core::future::ready(Ok(head.context().cache().clone()))
     }
 }
 
 #[cfg(feature = "email")]
 impl FromRequestHead for crate::email::Email {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        Ok(head.context().email().clone())
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = cot::Result<Self>> + Send {
+        core::future::ready(Ok(head.context().email().clone()))
     }
 }
 
@@ -263,35 +259,32 @@ pub enum StaticFilesGetError {
 impl_into_cot_error!(StaticFilesGetError);
 
 impl FromRequestHead for StaticFiles {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        Ok(StaticFiles {
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = cot::Result<Self>> + Send {
+        core::future::ready(Ok(StaticFiles {
             inner: head
                 .extensions
                 .get::<Arc<crate::static_files::StaticFiles>>()
                 .cloned()
                 .expect("StaticFilesMiddleware not enabled for the route/project"),
-        })
+        }))
     }
 }
 
 impl FromRequestHead for Session {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        Ok(Session::from_extensions(&head.extensions).clone())
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = cot::Result<Self>> + Send {
+        core::future::ready(Ok(Session::from_extensions(&head.extensions).clone()))
     }
 }
 
 impl FromRequestHead for Auth {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = cot::Result<Self>> + Send {
         let auth = head
             .extensions
             .get::<Auth>()
             .expect("AuthMiddleware not enabled for the route/project")
             .clone();
 
-        Ok(auth)
+        core::future::ready(Ok(auth))
     }
 }
 

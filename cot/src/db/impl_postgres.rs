@@ -11,9 +11,9 @@ impl_sea_query_db_backend!(DatabasePostgres: sqlx::postgres::Postgres, sqlx::pos
 impl_sea_query_transaction_backend!(DatabasePostgres, TransactionPostgres: sqlx::postgres::Postgres, PostgresRow, sea_query::PostgresQueryBuilder);
 
 impl DatabasePostgres {
-    #[expect(clippy::unused_async_trait_impl, clippy::unused_async)]
-    async fn init(&self) -> crate::db::Result<()> {
-        Ok(())
+    #[expect(clippy::unused_self, reason = "for a unified database interface")]
+    fn init(&self) -> impl Future<Output = crate::db::Result<()>> + Send {
+        core::future::ready(Ok(()))
     }
 
     fn prepare_values(values: &mut sea_query_sqlx::SqlxValues) {

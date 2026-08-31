@@ -12,9 +12,9 @@ impl_sea_query_db_backend!(DatabaseMySql: sqlx::mysql::MySql, sqlx::mysql::MySql
 impl_sea_query_transaction_backend!(DatabaseMySql, TransactionMySql: sqlx::mysql::MySql, MySqlRow, sea_query::MysqlQueryBuilder);
 
 impl DatabaseMySql {
-    #[expect(clippy::unused_async_trait_impl, clippy::unused_async)]
-    async fn init(&self) -> crate::db::Result<()> {
-        Ok(())
+    #[expect(clippy::unused_self, reason = "for a unified database interface")]
+    fn init(&self) -> impl Future<Output = crate::db::Result<()>> + Send {
+        core::future::ready(Ok(()))
     }
 
     fn prepare_values(_values: &mut sea_query_sqlx::SqlxValues) {

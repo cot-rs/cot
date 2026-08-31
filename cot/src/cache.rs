@@ -771,28 +771,29 @@ impl Cache {
     /// # Ok(())
     /// # }
     /// ```
-    #[expect(clippy::unused_async_trait_impl, clippy::unused_async)]
-    pub async fn from_config(config: &CacheConfig) -> CacheResult<Self> {
-        let store_cfg = &config.store;
+    pub fn from_config(config: &CacheConfig) -> impl Future<Output = CacheResult<Self>> + Send {
+        core::future::ready((|| {
+            let store_cfg = &config.store;
 
-        let this = {
-            match store_cfg.store_type {
-                CacheStoreTypeConfig::Memory => {
-                    let mem_store = Memory::new();
-                    Self::new(mem_store, config.prefix.clone(), config.timeout)
+            let this = {
+                match store_cfg.store_type {
+                    CacheStoreTypeConfig::Memory => {
+                        let mem_store = Memory::new();
+                        Self::new(mem_store, config.prefix.clone(), config.timeout)
+                    }
+                    #[cfg(feature = "redis")]
+                    CacheStoreTypeConfig::Redis { ref url, pool_size } => {
+                        let redis_store = Redis::new(url, pool_size)?;
+                        Self::new(redis_store, config.prefix.clone(), config.timeout)
+                    }
+                    _ => {
+                        unimplemented!();
+                    }
                 }
-                #[cfg(feature = "redis")]
-                CacheStoreTypeConfig::Redis { ref url, pool_size } => {
-                    let redis_store = Redis::new(url, pool_size)?;
-                    Self::new(redis_store, config.prefix.clone(), config.timeout)
-                }
-                _ => {
-                    unimplemented!();
-                }
-            }
-        };
+            };
 
-        Ok(this)
+            Ok(this)
+        })())
     }
 }
 

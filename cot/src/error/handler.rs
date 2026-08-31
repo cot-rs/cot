@@ -209,13 +209,15 @@ impl Display for RequestOuterError {
 }
 
 impl FromRequestHead for RequestOuterError {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        let error = head.extensions.get::<RequestOuterError>();
-        error
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = crate::Result<Self>> + Send {
+        let error = head
+            .extensions
+            .get::<RequestOuterError>()
             .ok_or_else(|| {
                 Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")
-            }).cloned()
+            })
+            .cloned();
+        core::future::ready(error)
     }
 }
 
@@ -246,17 +248,18 @@ impl Display for RequestError {
 }
 
 impl FromRequestHead for RequestError {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
-        let error = head.extensions.get::<RequestOuterError>();
-        error
+    fn from_request_head(head: &RequestHead) -> impl Future<Output = crate::Result<Self>> + Send {
+        let error = head
+            .extensions
+            .get::<RequestOuterError>()
             .ok_or_else(|| {
                 Error::internal(
                     "No error found in request head. \
                 Make sure you use this extractor in an error handler.",
                 )
             })
-            .map(|request_error| Self(request_error.0.clone()))
+            .map(|request_error| Self(request_error.0.clone()));
+        core::future::ready(error)
     }
 }
 

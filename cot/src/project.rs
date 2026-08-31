@@ -1307,7 +1307,6 @@ impl Bootstrapper<WithDatabase> {
     /// # }
     /// ```
     #[allow(
-        clippy::unused_async_trait_impl,
         clippy::unused_async,
         clippy::allow_attributes,
         reason = "see https://github.com/cot-rs/cot/pull/399#discussion_r2430379966"
@@ -1371,12 +1370,7 @@ impl Bootstrapper<WithCache> {
     /// # Ok(())
     /// # }
     /// ```
-    #[expect(
-        clippy::unused_async,
-        reason = "for consistency with other Bootstrapper::boot methods"
-    )]
-    #[expect(clippy::unused_async_trait_impl)]
-    pub async fn boot(self) -> cot::Result<Bootstrapper<Initialized>> {
+    pub fn boot(self) -> impl Future<Output = cot::Result<Bootstrapper<Initialized>>> {
         let router_service = RouterService::new(Arc::clone(&self.context.router));
         let handler_builder = RootHandlerBuilder {
             handler: router_service,
@@ -1387,12 +1381,12 @@ impl Bootstrapper<WithCache> {
         let auth_backend = self.project.auth_backend(&self.context);
         let context = self.context.with_auth(auth_backend);
 
-        Ok(Bootstrapper {
+        core::future::ready(Ok(Bootstrapper {
             project: self.project,
             context,
             handler: handler.handler,
             error_handler: handler.error_handler,
-        })
+        }))
     }
 }
 impl Bootstrapper<Initialized> {

@@ -1067,9 +1067,8 @@ mod tests {
     struct MockHandler;
 
     impl RequestHandler for MockHandler {
-        #[expect(clippy::unused_async_trait_impl)]
-        async fn handle(&self, _request: Request) -> Result<Response> {
-            Html::new("OK").into_response()
+        fn handle(&self, _request: Request) -> impl Future<Output = Result<Response>> + Send {
+            core::future::ready(Html::new("OK").into_response())
         }
     }
 

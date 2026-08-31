@@ -1306,26 +1306,32 @@ impl Bootstrapper<WithDatabase> {
     /// # Ok(())
     /// # }
     /// ```
-    #[allow(
-        clippy::unused_async,
-        clippy::allow_attributes,
-        reason = "see https://github.com/cot-rs/cot/pull/399#discussion_r2430379966"
-    )]
-    pub async fn with_cache(self) -> cot::Result<Bootstrapper<WithCache>> {
+    pub fn with_cache(self) -> impl Future<Output = cot::Result<Bootstrapper<WithCache>>> {
         #[cfg(feature = "cache")]
-        let cache = Self::init_cache(&self.context.config.cache).await?;
+        {
+            async move {
+                let cache = Self::init_cache(&self.context.config.cache).await?;
+                let context = self.context.with_cache(cache);
 
-        let context = self.context.with_cache(
-            #[cfg(feature = "cache")]
-            cache,
-        );
+                Ok(Bootstrapper {
+                    project: self.project,
+                    context,
+                    handler: self.handler,
+                    error_handler: self.error_handler,
+                })
+            }
+        }
 
-        Ok(Bootstrapper {
-            project: self.project,
-            context,
-            handler: self.handler,
-            error_handler: self.error_handler,
-        })
+        #[cfg(not(feature = "cache"))]
+        {
+            let context = self.context.with_cache();
+            core::future::ready(Ok(Bootstrapper {
+                project: self.project,
+                context,
+                handler: self.handler,
+                error_handler: self.error_handler,
+            }))
+        }
     }
 
     #[cfg(feature = "cache")]

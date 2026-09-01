@@ -110,10 +110,7 @@ impl Router {
     /// Panics when a url string could not be parsed into a [`Route`]
     #[must_use]
     pub fn with_urls<T: Into<Vec<Route>>>(urls: T) -> Self {
-        match Self::try_with_urls(urls) {
-            Ok(router) => router,
-            Err(err) => panic!("{err}"),
-        }
+        Self::try_with_urls(urls).unwrap_or_else(|err| panic!("{err}"))
     }
 
     /// Create a router with the given routes. This is a fallible version

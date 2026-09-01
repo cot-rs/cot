@@ -11,7 +11,7 @@ use cot::router::tree::MatchitPattern;
 use cot_core::error::impl_into_cot_error;
 use thiserror::Error;
 
-const PATH_MATCHER_ERROR_PREFIX: &str = "route conflict error:";
+const PATH_MATCHER_ERROR_PREFIX: &str = "invalid route pattern:";
 /// An error produced when parsing a route path pattern fails.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -491,7 +491,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: consecutive parameters are not allowed in pattern `/users/{id}{post_id}`"
+        expected = "invalid route pattern: consecutive parameters are not allowed in pattern `/users/{id}{post_id}`"
     )]
     fn path_parser_consecutive_params() {
         let _ = PathMatcher::new("/users/{id}{post_id}");
@@ -499,7 +499,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: invalid parameter name `` in pattern `/users/{}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
+        expected = "invalid route pattern: invalid parameter name `` in pattern `/users/{}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
     )]
     fn path_parser_invalid_name_empty() {
         let _ = PathMatcher::new("/users/{}");
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: invalid parameter name `123` in pattern `/users/{123}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
+        expected = "invalid route pattern: invalid parameter name `123` in pattern `/users/{123}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
     )]
     fn path_parser_invalid_name_numeric() {
         let _ = PathMatcher::new("/users/{123}");
@@ -515,7 +515,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: invalid parameter name `abc#$%` in pattern `/users/{abc#$%}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
+        expected = "invalid route pattern: invalid parameter name `abc#$%` in pattern `/users/{abc#$%}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
     )]
     fn path_parser_invalid_name_non_alphanumeric() {
         let _ = PathMatcher::new("/users/{abc#$%}");
@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: unclosed parameter `{foo` in pattern `/users/{foo`; expected a closing `}`"
+        expected = "invalid route pattern: unclosed parameter `{foo` in pattern `/users/{foo`; expected a closing `}`"
     )]
     fn path_parser_unclosed() {
         let _ = PathMatcher::new("/users/{foo");
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: closing brace `}` without a matching opening `{` in pattern `/users/foo}`"
+        expected = "invalid route pattern: closing brace `}` without a matching opening `{` in pattern `/users/foo}`"
     )]
     fn path_parser_missing_opening_brace() {
         let _ = PathMatcher::new("/users/foo}");
@@ -539,7 +539,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: unclosed parameter `{foo` in pattern `/users/{foo/bar`; expected a closing `}`"
+        expected = "invalid route pattern: unclosed parameter `{foo` in pattern `/users/{foo/bar`; expected a closing `}`"
     )]
     fn path_parser_unclosed_slash() {
         let _ = PathMatcher::new("/users/{foo/bar");
@@ -547,7 +547,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: unclosed parameter `{foo` in pattern `/users/{foo{bar`; expected a closing `}`"
+        expected = "invalid route pattern: unclosed parameter `{foo` in pattern `/users/{foo{bar`; expected a closing `}`"
     )]
     fn path_parser_unclosed_double() {
         let _ = PathMatcher::new("/users/{foo{bar");
@@ -555,7 +555,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: closing brace `}` without a matching opening `{` in pattern `/users/{{{foo}}/bar`"
+        expected = "invalid route pattern: closing brace `}` without a matching opening `{` in pattern `/users/{{{foo}}/bar`"
     )]
     fn path_parser_escaping_unclosed() {
         let _ = PathMatcher::new("/users/{{{foo}}/bar");
@@ -638,7 +638,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: wildcard parameter `{*rest}` must be the last segment of pattern `/users/{*rest}/edit`; a wildcard consumes the rest of the path, so nothing can follow it"
+        expected = "invalid route pattern: wildcard parameter `{*rest}` must be the last segment of pattern `/users/{*rest}/edit`; a wildcard consumes the rest of the path, so nothing can follow it"
     )]
     fn path_parser_no_path_allowed_after_wildcard() {
         let _ = PathMatcher::new("/users/{*rest}/edit");
@@ -646,7 +646,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: wildcard parameter `{*rest}` must be the last segment of pattern `/users/{*rest}/`; a wildcard consumes the rest of the path, so nothing can follow it"
+        expected = "invalid route pattern: wildcard parameter `{*rest}` must be the last segment of pattern `/users/{*rest}/`; a wildcard consumes the rest of the path, so nothing can follow it"
     )]
     fn path_parser_trail_slash_not_allowed_after_wildcard() {
         let _ = PathMatcher::new("/users/{*rest}/");
@@ -654,7 +654,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "route conflict error: invalid wildcard name `` in pattern `/users/{*}`; wildcard names must start with a letter or underscore and contain only letters, digits, or underscores"
+        expected = "invalid route pattern: invalid wildcard name `` in pattern `/users/{*}`; wildcard names must start with a letter or underscore and contain only letters, digits, or underscores"
     )]
     fn path_parser_invalid_wildcard_name_empty() {
         let _ = PathMatcher::new("/users/{*}");

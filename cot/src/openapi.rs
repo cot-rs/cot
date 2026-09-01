@@ -86,7 +86,7 @@
 //!     }
 //!
 //!     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
-//!         apps.register_with_views(SwaggerUi::new(), "/swagger");
+//!         apps.register_with_views(SwaggerUi::new(), "/swagger/");
 //!         apps.register_with_views(AddApp, "");
 //!     }
 //! }
@@ -95,7 +95,7 @@
 //! # async fn main() -> cot::Result<()> {
 //! #     let mut client = cot::test::Client::new(ApiProject).await;
 //! #
-//! #     let response = client.get("/swagger").await?;
+//! #     let response = client.get("/swagger/").await?;
 //! #     assert_eq!(response.status(), StatusCode::OK);
 //! #
 //! #     Ok(())

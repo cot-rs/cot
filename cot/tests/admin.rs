@@ -53,7 +53,7 @@ impl Project for AdminProject {
 
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register(DatabaseUserApp::new());
-        apps.register_with_views(AdminApp::new(), "/admin");
+        apps.register_with_views(AdminApp::new(), "/admin/");
         apps.register(HelloApp);
     }
 
@@ -146,7 +146,7 @@ async fn login_with(
     username: &str,
     password: &str,
 ) -> Result<(), Box<dyn Error>> {
-    driver.goto(&format!("{}/admin", server.url())).await?;
+    driver.goto(&format!("{}/admin/", server.url())).await?;
 
     let username_form = driver.find(Locator::Id("username")).await?;
     username_form.send_keys(username).await?;

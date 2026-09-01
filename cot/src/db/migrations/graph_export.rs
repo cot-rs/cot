@@ -62,7 +62,7 @@ impl<'a, T: DynMigration> GraphExporter<'a, T> {
     }
     pub(crate) fn export(&self, format: GraphFormat) -> super::Result<String> {
         let graph = MigrationSorter::generate_graph(self.migrations).map_err(|e| {
-            MigrationEngineError::Custom(format!("Failed to generate migration graph: {e}"))
+            MigrationEngineError::Custom(format!("failed to generate migration graph: {e}"))
         })?;
 
         let nodes = self
@@ -84,7 +84,11 @@ impl<'a, T: DynMigration> GraphExporter<'a, T> {
 }
 
 fn wrap_label(label: &str) -> Vec<String> {
-    #[allow(clippy::allow_attributes, clippy::wildcard_imports)]
+    #[allow(
+        clippy::allow_attributes,
+        clippy::wildcard_imports,
+        reason = "clippy skips wild-card in test mode. https://github.com/rust-lang/rust-clippy/issues/13186"
+    )]
     use style::*;
 
     if label.len() <= LABEL_WRAP_WIDTH {

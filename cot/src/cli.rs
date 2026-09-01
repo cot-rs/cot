@@ -22,6 +22,8 @@ const COLLECT_STATIC_DIR_PARAM: &str = "dir";
 const MIGRATION_GROUP_SUBCOMMAND: &str = "migration";
 const MIGRATION_ROLLBACK_SUBCOMMAND: &str = "rollback";
 const MIGRATION_GRAPH_SUBCOMMAND: &str = "graph";
+const MIGRATION_GRAPH_MERMAID_OPTION: &str = "mermaid";
+const MIGRATION_GRAPH_DOT_OPTION: &str = "dot";
 
 /// A central point for configuring the default Command Line Interface (CLI) for
 /// Cot-powered projects.
@@ -670,9 +672,14 @@ impl CliTask for MigrationGraph {
                 Arg::new("format")
                     .long("format")
                     .value_name("FORMAT")
-                    .value_parser(["dot", "mermaid"])
-                    .default_value("dot")
-                    .help("Output format: dot (Graphviz) or mermaid"),
+                    .value_parser([MIGRATION_GRAPH_DOT_OPTION, MIGRATION_GRAPH_MERMAID_OPTION])
+                    .default_value(MIGRATION_GRAPH_DOT_OPTION)
+                    .help("Output format: dot (Graphviz) or Mermaid")
+                    .long_help(
+                        "Output format for the migration dependency graph.\n\n\
+             - dot: Graphviz DOT format, see https://graphviz.org/doc/info/lang.html\n\
+             - mermaid: Mermaid flowchart syntax, see https://mermaid.js.org/syntax/flowchart.html",
+                    ),
             )
             .arg(
                 Arg::new("output")
@@ -691,7 +698,7 @@ impl CliTask for MigrationGraph {
         bootstrapper: Bootstrapper<WithConfig>,
     ) -> Result<()> {
         let format = match matches.get_one::<String>("format").map(String::as_str) {
-            Some("mermaid") => GraphFormat::Mermaid,
+            Some(MIGRATION_GRAPH_MERMAID_OPTION) => GraphFormat::Mermaid,
             _ => GraphFormat::Dot,
         };
 

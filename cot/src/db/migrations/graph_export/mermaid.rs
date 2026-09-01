@@ -4,7 +4,11 @@ use super::{Node, group_by_app, wrap_label};
 use crate::utils::graph::Graph;
 
 pub(super) fn render(nodes: &[Node<'_>], graph: &Graph) -> String {
-    #[allow(clippy::allow_attributes, clippy::wildcard_imports)]
+    #[allow(
+        clippy::allow_attributes,
+        clippy::wildcard_imports,
+        reason = "clippy skips wild-card in test mode. https://github.com/rust-lang/rust-clippy/issues/13186"
+    )]
     use super::style::*;
 
     let mut out = String::new();

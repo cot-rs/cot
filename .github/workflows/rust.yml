@@ -17,7 +17,7 @@ env:
 
   _RUST_STABLE: &rust_stable stable
   # Pinning the nightly version to a "stable" version to avoid CI breakages.
-  _RUST_NIGHTLY: &rust_nightly nightly-2026-08-08
+  _RUST_NIGHTLY: &rust_nightly nightly-2026-08-28
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
@@ -95,7 +95,7 @@ jobs:
           version: "v0.16.0"
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.85.4
+        uses: taiki-e/install-action@v2.87.1
         with:
           tool: nextest
 
@@ -170,7 +170,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.85.4
+        uses: taiki-e/install-action@v2.87.1
         with:
           tool: nextest
 
@@ -191,7 +191,7 @@ jobs:
 
     name: Test coverage checks
     runs-on: ubuntu-latest
-    needs: ["build"]
+    needs: ["check"]
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -206,13 +206,7 @@ jobs:
           components: llvm-tools-preview
 
       - name: Reclaim disk space
-        run: >
-          sudo rm -rf \
-              /opt/hostedtoolcache/CodeQL \
-              /usr/local/.ghcup \
-              /usr/local/lib/android \
-              /usr/local/lib/dotnet \
-              /usr/local/lib/swift
+        uses: insightsengineering/disk-space-reclaimer@v1
 
       - name: Cache Cargo registry
         uses: Swatinem/rust-cache@v2
@@ -394,7 +388,7 @@ jobs:
           save-if: 'false'
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.85.4
+        uses: taiki-e/install-action@v2.87.1
         with:
           tool: nextest
 

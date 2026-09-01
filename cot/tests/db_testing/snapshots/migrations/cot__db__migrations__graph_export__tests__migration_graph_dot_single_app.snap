@@ -1,0 +1,47 @@
+---
+source: cot/src/db/migrations/graph_export.rs
+expression: dot
+---
+digraph migrations {
+  rankdir=LR;
+  splines=spline;
+  nodesep=0.4;
+  ranksep=0.6;
+  bgcolor="transparent";
+
+  graph [fontname="Helvetica,Arial,sans-serif"];
+  node  [fontname="Helvetica,Arial,sans-serif", fontsize=11];
+  edge  [fontname="Helvetica,Arial,sans-serif", fontsize=9];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#eef2ff",
+    color="#4c51bf",
+    fontcolor="#1e1b4b",
+    penwidth=1,
+    margin="0.18,0.12"
+  ];
+
+  edge [
+    color="#9aa5b1",
+    penwidth=1.2,
+    arrowsize=0.8
+  ];
+
+  subgraph cluster_0 {
+    label="app1";
+    style="rounded,filled";
+    color="#d1d5db";
+    fillcolor="#f9fafb";
+    fontcolor="#374151";
+    fontsize=12;
+    margin=12;
+    n0 [label="m_0001_initial"];
+    n1 [label="m_0002_second"];
+    n2 [label="m_0003_third"];
+  }
+
+  n0 -> n1;
+  n1 -> n2;
+}

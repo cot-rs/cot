@@ -8,7 +8,7 @@ use async_trait::async_trait;
 pub use clap;
 use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
 #[cfg(feature = "db")]
-use cot::db::migrations::{MigrationEngine, SyncDynMigration};
+use cot::db::migrations::{GraphExporter, GraphFormat, MigrationEngine, SyncDynMigration};
 use cot::project::BootstrappedProject;
 use derive_more::Debug;
 
@@ -21,6 +21,9 @@ const LISTEN_PARAM: &str = "listen";
 const COLLECT_STATIC_DIR_PARAM: &str = "dir";
 const MIGRATION_GROUP_SUBCOMMAND: &str = "migration";
 const MIGRATION_ROLLBACK_SUBCOMMAND: &str = "rollback";
+const MIGRATION_GRAPH_SUBCOMMAND: &str = "graph";
+const MIGRATION_GRAPH_MERMAID_OPTION: &str = "mermaid";
+const MIGRATION_GRAPH_DOT_OPTION: &str = "dot";
 
 /// A central point for configuring the default Command Line Interface (CLI) for
 /// Cot-powered projects.
@@ -101,6 +104,7 @@ impl Cli {
             let mut migration_group =
                 CliTaskGroup::new(MIGRATION_GROUP_SUBCOMMAND).about("Database migration commands");
             migration_group.add_task(MigrationRollback);
+            migration_group.add_task(MigrationGraph);
 
             cli.add_task(migration_group);
         }
@@ -651,6 +655,80 @@ impl CliTask for MigrationRollback {
                     .await?;
             }
         }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "db")]
+struct MigrationGraph;
+
+#[cfg(feature = "db")]
+#[async_trait(?Send)]
+impl CliTask for MigrationGraph {
+    fn subcommand(&self) -> Command {
+        Command::new(MIGRATION_GRAPH_SUBCOMMAND)
+            .about("Export the migration dependency graph for visualization")
+            .arg(
+                Arg::new("format")
+                    .long("format")
+                    .value_name("FORMAT")
+                    .value_parser([MIGRATION_GRAPH_DOT_OPTION, MIGRATION_GRAPH_MERMAID_OPTION])
+                    .default_value(MIGRATION_GRAPH_DOT_OPTION)
+                    .help("Output format: dot (Graphviz) or Mermaid")
+                    .long_help(
+                        "Output format for the migration dependency graph.\n\n\
+             - dot: Graphviz DOT format, see https://graphviz.org/doc/info/lang.html\n\
+             - mermaid: Mermaid flowchart syntax, see https://mermaid.js.org/syntax/flowchart.html",
+                    ),
+            )
+            .arg(
+                Arg::new("output")
+                    .short('o')
+                    .long("output")
+                    .value_name("FILE")
+                    .value_parser(value_parser!(PathBuf))
+                    .required(false)
+                    .help("Write to a file instead of stdout"),
+            )
+    }
+
+    async fn execute(
+        &mut self,
+        matches: &ArgMatches,
+        bootstrapper: Bootstrapper<WithConfig>,
+    ) -> Result<()> {
+        let format = match matches.get_one::<String>("format").map(String::as_str) {
+            Some(MIGRATION_GRAPH_MERMAID_OPTION) => GraphFormat::Mermaid,
+            _ => GraphFormat::Dot,
+        };
+
+        let bootstrapper = bootstrapper
+            .with_apps()
+            .with_database()
+            .await?
+            .boot()
+            .await?;
+
+        let BootstrappedProject {
+            context,
+            handler: _,
+            error_handler: _,
+        } = bootstrapper.finish();
+
+        let mut migrations: Vec<Box<SyncDynMigration>> = Vec::new();
+        for app in context.apps() {
+            migrations.extend(app.migrations());
+        }
+
+        let engine = MigrationEngine::new(migrations)?;
+        let exporter = GraphExporter::new(engine.migrations());
+        let rendered = exporter.export(format)?;
+
+        match matches.get_one::<PathBuf>("output") {
+            Some(path) => std::fs::write(path, rendered)?,
+            None => println!("{rendered}"),
+        }
+
         Ok(())
     }
 }

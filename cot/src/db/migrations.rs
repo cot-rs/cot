@@ -1,5 +1,6 @@
 //! Database migrations.
 
+mod graph_export;
 mod sorter;
 
 use std::collections::{HashSet, VecDeque};
@@ -28,6 +29,7 @@ use std::{fmt, io};
 /// }
 /// ```
 pub use cot_macros::migration_op;
+pub(crate) use graph_export::{GraphExporter, GraphFormat};
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::{Level, info};
@@ -504,6 +506,10 @@ impl MigrationEngine {
             .delete(database)
             .await?;
         Ok(())
+    }
+
+    pub(crate) fn migrations(&self) -> &[MigrationWrapper] {
+        &self.migrations
     }
 }
 

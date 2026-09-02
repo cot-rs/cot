@@ -650,7 +650,7 @@ impl<T: Integer + Display> HtmlSafe for IntegerField<T> {}
 /// assert_eq!(<i8 as Integer>::MIN, Some(-128));
 /// assert_eq!(<i8 as Integer>::MAX, Some(127));
 /// ```
-pub trait Integer: Sized + ToString + Send + PartialOrd {
+pub trait Integer: Sized + ToString + Send {
     /// The minimum value of the type.
     ///
     /// # Examples
@@ -671,6 +671,10 @@ pub trait Integer: Sized + ToString + Send + PartialOrd {
     /// assert_eq!(<i8 as Integer>::MAX, Some(127));
     /// ```
     const MAX: Option<Self>;
+    #[doc(hidden)]
+    fn is_valid_range(_min: &Self, _max: &Self) -> bool {
+        true
+    }
 }
 
 macro_rules! impl_integer {
@@ -678,6 +682,10 @@ macro_rules! impl_integer {
         impl Integer for $type {
             const MAX: Option<Self> = Some(Self::MAX);
             const MIN: Option<Self> = Some(Self::MIN);
+
+            fn is_valid_range(min: &Self, max: &Self) -> bool {
+                min <= max
+            }
         }
     };
 }
@@ -1029,7 +1037,7 @@ impl<T: Float + Display> HtmlSafe for FloatField<T> {}
 /// A trait for types that can be represented as a float.
 ///
 /// This trait is implemented for `f32` and `f64`.
-pub trait Float: Sized + ToString + Send + PartialOrd {
+pub trait Float: Sized + ToString + Send {
     /// The minimum value of the type.
     ///
     /// # Examples
@@ -1050,6 +1058,10 @@ pub trait Float: Sized + ToString + Send + PartialOrd {
     /// assert_eq!(<f32 as Float>::MAX, Some(f32::MAX));
     /// ```
     const MAX: Option<Self>;
+    #[doc(hidden)]
+    fn is_valid_range(_min: &Self, _max: &Self) -> bool {
+        true
+    }
 }
 
 macro_rules! impl_float {
@@ -1057,6 +1069,10 @@ macro_rules! impl_float {
         impl Float for $type {
             const MIN: Option<Self> = Some(Self::MIN);
             const MAX: Option<Self> = Some(Self::MAX);
+
+            fn is_valid_range(min: &Self, max: &Self) -> bool {
+                min <= max
+            }
         }
     };
 }
@@ -1245,23 +1261,25 @@ impl_length_options_validation!(
     UrlFieldOptions,
 );
 
-impl<T: PartialOrd> ValidateFormFieldOptions for IntegerFieldOptions<T> {
+impl<T: Integer> ValidateFormFieldOptions for IntegerFieldOptions<T> {
     fn validate(&self) {
-        validate_min_max(
-            self.min.as_ref(),
-            self.max.as_ref(),
-            "minimum value cannot exceed maximum value",
-        );
+        if let (Some(min), Some(max)) = (&self.min, &self.max) {
+            assert!(
+                T::is_valid_range(min, max),
+                "minimum value cannot exceed maximum value"
+            );
+        }
     }
 }
 
-impl<T: PartialOrd> ValidateFormFieldOptions for FloatFieldOptions<T> {
+impl<T: Float> ValidateFormFieldOptions for FloatFieldOptions<T> {
     fn validate(&self) {
-        validate_min_max(
-            self.min.as_ref(),
-            self.max.as_ref(),
-            "minimum value cannot exceed maximum value",
-        );
+        if let (Some(min), Some(max)) = (&self.min, &self.max) {
+            assert!(
+                T::is_valid_range(min, max),
+                "minimum value cannot exceed maximum value"
+            );
+        }
     }
 }
 
@@ -1356,11 +1374,12 @@ impl_field_options_builder!(BoolFieldOptions, BoolFieldOptionsBuilder { must_be_
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::form::FormFieldValue;
     use std::panic::{AssertUnwindSafe, catch_unwind};
 
     use ::chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
+
+    use super::*;
+    use crate::form::FormFieldValue;
 
     fn test_field_options() -> FormFieldOptions {
         FormFieldOptions::builder()

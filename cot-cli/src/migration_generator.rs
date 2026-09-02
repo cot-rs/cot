@@ -23,15 +23,15 @@ use crate::utils::{CargoTomlManager, PackageManager};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
     let Some(manager) = CargoTomlManager::from_path(path)? else {
-        bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        bail!("no Cargo.toml found in the specified directory or any parent directory")
     };
 
     match manager {
         CargoTomlManager::Workspace(workspace) => {
             let Some(package) = workspace.get_current_package_manager() else {
                 bail!(
-                    "Generating migrations for workspaces is not supported yet. \
-                        Please generate migrations for each package separately."
+                    "generating migrations for workspaces is not supported yet. \
+                        Please generate migrations for each package separately"
                 );
             };
             make_package_migrations(package, options)
@@ -75,15 +75,15 @@ pub fn create_new_migration(
     options: MigrationGeneratorOptions,
 ) -> anyhow::Result<()> {
     let Some(manager) = CargoTomlManager::from_path(path)? else {
-        bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        bail!("no Cargo.toml found in the specified directory or any parent directory")
     };
 
     match manager {
         CargoTomlManager::Workspace(workspace) => {
             let Some(package) = workspace.get_current_package_manager() else {
                 bail!(
-                    "Generating migrations for workspaces is not supported yet. \
-                        Please generate migrations for each package separately."
+                    "generating migrations for workspaces is not supported yet. \
+                        Please generate migrations for each package separately"
                 );
             };
             create_package_new_migration(package, name, options)
@@ -137,7 +137,7 @@ pub fn list_migrations(path: &Path) -> anyhow::Result<HashMap<String, Vec<String
         }
         Ok(migration_list)
     } else {
-        bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        bail!("no Cargo.toml found in the specified directory or any parent directory")
     }
 }
 

@@ -1066,7 +1066,7 @@ macro_rules! impl_float_as_form_field {
 
                 if parsed.is_nan() || parsed.is_infinite() {
                     return Err(FormFieldValidationError::from_static(
-                        "Cannot have NaN or inf as form input values",
+                        "cannot have NaN or inf as form input values",
                     ));
                 }
 
@@ -1801,7 +1801,7 @@ mod tests {
             assert_eq!(
                 value,
                 Err(FormFieldValidationError::from_static(
-                    "Cannot have NaN or inf as form input values"
+                    "cannot have NaN or inf as form input values"
                 ))
             );
         }

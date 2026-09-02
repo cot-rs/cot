@@ -130,43 +130,43 @@ impl<T: Form> FormResult<T> {
 #[error("{message}")]
 pub enum FormFieldValidationError {
     /// The field is required.
-    #[error("This field is required.")]
+    #[error("this field is required")]
     Required,
     /// The field value is too long.
-    #[error("This exceeds the maximum length of {max_length}.")]
+    #[error("this exceeds the maximum length of {max_length}")]
     MaximumLengthExceeded {
         /// The maximum length of the field.
         max_length: u32,
     },
 
     /// The field value is too short.
-    #[error("This is below the minimum length of {min_length}.")]
+    #[error("this is below the minimum length of {min_length}")]
     MinimumLengthNotMet {
         /// The minimum length of the field.
         min_length: u32,
     },
 
     /// The field value is below the permitted minimum.
-    #[error("This is below the minimum value of {min_value}.")]
+    #[error("this is below the minimum value of {min_value}")]
     MinimumValueNotMet {
         /// The minimum permitted value.
         min_value: String,
     },
 
     /// The field value exceeds the permitted maximum.
-    #[error("This exceeds the maximum value of {max_value}.")]
+    #[error("this exceeds the maximum value of {max_value}")]
     MaximumValueExceeded {
         /// The maximum permitted value.
         max_value: String,
     },
     /// The field value is an ambiguous datetime.
-    #[error("The datetime value `{datetime}` is ambiguous.")]
+    #[error("the datetime value `{datetime}` is ambiguous")]
     AmbiguousDateTime {
         /// The ambiguous datetime value.
         datetime: NaiveDateTime,
     },
     /// The field value is a non-existent local datetime.
-    #[error("Local datetime {datetime} does not exist for the specified timezone {timezone}.")]
+    #[error("local datetime {datetime} does not exist for the specified timezone {timezone}")]
     NonExistentLocalDateTime {
         /// The non-existent local datetime value.
         datetime: NaiveDateTime,
@@ -174,13 +174,13 @@ pub enum FormFieldValidationError {
         timezone: Tz,
     },
     /// The field value is required to be true.
-    #[error("This field must be checked.")]
+    #[error("this field must be checked")]
     BooleanRequiredToBeTrue,
     /// The field value is invalid.
-    #[error("Value is not valid for this field.")]
+    #[error("value is not valid for this field")]
     InvalidValue(String),
     /// An error occurred while getting the field value.
-    #[error("Error getting field value: {0}")]
+    #[error("error getting field value: {0}")]
     FormFieldValueError(#[from] FormFieldValueError),
     /// Custom error with a given message.
     #[error("{0}")]
@@ -867,5 +867,24 @@ mod tests {
         } else {
             panic!("Expected RequestError");
         }
+    }
+    #[test]
+    fn built_in_validation_errors_have_idiomatic_messages() {
+        assert_eq!(
+            FormFieldValidationError::Required.to_string(),
+            "this field is required"
+        );
+        assert_eq!(
+            FormFieldValidationError::maximum_length_exceeded(10).to_string(),
+            "this exceeds the maximum length of 10"
+        );
+        assert_eq!(
+            FormFieldValidationError::minimum_length_not_met(2).to_string(),
+            "this is below the minimum length of 2"
+        );
+        assert_eq!(
+            FormFieldValidationError::invalid_value("invalid").to_string(),
+            "value is not valid for this field"
+        );
     }
 }

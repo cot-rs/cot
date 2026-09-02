@@ -1670,7 +1670,7 @@ async fn set_current_db(conn: &mut Connection, db_num: usize) {
 enum RedisDbAllocatorError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("Redis error: {0}")]
+    #[error("redis error: {0}")]
     Redis(String),
 }
 

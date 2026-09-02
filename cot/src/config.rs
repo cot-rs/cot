@@ -2521,9 +2521,10 @@ impl From<&str> for EmailUrl {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json;
     use time::OffsetDateTime;
+
+    use super::*;
 
     #[test]
     fn request_body_limit_config() {

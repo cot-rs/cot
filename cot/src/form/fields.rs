@@ -31,6 +31,16 @@ use crate::db::{Auto, ForeignKey, LimitedString, Model};
 use crate::form::{AsFormField, FormField, FormFieldOptions, FormFieldValidationError};
 use crate::html::HtmlTag;
 
+pub(crate) trait ValidateFormFieldOptions {
+    fn validate(&self);
+}
+
+fn validate_min_max<T: PartialOrd>(min: Option<&T>, max: Option<&T>, message: &str) {
+    if let (Some(min), Some(max)) = (min, max) {
+        assert!(min <= max, "{message}");
+    }
+}
+
 macro_rules! impl_form_field {
     ($field_type_name:ident, $field_options_type_name:ident, $purpose:literal $(, $generic_param:ident $(: $generic_param_bound:ident $(+ $generic_param_bound_more:ident)*)?)?) => {
         #[derive(Debug)]
@@ -48,6 +58,7 @@ macro_rules! impl_form_field {
                 options: $crate::form::FormFieldOptions,
                 custom_options: Self::CustomOptions,
             ) -> Self {
+                $crate::form::fields::ValidateFormFieldOptions::validate(&custom_options);
                 Self {
                     options,
                     custom_options,
@@ -639,7 +650,7 @@ impl<T: Integer + Display> HtmlSafe for IntegerField<T> {}
 /// assert_eq!(<i8 as Integer>::MIN, Some(-128));
 /// assert_eq!(<i8 as Integer>::MAX, Some(127));
 /// ```
-pub trait Integer: Sized + ToString + Send {
+pub trait Integer: Sized + ToString + Send + PartialOrd {
     /// The minimum value of the type.
     ///
     /// # Examples
@@ -1018,7 +1029,7 @@ impl<T: Float + Display> HtmlSafe for FloatField<T> {}
 /// A trait for types that can be represented as a float.
 ///
 /// This trait is implemented for `f32` and `f64`.
-pub trait Float: Sized + ToString + Send {
+pub trait Float: Sized + ToString + Send + PartialOrd {
     /// The minimum value of the type.
     ///
     /// # Examples
@@ -1211,6 +1222,80 @@ impl AsFormField for Url {
     }
 }
 
+macro_rules! impl_length_options_validation {
+    ($($options:ty),+ $(,)?) => {
+        $(
+            impl ValidateFormFieldOptions for $options {
+                fn validate(&self) {
+                    validate_min_max(
+                        self.min_length.as_ref(),
+                        self.max_length.as_ref(),
+                        "minimum length cannot exceed maximum length",
+                    );
+                }
+            }
+        )+
+    };
+}
+
+impl_length_options_validation!(
+    StringFieldOptions,
+    PasswordFieldOptions,
+    EmailFieldOptions,
+    UrlFieldOptions,
+);
+
+impl<T: PartialOrd> ValidateFormFieldOptions for IntegerFieldOptions<T> {
+    fn validate(&self) {
+        validate_min_max(
+            self.min.as_ref(),
+            self.max.as_ref(),
+            "minimum value cannot exceed maximum value",
+        );
+    }
+}
+
+impl<T: PartialOrd> ValidateFormFieldOptions for FloatFieldOptions<T> {
+    fn validate(&self) {
+        validate_min_max(
+            self.min.as_ref(),
+            self.max.as_ref(),
+            "minimum value cannot exceed maximum value",
+        );
+    }
+}
+
+macro_rules! impl_value_options_validation {
+    ($($options:ty),+ $(,)?) => {
+        $(
+            impl ValidateFormFieldOptions for $options {
+                fn validate(&self) {
+                    validate_min_max(
+                        self.min.as_ref(),
+                        self.max.as_ref(),
+                        "minimum value cannot exceed maximum value",
+                    );
+                }
+            }
+        )+
+    };
+}
+
+impl_value_options_validation!(
+    DateTimeFieldOptions,
+    DateTimeWithTimezoneFieldOptions,
+    TimeFieldOptions,
+    DateFieldOptions,
+);
+
+impl ValidateFormFieldOptions for BoolFieldOptions {
+    fn validate(&self) {}
+}
+
+impl<T> ValidateFormFieldOptions for SelectFieldOptions<T> {
+    fn validate(&self) {}
+}
+
 impl_field_options_builder!(
     StringFieldOptions,
     StringFieldOptionsBuilder {
@@ -1273,6 +1358,127 @@ impl_field_options_builder!(BoolFieldOptions, BoolFieldOptionsBuilder { must_be_
 mod tests {
     use super::*;
     use crate::form::FormFieldValue;
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use ::chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
+
+    fn test_field_options() -> FormFieldOptions {
+        FormFieldOptions::builder()
+            .id("test".to_owned())
+            .name("test".to_owned())
+            .required(true)
+            .build()
+    }
+    fn assert_rejects_invalid_options(build_field: impl FnOnce()) {
+        assert!(catch_unwind(AssertUnwindSafe(build_field)).is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "minimum length cannot exceed maximum length")]
+    fn string_field_rejects_invalid_options() {
+        StringField::with_options(
+            test_field_options(),
+            StringFieldOptions::builder()
+                .min_length(10)
+                .max_length(5)
+                .build(),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "minimum value cannot exceed maximum value")]
+    fn integer_field_rejects_invalid_options() {
+        IntegerField::<i32>::with_options(
+            test_field_options(),
+            IntegerFieldOptions::builder().min(10).max(5).build(),
+        );
+    }
+    #[test]
+    fn every_constrained_field_rejects_invalid_options() {
+        assert_rejects_invalid_options(|| {
+            PasswordField::with_options(
+                test_field_options(),
+                PasswordFieldOptions::builder()
+                    .min_length(10)
+                    .max_length(5)
+                    .build(),
+            );
+        });
+        assert_rejects_invalid_options(|| {
+            EmailField::with_options(
+                test_field_options(),
+                EmailFieldOptions::builder()
+                    .min_length(10)
+                    .max_length(5)
+                    .build(),
+            );
+        });
+        assert_rejects_invalid_options(|| {
+            UrlField::with_options(
+                test_field_options(),
+                UrlFieldOptions::builder()
+                    .min_length(10)
+                    .max_length(5)
+                    .build(),
+            );
+        });
+        assert_rejects_invalid_options(|| {
+            FloatField::<f64>::with_options(
+                test_field_options(),
+                FloatFieldOptions::builder().min(10.0).max(5.0).build(),
+            );
+        });
+
+        let min_date = NaiveDate::from_ymd_opt(2025, 1, 2).unwrap();
+        let max_date = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        assert_rejects_invalid_options(|| {
+            DateField::with_options(
+                test_field_options(),
+                DateFieldOptions::builder()
+                    .min(min_date)
+                    .max(max_date)
+                    .build(),
+            );
+        });
+
+        let min_time = NaiveTime::from_hms_opt(12, 0, 0).unwrap();
+        let max_time = NaiveTime::from_hms_opt(11, 0, 0).unwrap();
+        assert_rejects_invalid_options(|| {
+            TimeField::with_options(
+                test_field_options(),
+                TimeFieldOptions::builder()
+                    .min(min_time)
+                    .max(max_time)
+                    .build(),
+            );
+        });
+
+        let min_datetime =
+            NaiveDateTime::parse_from_str("2025-01-02 12:00", "%Y-%m-%d %H:%M").unwrap();
+        let max_datetime =
+            NaiveDateTime::parse_from_str("2025-01-01 12:00", "%Y-%m-%d %H:%M").unwrap();
+        assert_rejects_invalid_options(|| {
+            DateTimeField::with_options(
+                test_field_options(),
+                DateTimeFieldOptions::builder()
+                    .min(min_datetime)
+                    .max(max_datetime)
+                    .build(),
+            );
+        });
+
+        let min_datetime = DateTime::parse_from_rfc3339("2025-01-02T12:00:00+00:00").unwrap();
+        let max_datetime = DateTime::parse_from_rfc3339("2025-01-01T12:00:00+00:00").unwrap();
+        assert_rejects_invalid_options(|| {
+            DateTimeWithTimezoneField::with_options(
+                test_field_options(),
+                DateTimeWithTimezoneFieldOptions::builder()
+                    .min(min_datetime)
+                    .max(max_datetime)
+                    .build(),
+            );
+        });
+    }
 
     #[test]
     fn string_field_render() {
@@ -1522,33 +1728,6 @@ mod tests {
             result,
             Err(FormFieldValidationError::MinimumLengthNotMet { min_length: _ })
         ));
-    }
-
-    #[cot::test]
-    async fn email_field_clean_invalid_length_options() {
-        let mut field = EmailField::with_options(
-            FormFieldOptions::builder()
-                .id("email_test".to_owned())
-                .name("email_test".to_owned())
-                .required(true)
-                .build(),
-            EmailFieldOptions::builder()
-                .max_length(10)
-                .min_length(50)
-                .build(),
-        );
-
-        field
-            .set_value(FormFieldValue::new_text("user@example.com"))
-            .await
-            .unwrap();
-        let result = Email::clean_value(&field);
-
-        assert!(result.is_err());
-        if let Err(err) = result {
-            let msg = err.to_string();
-            assert!(msg.contains("min_length") && msg.contains("exceeds max_length"));
-        }
     }
 
     #[test]

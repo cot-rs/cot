@@ -491,6 +491,12 @@ where
     /// This method is used to add middleware to the project. The middleware
     /// will be applied to all routes in the project.
     ///
+    /// Each call wraps the handler built so far. Middleware registered later
+    /// therefore runs earlier while processing a request. Register middleware
+    /// dependencies after the middleware that needs them; for example,
+    /// [`crate::middleware::SessionMiddleware`] must be registered after
+    /// [`crate::middleware::AuthMiddleware`] so that session handling runs first.
+    ///
     /// # Examples
     ///
     /// ```

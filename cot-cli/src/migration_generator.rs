@@ -373,6 +373,7 @@ impl MigrationGenerator {
         trace!("Processing file: {:?}", &path);
 
         let symbol_resolver = SymbolResolver::from_file(&file, &path);
+        let glob_imports = SymbolResolver::glob_imports(&file, &path);
 
         let mut migration_models = Vec::new();
         for item in file.items {
@@ -387,6 +388,7 @@ impl MigrationGenerator {
                             item,
                             &args,
                             &symbol_resolver,
+                            glob_imports.clone(),
                         )?;
 
                         match args.model_type {
@@ -534,12 +536,20 @@ impl MigrationGenerator {
             }
         };
 
+        let mut seen_glob_imports = HashSet::new();
+        let glob_imports = migration
+            .modified_models
+            .iter()
+            .flat_map(|model| model.glob_imports.iter())
+            .filter(|import| seen_glob_imports.insert(import.to_token_stream().to_string()))
+            .collect::<Vec<_>>();
         let models = migration
             .modified_models
             .iter()
             .map(Self::model_to_migration_model)
             .collect::<Vec<_>>();
         let models_def = quote! {
+            #(#glob_imports)*
             #(#models)*
         };
 
@@ -1009,6 +1019,7 @@ impl MigrationProcessor {
 pub struct ModelInSource {
     model_item: syn::ItemStruct,
     model: Model,
+    glob_imports: Vec<syn::ItemUse>,
 }
 
 impl ModelInSource {
@@ -1017,6 +1028,7 @@ impl ModelInSource {
         item: syn::ItemStruct,
         args: &ModelArgs,
         symbol_resolver: &SymbolResolver,
+        glob_imports: Vec<syn::ItemUse>,
     ) -> anyhow::Result<Self> {
         let input: syn::DeriveInput = item.clone().into();
         let opts = ModelOpts::new_from_derive_input(&input)
@@ -1027,6 +1039,7 @@ impl ModelInSource {
         Ok(Self {
             model_item: item,
             model,
+            glob_imports,
         })
     }
 }
@@ -1962,6 +1975,7 @@ mod tests {
                     foreign_key: None,
                 }],
             },
+            glob_imports: Vec::new(),
         }
     }
     fn get_bigger_test_model() -> ModelInSource {
@@ -2011,6 +2025,7 @@ mod tests {
                     },
                 ],
             },
+            glob_imports: Vec::new(),
         }
     }
 

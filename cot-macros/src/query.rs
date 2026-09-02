@@ -390,4 +390,15 @@ mod tests {
             );
         }
     }
+    #[test]
+    fn concat_composite_receiver_with_value() {
+        let receiver = Expr::parse(quote! { $first.concat($last) }).unwrap();
+        let argument = syn::parse2(quote! { "!" }).unwrap();
+        let model_name = syn::parse_quote!(User);
+
+        let tokens = handle_concat(&model_name, receiver, &argument).to_string();
+
+        assert!(tokens.contains("Expr :: value"));
+        assert!(tokens.contains("\"!\""));
+    }
 }

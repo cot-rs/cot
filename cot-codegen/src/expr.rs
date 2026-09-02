@@ -736,6 +736,14 @@ mod tests {
 
         assert_eq!(expected, unwrap_syn(Expr::parse(input)));
     }
+    #[test]
+    fn function_argument_field_ref_roundtrips() {
+        let input = quote! { $other };
+        let argument: ExprArgument = syn::parse2(input.clone()).unwrap();
+
+        assert!(matches!(argument, ExprArgument::FieldRef { .. }));
+        assert_eq!(quote!(#argument).to_string(), input.to_string());
+    }
 
     #[test]
     fn parse_member_access() {

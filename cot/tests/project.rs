@@ -1,11 +1,13 @@
 use bytes::Bytes;
 use cot::config::ProjectConfig;
+use cot::error::handler::{DynErrorPageHandler, RequestError};
 use cot::html::Html;
 use cot::project::RegisterAppsContext;
 use cot::request::Request;
+use cot::response::IntoResponse;
 use cot::router::{Route, Router};
 use cot::test::Client;
-use cot::{App, AppBuilder, Project, StatusCode, reverse};
+use cot::{App, AppBuilder, Body, Project, StatusCode, reverse};
 
 #[cot::test]
 #[cfg_attr(
@@ -59,6 +61,63 @@ async fn cot_project_router_sub_path() {
 
     let response = client.get("/app/hello").await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[cot::test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: can't call foreign function `sqlite3_open_v2`"
+)]
+async fn request_body_limit_uses_project_error_handler() {
+    async fn consume_body(request: Request) -> cot::Result<Html> {
+        request.into_body().into_bytes().await?;
+        Ok(Html::new("accepted"))
+    }
+
+    async fn error_handler(error: RequestError) -> impl IntoResponse {
+        Html::new("custom error handler").with_status(error.status_code())
+    }
+
+    struct TestApp;
+    impl App for TestApp {
+        fn name(&self) -> &'static str {
+            "test"
+        }
+
+        fn router(&self) -> Router {
+            Router::with_urls([Route::with_handler("/", consume_body)])
+        }
+    }
+
+    struct TestProject;
+    impl Project for TestProject {
+        fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
+            Ok(ProjectConfig::builder().max_request_body_size(5).build())
+        }
+
+        fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+            apps.register_with_views(TestApp, "");
+        }
+
+        fn error_handler(&self) -> DynErrorPageHandler {
+            DynErrorPageHandler::new(error_handler)
+        }
+    }
+
+    let request = http::Request::post("/")
+        .body(Body::fixed("Hello, world!"))
+        .unwrap();
+    let response = Client::new(TestProject)
+        .await
+        .request(request)
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(
+        response.into_body().into_bytes().await.unwrap(),
+        "custom error handler"
+    );
 }
 
 #[cot::test]

@@ -45,6 +45,8 @@ pub mod method;
 pub mod path;
 mod tree;
 
+type RouteMap = HashMap<RouteName, Vec<(Option<AppName>, Arc<PathMatcher>)>>;
+
 /// A router that can be used to route requests to their respective views.
 ///
 /// This struct is responsible for routing requests to their respective views.
@@ -68,7 +70,7 @@ mod tree;
 pub struct Router {
     app_name: Option<AppName>,
     urls: Vec<Route>,
-    names: HashMap<RouteName, Vec<(Option<AppName>, Arc<PathMatcher>)>>,
+    names: RouteMap,
     route_tree: RouteTrie,
 }
 
@@ -135,8 +137,7 @@ impl Router {
     /// This method fails when the underlying trie fails to build.
     pub fn try_with_urls<T: Into<Vec<Route>>>(urls: T) -> Result<Self> {
         let urls = Self::merge_conflicting_routers(urls.into())?;
-        let mut names: HashMap<RouteName, Vec<(Option<AppName>, Arc<PathMatcher>)>> =
-            HashMap::new();
+        let mut names: RouteMap = HashMap::new();
 
         for url in &urls {
             if let Some(name) = &url.name {
@@ -173,12 +174,12 @@ impl Router {
             if route.kind() != RouteKind::Router {
                 merged.push(route);
                 continue;
-            };
+            }
 
             let pattern = tree::router_mount_pattern(&route);
             if let Some(&pos) = positions.get(&pattern) {
                 let existing = merged[pos].clone();
-                merged[pos] = Self::merge_router_routes(existing, route)?;
+                merged[pos] = Self::merge_router_routes(&existing, &route)?;
             } else {
                 positions.insert(pattern, merged.len());
                 merged.push(route);
@@ -188,7 +189,7 @@ impl Router {
         Ok(merged)
     }
 
-    fn merge_router_routes(existing: Route, new: Route) -> Result<Route> {
+    fn merge_router_routes(existing: &Route, new: &Route) -> Result<Route> {
         let existing_router = existing
             .router()
             .expect("existing route should be a nested router");

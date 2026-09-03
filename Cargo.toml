@@ -145,7 +145,7 @@ subtle = { version = "2", default-features = false }
 swagger-ui-redist = { version = "0.1" }
 syn = { version = "3", default-features = false }
 sync_wrapper = "1"
-tempfile = "3"
+tempfile = "3.11"
 thiserror = "2"
 time = { version = "0.3.55", default-features = false }
 tokio = { version = "1.53", default-features = false }

@@ -1,0 +1,13 @@
+---
+source: cot-cli/tests/snapshot_testing/external/check.rs
+info:
+  program: cot
+  args:
+    - banana
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+Error: unknown command `banana`. Run `cot --help` to see available commands.

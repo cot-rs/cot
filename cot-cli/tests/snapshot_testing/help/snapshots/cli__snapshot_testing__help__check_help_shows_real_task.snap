@@ -1,0 +1,20 @@
+---
+source: cot-cli/tests/snapshot_testing/help/mod.rs
+info:
+  program: cot
+  args:
+    - check
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Verifies the configuration, including connections to the database and other services
+
+Usage: cot check
+
+Options:
+  -h, --help  Print help
+
+
+----- stderr -----

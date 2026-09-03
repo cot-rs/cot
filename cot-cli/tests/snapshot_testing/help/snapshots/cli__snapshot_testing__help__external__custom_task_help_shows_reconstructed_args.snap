@@ -1,0 +1,25 @@
+---
+source: cot-cli/tests/snapshot_testing/help/external.rs
+info:
+  program: cot
+  args:
+    - frobnicate
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Frobnicates the target
+
+Usage: cot frobnicate [OPTIONS] <target>
+
+Arguments:
+  <target>  What to frobnicate
+
+Options:
+      --intensity <intensity>  How hard to frobnicate
+      --build                  Simulated flag colliding with cot-cli's own --build
+  -h, --help                   Print help
+
+
+----- stderr -----

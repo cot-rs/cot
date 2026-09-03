@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/cot-rs/cot/compare/cot-v0.7.0...cot-v0.8.0) - 2026-09-03
+
+[View diff on diff.rs](https://diff.rs/cot/0.7.0/cot/0.8.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Support for rolling back migrations ([#583](https://github.com/cot-rs/cot/pull/583)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- [**breaking**] *(orm)* Transactions support ([#468](https://github.com/cot-rs/cot/pull/468)) (by [@m4tx](https://github.com/m4tx))
+- Add trailing slash redirect middleware ([#633](https://github.com/cot-rs/cot/pull/633)) (by [@Guflly](https://github.com/Guflly))
+- *(db)* Reject application models in migrations ([#625](https://github.com/cot-rs/cot/pull/625)) (by [@Guflly](https://github.com/Guflly))
+- *(orm)* Add an escape hatch for raw SELECT queries ([#609](https://github.com/cot-rs/cot/pull/609)) (by [@m4tx](https://github.com/m4tx))
+- *(orm)* String matching in `Query` ([#605](https://github.com/cot-rs/cot/pull/605)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add wildcard path route ([#586](https://github.com/cot-rs/cot/pull/586)) (by [@dharshan-0](https://github.com/dharshan-0))
+
+### Fixes
+
+- *(ci)* Fix coverage failure ([#648](https://github.com/cot-rs/cot/pull/648)) (by [@m4tx](https://github.com/m4tx))
+- *(db)* Classify foreign key violations ([#644](https://github.com/cot-rs/cot/pull/644)) (by [@oxura](https://github.com/oxura))
+- Snapshot tests, update compiler output ([#635](https://github.com/cot-rs/cot/pull/635)) (by [@m4tx](https://github.com/m4tx))
+
+### Other
+
+- Update Rust nightly, reformat ([#668](https://github.com/cot-rs/cot/pull/668)) (by [@m4tx](https://github.com/m4tx))
+- Update Star History links in README ([#646](https://github.com/cot-rs/cot/pull/646)) (by [@m4tx](https://github.com/m4tx))
+- Clippy fix ([#641](https://github.com/cot-rs/cot/pull/641)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add Migration docs ([#622](https://github.com/cot-rs/cot/pull/622)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Use built-in askama profile in djlint ([#620](https://github.com/cot-rs/cot/pull/620)) (by [@m4tx](https://github.com/m4tx))
+- *(pre-commit.ci)* Pre-commit autoupdate ([#607](https://github.com/cot-rs/cot/pull/607)) (by [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
 ## [0.7.0](https://github.com/cot-rs/cot/compare/cot-v0.6.0...cot-v0.7.0) - 2026-07-11
 
 [View diff on diff.rs](https://diff.rs/cot/0.6.0/cot/0.7.0/Cargo.toml)

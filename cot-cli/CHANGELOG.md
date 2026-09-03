@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.7.0...cot-cli-v0.8.0) - 2026-09-03
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.7.0/cot-cli/0.8.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Support for rolling back migrations ([#583](https://github.com/cot-rs/cot/pull/583)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add trailing slash redirect middleware ([#633](https://github.com/cot-rs/cot/pull/633)) (by [@Guflly](https://github.com/Guflly))
+
+### Other
+
+- Update Rust nightly, reformat ([#668](https://github.com/cot-rs/cot/pull/668)) (by [@m4tx](https://github.com/m4tx))
+- Update Star History links in README ([#646](https://github.com/cot-rs/cot/pull/646)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump all deps ([#627](https://github.com/cot-rs/cot/pull/627)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump all deps ([#616](https://github.com/cot-rs/cot/pull/616)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.7.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.6.0...cot-cli-v0.7.0) - 2026-07-11
 
 [View diff on diff.rs](https://diff.rs/cot-cli/0.6.0/cot-cli/0.7.0/Cargo.toml)

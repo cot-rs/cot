@@ -533,8 +533,8 @@ where
 
     fn call(&mut self, mut req: Request) -> Self::Future {
         // The inner service may panic until ready, so it's important to clone
-        // it here and used the version that is ready. This is a common pattern when
-        // using `tower::Service`.
+        // it here and used the version that is ready. This is a common pattern
+        // when using `tower::Service`.
         //
         // https://docs.rs/tower/latest/tower/trait.Service.html#be-careful-when-cloning-inner-services
         let clone = self.inner.clone();

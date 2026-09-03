@@ -1022,7 +1022,8 @@ fn read_config(config: &str) -> cot::Result<ProjectConfig> {
     let result = match std::fs::read_to_string(config) {
         Ok(config_content) => Ok(config_content),
         Err(_err) => {
-            // try to read the config from the `config` directory if it's not a file
+            // try to read the config from the `config` directory if it's not a
+            // file
             let path = PathBuf::from("config").join(config).with_extension("toml");
             trace!(
                 config,

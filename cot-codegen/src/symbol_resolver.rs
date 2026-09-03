@@ -8,8 +8,6 @@ use std::path::Path;
 use quote::format_ident;
 #[cfg(feature = "symbol-resolver")]
 use syn::UseTree;
-#[cfg(feature = "symbol-resolver")]
-use tracing::warn;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolResolver {
@@ -35,6 +33,41 @@ impl SymbolResolver {
     pub fn from_file(file: &syn::File, module_path: &Path) -> Self {
         let imports = Self::get_imports(file, &ModulePath::from_fs_path(module_path));
         Self::new(imports)
+    }
+
+    /// Returns top-level glob imports with paths resolved relative to the
+    /// source module.
+    #[cfg(feature = "symbol-resolver")]
+    #[must_use]
+    pub fn glob_imports(file: &syn::File, module_path: &Path) -> Vec<syn::ItemUse> {
+        let module_path = ModulePath::from_fs_path(module_path);
+        file.items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Use(item_use) => Some(item_use),
+                _ => None,
+            })
+            .flat_map(|item_use| {
+                let mut paths = Vec::new();
+                collect_glob_paths(&item_use.tree, &module_path, Vec::new(), &mut paths);
+
+                paths.into_iter().map(|path| {
+                    let leading_colon = if item_use.leading_colon.is_some()
+                        && path.first().is_some_and(|segment| segment != "crate")
+                    {
+                        "::"
+                    } else {
+                        ""
+                    };
+                    let path = path.join("::");
+                    let mut import =
+                        syn::parse_str::<syn::ItemUse>(&format!("use {leading_colon}{path}::*;"))
+                            .expect("collected glob path should be a valid use statement");
+                    import.attrs.clone_from(&item_use.attrs);
+                    import
+                })
+            })
+            .collect()
     }
 
     /// Return the list of top-level `use` statements, structs, and constants as
@@ -279,9 +312,7 @@ impl VisibleSymbol {
                     &rename.ident.to_string(),
                 )];
             }
-            UseTree::Glob(_) => {
-                warn!("Glob imports are not supported");
-            }
+            UseTree::Glob(_) => {}
             UseTree::Group(group) => {
                 return group
                     .items
@@ -292,6 +323,39 @@ impl VisibleSymbol {
         }
 
         vec![]
+    }
+}
+
+#[cfg(feature = "symbol-resolver")]
+fn collect_glob_paths(
+    tree: &UseTree,
+    current_module: &ModulePath,
+    mut path: Vec<String>,
+    paths: &mut Vec<Vec<String>>,
+) {
+    match tree {
+        UseTree::Path(segment) => {
+            match segment.ident.to_string().as_str() {
+                "crate" => path = vec![String::from("crate")],
+                "self" if path.is_empty() => path.clone_from(&current_module.parts),
+                "self" => {}
+                "super" => {
+                    if path.is_empty() {
+                        path.clone_from(&current_module.parts);
+                    }
+                    path.pop();
+                }
+                ident => path.push(ident.to_owned()),
+            }
+            collect_glob_paths(&segment.tree, current_module, path, paths);
+        }
+        UseTree::Group(group) => {
+            for tree in &group.items {
+                collect_glob_paths(tree, current_module, path.clone(), paths);
+            }
+        }
+        UseTree::Glob(_) => paths.push(path),
+        UseTree::Name(_) | UseTree::Rename(_) => {}
     }
 }
 
@@ -442,6 +506,42 @@ const MY_CONSTANT: u8 = 42;
             },
         ];
         assert_eq!(imports, expected);
+    }
+
+    #[test]
+    fn glob_imports_resolve_relative_paths() {
+        let source = r"
+#[cfg(test)]
+use crate::{types::*, constants::VALUE};
+use super::shared::*;
+use self::local::*;
+        ";
+        let file = syn::parse_file(source).unwrap();
+
+        let imports = SymbolResolver::glob_imports(&file, Path::new("foo/bar.rs"))
+            .iter()
+            .map(ToTokens::to_token_stream)
+            .map(|tokens| tokens.to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            imports,
+            [
+                quote!(
+                    #[cfg(test)]
+                    use crate::types::*;
+                )
+                .to_string(),
+                quote!(
+                    use crate::foo::shared::*;
+                )
+                .to_string(),
+                quote!(
+                    use crate::foo::bar::local::*;
+                )
+                .to_string(),
+            ]
+        );
     }
 
     #[test]

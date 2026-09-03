@@ -223,6 +223,60 @@ fn create_model_keywords_source() {
     );
 }
 
+#[test]
+fn create_model_source_preserves_glob_imports() {
+    let generator = test_generator();
+    let src = r"
+use crate::model_types::*;
+use super::shared::*;
+
+#[model]
+struct MyModel {
+    #[model(primary_key)]
+    id: Auto<i32>,
+}
+";
+    let source_files = vec![SourceFile::parse(PathBuf::from("models/my_model.rs"), src).unwrap()];
+
+    let migration = generator
+        .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
+        .unwrap();
+
+    assert!(migration.content.contains("use crate::model_types::*;"));
+    assert!(migration.content.contains("use crate::models::shared::*;"));
+}
+
+#[test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
+)]
+fn create_model_with_glob_import_compiles() {
+    let generator = test_generator();
+    let src = r"
+mod model_types {
+    pub use cot::db::{model, Auto};
+}
+use crate::model_types::*;
+
+#[model]
+struct MyModel {
+    #[model(primary_key)]
+    id: Auto<i32>,
+}
+
+fn main() {}
+";
+    let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
+    let migration = generator
+        .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
+        .unwrap();
+
+    compile_test(src, &migration.name, &migration.content);
+}
+
 /// Test that the migration generator can generate a "create model" migration
 /// for a given model which compiles successfully.
 #[test]

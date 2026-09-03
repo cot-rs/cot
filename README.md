@@ -90,9 +90,9 @@ The guide served at the [official website](https://cot.rs/guide/latest/) is buil
 
 <a href="https://www.star-history.com/?repos=cot-rs%2Fcot&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&theme=dark&legend=top-left&sealed_token=f19Y88C-akDqgnKA83bdAa2kynB_tXjd24Q542FijwbM42YmtFImSQGoX7W2L6bGYDRbk-U4lm2J8mSWGPCx0klmHDV2wXPyrtnevwonQLDUfxbffHYedBjMxwQpyoIH8f-966Nuf4sZV00_51frhUQnDvNCrrm0qiiL5fZSURKzGzENMyzi_pFk5-f8" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&legend=top-left&sealed_token=f19Y88C-akDqgnKA83bdAa2kynB_tXjd24Q542FijwbM42YmtFImSQGoX7W2L6bGYDRbk-U4lm2J8mSWGPCx0klmHDV2wXPyrtnevwonQLDUfxbffHYedBjMxwQpyoIH8f-966Nuf4sZV00_51frhUQnDvNCrrm0qiiL5fZSURKzGzENMyzi_pFk5-f8" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&legend=top-left&sealed_token=f19Y88C-akDqgnKA83bdAa2kynB_tXjd24Q542FijwbM42YmtFImSQGoX7W2L6bGYDRbk-U4lm2J8mSWGPCx0klmHDV2wXPyrtnevwonQLDUfxbffHYedBjMxwQpyoIH8f-966Nuf4sZV00_51frhUQnDvNCrrm0qiiL5fZSURKzGzENMyzi_pFk5-f8" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&theme=dark&legend=top-left&sealed_token=HBb8y83upj1zlVEyN92ev41PTG7PRUCSQ429LuCiuR6BRvjIa2qRbH3ZZ6uqVGroD5Q9VYHmpCgLsJBJWQdh25Hu4my-iAHT0d31H9ly811gUM0Q25qV7tQRe2MZwvu42y6TT0nYve6zBhVxhTSZjsvkcYrARvuUZ7PJSx6nBApR6U1scKXaHzXA2DPJ" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&legend=top-left&sealed_token=HBb8y83upj1zlVEyN92ev41PTG7PRUCSQ429LuCiuR6BRvjIa2qRbH3ZZ6uqVGroD5Q9VYHmpCgLsJBJWQdh25Hu4my-iAHT0d31H9ly811gUM0Q25qV7tQRe2MZwvu42y6TT0nYve6zBhVxhTSZjsvkcYrARvuUZ7PJSx6nBApR6U1scKXaHzXA2DPJ" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=cot-rs/cot&type=date&legend=top-left&sealed_token=HBb8y83upj1zlVEyN92ev41PTG7PRUCSQ429LuCiuR6BRvjIa2qRbH3ZZ6uqVGroD5Q9VYHmpCgLsJBJWQdh25Hu4my-iAHT0d31H9ly811gUM0Q25qV7tQRe2MZwvu42y6TT0nYve6zBhVxhTSZjsvkcYrARvuUZ7PJSx6nBApR6U1scKXaHzXA2DPJ" />
  </picture>
 </a>
 

@@ -39,8 +39,8 @@ authors = [
 ]
 
 [workspace.lints.rust]
-deprecated-safe = "warn"
-keyword-idents = "warn"
+deprecated_safe = "warn"
+keyword_idents = "warn"
 missing_copy_implementations = "warn"
 missing_debug_implementations = "warn"
 trivial_casts = "warn"

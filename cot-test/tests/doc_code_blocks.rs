@@ -6,12 +6,27 @@ use std::sync::OnceLock;
 use comrak::arena_tree::NodeEdge;
 use comrak::nodes::NodeValue;
 use comrak::{Arena, parse_document};
-use cot_test::{TestConfig, TestLanguage, get_test_project};
+use cot_test::utils::format_code_snippet;
+use cot_test::{TestConfig, TestLanguage, TestLanguageFromStringError, get_test_project};
 use libtest_mimic::{Arguments, Failed, Trial};
 
 type TestRunner = fn(&str) -> Result<(), Failed>;
 
 static TEST_RUNNERS: OnceLock<HashMap<(TestLanguage, TestConfig), TestRunner>> = OnceLock::new();
+
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "{source}\n{}",
+    format_code_snippet(literal, file_name, *start_line, *start_col, 5)
+)]
+pub struct CodeBlockError {
+    #[source]
+    source: TestLanguageFromStringError,
+    file_name: String,
+    literal: String,
+    start_line: usize,
+    start_col: usize,
+}
 
 fn main() {
     let args = Arguments::from_args();
@@ -45,13 +60,19 @@ fn main() {
         }
 
         let contents = fs::read_to_string(&path).expect("failed to read md file");
-        test_md(&mut trials, file_name, &contents);
+        if let Err(err) = test_md(&mut trials, file_name, &contents) {
+            panic!("{err}");
+        }
     }
 
     libtest_mimic::run(&args, trials).exit();
 }
 
-fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
+fn test_md(
+    trials: &mut Vec<Trial>,
+    file_name: &str,
+    file_contents: &str,
+) -> Result<(), CodeBlockError> {
     let arena = Arena::new();
 
     let mut options = comrak::Options::default();
@@ -75,7 +96,14 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
                             TestConfig::Default,
                         )
                     };
-                let lang = lang.expect("unknown language");
+
+                let lang = lang.map_err(|source| CodeBlockError {
+                    source,
+                    file_name: file_name.to_string(),
+                    literal: code_block.literal.clone(),
+                    start_line: node_data.sourcepos.start.line,
+                    start_col: node_data.sourcepos.start.column,
+                })?;
 
                 if let Some(runner) = TEST_RUNNERS.get().unwrap().get(&(lang, test_config)) {
                     let literal = if lang == TestLanguage::Rust {
@@ -106,6 +134,7 @@ fn test_md(trials: &mut Vec<Trial>, file_name: &str, file_contents: &str) {
             }
         }
     }
+    Ok(())
 }
 
 fn clean_code(code: &str) -> String {

@@ -7,6 +7,8 @@ use clap_verbosity_flag::Verbosity;
 pub const PACKAGE_LONG_FLAG: &str = "--package";
 pub const PACKAGE_SHORT_FLAG: &str = "-p";
 pub const RELEASE_FLAG: &str = "--release";
+pub const HELP_LONG_FLAG: &str = "--help";
+pub const HELP_SHORT_FLAG: &str = "-h";
 pub const BINARY_FLAG: &str = "--bin";
 pub const BUILD_FLAG: &str = "--build";
 

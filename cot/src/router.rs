@@ -38,7 +38,7 @@ use crate::error::NotFound;
 use crate::request::{PathParams, Request, RequestExt, RequestHead};
 use crate::response::Response;
 use crate::router::path::{PathMatcher, ReverseParamMap};
-use crate::router::tree::{Entry, RouteTrie};
+use crate::router::tree::{Entry, MatchitPattern, RouteTrie};
 use crate::{Error, ProjectContext, Result};
 
 pub mod method;
@@ -68,7 +68,7 @@ mod tree;
 pub struct Router {
     app_name: Option<AppName>,
     urls: Vec<Route>,
-    names: HashMap<RouteName, Arc<PathMatcher>>,
+    names: HashMap<RouteName, Vec<(Option<AppName>, Arc<PathMatcher>)>>,
     route_tree: RouteTrie,
 }
 
@@ -134,12 +134,26 @@ impl Router {
     ///
     /// This method fails when the underlying trie fails to build.
     pub fn try_with_urls<T: Into<Vec<Route>>>(urls: T) -> Result<Self> {
-        let urls = urls.into();
-        let mut names = HashMap::new();
+        let urls = Self::merge_conflicting_routers(urls.into())?;
+        let mut names: HashMap<RouteName, Vec<(Option<AppName>, Arc<PathMatcher>)>> =
+            HashMap::new();
 
         for url in &urls {
             if let Some(name) = &url.name {
-                names.insert(name.clone(), url.url.clone());
+                let requested = url.app_name.as_ref().map(|a| a.0.as_str());
+                let bucket = names.entry(name.clone()).or_default();
+                if let Some((_, existing_url)) = bucket
+                    .iter()
+                    .find(|(app, _)| app.as_ref().map(|a| a.0.as_str()) == requested)
+                {
+                    return Err(RouteConflictError::DuplicateRouteName {
+                        name: name.0.clone(),
+                        existing: existing_url.to_string(),
+                        new: url.url(),
+                    }
+                    .into());
+                }
+                bucket.push((url.app_name.clone(), url.url.clone()));
             }
         }
         let route_tree = RouteTrie::build(&urls)?;
@@ -149,6 +163,64 @@ impl Router {
             names,
             route_tree,
         })
+    }
+
+    fn merge_conflicting_routers(urls: Vec<Route>) -> Result<Vec<Route>> {
+        let mut merged: Vec<Route> = Vec::with_capacity(urls.len());
+        let mut positions: HashMap<MatchitPattern, usize> = HashMap::new();
+
+        for route in urls {
+            if route.kind() != RouteKind::Router {
+                merged.push(route);
+                continue;
+            };
+
+            let pattern = tree::router_mount_pattern(&route);
+            if let Some(&pos) = positions.get(&pattern) {
+                let existing = merged[pos].clone();
+                merged[pos] = Self::merge_router_routes(existing, route)?;
+            } else {
+                positions.insert(pattern, merged.len());
+                merged.push(route);
+            }
+        }
+
+        Ok(merged)
+    }
+
+    fn merge_router_routes(existing: Route, new: Route) -> Result<Route> {
+        let existing_router = existing
+            .router()
+            .expect("existing route should be a nested router");
+        let new_router = new.router().expect("new route should be a nested router");
+
+        debug!(
+            path = %existing.url(),
+            existing_app = ?existing_router.app_name,
+            new_app = ?new_router.app_name,
+            "merging nested routers mounted at the same path",
+        );
+
+        let mut combined = Vec::with_capacity(existing_router.urls.len() + new_router.urls.len());
+        combined.extend(
+            existing_router
+                .urls
+                .iter()
+                .cloned()
+                .map(|r| r.with_app_name_if_unset(existing_router.app_name.clone())),
+        );
+
+        combined.extend(
+            new_router
+                .urls
+                .iter()
+                .cloned()
+                .map(|r| r.with_app_name_if_unset(new_router.app_name.clone())),
+        );
+
+        let merged_router = Router::try_with_urls(combined)?;
+
+        Ok(Route::with_router(&existing.url(), merged_router))
     }
 
     pub(crate) fn set_app_name(&mut self, app_name: AppName) {
@@ -212,13 +284,16 @@ impl Router {
         match &route.view {
             RouteInner::Handler(handler) => Some(HandlerFound {
                 handler: &**handler,
-                app_name: router.app_name.clone(),
+                app_name: route.app_name.clone().or_else(|| router.app_name.clone()),
                 name: route.name.clone(),
                 params: params.to_vec(),
             }),
             RouteInner::Router(nested_router) => {
                 nested_router.get_handler(remaining_path).map(|mut found| {
-                    found.app_name = found.app_name.or_else(|| router.app_name.clone());
+                    found.app_name = found
+                        .app_name
+                        .or_else(|| route.app_name.clone())
+                        .or_else(|| router.app_name.clone());
 
                     let mut combined = params.to_vec();
                     combined.extend(found.params);
@@ -231,7 +306,7 @@ impl Router {
                 let handler: &(dyn BoxRequestHandler + Send + Sync) = &**handler;
                 Some(HandlerFound {
                     handler,
-                    app_name: router.app_name.clone(),
+                    app_name: route.app_name.clone().or_else(|| router.app_name.clone()),
                     name: route.name.clone(),
                     params: params.to_vec(),
                 })
@@ -320,16 +395,23 @@ impl Router {
         name: &str,
         params: &ReverseParamMap,
     ) -> Result<Option<String>> {
-        let url = self
-            .names
-            .get(&RouteName(String::from(name)))
-            .map(|matcher| matcher.reverse(params));
-        if let Some(url) = url {
-            return Ok(Some(url?));
+        if let Some(candidates) = self.names.get(&RouteName(String::from(name))) {
+            let matched = candidates
+                .iter()
+                .find(|(candidate_app, _)| candidate_app.as_ref().map(|a| a.0.as_str()) == app_name)
+                .or_else(|| {
+                    candidates
+                        .iter()
+                        .find(|(candidate_app, _)| candidate_app.is_none())
+                });
+            if let Some((_, matcher)) = matched {
+                return Ok(Some(matcher.reverse(params)?));
+            }
         }
 
         for route in &self.urls {
             if let RouteInner::Router(router) = &route.view
+                && Self::app_name_matches(app_name, route.app_name.as_ref())
                 && let Some(url) = router.reverse_option(app_name, name, params)?
             {
                 let prefix = AbsolutePath::new(route.url.reverse(params)?);
@@ -348,6 +430,10 @@ impl Router {
             }
         }
         Ok(None)
+    }
+
+    fn app_name_matches(requested: Option<&str>, candidate: Option<&AppName>) -> bool {
+        requested.is_none() || candidate.is_none() || candidate.map(|a| a.0.as_str()) == requested
     }
 
     /// Get the routes in this router.
@@ -527,6 +613,16 @@ enum RouteConflictError {
     DuplicateRouter { existing: String, new: String },
 
     #[error(
+        "{ERROR_PREFIX} duplicate route name: `{name}` is registered at both `{existing}` and `{new}`; route names \
+     must be unique within the same app"
+    )]
+    DuplicateRouteName {
+        name: String,
+        existing: String,
+        new: String,
+    },
+
+    #[error(
         "{ERROR_PREFIX} conflicting route parameters: `{existing}` uses `{{{existing_name}}}` but `{new}` uses \
          `{{{new_name}}}` at the same position in the path; both routes must bind the same \
          parameter name there, since only one value can be captured at that position"
@@ -655,6 +751,7 @@ pub struct Route {
     url: Arc<PathMatcher>,
     view: RouteInner,
     name: Option<RouteName>,
+    app_name: Option<AppName>,
 }
 
 impl Route {
@@ -685,6 +782,7 @@ impl Route {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: None,
+            app_name: None,
         }
     }
 
@@ -722,6 +820,7 @@ impl Route {
                 crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: None,
+            app_name: None,
         }
     }
 
@@ -753,6 +852,7 @@ impl Route {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::Handler(Arc::new(into_box_request_handler(handler))),
             name: Some(RouteName(name.into())),
+            app_name: None,
         }
     }
 
@@ -791,6 +891,7 @@ impl Route {
                 crate::openapi::into_box_api_endpoint_request_handler(handler),
             )),
             name: Some(RouteName(name.into())),
+            app_name: None,
         }
     }
 
@@ -816,6 +917,7 @@ impl Route {
             url: Arc::new(PathMatcher::new(url)),
             view: RouteInner::Router(Arc::new(router)),
             name: None,
+            app_name: None,
         }
     }
 
@@ -880,6 +982,14 @@ impl Route {
             #[cfg(feature = "openapi")]
             RouteInner::ApiHandler(_) => None,
         }
+    }
+
+    #[must_use]
+    fn with_app_name_if_unset(mut self, app_name: Option<AppName>) -> Self {
+        if self.app_name.is_none() {
+            self.app_name = app_name;
+        }
+        self
     }
 }
 
@@ -2013,36 +2123,110 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "route conflict error: duplicate nested router: `/users` conflicts with an already registered nested router mounted at `/users`"
-    )]
-    fn router_duplicate_nested_router_routes_panic() {
+    fn router_duplicate_nested_router_routes_merge() {
+        let router1 = Router::with_urls(vec![Route::with_handler_and_name("/a", MockHandler, "a")]);
+        let router2 = Router::with_urls(vec![Route::with_handler_and_name("/b", MockHandler, "b")]);
+
+        let router = Router::with_urls(vec![
+            Route::with_router("/users", router1),
+            Route::with_router("/users", router2),
+        ]);
+
+        assert_eq!(
+            router.get_handler("/users/a").unwrap().name,
+            Some(RouteName("a".to_string()))
+        );
+        assert_eq!(
+            router.get_handler("/users/b").unwrap().name,
+            Some(RouteName("b".to_string()))
+        );
+    }
+
+    #[test]
+    fn router_duplicate_nested_router_routes_merge_with_slash() {
+        let router1 = Router::with_urls(vec![Route::with_handler_and_name("/a", MockHandler, "a")]);
+        let router2 = Router::with_urls(vec![Route::with_handler_and_name("/b", MockHandler, "b")]);
+
+        let router = Router::with_urls(vec![
+            Route::with_router("/users/", router1),
+            Route::with_router("/users/", router2),
+        ]);
+
+        assert_eq!(
+            router.get_handler("/users/a").unwrap().name,
+            Some(RouteName("a".to_string()))
+        );
+        assert_eq!(
+            router.get_handler("/users/b").unwrap().name,
+            Some(RouteName("b".to_string()))
+        );
+    }
+
+    #[test]
+    fn router_duplicate_nested_router_routes_merge_slash_diff() {
+        let router1 = Router::with_urls(vec![Route::with_handler_and_name("/a", MockHandler, "a")]);
+        let router2 = Router::with_urls(vec![Route::with_handler_and_name("/b", MockHandler, "b")]);
+
+        let router = Router::with_urls(vec![
+            Route::with_router("/users/", router1),
+            Route::with_router("/users", router2),
+        ]);
+
+        assert_eq!(
+            router.get_handler("/users/a").unwrap().name,
+            Some(RouteName("a".to_string()))
+        );
+        assert_eq!(
+            router.get_handler("/users/b").unwrap().name,
+            Some(RouteName("b".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "route conflict error: duplicate route")]
+    fn router_merged_routers_reject_leaf_conflicts() {
+        let router1 = Router::with_urls(vec![Route::with_handler("/health", MockHandler)]);
+        let router2 = Router::with_urls(vec![Route::with_handler("/health", MockHandler)]);
+
         let _ = Router::with_urls(vec![
-            Route::with_router("/users", Router::empty()),
-            Route::with_router("/users", Router::empty()),
+            Route::with_router("/api", router1),
+            Route::with_router("/api", router2),
         ]);
     }
 
     #[test]
-    #[should_panic(
-        expected = "route conflict error: duplicate nested router: `/users/` conflicts with an already registered nested router mounted at `/users/`"
-    )]
-    fn router_duplicate_nested_router_routes_trailing_slash_panic() {
-        let _ = Router::with_urls(vec![
-            Route::with_router("/users/", Router::empty()),
-            Route::with_router("/users/", Router::empty()),
-        ]);
-    }
+    fn router_merged_routers_reverse_scoped_by_app_name() {
+        let mut router1 = Router::with_urls(vec![Route::with_handler_and_name(
+            "/one",
+            MockHandler,
+            "index",
+        )]);
+        router1.set_app_name(AppName("app1".to_string()));
 
-    #[test]
-    #[should_panic(
-        expected = "route conflict error: duplicate nested router: `/users` conflicts with an already registered nested router mounted at `/users/`"
-    )]
-    fn router_duplicate_with_trailing_slash_diff_panic() {
-        let _ = Router::with_urls(vec![
-            Route::with_router("/users/", Router::empty()),
-            Route::with_router("/users", Router::empty()),
+        let mut router2 = Router::with_urls(vec![Route::with_handler_and_name(
+            "/two",
+            MockHandler,
+            "index",
+        )]);
+        router2.set_app_name(AppName("app2".to_string()));
+
+        let router = Router::with_urls(vec![
+            Route::with_router("/shared", router1),
+            Route::with_router("/shared", router2),
         ]);
+
+        assert_eq!(
+            router
+                .reverse(Some("app1"), "index", &ReverseParamMap::new())
+                .unwrap(),
+            "/shared/one"
+        );
+        assert_eq!(
+            router
+                .reverse(Some("app2"), "index", &ReverseParamMap::new())
+                .unwrap(),
+            "/shared/two"
+        );
     }
 
     #[test]

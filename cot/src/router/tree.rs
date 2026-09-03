@@ -52,12 +52,7 @@ impl RouteTrie {
                 // sentinel. This should also allow us reject routes for
                 // routers(sub-routers) who's version without a trailing slash
                 // already exist. (eg. `foo` and `foo/`cannot overlap as sub-routers)
-                let url = route.url();
-                let trimmed = url
-                    .strip_suffix('/')
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or(&url);
-                MatchitPattern::new(trimmed)
+                router_mount_pattern(route)
             } else {
                 MatchitPattern::try_from(route.url.clone())?
             };
@@ -215,6 +210,15 @@ impl RouteTrie {
     pub(super) fn at<'a>(&'a self, path: &'a str) -> Option<Match<'a, 'a, &'a Entry>> {
         self.inner.at(path).ok()
     }
+}
+
+pub(super) fn router_mount_pattern(route: &Route) -> MatchitPattern {
+    let url = route.url();
+    let trimmed = url
+        .strip_suffix('/')
+        .filter(|s| !s.is_empty())
+        .unwrap_or(&url);
+    MatchitPattern::new(trimmed)
 }
 
 #[cfg(test)]

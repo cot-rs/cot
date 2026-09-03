@@ -372,7 +372,7 @@ impl<D: serde::Serialize> IntoResponse for crate::json::Json<D> {
 
 #[cfg(feature = "json")]
 #[derive(Debug, thiserror::Error)]
-#[error("JSON serialization error: {0}")]
+#[error("failed to serialize JSON: {0}")]
 struct JsonSerializeError(serde_path_to_error::Error<serde_json::Error>);
 #[cfg(feature = "json")]
 impl_into_cot_error!(JsonSerializeError, INTERNAL_SERVER_ERROR);

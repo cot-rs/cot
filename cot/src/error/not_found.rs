@@ -19,7 +19,7 @@ use thiserror::Error;
 /// let error = NotFound::new();
 ///
 /// // Create a 404 error with a custom message
-/// let error = NotFound::with_message("User not found");
+/// let error = NotFound::with_message("user not found");
 /// ```
 ///
 /// ["404 Not Found"]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/404
@@ -33,7 +33,7 @@ pub struct NotFound {
 impl_into_cot_error!(NotFound, NOT_FOUND);
 
 impl NotFound {
-    /// Creates a new `NotFound` error with a generic "Not Found" message.
+    /// Creates a new `NotFound` error with a generic "not found" message.
     ///
     /// This is the most common way to create a 404 error when you don't need
     /// to provide additional context about what was not found.
@@ -61,9 +61,9 @@ impl NotFound {
     /// ```
     /// use cot::error::NotFound;
     ///
-    /// let error = NotFound::with_message("User with ID 123 not found");
+    /// let error = NotFound::with_message("user with ID 123 not found");
     /// let page_name = "home";
-    /// let error = NotFound::with_message(format!("Page '{}' not found", page_name));
+    /// let error = NotFound::with_message(format!("page '{}' not found", page_name));
     /// ```
     #[must_use]
     pub fn with_message<T: Into<String>>(message: T) -> Self {
@@ -99,14 +99,14 @@ pub enum Kind {
     ///
     /// This variant is used when the router cannot find a route that matches
     /// the request's path and method.
-    #[error("Not Found")]
+    #[error("not found")]
     #[non_exhaustive]
     FromRouter,
     /// A generic 404 error without additional context.
     ///
     /// This variant is used for basic "not found" errors where no specific
     /// message or context is needed.
-    #[error("Not Found")]
+    #[error("not found")]
     #[non_exhaustive]
     Custom,
     /// A 404 error with a custom message providing additional context.
@@ -114,7 +114,22 @@ pub enum Kind {
     /// This variant includes a custom message that describes what specifically
     /// was not found, which can be useful for debugging or providing more
     /// informative error responses.
-    #[error("Not Found: {0}")]
+    #[error("not found: {0}")]
     #[non_exhaustive]
     WithMessage(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn messages_are_idiomatic() {
+        assert_eq!(NotFound::new().to_string(), "not found");
+        assert_eq!(
+            NotFound::with_message("resource unavailable").to_string(),
+            "not found: resource unavailable"
+        );
+        assert_eq!(NotFound::router().to_string(), "not found");
+    }
 }

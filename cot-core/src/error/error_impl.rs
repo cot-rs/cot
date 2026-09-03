@@ -51,10 +51,10 @@ impl Error {
     /// ```
     /// use cot::Error;
     ///
-    /// let error = Error::internal("An error occurred");
+    /// let error = Error::internal("an error occurred");
     /// let error = Error::internal(std::io::Error::new(
     ///     std::io::ErrorKind::Other,
-    ///     "An error occurred",
+    ///     "an error occurred",
     /// ));
     /// ```
     #[must_use]
@@ -79,10 +79,10 @@ impl Error {
     /// use cot::{Error, StatusCode};
     ///
     /// // Create a 400 Bad Request error
-    /// let error = Error::with_status("Invalid input", StatusCode::BAD_REQUEST);
+    /// let error = Error::with_status("invalid input", StatusCode::BAD_REQUEST);
     ///
     /// // Create a 403 Forbidden error
-    /// let error = Error::with_status("Access denied", StatusCode::FORBIDDEN);
+    /// let error = Error::with_status("access denied", StatusCode::FORBIDDEN);
     /// ```
     #[must_use]
     pub fn with_status<E>(error: E, status_code: StatusCode) -> Self
@@ -109,10 +109,10 @@ impl Error {
     /// ```
     /// use cot::{Error, StatusCode};
     ///
-    /// let error = Error::internal("Something went wrong");
+    /// let error = Error::internal("something went wrong");
     /// assert_eq!(error.status_code(), StatusCode::INTERNAL_SERVER_ERROR);
     ///
-    /// let error = Error::with_status("Bad request", StatusCode::BAD_REQUEST);
+    /// let error = Error::with_status("bad request", StatusCode::BAD_REQUEST);
     /// assert_eq!(error.status_code(), StatusCode::BAD_REQUEST);
     /// ```
     #[must_use]

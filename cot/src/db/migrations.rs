@@ -50,7 +50,7 @@ pub enum MigrationEngineError {
     #[error("error running migration: {0}")]
     Custom(String),
     /// An I/O error occurred while writing output (e.g. during dry-run).
-    #[error("I/O error while writing migration output: {0}")]
+    #[error("failed to write migration output: {0}")]
     Io(#[from] io::Error),
 }
 

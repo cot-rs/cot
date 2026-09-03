@@ -102,7 +102,7 @@ impl CargoTomlManager {
             }
 
             (None, None) => {
-                bail!("Cargo.toml is not a valid workspace or package manifest");
+                bail!("invalid Cargo.toml: expected a workspace or package manifest");
             }
         };
 

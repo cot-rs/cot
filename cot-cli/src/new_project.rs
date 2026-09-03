@@ -69,8 +69,9 @@ pub fn new_project(
     let dev_secret_key = generate_secret_key();
 
     for (file_name, content) in PROJECT_FILES {
-        // Cargo reads and parses all files that are named "Cargo.toml" in a repository,
-        // so we need a different name so that it doesn't fail on build.
+        // Cargo reads and parses all files that are named "Cargo.toml" in a
+        // repository, so we need a different name so that it doesn't
+        // fail on build.
         let file_name = file_name.replace(".template", "");
 
         let file_path = path.join(file_name);

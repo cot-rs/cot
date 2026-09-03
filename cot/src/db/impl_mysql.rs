@@ -67,8 +67,8 @@ pub(crate) fn build_like_expr(
 
     match case_sensitivity {
         CaseSensitivity::Sensitive => {
-            // We assume that the database is using utf8mb4 character set, which is the
-            // default in MySQL 8.0. See https://dev.mysql.com/doc/refman/8.0/en/charset.html
+            // We assume that the database is using utf8mb4 character set, which
+            // is the default in MySQL 8.0. See https://dev.mysql.com/doc/refman/8.0/en/charset.html
             // TODO: Allow users to change collation in the future if needed.
             let collated_lhs = sea_query::Expr::cust_with_exprs("? COLLATE utf8mb4_bin", [lhs]);
             let like = LikeExpr::new(sql_pattern).escape(LIKE_ESCAPE_CHAR);

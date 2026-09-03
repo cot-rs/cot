@@ -324,8 +324,8 @@ async fn test_migration_engine_rollback_includes_dependent_apps(test_db: &mut Te
     )
     .await;
 
-    // rollback everything except the initial migration in the source/independent
-    // app
+    // rollback everything except the initial migration in the
+    // source/independent app
     let dry_run_output = migration_rollback_dry_run(
         &engine,
         &test_db.database(),

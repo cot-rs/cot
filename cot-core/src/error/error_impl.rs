@@ -171,9 +171,10 @@ impl Error {
 
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // If the alternate (`{:#?}`) formatting has been specified, print out the
-        // `Debug` formatting normally. If not, (which is the case when using
-        // `Result::unwrap()` or `Result::expect()`) pretty print the error.
+        // If the alternate (`{:#?}`) formatting has been specified, print out
+        // the `Debug` formatting normally. If not, (which is the case
+        // when using `Result::unwrap()` or `Result::expect()`) pretty
+        // print the error.
         if f.alternate() {
             Debug::fmt(&self.repr, f)
         } else {

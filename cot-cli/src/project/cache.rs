@@ -46,8 +46,8 @@ pub(crate) fn load_or_refresh(
     // slow path
     // stdout/stderr are piped and drained on separate threads to avoid a
     // deadlock. Pipe buffers are OS-bounded, so if the child fills one
-    // while we're blocked waiting to timeout in `wait_timeout` or reading the other
-    // output, its write blocks and deadlocks.
+    // while we're blocked waiting to timeout in `wait_timeout` or reading the
+    // other output, its write blocks and deadlocks.
     // https://doc.rust-lang.org/std/process/index.html#handling-io
     // https://docs.rs/os_pipe/latest/os_pipe/#common-deadlocks-related-to-pipes
     let mut child = std::process::Command::new(binary_path)

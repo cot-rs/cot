@@ -2336,6 +2336,9 @@ fn request_axum_to_cot(
 }
 
 pub(crate) fn prepare_request(request: &mut Request, context: Arc<ProjectContext>) {
+    let body =
+        std::mem::take(request.body_mut()).with_limit(context.config().max_request_body_size);
+    *request.body_mut() = body;
     request.extensions_mut().insert(context);
 }
 

@@ -116,10 +116,7 @@ pub(super) struct PathMatcher {
 impl PathMatcher {
     #[must_use]
     pub(crate) fn new<T: Into<String>>(path_pattern: T) -> Self {
-        match Self::try_new(path_pattern) {
-            Ok(matcher) => matcher,
-            Err(err) => panic!("{err}"),
-        }
+        Self::try_new(path_pattern).unwrap_or_else(|err| panic!("{err}"))
     }
 
     pub(crate) fn try_new<T: Into<String>>(path_pattern: T) -> Result<Self, PathMatcherError> {

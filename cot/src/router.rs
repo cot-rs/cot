@@ -147,6 +147,8 @@ impl Router {
                     .iter()
                     .find(|(app, _)| app.as_ref().map(|a| a.0.as_str()) == requested)
                 {
+                    // we found another route in the same app with the same
+                    // name. This is unacceptable
                     return Err(RouteConflictError::DuplicateRouteName {
                         name: name.0.clone(),
                         existing: existing_url.to_string(),
@@ -175,6 +177,18 @@ impl Router {
                 merged.push(route);
                 continue;
             }
+            // we want to merge/fold routers that have the same mount
+            // point(pattern). This can be useful especially in cases
+            // where multiple apps are registered with the same pattern
+            // as shown in the example below:
+            //
+            // fn register_apps(
+            //    &self, apps: &mut AppBuilder,
+            //    _context: &RegisterAppsContext
+            // ) {
+            //     apps.register_with_views(App1, "/foo");
+            //     apps.register_with_views(App2, "/foo");
+            // }
 
             let pattern = tree::router_mount_pattern(&route);
             if let Some(&pos) = positions.get(&pattern) {
@@ -221,6 +235,9 @@ impl Router {
 
         let merged_router = Router::try_with_urls(combined)?;
 
+        // setting the router's url to that of the existing route is done purely
+        // for deterministic purposes. This should have no side-effect since we match
+        // against the normalized url
         Ok(Route::with_router(&existing.url(), merged_router))
     }
 
@@ -406,10 +423,14 @@ impl Router {
                         .find(|(candidate_app, _)| candidate_app.is_none())
                 });
             if let Some((_, matcher)) = matched {
+                // fast path: we found the route with the provided name in this
+                // router
                 return Ok(Some(matcher.reverse(params)?));
             }
         }
 
+        // slow path: the route may exist in the nested routers. we search
+        // through recursively to find it.
         for route in &self.urls {
             if let RouteInner::Router(router) = &route.view
                 && Self::app_name_matches(app_name, route.app_name.as_ref())
@@ -419,11 +440,10 @@ impl Router {
                 let suffix = AbsolutePath::new(url);
 
                 // we are in a sub-router, and if its parent does not end in a
-                // trailing slash (eg. `foo`) and the found
-                // route is the sub-router's root (`/`), then we
-                // can safely assume that the trailing-slash
-                // version (eg. `foo/`) does not exist. We return its parent and
-                // must not join
+                // trailing slash (eg. `foo`) and the found route is the
+                // sub-router's root (`/`), then we can safely assume that
+                //  the trailing-slash version (eg. `foo/`) does not exist.
+                //  We return its parent and must not join
                 let combined = if !prefix.as_str().ends_with('/') && suffix.as_str() == "/" {
                     prefix
                 } else {
@@ -924,6 +944,14 @@ impl Route {
         }
     }
 
+    #[must_use]
+    fn with_app_name_if_unset(mut self, app_name: Option<AppName>) -> Self {
+        if self.app_name.is_none() {
+            self.app_name = app_name;
+        }
+        self
+    }
+
     /// Get the URL for this route.
     ///
     /// # Examples
@@ -968,6 +996,11 @@ impl Route {
     }
 
     #[must_use]
+    pub(crate) fn app_name(&self) -> Option<&AppName> {
+        self.app_name.as_ref()
+    }
+
+    #[must_use]
     pub(crate) fn kind(&self) -> RouteKind {
         match &self.view {
             RouteInner::Handler(_) => RouteKind::Handler,
@@ -985,14 +1018,6 @@ impl Route {
             #[cfg(feature = "openapi")]
             RouteInner::ApiHandler(_) => None,
         }
-    }
-
-    #[must_use]
-    fn with_app_name_if_unset(mut self, app_name: Option<AppName>) -> Self {
-        if self.app_name.is_none() {
-            self.app_name = app_name;
-        }
-        self
     }
 }
 
@@ -2126,6 +2151,17 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(
+        expected = "route conflict error: duplicate route name: `home` is registered at both `/a` and `/b`; route names must be unique within the same app"
+    )]
+    fn router_duplicate_route_name_same_app_panics() {
+        let _ = Router::with_urls(vec![
+            Route::with_handler_and_name("/a", MockHandler, "home"),
+            Route::with_handler_and_name("/b", MockHandler, "home"),
+        ]);
+    }
+
+    #[test]
     fn router_duplicate_nested_router_routes_merge() {
         let router1 = Router::with_urls(vec![Route::with_handler_and_name("/a", MockHandler, "a")]);
         let router2 = Router::with_urls(vec![Route::with_handler_and_name("/b", MockHandler, "b")]);
@@ -2198,6 +2234,26 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "route conflict error: duplicate route name")]
+    fn router_merged_routers_both_unscoped_same_name_panics() {
+        let router1 = Router::with_urls(vec![Route::with_handler_and_name(
+            "/a",
+            MockHandler,
+            "home",
+        )]);
+        let router2 = Router::with_urls(vec![Route::with_handler_and_name(
+            "/b",
+            MockHandler,
+            "home",
+        )]);
+
+        let _ = Router::with_urls(vec![
+            Route::with_router("/shared", router1),
+            Route::with_router("/shared", router2),
+        ]);
+    }
+
+    #[test]
     fn router_merged_routers_reverse_scoped_by_app_name() {
         let mut router1 = Router::with_urls(vec![Route::with_handler_and_name(
             "/one",
@@ -2230,6 +2286,60 @@ mod tests {
                 .unwrap(),
             "/shared/two"
         );
+    }
+
+    #[test]
+    fn router_reverse_prefers_exact_app_scope_over_unscoped_candidate() {
+        // router with no name set
+        let unscoped_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/unscoped",
+            MockHandler,
+            "dup",
+        )]);
+
+        // router with name set
+        let mut scoped_router = Router::with_urls(vec![Route::with_handler_and_name(
+            "/scoped",
+            MockHandler,
+            "dup",
+        )]);
+        scoped_router.set_app_name(AppName("app1".to_string()));
+
+        let router = Router::with_urls(vec![
+            Route::with_router("/a", unscoped_router),
+            Route::with_router("/a", scoped_router),
+        ]);
+
+        let url = router
+            .reverse(Some("app1"), "dup", &ReverseParamMap::new())
+            .unwrap();
+        assert_eq!(url, "/a/scoped");
+    }
+
+    #[test]
+    fn router_reverse_no_app_name_returns_none() {
+        let mut router1 = Router::with_urls(vec![Route::with_handler_and_name(
+            "/one",
+            MockHandler,
+            "home",
+        )]);
+        router1.set_app_name(AppName("app1".to_string()));
+        let mut router2 = Router::with_urls(vec![Route::with_handler_and_name(
+            "/two",
+            MockHandler,
+            "home",
+        )]);
+        router2.set_app_name(AppName("app2".to_string()));
+
+        let router = Router::with_urls(vec![
+            Route::with_router("/shared", router1),
+            Route::with_router("/shared", router2),
+        ]);
+
+        let result = router
+            .reverse_option(None, "home", &ReverseParamMap::new())
+            .unwrap();
+        assert!(result.is_none());
     }
 
     #[test]

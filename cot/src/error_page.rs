@@ -159,6 +159,10 @@ impl ErrorPageTemplateBuilder {
                     crate::router::RouteKind::Handler => "View".to_owned(),
                 },
                 name: route.name().unwrap_or_default().to_owned(),
+                app: route
+                    .app_name()
+                    .map(|a| a.0.clone())
+                    .unwrap_or_default(),
             });
 
             if let Some(inner_router) = route.router() {
@@ -250,6 +254,7 @@ struct RouteData {
     path: String,
     kind: String,
     name: String,
+    app: String,
 }
 
 #[derive(Debug, Clone)]
@@ -627,13 +632,15 @@ mod tests {
                     index: "0".to_string(),
                     path: "/foo".to_string(),
                     kind: "Root Router".to_string(),
-                    name: String::new()
+                    name: String::new(),
+                    app: String::new()
                 },
                 RouteData {
                     index: "0.0".to_string(),
                     path: "/foo/bar".to_string(),
                     kind: "Router".to_string(),
-                    name: String::new()
+                    name: String::new(),
+                    app: String::new()
                 }
             ]
         );

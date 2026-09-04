@@ -12,6 +12,15 @@ struct TestModel {
     name: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+#[model]
+struct ConcatModel {
+    #[model(primary_key)]
+    id: Auto<i32>,
+    first_name: String,
+    last_name: String,
+}
+
 // Check different types for the primary key
 #[derive(Debug, PartialEq)]
 #[model]
@@ -59,6 +68,23 @@ const CREATE_TEST_MODEL: Operation = Operation::create_model()
     ])
     .build();
 
+const CREATE_CONCAT_MODEL: Operation = Operation::create_model()
+    .table_name(Identifier::new("cot__concat_model"))
+    .fields(&[
+        Field::new(Identifier::new("id"), <Auto<i32> as DatabaseField>::TYPE)
+            .primary_key()
+            .auto(),
+        Field::new(
+            Identifier::new("first_name"),
+            <String as DatabaseField>::TYPE,
+        ),
+        Field::new(
+            Identifier::new("last_name"),
+            <String as DatabaseField>::TYPE,
+        ),
+    ])
+    .build();
+
 #[cot_macros::dbtest]
 async fn model_crud(test_db: &mut TestDatabase) {
     migrate_test_model(&*test_db).await;
@@ -92,6 +118,31 @@ async fn model_crud(test_db: &mut TestDatabase) {
         .unwrap();
 
     assert_eq!(TestModel::objects().all(&**test_db).await.unwrap(), vec![]);
+}
+
+#[cot_macros::dbtest]
+async fn string_concat_filter(test_db: &mut TestDatabase) {
+    CREATE_CONCAT_MODEL.forwards(&*test_db).await.unwrap();
+
+    let mut model = ConcatModel {
+        id: Auto::auto(),
+        first_name: "Ada".to_owned(),
+        last_name: "Lovelace".to_owned(),
+    };
+    model.insert(&**test_db).await.unwrap();
+
+    let with_separator =
+        query!(ConcatModel, $first_name.concat(" ").concat($last_name) == "Ada Lovelace")
+            .all(&**test_db)
+            .await
+            .unwrap();
+    assert_eq!(with_separator, vec![model.clone()]);
+
+    let fields_only = query!(ConcatModel, $first_name.concat($last_name) == "AdaLovelace")
+        .all(&**test_db)
+        .await
+        .unwrap();
+    assert_eq!(fields_only, vec![model]);
 }
 
 #[cot_macros::dbtest]

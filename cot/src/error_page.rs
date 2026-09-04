@@ -159,10 +159,7 @@ impl ErrorPageTemplateBuilder {
                     crate::router::RouteKind::Handler => "View".to_owned(),
                 },
                 name: route.name().unwrap_or_default().to_owned(),
-                app: route
-                    .app_name()
-                    .map(|a| a.0.clone())
-                    .unwrap_or_default(),
+                app: route.app_name().map(|a| a.0.clone()).unwrap_or_default(),
             });
 
             if let Some(inner_router) = route.router() {

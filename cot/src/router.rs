@@ -236,8 +236,8 @@ impl Router {
         let merged_router = Router::try_with_urls(combined)?;
 
         // setting the router's url to that of the existing route is done purely
-        // for deterministic purposes. This should have no side-effect since we match
-        // against the normalized url
+        // for deterministic purposes. This should have no side-effect since we
+        // match against the normalized url
         Ok(Route::with_router(&existing.url(), merged_router))
     }
 

@@ -418,10 +418,12 @@ impl Router {
                 let prefix = AbsolutePath::new(route.url.reverse(params)?);
                 let suffix = AbsolutePath::new(url);
 
-                // we are in a sub-router, and if its parent does not end in a trailing slash
-                // (eg. `foo`) and the found route is the sub-router's root
-                // (`/`), then we can safely assume that the trailing-slash
-                // version (eg. `foo/`) does not exist. We return its parent and must not join
+                // we are in a sub-router, and if its parent does not end in a
+                // trailing slash (eg. `foo`) and the found
+                // route is the sub-router's root (`/`), then we
+                // can safely assume that the trailing-slash
+                // version (eg. `foo/`) does not exist. We return its parent and
+                // must not join
                 let combined = if !prefix.as_str().ends_with('/') && suffix.as_str() == "/" {
                     prefix
                 } else {

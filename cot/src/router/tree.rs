@@ -48,10 +48,12 @@ impl RouteTrie {
             HashMap::new();
         for (i, route) in routes.iter().enumerate() {
             let pattern = if route.kind() == RouteKind::Router {
-                // normalize path of sub-routers since we will attach an internal wildcard
-                // sentinel. This should also allow us reject routes for
+                // normalize path of sub-routers since we will attach an
+                // internal wildcard sentinel. This should also
+                // allow us reject routes for
                 // routers(sub-routers) who's version without a trailing slash
-                // already exist. (eg. `foo` and `foo/`cannot overlap as sub-routers)
+                // already exist. (eg. `foo` and `foo/`cannot overlap as
+                // sub-routers)
                 router_mount_pattern(route)
             } else {
                 MatchitPattern::try_from(route.url.clone())?
@@ -103,9 +105,9 @@ impl RouteTrie {
                 .or(router_idx)
                 .expect("route index should exist");
 
-            // we insert the original path, not the (possibly trimmed) deduped route so that
-            // routers(sub-routers) that were mounted/declared with trailing slashes still
-            // match.
+            // we insert the original path, not the (possibly trimmed) deduped
+            // route so that routers(sub-routers) that were
+            // mounted/declared with trailing slashes still match.
             let insertion_pattern = MatchitPattern::try_from(routes[route_idx].url.clone())?;
             Self::insert_or_diagnose(
                 &mut inner,
@@ -115,9 +117,10 @@ impl RouteTrie {
                 routes,
             )?;
 
-            // when a nested router is provided, we treat it as a "false" wildcard segment
-            // and keep a sentinel there so we can use that to find what sub router to
-            // search at lookup time.
+            // when a nested router is provided, we treat it as a "false"
+            // wildcard segment and keep a sentinel there so we can
+            // use that to find what sub router to search at lookup
+            // time.
             if let Some(r) = router_idx {
                 let prefix = AbsolutePath::new(routes[route_idx].url());
                 let wildcard_suffix = AbsolutePath::new(format!("{{*{NESTED_ROUTER_PARAM}}}"));

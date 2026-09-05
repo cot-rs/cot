@@ -485,7 +485,7 @@ mod tests {
     struct MockHandler;
 
     impl RequestHandler for MockHandler {
-        fn handle(&self, _request: Request) -> impl Future<Output=Result<Response>> {
+        fn handle(&self, _request: Request) -> impl Future<Output = Result<Response>> {
             std::future::ready(Html::new("OK").into_response())
         }
     }

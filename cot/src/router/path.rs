@@ -3,6 +3,7 @@
 //! This module provides a path matcher that can be used to match paths against
 //! a given pattern. It also provides a way to reverse paths to their original
 //! form given a set of parameters.
+
 use std::collections::HashMap;
 use std::fmt::{Display, Write};
 use std::sync::Arc;

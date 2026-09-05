@@ -4,6 +4,7 @@ pub mod args;
 pub mod handlers;
 pub mod migration_generator;
 pub mod new_project;
+pub mod project;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 mod utils;

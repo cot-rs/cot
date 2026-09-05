@@ -92,6 +92,7 @@
                     <th scope="col">URL</th>
                     <th scope="col">Type</th>
                     <th scope="col">Name</th>
+                    <th scope="col">App</th>
                 </tr>
             </thead>
             <tbody>
@@ -111,6 +112,13 @@
                                 <em>&lt;none&gt;</em>
                             {% else %}
                                 {{ route.name }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if route.app.is_empty() %}
+                                <em>&lt;none&gt;</em>
+                            {% else %}
+                                {{ route.app }}
                             {% endif %}
                         </td>
                     </tr>

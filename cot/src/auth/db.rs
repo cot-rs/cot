@@ -341,9 +341,10 @@ impl DatabaseUser {
                 PasswordVerificationResult::Invalid => Ok(None),
             }
         } else {
-            // SECURITY: If no user was found, run the same hashing function to prevent
-            // timing attacks from being used to determine if a user exists. Additionally,
-            // do something with the result to prevent the compiler from optimizing out the
+            // SECURITY: If no user was found, run the same hashing function to
+            // prevent timing attacks from being used to determine
+            // if a user exists. Additionally, do something with the
+            // result to prevent the compiler from optimizing out the
             // operation.
             // TODO: benchmark this to make sure it works as expected
             let dummy_hash = PasswordHash::from_password(credentials.password());

@@ -249,6 +249,7 @@ impl_db_field!(Vec<u8>, Blob);
 impl_db_field!(Bytes, Blob, with Vec<u8>);
 
 impl TextField for String {}
+impl TextField for &str {}
 
 impl ToDbValue for &str {
     fn to_db_value(&self) -> DbValue {

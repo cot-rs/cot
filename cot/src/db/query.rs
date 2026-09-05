@@ -8,8 +8,8 @@ use derive_more::with_trait::Debug;
 use thiserror::Error;
 
 use crate::db;
-use crate::db::query::expr::SqlQueryBuilder;
 pub use crate::db::query::expr::{Expr, ExprAdd, ExprDiv, ExprMul, ExprOrd, ExprSub};
+use crate::db::query::expr::{OrderByExpr, SqlQueryBuilder};
 use crate::db::{Auto, DatabaseBackend, ForeignKey, Model, StatementResult, ToDbFieldValue};
 const ERROR_PREFIX: &str = "expression error:";
 
@@ -47,6 +47,7 @@ pub enum QueryBuildingError {
 pub struct Query<T> {
     filter: Option<Expr>,
     limit: Option<u64>,
+    order_by: Vec<OrderByExpr>,
     offset: Option<u64>,
     phantom_data: PhantomData<fn() -> T>,
 }
@@ -56,6 +57,7 @@ impl<T> Debug for Query<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Query")
             .field("filter", &self.filter)
+            .field("order_by", &self.order_by)
             .field("limit", &self.limit)
             .field("offset", &self.offset)
             .field("phantom_data", &self.phantom_data)
@@ -69,6 +71,7 @@ impl<T> Clone for Query<T> {
         Self {
             filter: self.filter.clone(),
             limit: self.limit,
+            order_by: self.order_by.clone(),
             offset: self.offset,
             phantom_data: PhantomData,
         }
@@ -112,6 +115,7 @@ impl<T: Model> Query<T> {
         Self {
             filter: None,
             limit: None,
+            order_by: Vec::new(),
             offset: None,
             phantom_data: PhantomData,
         }
@@ -160,6 +164,36 @@ impl<T: Model> Query<T> {
     /// ```
     pub fn limit(&mut self, limit: u64) -> &mut Self {
         self.limit = Some(limit);
+        self
+    }
+
+    /// Set an order for records from the query.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cot::db::model;
+    /// use cot::db::query::{ExprSort, Query};
+    ///
+    /// #[model]
+    /// struct User {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    ///     name: String,
+    /// }
+    ///
+    /// let mut query = Query::<User>::new();
+    /// query.order_by([
+    ///     <User as cot::db::Model>::Fields::id.asc(),
+    ///     <User as cot::db::Model>::Fields::name.desc().nulls_first(),
+    /// ]);
+    /// ```
+    pub fn order_by<I, O>(&mut self, order_by: I) -> &mut Self
+    where
+        O: Into<OrderByExpr>,
+        I: IntoIterator<Item = O>,
+    {
+        self.order_by = order_by.into_iter().map(Into::into).collect();
         self
     }
 
@@ -247,6 +281,17 @@ impl<T: Model> Query<T> {
         if let Some(limit) = self.limit {
             statement.limit(limit);
         }
+    }
+
+    pub(super) fn add_order_by_to_statement(
+        &self,
+        statement: &mut sea_query::SelectStatement,
+        sql_builder: &dyn SqlQueryBuilder,
+    ) -> Result<(), QueryBuildingError> {
+        for order_by in &self.order_by {
+            order_by.add_to_statement(statement, sql_builder)?;
+        }
+        Ok(())
     }
 
     pub(super) fn add_offset_to_statement(&self, statement: &mut sea_query::SelectStatement) {

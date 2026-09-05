@@ -1360,14 +1360,11 @@ impl<T> FieldRef<T> {
     }
 }
 
-impl<LHS, RHS> Add<FieldRef<RHS>> for FieldRef<LHS>
-where
-    FieldRef<LHS>: ExprAdd<FieldRef<RHS>>,
-{
+impl<Lhs, Rhs> Add<FieldRef<Rhs>> for FieldRef<Lhs> {
     type Output = Expr;
 
-    fn add(self, rhs: FieldRef<RHS>) -> Self::Output {
-        ExprAdd::add(self, rhs)
+    fn add(self, rhs: FieldRef<Rhs>) -> Self::Output {
+        Expr::add(self.as_expr(), rhs.as_expr())
     }
 }
 
@@ -1700,16 +1697,13 @@ impl_num_expr!(f64);
 
 impl ExprAdd<String> for FieldRef<String> {
     fn add<V: Into<String>>(self, other: V) -> Expr {
-        Expr::add(Expr::field(self.identifier()), Expr::value(other.into()))
+        Expr::add(self.as_expr(), Expr::value(other.into()))
     }
 }
 
 impl<const LIMIT: u32> ExprAdd<FieldRef<LimitedString<LIMIT>>> for FieldRef<LimitedString<LIMIT>> {
     fn add<V: Into<FieldRef<LimitedString<LIMIT>>>>(self, other: V) -> Expr {
-        Expr::add(
-            Expr::field(self.identifier()),
-            Expr::field(other.into().identifier()),
-        )
+        Expr::add(self.as_expr(), other.into().as_expr())
     }
 }
 #[cfg(test)]

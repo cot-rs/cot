@@ -14,6 +14,8 @@ use cot::db::impl_mysql::MySqlValueRef;
 use cot::db::impl_postgres::PostgresValueRef;
 #[cfg(feature = "sqlite")]
 use cot::db::impl_sqlite::SqliteValueRef;
+use cot::db::query::expr::FieldRef;
+use cot::db::query::{Expr, ExprAdd};
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
 use securer_string::SecureString;
@@ -464,6 +466,12 @@ impl DatabaseField for Url {
 #[cfg(feature = "db")]
 impl TextField for Url {}
 
+impl ExprAdd<Url> for FieldRef<Url> {
+    fn add<V: Into<Url>>(self, other: V) -> Expr {
+        Expr::add(self.as_expr(), Expr::value(other.into()))
+    }
+}
+
 /// A validated email address.
 ///
 /// This is a newtype wrapper around [`EmailAddress`] that provides validation
@@ -812,6 +820,12 @@ impl Display for Email {
 
 #[cfg(feature = "db")]
 impl TextField for Email {}
+
+impl ExprAdd<Email> for FieldRef<Email> {
+    fn add<V: Into<Email>>(self, other: V) -> Expr {
+        Expr::add(self.as_expr(), Expr::value(other.into()))
+    }
+}
 
 #[cfg(test)]
 mod tests {

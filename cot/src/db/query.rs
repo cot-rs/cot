@@ -173,16 +173,20 @@ impl<T: Model> Query<T> {
     ///
     /// ```
     /// use cot::db::model;
-    /// use cot::db::query::{Expr, Query};
+    /// use cot::db::query::{ExprSort, Query};
     ///
     /// #[model]
     /// struct User {
     ///     #[model(primary_key)]
     ///     id: i32,
-    ///     age: i32,
+    ///     name: String,
     /// }
     ///
-    /// let query = Query::<User>::new().order_by(User::age, Order::Asc); // or Order::Desc
+    /// let mut query = Query::<User>::new();
+    /// query.order_by([
+    ///     <User as cot::db::Model>::Fields::id.asc(),
+    ///     <User as cot::db::Model>::Fields::name.desc().nulls_first(),
+    /// ]);
     /// ```
     pub fn order_by<I, O>(&mut self, order_by: I) -> &mut Self
     where

@@ -1,3 +1,4 @@
+//! Database expression for order_by
 use cot::db::{DbFieldValue, ToDbFieldValue};
 
 use crate::db::Identifier;
@@ -129,7 +130,7 @@ impl OrderByExpr {
     ///
     /// # Panics
     ///
-    /// Panics if this term was built with [`ExprSort::custom_order`]. A
+    /// Panics if this term was built with [`ExprSort::custom`]. A
     /// custom-order term never produces a `NULL` sort key,
     /// so an explicit `NULLS` placement on top of it can never have any
     /// effect.

@@ -420,6 +420,121 @@ async fn search_customers_with_expr(db: Database) -> cot::Result<()> {
 
 For the complete list of pattern-matching methods, their case-insensitive counterparts, and the glob pattern syntax used by `raw_like`, see the [`Expr`](enum@cot::db::query::expr::Expr) and [`ExprLike`](trait@cot::db::query::expr::ExprLike) docs.
 
+## Ordering results
+
+Cot lets you control the order rows come back in with the [`order_by`](struct@cot::db::query::Query#method.order_by) method on [`Query`](struct@cot::db::query::Query). Call it with a list of ordering terms built from a model's `Fields`.
+
+```rust
+use cot::db::Database;
+use cot::db::Model;
+
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, #[model(unique)] email: cot::common_types::Email, full_name: LimitedString<128>, is_verified: bool }
+async fn get_customers_by_name(db: Database) -> cot::Result<()> {
+    let customers = Customer::objects()
+        .order_by([<Customer as Model>::Fields::full_name.asc()])
+        .all(&db)
+        .await?;
+    println!("Customers: {:?}", customers);
+#   Ok(())
+}
+```
+
+The example above sorts customers alphabetically by `full_name`. Use [`desc`](trait@cot::db::query::expr::ExprSort#method.desc) instead of `asc` to reverse the order. If you pass a bare field without calling `asc` or `desc` on it, it defaults to ascending order.
+
+```rust
+# use cot::db::Model;
+# #[model] #[derive(Debug)] struct Customer { #[model(primary_key)] id: Auto<i64>, full_name: LimitedString<128> }
+# async fn foo(db: &cot::db::Database) -> cot::Result<()> {
+let customers = Customer::objects()
+    .order_by([<Customer as Model>::Fields::full_name])
+    .all(db)
+    .await?;
+# Ok(())
+# }
+```
+
+`order_by` works alongside `filter`, `limit`, and `offset`, and combines cleanly with the `query!` macro too, since it all returns a `Query`.
+
+### Ordering by multiple fields
+
+Pass more than one term to `order_by` to break ties. Terms are applied in the order given, so the first term is the primary sort and later ones only kick in when earlier ones tie.
+
+```rust
+# use cot::db::Model;
+# #[model] #[derive(Debug)] struct Order { #[model(primary_key)] id: Auto<i64>, is_fulfilled: bool, quantity: i32 }
+# async fn foo(db: &cot::db::Database) -> cot::Result<()> {
+let orders = Order::objects()
+    .order_by([
+        <Order as Model>::Fields::is_fulfilled.asc(),
+        <Order as Model>::Fields::quantity.desc(),
+    ])
+    .all(db)
+    .await?;
+# Ok(())
+# }
+```
+
+This sorts unfulfilled orders first, and within each fulfillment status, sorts by quantity descending.
+
+### Controlling where NULLs land
+
+If a field is nullable, use [`nulls_first`](struct@cot::db::query::expr::OrderByExpr#method.nulls_first) or [`nulls_last`](struct@cot::db::query::expr::OrderByExpr#method.nulls_last) to pin down where `NULL` values show up, regardless of database backend or sort direction.
+
+```rust
+# use cot::db::Model;
+# #[model] #[derive(Debug)] struct Product { #[model(primary_key)] id: Auto<i64>, price_cents: i64, stock: Option<i32> }
+# async fn foo(db: &cot::db::Database) -> cot::Result<()> {
+let products = Product::objects()
+    .order_by([<Product as Model>::Fields::stock.asc().nulls_last()])
+    .all(db)
+    .await?;
+# Ok(())
+# }
+```
+
+Without `nulls_first`/`nulls_last`, where `NULL`s land is left to the database's default behavior, which differs between backends.
+
+### Ordering by an expression
+
+You're not limited to ordering by a single column. Any [`Expr`](enum@cot::db::query::expr::Expr) can be turned into an ordering term by calling `asc()` or `desc()` on it directly, which is handy for computed values like sums.
+
+```rust
+# use cot::db::Model;
+# use cot::db::query::expr::Expr;
+# #[model] #[derive(Debug)] struct Order { #[model(primary_key)] id: Auto<i64>, quantity: i32, price_cents: i64 }
+# async fn foo(db: &cot::db::Database) -> cot::Result<()> {
+let orders = Order::objects()
+    .order_by([
+        (<Order as Model>::Fields::quantity + <Order as Model>::Fields::price_cents).desc(),
+    ])
+    .all(db)
+    .await?;
+# Ok(())
+# }
+```
+
+This sorts orders by `quantity + price_cents`, largest first.
+
+### Custom ranking
+
+Sometimes alphabetical or numeric order isn't what you want, you want a specific, hand-picked order instead. The [`custom`](trait@cot::db::query::expr::ExprSort#method.custom) method lets you rank rows by matching a field against a list of values you provide, in the order you give them.
+
+```rust
+# use cot::db::Model;
+# #[model] #[derive(Debug)] struct Product { #[model(primary_key)] id: Auto<i64>, sku: LimitedString<64> }
+# async fn foo(db: &cot::db::Database) -> cot::Result<()> {
+// Featured products first, in this exact order, regardless of their SKU
+// or insertion order.
+let products = Product::objects()
+    .order_by([<Product as Model>::Fields::sku.custom(["SKU-003", "SKU-001", "SKU-002"])])
+    .all(db)
+    .await?;
+# Ok(())
+# }
+```
+
+Rows whose value isn't in the list still come back, they just end up somewhere after the ranked ones, in no guaranteed order. `nulls_first`/`nulls_last` can't be combined with `custom`, since a custom-ranked term never produces a `NULL` sort key in the first place.
+
 ## Removing an object
 The [`delete`](struct@cot::db::query::Query#method.delete) method can be used to remove an object from the database. The example below shows how to remove a `Customer` instance with the primary key of `5`.
 

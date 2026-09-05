@@ -1,0 +1,14 @@
+---
+source: cot-cli/tests/snapshot_testing/external/check.rs
+info:
+  program: cot
+  args:
+    - check
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+Error: unknown command `check` and no project binary was found in the `target` dir.
+Hint: run `cargo build` first, or pass `cot --build check` to build it automatically.

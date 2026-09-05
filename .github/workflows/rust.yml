@@ -17,7 +17,7 @@ env:
 
   _RUST_STABLE: &rust_stable stable
   # Pinning the nightly version to a "stable" version to avoid CI breakages.
-  _RUST_NIGHTLY: &rust_nightly nightly-2026-08-28
+  _RUST_NIGHTLY: &rust_nightly nightly-2026-09-02
 
 # See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
 # This will ensure that only one commit will be running tests at a time on each PR.
@@ -95,7 +95,7 @@ jobs:
           version: "v0.16.0"
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.85.4
+        uses: taiki-e/install-action@v2.87.1
         with:
           tool: nextest
 
@@ -170,7 +170,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.85.4
+        uses: taiki-e/install-action@v2.87.1
         with:
           tool: nextest
 
@@ -388,7 +388,7 @@ jobs:
           save-if: 'false'
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.85.4
+        uses: taiki-e/install-action@v2.87.1
         with:
           tool: nextest
 

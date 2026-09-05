@@ -453,8 +453,10 @@ impl MigrationEngine {
         while let Some(index) = queue.pop_front() {
             for &dependent_index in graph.get_edges(index) {
                 if rollback_indices.insert(dependent_index) {
-                    // we found a migration that depends on the one we're rolling back, so let's
-                    // add it to the queue which we will later traverse its dependents as well.
+                    // we found a migration that depends on the one we're
+                    // rolling back, so let's add it to the
+                    // queue which we will later traverse its dependents as
+                    // well.
                     queue.push_back(dependent_index);
                 }
             }

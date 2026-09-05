@@ -2365,9 +2365,9 @@ impl Database {
             .collect();
         let value_indices: Vec<_> = (0..T::COLUMNS.len()).collect();
 
-        // Determine which columns are Auto vs Value by examining the first instance
-        // (all instances should have the same structure, as we are inserting a single
-        // Model)
+        // Determine which columns are Auto vs Value by examining the first
+        // instance (all instances should have the same structure, as we
+        // are inserting a single Model)
         let first_values = data[0]
             .get_values(&value_indices)
             .into_iter()
@@ -2516,8 +2516,9 @@ impl Database {
             })?;
 
             // Fetch the inserted rows using a SELECT query
-            // Note: This assumes IDs are consecutive, which is generally safe for
-            // auto_increment but could fail with concurrent inserts
+            // Note: This assumes IDs are consecutive, which is generally safe
+            // for auto_increment but could fail with concurrent
+            // inserts
             let query = sea_query::Query::select()
                 .from(T::TABLE_NAME)
                 .columns(auto_col_identifiers.iter().cloned())

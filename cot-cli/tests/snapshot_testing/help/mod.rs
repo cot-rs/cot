@@ -1,3 +1,5 @@
+mod external;
+
 use super::*;
 
 #[test]
@@ -11,7 +13,7 @@ fn no_args() {
 fn short_help() {
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(cot_cli!("-h")) }
+        { assert_cmd_snapshot!(cot_cli!("-p","cot-cli","-h")) }
     );
 }
 
@@ -19,7 +21,7 @@ fn short_help() {
 fn long_help() {
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(cot_cli!("--help")) }
+        { assert_cmd_snapshot!(cot_cli!("-p","cot-cli","--help")) }
     );
 }
 

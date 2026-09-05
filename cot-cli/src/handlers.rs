@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ffi::OsString;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
@@ -5,7 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::CommandFactory;
-use cot::metadata::CommandMeta;
+use cot::metadata::{ArgMeta, CommandMeta};
 use cot::utils::cli::{StatusType, print_status_msg};
 
 use crate::args::{
@@ -181,6 +182,112 @@ fn exec(proj: &ProjectBinary, args: &[OsString]) -> anyhow::Result<()> {
         let status = std::process::Command::new(&proj.path).args(args).status()?;
         std::process::exit(status.code().unwrap_or(1));
     }
+}
+
+/// Build a fresh [`clap::Command`] and inject the project's subcommands into
+/// it before printing.
+pub fn handle_combined_help(
+    project: Option<&ProjectBinary>,
+    path: &[String],
+) -> anyhow::Result<()> {
+    let cmd = combined_help_command(project);
+    let mut target = navigate_to(cmd, path);
+    target.print_help()?;
+    println!();
+    Ok(())
+}
+
+fn navigate_to(mut cmd: clap::Command, path: &[String]) -> clap::Command {
+    let mut bin_name = cmd.get_name().to_string();
+
+    for segment in path {
+        match cmd.find_subcommand(segment) {
+            Some(sub) => {
+                bin_name = format!("{bin_name} {segment}");
+                cmd = sub.clone();
+            }
+            None => break,
+        }
+    }
+
+    cmd.bin_name(bin_name)
+}
+
+fn combined_help_command(project: Option<&ProjectBinary>) -> clap::Command {
+    let mut cmd = Cli::command();
+
+    if let Some(proj) = project
+        && let Some(meta) = &proj.metadata
+    {
+        let mut cmd_set: HashSet<String> = cmd
+            .get_subcommands()
+            .map(|sc| sc.get_name().to_string())
+            .collect();
+
+        for meta_cmd in &meta.commands {
+            if cmd_set.insert(meta_cmd.name.clone()) {
+                cmd = cmd.subcommand(build_clap_subcommand(meta_cmd));
+            } else {
+                // there's an existing command, let's merge them into one. For command
+                // collisions, metadata(such as name and about) of the command
+                // present in `cot-cli` will take precedence.
+                cmd = cmd.mut_subcommand(&meta_cmd.name, |mut sc| {
+                    for sub in &meta_cmd.subcommands {
+                        sc = sc.subcommand(build_clap_subcommand(sub));
+                    }
+                    sc
+                });
+            }
+        }
+    }
+
+    cmd
+}
+
+fn build_clap_subcommand(meta: &CommandMeta) -> clap::Command {
+    let mut cmd = clap::Command::new(&meta.name);
+
+    if let Some(about) = &meta.about {
+        cmd = cmd.about(about.clone());
+    }
+
+    for alias in &meta.aliases {
+        cmd = cmd.visible_alias(alias.clone());
+    }
+
+    for arg_meta in &meta.args {
+        cmd = cmd.arg(build_clap_arg(arg_meta));
+    }
+
+    for sub in &meta.subcommands {
+        cmd = cmd.subcommand(build_clap_subcommand(sub));
+    }
+
+    cmd
+}
+
+fn build_clap_arg(meta: &ArgMeta) -> clap::Arg {
+    let mut arg = clap::Arg::new(&meta.name).required(meta.required);
+
+    if meta.is_positional
+        && let Some(vn) = &meta.value_name
+    {
+        arg = arg.value_name(vn.clone());
+    } else {
+        if let Some(long) = &meta.long {
+            arg = arg.long(long.clone());
+        }
+        if let Some(short) = meta.short {
+            arg = arg.short(short);
+        }
+        if !meta.takes_value {
+            arg = arg.action(clap::ArgAction::SetTrue);
+        }
+    }
+    if let Some(help) = &meta.help {
+        arg = arg.help(help.clone());
+    }
+    arg
 }
 
 fn generate_completions(shell: clap_complete::Shell, writer: &mut impl std::io::Write) {
@@ -456,5 +563,237 @@ mod tests {
     #[test]
     fn command_path_exists_empty_path_is_true() {
         assert!(command_path_exists(&[], &[]));
+    }
+
+    #[test]
+    fn build_clap_subcommand_preserves_about_aliases_and_nested_subcommands() {
+        let meta = CommandMeta {
+            name: "migration".to_string(),
+            about: Some("Migration commands".to_string()),
+            aliases: vec!["database".to_string()],
+            subcommands: vec![CommandMeta {
+                name: "rollback".to_string(),
+                about: Some("Rollback migrations".to_string()),
+                aliases: vec!["rbk".to_string()],
+                subcommands: vec![],
+                args: vec![],
+            }],
+            args: vec![],
+        };
+
+        let cmd = build_clap_subcommand(&meta);
+
+        assert_eq!(cmd.get_name(), "migration");
+        assert_eq!(cmd.get_about().unwrap().to_string(), "Migration commands");
+        assert!(cmd.get_all_aliases().any(|alias| alias == "database"));
+        let nested = cmd
+            .get_subcommands()
+            .find(|subcommand| subcommand.get_name() == "rollback")
+            .unwrap();
+        assert_eq!(
+            nested.get_about().unwrap().to_string(),
+            "Rollback migrations"
+        );
+        assert!(nested.get_all_aliases().any(|alias| alias == "rbk"));
+    }
+
+    #[test]
+    fn build_clap_arg_positional_required() {
+        let meta = ArgMeta {
+            name: "migration_name".to_string(),
+            long: None,
+            short: None,
+            help: Some("Migration to roll back to".to_string()),
+            required: true,
+            is_positional: true,
+            takes_value: true,
+            value_name: Some("MIGRATION_NAME".to_string()),
+        };
+
+        let arg = build_clap_arg(&meta);
+
+        assert!(arg.is_required_set());
+        assert!(arg.is_positional());
+        assert_eq!(arg.get_value_names().unwrap()[0].as_str(), "MIGRATION_NAME");
+    }
+
+    #[test]
+    fn build_clap_arg_boolean_flag_sets_true_action() {
+        let meta = ArgMeta {
+            name: "dry-run".to_string(),
+            long: Some("dry-run".to_string()),
+            short: None,
+            help: None,
+            required: false,
+            is_positional: false,
+            takes_value: false,
+            value_name: None,
+        };
+
+        let arg = build_clap_arg(&meta);
+
+        assert_eq!(arg.get_long(), Some("dry-run"));
+    }
+
+    #[test]
+    fn build_clap_arg_valued_flag_with_short_and_long() {
+        let meta = ArgMeta {
+            name: "app".to_string(),
+            long: Some("app".to_string()),
+            short: Some('a'),
+            help: Some("App name".to_string()),
+            required: false,
+            is_positional: false,
+            takes_value: true,
+            value_name: None,
+        };
+
+        let arg = build_clap_arg(&meta);
+
+        assert_eq!(arg.get_long(), Some("app"));
+        assert_eq!(arg.get_short(), Some('a'));
+    }
+
+    #[test]
+    fn combined_help_command_includes_project_commands_and_builtin_commands() {
+        let project = ProjectBinary {
+            path: PathBuf::from("target/debug/example"),
+            metadata: Some(cot::metadata::ProjectMetadata {
+                version: cot::metadata::METADATA_SCHEMA_VERSION,
+                binary_name: "example".to_string(),
+                commands: vec![CommandMeta {
+                    name: "health".to_string(),
+                    about: Some("Check the server health".to_string()),
+                    aliases: vec![],
+                    subcommands: vec![],
+                    args: vec![],
+                }],
+            }),
+        };
+
+        let cmd = combined_help_command(Some(&project));
+
+        assert!(
+            cmd.get_subcommands()
+                .any(|subcommand| subcommand.get_name() == "new")
+        );
+        let health = cmd
+            .get_subcommands()
+            .find(|subcommand| subcommand.get_name() == "health")
+            .unwrap();
+        assert_eq!(
+            health.get_about().unwrap().to_string(),
+            "Check the server health"
+        );
+    }
+
+    #[test]
+    fn combined_help_command_merges_duplicate_subcommand_preserving_builtin_about() {
+        let project = ProjectBinary {
+            path: PathBuf::from("target/debug/example"),
+            metadata: Some(cot::metadata::ProjectMetadata {
+                version: cot::metadata::METADATA_SCHEMA_VERSION,
+                binary_name: "example".to_string(),
+                commands: vec![CommandMeta {
+                    name: "migration".to_string(),
+                    about: Some("Should not override cot-cli's about".to_string()),
+                    aliases: vec![],
+                    subcommands: vec![CommandMeta {
+                        name: "rollback".to_string(),
+                        about: Some("Rollback migrations".to_string()),
+                        aliases: vec![],
+                        subcommands: vec![],
+                        args: vec![],
+                    }],
+                    args: vec![],
+                }],
+            }),
+        };
+
+        let cmd = combined_help_command(Some(&project));
+
+        let matches: Vec<_> = cmd
+            .get_subcommands()
+            .filter(|sc| sc.get_name() == "migration")
+            .collect();
+        assert_eq!(matches.len(), 1, "migration should not be duplicated");
+
+        let migration = matches[0];
+        assert_eq!(
+            migration.get_about().unwrap().to_string(),
+            "Manage migrations for a Cot project"
+        );
+        assert!(
+            migration
+                .get_subcommands()
+                .any(|sc| sc.get_name() == "rollback")
+        );
+        assert!(
+            migration
+                .get_subcommands()
+                .any(|sc| sc.get_name() == "list")
+        );
+    }
+
+    #[test]
+    fn navigate_to_returns_root_for_empty_path() {
+        let cmd = combined_help_command(None);
+        let target = navigate_to(cmd, &[]);
+        assert_eq!(target.get_name(), "cot");
+    }
+
+    #[test]
+    fn navigate_to_descends_into_known_subcommand() {
+        let cmd = combined_help_command(None);
+        let target = navigate_to(cmd, &["migration".to_string()]);
+        assert_eq!(target.get_name(), "migration");
+        assert_eq!(target.get_bin_name(), Some("cot migration"));
+    }
+
+    #[test]
+    fn navigate_to_stops_at_first_unknown_segment() {
+        let cmd = combined_help_command(None);
+        let target = navigate_to(cmd, &["migration".to_string(), "nonexistent".to_string()]);
+        assert_eq!(target.get_name(), "migration");
+    }
+
+    #[test]
+    fn navigate_to_descends_into_merged_binary_subcommand_with_args() {
+        let project = ProjectBinary {
+            path: PathBuf::from("target/debug/example"),
+            metadata: Some(cot::metadata::ProjectMetadata {
+                version: cot::metadata::METADATA_SCHEMA_VERSION,
+                binary_name: "example".to_string(),
+                commands: vec![CommandMeta {
+                    name: "migration".to_string(),
+                    about: None,
+                    aliases: vec![],
+                    subcommands: vec![CommandMeta {
+                        name: "rollback".to_string(),
+                        about: Some("Rollback migrations".to_string()),
+                        aliases: vec![],
+                        subcommands: vec![],
+                        args: vec![ArgMeta {
+                            name: "dry-run".to_string(),
+                            long: Some("dry-run".to_string()),
+                            short: None,
+                            help: Some("Print the rollback plan".to_string()),
+                            required: false,
+                            is_positional: false,
+                            takes_value: false,
+                            value_name: None,
+                        }],
+                    }],
+                    args: vec![],
+                }],
+            }),
+        };
+
+        let cmd = combined_help_command(Some(&project));
+        let target = navigate_to(cmd, &["migration".to_string(), "rollback".to_string()]);
+
+        assert_eq!(target.get_name(), "rollback");
+        assert_eq!(target.get_bin_name(), Some("cot migration rollback"));
+        assert!(target.get_arguments().any(|a| a.get_id() == "dry-run"));
     }
 }

@@ -53,7 +53,8 @@ pub fn load(
         if !binary_path.exists() {
             bail!(
                 "`cargo build` succeeded but `{}` still wasn't found at the expected path, \
-                 this may mean the binary name `cot` resolved doesn't match what cargo built.",
+                 this may mean the binary name `cot` resolved doesn't match what cargo built.\
+                 Please report this at https://github.com/cot-lang/cot/issues/new",
                 binary_path.display(),
             );
         }
@@ -61,7 +62,7 @@ pub fn load(
 
     // Guard against the `cot` CLI resolving to itself. This can happen when
     // running from within the `cot-cli` package or a workspace package whose
-    // binary is the current executable. Querying it for `--metadata` would
+    // binary is the current executable. Querying it for metadata would
     // either recurse or fail: only cot application binaries implement that
     // flag, not the CLI proxy.
     if discovery::is_current_executable(&binary_path) {

@@ -16,9 +16,8 @@ pub(crate) fn build_binary(
         &format!("no existing binary found for `{binary_name}`, building it now"),
     );
 
-    let mut cmd = std::process::Command::new(
-        std::env::var_os(CARGO_ENV).unwrap_or_else(|| "cargo".into()),
-    );
+    let mut cmd =
+        std::process::Command::new(std::env::var_os(CARGO_ENV).unwrap_or_else(|| "cargo".into()));
     cmd.args([
         "build",
         PACKAGE_SHORT_FLAG,

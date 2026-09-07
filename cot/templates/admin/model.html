@@ -47,7 +47,8 @@
             <div class="pagination">
                 <select id="page-size-selector">
                     {% for option in [10, 20, 30, 40] %}
-                        <option value="{{ option }}" {% if option == page_size %}selected{% endif %}>{{ option }}</option>
+                        <option value="{{ option }}"
+                                {% if option == page_size %}selected{% endif %}>{{ option }}</option>
                     {% endfor %}
                 </select>
                 {% if page > 1 %}

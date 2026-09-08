@@ -479,8 +479,8 @@ This sorts unfulfilled orders first, and within each fulfillment status, sorts b
 
 #### Handling NULL values
 
-When a column contains `NULL` values, you can use [`nulls_first`](trait@cot::db::query::expr::ExprSort#method.nulls_first) or [`nulls_last`](trait@cot::db::query::expr::ExprSort#method.nulls_last) methods to control where `NULL` values show up in the sort order. 
-The `nulls_first` method puts `NULL` values at the beginning of the sort order before non-null values, while `nulls_last` puts them at the end. The default behavior of null ordering is determined by the order in which the terms are sorted. If the order is `asc`, the 
+When a column contains `NULL` values, you can use [`nulls_first`](trait@cot::db::query::expr::ExprSort#method.nulls_first) or [`nulls_last`](trait@cot::db::query::expr::ExprSort#method.nulls_last) methods to control where `NULL` values show up in the sort order.
+The `nulls_first` method puts `NULL` values at the beginning of the sort order before non-null values, while `nulls_last` puts them at the end. The default behavior of null ordering is determined by the order in which the terms are sorted. If the order is `asc`, the
 null ordering defaults to `nulls_last`, and if the order is `desc`, the null ordering defaults to `nulls_first`.
 
 ```rust
@@ -531,7 +531,7 @@ Sometimes alphabetical or numeric order isn't what you want, you want a specific
 // Featured products first, in this exact order, regardless of their SKU
 // or insertion order.
 let values = vec![
-    LimitedString::new("SKU-001").unwrap(), 
+    LimitedString::new("SKU-001").unwrap(),
     LimitedString::new("SKU-002").unwrap(),
     LimitedString::new("SKU-003").unwrap()
 ];

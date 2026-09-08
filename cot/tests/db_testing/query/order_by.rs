@@ -250,7 +250,7 @@ async fn order_by_mixed_column_and_expression_terms(test_db: &mut TestDatabase) 
 }
 
 #[cot_macros::dbtest]
-async fn order_by_expression_subtraction_ascending(test_db: &mut TestDatabase) {
+async fn order_by_expression_sub_asc(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -274,7 +274,7 @@ async fn order_by_expression_subtraction_ascending(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_expression_multiplication_ascending(test_db: &mut TestDatabase) {
+async fn order_by_expression_mul_asc(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -298,7 +298,7 @@ async fn order_by_expression_multiplication_ascending(test_db: &mut TestDatabase
 }
 
 #[cot_macros::dbtest]
-async fn order_by_expression_division_ascending(test_db: &mut TestDatabase) {
+async fn order_by_expression_div_asc(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -322,7 +322,7 @@ async fn order_by_expression_division_ascending(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_nulls_first_with_ascending(test_db: &mut TestDatabase) {
+async fn order_by_nulls_first_with_asc(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -345,7 +345,7 @@ async fn order_by_nulls_first_with_ascending(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_nulls_last_with_ascending(test_db: &mut TestDatabase) {
+async fn order_by_nulls_last_with_asc(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -391,7 +391,7 @@ async fn order_by_asc_default_nulls_last(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_bare_field_defaults_to_nulls_last(test_db: &mut TestDatabase) {
+async fn order_by_bare_field_default_nulls_last(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -414,7 +414,7 @@ async fn order_by_bare_field_defaults_to_nulls_last(test_db: &mut TestDatabase) 
 }
 
 #[cot_macros::dbtest]
-async fn order_by_bare_expression_defaults_to_nulls_last(test_db: &mut TestDatabase) {
+async fn order_by_bare_expr_default_nulls_last(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -437,7 +437,7 @@ async fn order_by_bare_expression_defaults_to_nulls_last(test_db: &mut TestDatab
 }
 
 #[cot_macros::dbtest]
-async fn order_by_nulls_first_with_descending(test_db: &mut TestDatabase) {
+async fn order_by_nulls_first_desc(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -462,7 +462,7 @@ async fn order_by_nulls_first_with_descending(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_nulls_last_with_descending(test_db: &mut TestDatabase) {
+async fn order_by_nulls_last_with_desc(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -534,9 +534,7 @@ async fn order_by_field_value_ranking(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_field_value_ranking_partial_list_keeps_remaining_rows(
-    test_db: &mut TestDatabase,
-) {
+async fn order_by_field_value_keeps_remaining_rows(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -587,7 +585,7 @@ async fn order_by_combined_with_filter(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_combined_with_limit_and_offset(test_db: &mut TestDatabase) {
+async fn order_by_combined_limit_and_offset(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -687,7 +685,7 @@ fn field_value_panics_on_empty_values() {
 
 #[test]
 #[should_panic(expected = "cannot use an auto-generated value as a field value ordering key")]
-fn field_value_panics_on_auto_generated_value() {
+fn field_value_panic_auto_generated_value() {
     let _ = <OrderTestModel as Model>::Fields::id.field_value([Auto::auto()]);
 }
 

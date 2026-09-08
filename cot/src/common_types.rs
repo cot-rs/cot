@@ -14,7 +14,9 @@ use cot::db::impl_mysql::MySqlValueRef;
 use cot::db::impl_postgres::PostgresValueRef;
 #[cfg(feature = "sqlite")]
 use cot::db::impl_sqlite::SqliteValueRef;
+#[cfg(feature = "db")]
 use cot::db::query::expr::FieldRef;
+#[cfg(feature = "db")]
 use cot::db::query::{Expr, ExprAdd};
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
@@ -466,6 +468,7 @@ impl DatabaseField for Url {
 #[cfg(feature = "db")]
 impl TextField for Url {}
 
+#[cfg(feature = "db")]
 impl ExprAdd<Url> for FieldRef<Url> {
     fn add<V: Into<Url>>(self, other: V) -> Expr {
         Expr::add(self.as_expr(), Expr::value(other.into()))
@@ -821,6 +824,7 @@ impl Display for Email {
 #[cfg(feature = "db")]
 impl TextField for Email {}
 
+#[cfg(feature = "db")]
 impl ExprAdd<Email> for FieldRef<Email> {
     fn add<V: Into<Email>>(self, other: V) -> Expr {
         Expr::add(self.as_expr(), Expr::value(other.into()))

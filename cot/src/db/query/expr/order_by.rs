@@ -140,7 +140,7 @@ impl OrderByExpr {
     /// # Panics
     ///
     /// Panics if this term was built with [`ExprSort::field_value`]. A
-    /// field_value term never produces a `NULL` sort key,
+    /// `field_value` term never produces a `NULL` sort key,
     /// so an explicit `NULLS` placement on top of it can never have any
     /// effect.
     #[must_use]

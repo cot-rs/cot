@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::ops::{Add, Div, Mul, Sub};
 
 use cot::db::query::{IntoField, QueryBuildingError};
-use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, LimitedString, ToDbFieldValue};
+use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, ToDbFieldValue};
 pub use like::ExprLike;
 use like::{CaseSensitivity, LikeExprBuilder, LikeMode};
 pub use order_by::{ExprSort, NullsOrder, OrderByExpr, SortOrder};
@@ -1767,19 +1767,9 @@ impl_num_expr!(u64);
 impl_num_expr!(f32);
 impl_num_expr!(f64);
 
-impl ExprAdd<String> for FieldRef<String> {
-    fn add<V: Into<String>>(self, other: V) -> Expr {
-        // TODO: use Expr::concat instead
-        Expr::add(self.as_expr(), Expr::value(other.into()))
-    }
-}
+// TODO: Provide `ExprAdd<T> for FieldRef<T>` implementations for String and
+// LimitedString if Expr::concat is supported
 
-impl<const LIMIT: u32> ExprAdd<FieldRef<LimitedString<LIMIT>>> for FieldRef<LimitedString<LIMIT>> {
-    fn add<V: Into<FieldRef<LimitedString<LIMIT>>>>(self, other: V) -> Expr {
-        // TODO: use Expr::concat instead
-        Expr::add(self.as_expr(), other.into().as_expr())
-    }
-}
 #[cfg(test)]
 mod test {
     use super::*;

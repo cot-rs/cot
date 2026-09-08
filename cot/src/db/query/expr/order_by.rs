@@ -23,15 +23,6 @@ impl From<&SortOrder> for sea_query::Order {
     }
 }
 
-impl From<SortOrder> for sea_query::Order {
-    fn from(value: SortOrder) -> Self {
-        match value {
-            SortOrder::Asc => sea_query::Order::Asc,
-            SortOrder::Desc => sea_query::Order::Desc,
-        }
-    }
-}
-
 /// The order to sort null values
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NullsOrder {
@@ -39,15 +30,6 @@ pub enum NullsOrder {
     First,
     /// Null values will appear last
     Last,
-}
-
-impl From<&NullsOrder> for sea_query::NullOrdering {
-    fn from(value: &NullsOrder) -> Self {
-        match value {
-            NullsOrder::First => sea_query::NullOrdering::First,
-            NullsOrder::Last => sea_query::NullOrdering::Last,
-        }
-    }
 }
 
 impl From<NullsOrder> for sea_query::NullOrdering {

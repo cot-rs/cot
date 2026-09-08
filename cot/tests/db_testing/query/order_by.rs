@@ -561,6 +561,48 @@ async fn order_by_field_value_keeps_remaining_rows(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
+async fn order_by_field_value_then_secondary_order(test_db: &mut TestDatabase) {
+    migrate_order_test_model(&*test_db).await;
+
+    seed_order_test_model(
+        test_db,
+        &[
+            ("banana", 1, 0, 0, None),
+            ("cherry", 2, 0, 0, None),
+            ("cherry", 1, 0, 0, None),
+            ("banana", 3, 0, 0, None),
+            ("apple", 2, 0, 0, None),
+        ],
+    )
+    .await;
+
+    let objects = OrderTestModel::objects()
+        .order_by([
+            <OrderTestModel as Model>::Fields::category.field_value(["cherry", "apple", "banana"]),
+            <OrderTestModel as Model>::Fields::priority.desc(),
+        ])
+        .all(&**test_db)
+        .await
+        .unwrap();
+
+    let got: Vec<_> = objects
+        .iter()
+        .map(|o| (o.category.as_str(), o.priority))
+        .collect();
+
+    assert_eq!(
+        got,
+        vec![
+            ("cherry", 2),
+            ("cherry", 1),
+            ("apple", 2),
+            ("banana", 3),
+            ("banana", 1),
+        ]
+    );
+}
+
+#[cot_macros::dbtest]
 async fn order_by_combined_with_filter(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(

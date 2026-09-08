@@ -3,7 +3,7 @@ pub mod like;
 mod order_by;
 
 use std::marker::PhantomData;
-use std::ops::Add;
+use std::ops::{Add, Div, Mul, Sub};
 
 use cot::db::query::{IntoField, QueryBuildingError};
 use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, LimitedString, ToDbFieldValue};
@@ -1203,36 +1203,84 @@ impl Expr {
         Self::RawLike(Box::new(lhs), Box::new(rhs), CaseSensitivity::Insensitive)
     }
 
-    /// Builds an ascending `ORDER BY` term from this expression. See the
-    /// note on [`Query::filter`](crate::db::query::Query::filter) about
-    /// `Expr` not being restricted to field references — the same applies
-    /// here; ordering by a boolean-producing expression is legal SQL but
-    /// rarely what you want.
+    /// Builds an ascending `ORDER BY` term from an expression, with `NULL`s
+    /// sorted last by default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::query::Query;
+    /// use cot::db::query::expr::Expr;
+    /// use cot::db::{model, query};
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    ///     filename: String,
+    /// }
+    ///
+    /// let _ = Expr::field("filename").asc();
+    /// ```
     #[must_use]
     pub fn asc(self) -> OrderByExpr {
         OrderByExpr::directional(OrderTarget::Expression(self), SortOrder::Asc)
     }
 
-    /// The descending counterpart of [`Self::asc`].
+    /// Builds a descending `ORDER BY` term from an expression, with `NULL`s
+    /// sorted first by default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::query::Query;
+    /// use cot::db::query::expr::Expr;
+    /// use cot::db::{model, query};
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    ///     filename: String,
+    /// }
+    ///
+    /// let _ = Expr::field("filename").desc();
+    /// ```
     #[must_use]
     pub fn desc(self) -> OrderByExpr {
         OrderByExpr::directional(OrderTarget::Expression(self), SortOrder::Desc)
     }
 
-    /// The [`ExprSort::custom`]-equivalent for a compound expression.
+    /// Order an expression based on the position of the provided field values
     ///
-    /// Takes plain [`ToDbValue`] items rather than [`IntoField<T>`]: unlike
-    /// [`FieldRef<T>`], a general `Expr` isn't associated with one Rust
-    /// field type to convert against, so there's no `T` for `IntoField<T>`
-    /// to key off of.
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::query::Query;
+    /// use cot::db::query::expr::Expr;
+    /// use cot::db::{ToDbValue, model, query};
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: i32,
+    ///     filename: String,
+    /// }
+    ///
+    /// let _ = Expr::field("filename").field_value(vec![
+    ///     "foo".to_string(),
+    ///     "bar".to_string(),
+    ///     "baz".to_string(),
+    /// ]);
+    /// ```
     #[must_use]
-    pub fn custom<I>(self, values: I) -> OrderByExpr
+    pub fn field_value<I>(self, values: I) -> OrderByExpr
     where
         I: IntoIterator,
         I::Item: ToDbValue,
     {
         let values = values.into_iter().map(|v| v.to_db_value()).collect();
-        OrderByExpr::custom(OrderTarget::Expression(self), sea_query::Values(values))
+        OrderByExpr::field_value(OrderTarget::Expression(self), sea_query::Values(values))
     }
 
     /// Returns the expression as a [`sea_query::SimpleExpr`].
@@ -1365,6 +1413,30 @@ impl<Lhs, Rhs> Add<FieldRef<Rhs>> for FieldRef<Lhs> {
 
     fn add(self, rhs: FieldRef<Rhs>) -> Self::Output {
         Expr::add(self.as_expr(), rhs.as_expr())
+    }
+}
+
+impl<Lhs, Rhs> Sub<FieldRef<Rhs>> for FieldRef<Lhs> {
+    type Output = Expr;
+
+    fn sub(self, rhs: FieldRef<Rhs>) -> Self::Output {
+        Expr::sub(self.as_expr(), rhs.as_expr())
+    }
+}
+
+impl<Lhs, Rhs> Mul<FieldRef<Rhs>> for FieldRef<Lhs> {
+    type Output = Expr;
+
+    fn mul(self, rhs: FieldRef<Rhs>) -> Self::Output {
+        Expr::mul(self.as_expr(), rhs.as_expr())
+    }
+}
+
+impl<Lhs, Rhs> Div<FieldRef<Rhs>> for FieldRef<Lhs> {
+    type Output = Expr;
+
+    fn div(self, rhs: FieldRef<Rhs>) -> Self::Output {
+        Expr::div(self.as_expr(), rhs.as_expr())
     }
 }
 
@@ -1697,12 +1769,14 @@ impl_num_expr!(f64);
 
 impl ExprAdd<String> for FieldRef<String> {
     fn add<V: Into<String>>(self, other: V) -> Expr {
+        // TODO: use Expr::concat instead
         Expr::add(self.as_expr(), Expr::value(other.into()))
     }
 }
 
 impl<const LIMIT: u32> ExprAdd<FieldRef<LimitedString<LIMIT>>> for FieldRef<LimitedString<LIMIT>> {
     fn add<V: Into<FieldRef<LimitedString<LIMIT>>>>(self, other: V) -> Expr {
+        // TODO: use Expr::concat instead
         Expr::add(self.as_expr(), other.into().as_expr())
     }
 }
@@ -1757,4 +1831,25 @@ mod test {
     test_expr_constructor!(expr_sub, Sub, sub);
     test_expr_constructor!(expr_mul, Mul, mul);
     test_expr_constructor!(expr_div, Div, div);
+
+    #[test]
+    fn field_ref_sub_operator_builds_sub_expr() {
+        let x: FieldRef<i32> = FieldRef::new(Identifier::new("x"));
+        let y: FieldRef<i32> = FieldRef::new(Identifier::new("y"));
+        assert!(matches!(x - y, Expr::Sub(_, _)));
+    }
+
+    #[test]
+    fn field_ref_mul_operator_builds_mul_expr() {
+        let x: FieldRef<i32> = FieldRef::new(Identifier::new("x"));
+        let y: FieldRef<i32> = FieldRef::new(Identifier::new("y"));
+        assert!(matches!(x * y, Expr::Mul(_, _)));
+    }
+
+    #[test]
+    fn field_ref_div_operator_builds_div_expr() {
+        let x: FieldRef<i32> = FieldRef::new(Identifier::new("x"));
+        let y: FieldRef<i32> = FieldRef::new(Identifier::new("y"));
+        assert!(matches!(x / y, Expr::Div(_, _)));
+    }
 }

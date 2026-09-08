@@ -250,6 +250,78 @@ async fn order_by_mixed_column_and_expression_terms(test_db: &mut TestDatabase) 
 }
 
 #[cot_macros::dbtest]
+async fn order_by_expression_subtraction_ascending(test_db: &mut TestDatabase) {
+    migrate_order_test_model(&*test_db).await;
+    seed_order_test_model(
+        test_db,
+        &[
+            ("a", 1, 5, 2, None), // x - y = 3
+            ("b", 1, 1, 4, None), // x - y = -3
+            ("c", 1, 3, 3, None), // x - y = 0
+        ],
+    )
+    .await;
+
+    let objects = OrderTestModel::objects()
+        .order_by([
+            (<OrderTestModel as Model>::Fields::x - <OrderTestModel as Model>::Fields::y).asc(),
+        ])
+        .all(&**test_db)
+        .await
+        .unwrap();
+
+    assert_eq!(categories_of(&objects), vec!["b", "c", "a"]);
+}
+
+#[cot_macros::dbtest]
+async fn order_by_expression_multiplication_ascending(test_db: &mut TestDatabase) {
+    migrate_order_test_model(&*test_db).await;
+    seed_order_test_model(
+        test_db,
+        &[
+            ("a", 1, 2, 3, None), // x * y = 6
+            ("b", 1, 4, 1, None), // x * y = 4
+            ("c", 1, 1, 1, None), // x * y = 1
+        ],
+    )
+    .await;
+
+    let objects = OrderTestModel::objects()
+        .order_by([
+            (<OrderTestModel as Model>::Fields::x * <OrderTestModel as Model>::Fields::y).asc(),
+        ])
+        .all(&**test_db)
+        .await
+        .unwrap();
+
+    assert_eq!(categories_of(&objects), vec!["c", "b", "a"]);
+}
+
+#[cot_macros::dbtest]
+async fn order_by_expression_division_ascending(test_db: &mut TestDatabase) {
+    migrate_order_test_model(&*test_db).await;
+    seed_order_test_model(
+        test_db,
+        &[
+            ("a", 1, 10, 2, None), // x / y = 5
+            ("b", 1, 9, 3, None),  // x / y = 3
+            ("c", 1, 8, 4, None),  // x / y = 2
+        ],
+    )
+    .await;
+
+    let objects = OrderTestModel::objects()
+        .order_by([
+            (<OrderTestModel as Model>::Fields::x / <OrderTestModel as Model>::Fields::y).asc(),
+        ])
+        .all(&**test_db)
+        .await
+        .unwrap();
+
+    assert_eq!(categories_of(&objects), vec!["c", "b", "a"]);
+}
+
+#[cot_macros::dbtest]
 async fn order_by_nulls_first_with_ascending(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
@@ -287,6 +359,75 @@ async fn order_by_nulls_last_with_ascending(test_db: &mut TestDatabase) {
 
     let objects = OrderTestModel::objects()
         .order_by([<OrderTestModel as Model>::Fields::score.asc().nulls_last()])
+        .all(&**test_db)
+        .await
+        .unwrap();
+
+    let scores: Vec<_> = objects.iter().map(|o| o.score).collect();
+    assert_eq!(scores, vec![Some(1), Some(2), None]);
+}
+
+#[cot_macros::dbtest]
+async fn order_by_asc_default_nulls_last(test_db: &mut TestDatabase) {
+    migrate_order_test_model(&*test_db).await;
+    seed_order_test_model(
+        test_db,
+        &[
+            ("a", 1, 0, 0, Some(2)),
+            ("b", 1, 0, 0, None),
+            ("c", 1, 0, 0, Some(1)),
+        ],
+    )
+    .await;
+
+    let objects = OrderTestModel::objects()
+        .order_by([<OrderTestModel as Model>::Fields::score.asc()])
+        .all(&**test_db)
+        .await
+        .unwrap();
+
+    let scores: Vec<_> = objects.iter().map(|o| o.score).collect();
+    assert_eq!(scores, vec![Some(1), Some(2), None]);
+}
+
+#[cot_macros::dbtest]
+async fn order_by_bare_field_defaults_to_nulls_last(test_db: &mut TestDatabase) {
+    migrate_order_test_model(&*test_db).await;
+    seed_order_test_model(
+        test_db,
+        &[
+            ("a", 1, 0, 0, Some(2)),
+            ("b", 1, 0, 0, None),
+            ("c", 1, 0, 0, Some(1)),
+        ],
+    )
+    .await;
+
+    let objects = OrderTestModel::objects()
+        .order_by([<OrderTestModel as Model>::Fields::score])
+        .all(&**test_db)
+        .await
+        .unwrap();
+
+    let scores: Vec<_> = objects.iter().map(|o| o.score).collect();
+    assert_eq!(scores, vec![Some(1), Some(2), None]);
+}
+
+#[cot_macros::dbtest]
+async fn order_by_bare_expression_defaults_to_nulls_last(test_db: &mut TestDatabase) {
+    migrate_order_test_model(&*test_db).await;
+    seed_order_test_model(
+        test_db,
+        &[
+            ("a", 1, 0, 0, Some(2)),
+            ("b", 1, 0, 0, None),
+            ("c", 1, 0, 0, Some(1)),
+        ],
+    )
+    .await;
+
+    let objects = OrderTestModel::objects()
+        .order_by([<OrderTestModel as Model>::Fields::score.as_expr()])
         .all(&**test_db)
         .await
         .unwrap();
@@ -344,7 +485,30 @@ async fn order_by_nulls_last_with_descending(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_custom_ranking(test_db: &mut TestDatabase) {
+async fn order_by_desc_default_nulls_first(test_db: &mut TestDatabase) {
+    migrate_order_test_model(&*test_db).await;
+    seed_order_test_model(
+        test_db,
+        &[
+            ("a", 1, 0, 0, Some(2)),
+            ("b", 1, 0, 0, None),
+            ("c", 1, 0, 0, Some(1)),
+        ],
+    )
+    .await;
+
+    let objects = OrderTestModel::objects()
+        .order_by([<OrderTestModel as Model>::Fields::score.desc()])
+        .all(&**test_db)
+        .await
+        .unwrap();
+
+    let scores: Vec<_> = objects.iter().map(|o| o.score).collect();
+    assert_eq!(scores, vec![None, Some(2), Some(1)]);
+}
+
+#[cot_macros::dbtest]
+async fn order_by_field_value_ranking(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -360,7 +524,7 @@ async fn order_by_custom_ranking(test_db: &mut TestDatabase) {
     // or insertion order.
     let objects = OrderTestModel::objects()
         .order_by([
-            <OrderTestModel as Model>::Fields::category.custom(["cherry", "apple", "banana"])
+            <OrderTestModel as Model>::Fields::category.field_value(["cherry", "apple", "banana"])
         ])
         .all(&**test_db)
         .await
@@ -370,7 +534,9 @@ async fn order_by_custom_ranking(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_custom_ranking_partial_list_keeps_remaining_rows(test_db: &mut TestDatabase) {
+async fn order_by_field_value_ranking_partial_list_keeps_remaining_rows(
+    test_db: &mut TestDatabase,
+) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -385,7 +551,7 @@ async fn order_by_custom_ranking_partial_list_keeps_remaining_rows(test_db: &mut
     // Only rank "banana" explicitly. the rest keep arbitrary (but present)
     // positions after it.
     let objects = OrderTestModel::objects()
-        .order_by([<OrderTestModel as Model>::Fields::category.custom(["banana"])])
+        .order_by([<OrderTestModel as Model>::Fields::category.field_value(["banana"])])
         .all(&**test_db)
         .await
         .unwrap();
@@ -511,4 +677,32 @@ async fn order_by_empty_table_returns_empty(test_db: &mut TestDatabase) {
         .unwrap();
 
     assert!(objects.is_empty());
+}
+
+#[test]
+#[should_panic(expected = "requires at least one value to rank by")]
+fn field_value_panics_on_empty_values() {
+    let _ = <OrderTestModel as Model>::Fields::category.field_value(Vec::<&str>::new());
+}
+
+#[test]
+#[should_panic(expected = "cannot use an auto-generated value as a field value ordering key")]
+fn field_value_panics_on_auto_generated_value() {
+    let _ = <OrderTestModel as Model>::Fields::id.field_value([Auto::auto()]);
+}
+
+#[test]
+#[should_panic(expected = "can't be combined with `field_value`")]
+fn nulls_first_panics_after_field_value() {
+    let _ = <OrderTestModel as Model>::Fields::category
+        .field_value(["a"])
+        .nulls_first();
+}
+
+#[test]
+#[should_panic(expected = "can't be combined with `field_value`")]
+fn nulls_last_panics_after_field_value() {
+    let _ = <OrderTestModel as Model>::Fields::category
+        .field_value(["a"])
+        .nulls_last();
 }

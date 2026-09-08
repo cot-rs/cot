@@ -1,4 +1,4 @@
-//! Database expression for order_by
+//! Database ORDER BY clause.
 use cot::db::{DbFieldValue, ToDbFieldValue};
 
 use crate::db::Identifier;
@@ -71,11 +71,15 @@ pub(crate) enum OrderTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 enum OrderMode {
-    Directional {
-        order: SortOrder,
-        nulls: Option<NullsOrder>,
-    },
-    Custom(sea_query::Values),
+    Directional { order: SortOrder, nulls: NullsOrder },
+    FieldValue(sea_query::Values),
+}
+
+fn default_nulls_for(order: SortOrder) -> NullsOrder {
+    match order {
+        SortOrder::Asc => NullsOrder::Last,
+        SortOrder::Desc => NullsOrder::First,
+    }
 }
 
 /// An `ORDER BY` term.
@@ -84,7 +88,9 @@ enum OrderMode {
 ///
 /// ```
 /// use cot::db::model;
-/// use cot::db::query::{ExprSort, Query};
+/// use cot::db::query::Query;
+///
+/// use crate::cot::db::query::expr::ExprSort;
 ///
 /// #[model]
 /// struct User {
@@ -110,18 +116,21 @@ impl OrderByExpr {
     pub(crate) fn directional(target: OrderTarget, order: SortOrder) -> Self {
         Self {
             target,
-            mode: OrderMode::Directional { order, nulls: None },
+            mode: OrderMode::Directional {
+                order,
+                nulls: default_nulls_for(order),
+            },
         }
     }
 
-    pub(crate) fn custom(target: OrderTarget, values: sea_query::Values) -> Self {
+    pub(crate) fn field_value(target: OrderTarget, values: sea_query::Values) -> Self {
         assert!(
             !values.0.is_empty(),
-            "`custom` requires at least one value to rank by"
+            "`field_value` requires at least one value to rank by"
         );
         Self {
             target,
-            mode: OrderMode::Custom(values),
+            mode: OrderMode::FieldValue(values),
         }
     }
 
@@ -130,8 +139,8 @@ impl OrderByExpr {
     ///
     /// # Panics
     ///
-    /// Panics if this term was built with [`ExprSort::custom`]. A
-    /// custom-order term never produces a `NULL` sort key,
+    /// Panics if this term was built with [`ExprSort::field_value`]. A
+    /// field_value term never produces a `NULL` sort key,
     /// so an explicit `NULLS` placement on top of it can never have any
     /// effect.
     #[must_use]
@@ -154,9 +163,9 @@ impl OrderByExpr {
     #[track_caller]
     fn set_nulls(&mut self, nulls: NullsOrder) {
         match &mut self.mode {
-            OrderMode::Directional { nulls: n, .. } => *n = Some(nulls),
-            OrderMode::Custom(_) => panic!(
-                "`nulls_first`/`nulls_last` can't be combined with `custom`: a custom-order \
+            OrderMode::Directional { nulls: n, .. } => *n = nulls,
+            OrderMode::FieldValue(_) => panic!(
+                "`nulls_first`/`nulls_last` can't be combined with `field_value`: a field_value \
                  term never produces a NULL sort key, so an explicit NULLS placement would \
                  have no effect"
             ),
@@ -169,8 +178,8 @@ impl OrderByExpr {
         sql_builder: &dyn SqlQueryBuilder,
     ) -> Result<(), QueryBuildingError> {
         let (sea_order, nulls): (sea_query::Order, Option<NullsOrder>) = match &self.mode {
-            OrderMode::Directional { order, nulls } => (order.into(), *nulls),
-            OrderMode::Custom(values) => (sea_query::Order::Field(values.clone()), None),
+            OrderMode::Directional { order, nulls } => (order.into(), Some(*nulls)),
+            OrderMode::FieldValue(values) => (sea_query::Order::Field(values.clone()), None),
         };
 
         match &self.target {
@@ -218,7 +227,7 @@ pub trait ExprSort<T> {
     fn desc(&self) -> OrderByExpr;
 
     /// Sorts rows by the position of this field's value
-    fn custom<I>(&self, values: I) -> OrderByExpr
+    fn field_value<I>(&self, values: I) -> OrderByExpr
     where
         I: IntoIterator,
         I::Item: IntoField<T>;
@@ -233,7 +242,7 @@ impl<T: ToDbFieldValue + 'static> ExprSort<T> for FieldRef<T> {
         OrderByExpr::directional(OrderTarget::Column(self.identifier()), SortOrder::Desc)
     }
 
-    fn custom<I>(&self, values: I) -> OrderByExpr
+    fn field_value<I>(&self, values: I) -> OrderByExpr
     where
         I: IntoIterator,
         I::Item: IntoField<T>,
@@ -243,11 +252,11 @@ impl<T: ToDbFieldValue + 'static> ExprSort<T> for FieldRef<T> {
             .map(|v| match v.into_field().to_db_field_value() {
                 DbFieldValue::Value(value) => value,
                 DbFieldValue::Auto => {
-                    panic!("cannot use an auto-generated value as a custom ordering key")
+                    panic!("cannot use an auto-generated value as a field value ordering key")
                 }
             })
             .collect();
-        OrderByExpr::custom(
+        OrderByExpr::field_value(
             OrderTarget::Column(self.identifier()),
             sea_query::Values(values),
         )

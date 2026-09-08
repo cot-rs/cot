@@ -8,7 +8,7 @@ use derive_more::with_trait::Debug;
 use thiserror::Error;
 
 use crate::db;
-pub use crate::db::query::expr::{Expr, ExprAdd, ExprDiv, ExprMul, ExprOrd, ExprSub};
+pub use crate::db::query::expr::{Expr, ExprAdd, ExprDiv, ExprMul, ExprOrd, ExprSub, ExprSort};
 use crate::db::query::expr::{OrderByExpr, SqlQueryBuilder};
 use crate::db::{Auto, DatabaseBackend, ForeignKey, Model, StatementResult, ToDbFieldValue};
 const ERROR_PREFIX: &str = "expression error:";

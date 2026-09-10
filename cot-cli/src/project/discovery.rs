@@ -143,11 +143,6 @@ pub(crate) fn is_current_executable(binary_path: &Path) -> bool {
     binary_path == current_exe
 }
 
-/// Runs `cargo metadata --no-deps` rooted at `path`.
-///
-/// `--no-deps` means this never touches the network or reads/writes
-/// `Cargo.lock`: it only needs to parse the workspace's own manifests, so
-/// it's safe to run on every `cot` invocation.
 pub(crate) fn load_cargo_metadata(path: &Path) -> anyhow::Result<Option<Metadata>> {
     if !path.exists() {
         bail!("path does not exist: {}", path.display())
@@ -173,9 +168,6 @@ fn available_packages(metadata: &Metadata) -> String {
         .join(", ")
 }
 
-/// Finds the workspace member `path` is inside of, preferring the most
-/// specific (deepest) match — mirrors how cargo resolves the "current
-/// package" from the nearest enclosing manifest.
 fn current_package<'a>(metadata: &'a Metadata, path: &Path) -> Option<&'a Package> {
     let path = path.canonicalize().ok()?;
 

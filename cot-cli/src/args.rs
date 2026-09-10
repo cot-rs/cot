@@ -151,9 +151,9 @@ pub fn extract_package_arg(raw: &[String]) -> Option<String> {
     let mut iter = raw.iter();
     while let Some(arg) = iter.next() {
         if arg == "--" {
-            // all args before the double dash delimeter is used internally per convention
-            // and any arg after the delimeter is forwarded to the binary, so we
-            // stop here
+            // all args before the double dash delimeter is used internally per
+            // convention and any arg after the delimeter is
+            // forwarded to the binary, so we stop here
             return None;
         }
         if let Some(value) = arg.strip_prefix(&format!("{PACKAGE_LONG_FLAG}=")) {

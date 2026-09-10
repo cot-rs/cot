@@ -127,9 +127,10 @@ pub fn handle_external(
             );
         }
         None => {
-            // The metadata retrieval from the binary most likely failed or didnt exist so
-            // theres no way to validate the command exists here. We forward the command
-            // unconditionally and let the binary handle it.
+            // The metadata retrieval from the binary most likely failed or
+            // didnt exist so theres no way to validate the command
+            // exists here. We forward the command unconditionally
+            // and let the binary handle it.
             print_status_msg(
                 StatusType::Warning,
                 &format!(

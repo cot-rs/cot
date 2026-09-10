@@ -3,6 +3,10 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::Verbosity;
 
+pub const PACKAGE_SHORT_FLAG: &str = "-p";
+pub const RELEASE_FLAG: &str = "--release";
+pub const BINARY_FLAG: &str = "--bin";
+
 #[derive(Debug, Parser)]
 #[command(
     name = "cot",

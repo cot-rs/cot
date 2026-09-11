@@ -1197,10 +1197,16 @@ impl StaticFilesConfig {
 #[serde(default)]
 #[non_exhaustive]
 pub struct MiddlewareConfig {
+    /// The configuration for the authentication middleware.
+    pub auth: EnabledMiddlewareConfig,
+    /// The configuration for the static files middleware.
+    pub static_files: EnabledMiddlewareConfig,
     /// The configuration for the live reload middleware.
     pub live_reload: LiveReloadMiddlewareConfig,
     /// The configuration for the session middleware.
     pub session: SessionMiddlewareConfig,
+    /// The configuration for the trailing slash middleware.
+    pub trailing_slash: EnabledMiddlewareConfig,
 }
 
 impl MiddlewareConfig {
@@ -1236,9 +1242,46 @@ impl MiddlewareConfigBuilder {
     #[must_use]
     pub fn build(&self) -> MiddlewareConfig {
         MiddlewareConfig {
+            auth: self.auth.clone().unwrap_or_default(),
+            static_files: self.static_files.clone().unwrap_or_default(),
             live_reload: self.live_reload.clone().unwrap_or_default(),
             session: self.session.clone().unwrap_or_default(),
+            trailing_slash: self.trailing_slash.clone().unwrap_or_default(),
         }
+    }
+}
+
+/// Configuration shared by middleware that can simply be enabled or disabled.
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+#[non_exhaustive]
+pub struct EnabledMiddlewareConfig {
+    /// Whether the middleware is enabled.
+    pub enabled: bool,
+}
+
+impl EnabledMiddlewareConfig {
+    /// Create a new [`EnabledMiddlewareConfigBuilder`].
+    #[must_use]
+    pub fn builder() -> EnabledMiddlewareConfigBuilder {
+        EnabledMiddlewareConfigBuilder::default()
+    }
+}
+
+impl EnabledMiddlewareConfigBuilder {
+    /// Builds the middleware configuration.
+    #[must_use]
+    pub fn build(&self) -> EnabledMiddlewareConfig {
+        EnabledMiddlewareConfig {
+            enabled: self.enabled.unwrap_or(true),
+        }
+    }
+}
+
+impl Default for EnabledMiddlewareConfig {
+    fn default() -> Self {
+        Self::builder().build()
     }
 }
 
@@ -1602,7 +1645,10 @@ impl From<Expiry> for tower_sessions::Expiry {
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
+#[expect(clippy::struct_excessive_bools)]
 pub struct SessionMiddlewareConfig {
+    /// Whether the session middleware is enabled.
+    pub enabled: bool,
     /// The [`Secure`] of the cookie determines whether the session middleware
     /// is secure.
     ///
@@ -1838,6 +1884,7 @@ impl SessionMiddlewareConfigBuilder {
     #[must_use]
     pub fn build(&self) -> SessionMiddlewareConfig {
         SessionMiddlewareConfig {
+            enabled: self.enabled.unwrap_or(true),
             secure: self.secure.unwrap_or(true),
             http_only: self.http_only.unwrap_or(true),
             same_site: self.same_site.unwrap_or_default(),
@@ -2515,8 +2562,12 @@ mod tests {
             cache_timeout = "1h"
 
             [middlewares]
+            auth.enabled = false
+            static_files.enabled = false
             live_reload.enabled = true
+            trailing_slash.enabled = false
             [middlewares.session]
+            enabled = false
             secure = false
             http_only = false
             domain = "localhost"
@@ -2543,7 +2594,11 @@ mod tests {
             config.static_files.cache_timeout,
             Some(Duration::from_hours(1))
         );
+        assert!(!config.middlewares.auth.enabled);
+        assert!(!config.middlewares.static_files.enabled);
         assert!(config.middlewares.live_reload.enabled);
+        assert!(!config.middlewares.session.enabled);
+        assert!(!config.middlewares.trailing_slash.enabled);
         assert!(!config.middlewares.session.secure);
         assert!(!config.middlewares.session.http_only);
         assert_eq!(
@@ -2565,6 +2620,8 @@ mod tests {
         assert_eq!(config.secret_key.as_bytes(), b"");
         assert_eq!(config.fallback_secret_keys.len(), 0);
         assert_eq!(config.auth_backend, AuthBackendConfig::None);
+        assert!(config.middlewares.auth.enabled);
+        assert!(config.middlewares.static_files.enabled);
         assert_eq!(config.static_files.url, "/static/");
         assert_eq!(
             config.static_files.rewrite,
@@ -2572,6 +2629,7 @@ mod tests {
         );
         assert_eq!(config.static_files.cache_timeout, None);
         assert!(!config.middlewares.live_reload.enabled);
+        assert!(config.middlewares.session.enabled);
         assert!(config.middlewares.session.secure);
         assert!(config.middlewares.session.http_only);
         assert_eq!(config.middlewares.session.domain, None);
@@ -2584,6 +2642,7 @@ mod tests {
             config.middlewares.session.store.store_type,
             SessionStoreTypeConfig::Memory
         );
+        assert!(config.middlewares.trailing_slash.enabled);
         assert_eq!(config.database.url, None);
     }
 

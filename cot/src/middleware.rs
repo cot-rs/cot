@@ -29,6 +29,7 @@ use crate::session::store::file::FileStore;
 use crate::session::store::memory::MemoryStore;
 #[cfg(feature = "redis")]
 use crate::session::store::redis::RedisStore;
+use crate::static_files::StaticFilesMiddleware;
 
 #[cfg(feature = "live-reload")]
 mod live_reload;
@@ -102,6 +103,83 @@ pub use live_reload::LiveReloadMiddleware;
 pub use trailing_slash::{TrailingSlashMiddleware, TrailingSlashService};
 
 type DynamicSessionStore = SessionManagerLayer<SessionStoreWrapper, PlaintextCookie>;
+type OptionalLayer<L> = tower::util::Either<L, tower::layer::util::Identity>;
+#[cfg(feature = "live-reload")]
+type ConfiguredLiveReloadMiddleware = LiveReloadMiddleware;
+#[cfg(not(feature = "live-reload"))]
+type ConfiguredLiveReloadMiddleware = tower::layer::util::Identity;
+type CommonMiddlewareLayer = (
+    OptionalLayer<TrailingSlashMiddleware>,
+    OptionalLayer<ConfiguredLiveReloadMiddleware>,
+    OptionalLayer<SessionMiddleware>,
+    OptionalLayer<AuthMiddleware>,
+    OptionalLayer<StaticFilesMiddleware>,
+);
+
+/// A collection of the middlewares enabled by default in generated projects.
+///
+/// Each child middleware can be disabled in the project configuration under
+/// `[middlewares]`. The order is the same as the generated project template.
+///
+/// ```toml
+/// [middlewares]
+/// auth.enabled = false
+/// static_files.enabled = false
+/// live_reload.enabled = false
+/// session.enabled = false
+/// trailing_slash.enabled = false
+/// ```
+#[derive(Debug, Clone)]
+pub struct CommonMiddleware(CommonMiddlewareLayer);
+
+impl CommonMiddleware {
+    /// Creates common middleware from the project context and its
+    /// configuration.
+    #[must_use]
+    pub fn from_context(context: &MiddlewareContext) -> Self {
+        let config = &context.config().middlewares;
+        #[cfg(feature = "live-reload")]
+        let live_reload = tower::util::option_layer(
+            config
+                .live_reload
+                .enabled
+                .then(|| LiveReloadMiddleware::from_context(context)),
+        );
+        #[cfg(not(feature = "live-reload"))]
+        let live_reload = tower::util::option_layer(None::<tower::layer::util::Identity>);
+
+        Self((
+            tower::util::option_layer(
+                config
+                    .trailing_slash
+                    .enabled
+                    .then(|| TrailingSlashMiddleware::from_context(context)),
+            ),
+            live_reload,
+            tower::util::option_layer(
+                config
+                    .session
+                    .enabled
+                    .then(|| SessionMiddleware::from_context(context)),
+            ),
+            tower::util::option_layer(config.auth.enabled.then(AuthMiddleware::new)),
+            tower::util::option_layer(
+                config
+                    .static_files
+                    .enabled
+                    .then(|| StaticFilesMiddleware::from_context(context)),
+            ),
+        ))
+    }
+}
+
+impl<S> tower::Layer<S> for CommonMiddleware {
+    type Service = <CommonMiddlewareLayer as tower::Layer<S>>::Service;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        self.0.layer(inner)
+    }
+}
 
 /// A middleware that provides session management.
 ///
@@ -557,21 +635,22 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    use http::Request;
+    use http::{Request, StatusCode};
     use tower::{Layer, Service, ServiceExt};
 
     use super::*;
     use crate::auth::Auth;
     use crate::config::{
-        CacheUrl, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,
-        SessionStoreConfig, SessionStoreTypeConfig,
+        CacheUrl, DatabaseConfig, EnabledMiddlewareConfig, MiddlewareConfig, ProjectConfig,
+        SessionMiddlewareConfig, SessionStoreConfig, SessionStoreTypeConfig,
     };
     use crate::middleware::SessionMiddleware;
     use crate::project::{RegisterAppsContext, WithCache};
     use crate::response::Response;
+    use crate::router::{Route, Router};
     use crate::session::Session;
     use crate::test::TestRequestBuilder;
-    use crate::{AppBuilder, Body, Bootstrapper, Error, Project, ProjectContext};
+    use crate::{App, AppBuilder, Body, Bootstrapper, Error, Project, ProjectContext};
 
     #[cot::test]
     async fn session_middleware_adds_session() {
@@ -750,6 +829,75 @@ mod tests {
 
     impl Project for TestProject {
         fn register_apps(&self, _apps: &mut AppBuilder, _context: &RegisterAppsContext) {}
+    }
+
+    struct CommonMiddlewareApp;
+
+    async fn common_middleware_page(_request: Request<Body>) -> crate::Result<Response> {
+        Ok(Response::new(Body::empty()))
+    }
+
+    impl App for CommonMiddlewareApp {
+        fn name(&self) -> &'static str {
+            "common_middleware_app"
+        }
+
+        fn router(&self) -> Router {
+            Router::with_urls([Route::with_handler("/page/", common_middleware_page)])
+        }
+    }
+
+    struct CommonMiddlewareProject {
+        trailing_slash_enabled: bool,
+    }
+
+    impl Project for CommonMiddlewareProject {
+        fn config(&self, _config_name: &str) -> crate::Result<ProjectConfig> {
+            Ok(ProjectConfig::builder()
+                .middlewares(
+                    MiddlewareConfig::builder()
+                        .auth(EnabledMiddlewareConfig::builder().enabled(false).build())
+                        .session(SessionMiddlewareConfig::builder().enabled(false).build())
+                        .trailing_slash(
+                            EnabledMiddlewareConfig::builder()
+                                .enabled(self.trailing_slash_enabled)
+                                .build(),
+                        )
+                        .build(),
+                )
+                .build())
+        }
+
+        fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+            apps.register_with_views(CommonMiddlewareApp, "");
+        }
+
+        fn middlewares(
+            &self,
+            handler: crate::project::RootHandlerBuilder,
+            context: &MiddlewareContext,
+        ) -> crate::project::RootHandler {
+            handler
+                .middleware(CommonMiddleware::from_context(context))
+                .build()
+        }
+    }
+
+    #[cot::test]
+    async fn common_middleware_respects_trailing_slash_config() {
+        let mut enabled_client = crate::test::Client::new(CommonMiddlewareProject {
+            trailing_slash_enabled: true,
+        })
+        .await;
+        let response = enabled_client.get("/page").await.unwrap();
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+
+        let mut disabled_client = crate::test::Client::new(CommonMiddlewareProject {
+            trailing_slash_enabled: false,
+        })
+        .await;
+        let response = disabled_client.get("/page").await.unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 
     #[cot::test]

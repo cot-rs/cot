@@ -4,8 +4,13 @@ use tempfile::TempDir;
 // It's pointless to run miri on UI tests
 #[cfg(not(miri))]
 mod snapshot_testing;
-#[cfg(not(miri))]
-use snapshot_testing::cot_cli_path;
+
+#[cfg(miri)]
+mod snapshot_testing {
+    pub fn cot_cli_path() -> std::path::PathBuf {
+        unreachable!("miri tests are #[ignore]d")
+    }
+}
 
 #[test]
 #[cfg_attr(
@@ -13,7 +18,7 @@ use snapshot_testing::cot_cli_path;
     ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
 )]
 fn discovery_honors_cargo_target_dir_env_var() {
-    let project = CotProjectBuilder::new(cot_cli_path())
+    let project = CotProjectBuilder::new(snapshot_testing::cot_cli_path())
         .build()
         .unwrap()
         .compile()
@@ -41,7 +46,7 @@ fn discovery_honors_cargo_target_dir_env_var() {
     ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
 )]
 fn discovery_honors_project_level_cargo_config() {
-    let project = CotProjectBuilder::new(cot_cli_path())
+    let project = CotProjectBuilder::new(snapshot_testing::cot_cli_path())
         .with_file(
             ".cargo/config.toml",
             "[build]\ntarget-dir = \"custom-target\"\n",
@@ -69,7 +74,7 @@ fn discovery_honors_project_level_cargo_config() {
     ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
 )]
 fn discovery_honors_global_cargo_config() {
-    let project = CotProjectBuilder::new(cot_cli_path())
+    let project = CotProjectBuilder::new(snapshot_testing::cot_cli_path())
         .build()
         .unwrap()
         .compile()
@@ -105,7 +110,7 @@ fn discovery_honors_global_cargo_config() {
     ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
 )]
 fn cargo_target_dir_env_wins_over_project_config() {
-    let project = CotProjectBuilder::new(cot_cli_path())
+    let project = CotProjectBuilder::new(snapshot_testing::cot_cli_path())
         .with_file(
             ".cargo/config.toml",
             "[build]\ntarget-dir = \"from-config\"\n",

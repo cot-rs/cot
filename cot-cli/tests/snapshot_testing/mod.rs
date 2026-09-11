@@ -1,3 +1,4 @@
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub(crate) use insta_cmd::assert_cmd_snapshot;
@@ -5,6 +6,7 @@ pub(crate) use insta_cmd::assert_cmd_snapshot;
 pub(crate) use crate::cot_cli;
 
 mod cli;
+mod external;
 mod help;
 mod migration;
 mod new;
@@ -46,6 +48,14 @@ macro_rules! cot_cli {
     }
 }
 
+pub(crate) fn cot_cli_path() -> PathBuf {
+    if let Ok(path) = std::env::var("COT_CLI_TEST_CMD") {
+        PathBuf::from(path)
+    } else {
+        assert_cmd::cargo::cargo_bin!("cot").to_path_buf()
+    }
+}
+
 /// Get the command for the Cot CLI binary under test.
 ///
 /// By default, this is the binary defined in this crate.
@@ -59,16 +69,22 @@ macro_rules! cot_cli {
 ///
 ///     COT_CLI_TEST_CMD="$PWD"/custom-cot-cli cargo test --test cli
 pub(crate) fn cot_cli_cmd() -> Command {
-    if let Ok(np) = std::env::var("COT_CLI_TEST_CMD") {
-        Command::new(np)
-    } else {
-        Command::new(assert_cmd::cargo::cargo_bin!("cot"))
-    }
+    Command::new(cot_cli_path())
+}
+
+/// Convenience: build a `cot` command in an arbitrary directory.
+///
+/// Useful for testing behaviour outside any Cot project.
+pub(crate) fn cot_cmd_in(args: &[&str], dir: &Path) -> Command {
+    let mut cmd = cot_cli_cmd();
+    cmd.current_dir(dir).args(args);
+    cmd
 }
 
 const GENERIC_FILTERS: &[(&str, &str)] = &[
     (r"(?m)^.\[2m[\d-]+?T[\d:\.]+?Z.\[0m ", "TIMESTAMP "), // Remove timestamp
-    (r"cot\.exe", r"cot"),                                 // Redact Windows .exe
+    (r"(\S+?)\.exe\b", r"$1"),                             // Redact Windows .exe
+    (r"\bcot-cli-test-\d+(?:-\d+)*\b", "[PROJECT_NAME]"),  // Redact generated project name
 ];
 
 const TEMP_PATH_FILTERS: &[(&str, &str)] = &[

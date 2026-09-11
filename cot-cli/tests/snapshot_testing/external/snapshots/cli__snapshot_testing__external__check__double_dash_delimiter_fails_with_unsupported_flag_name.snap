@@ -1,0 +1,20 @@
+---
+source: cot-cli/tests/snapshot_testing/external/check.rs
+info:
+  program: cot
+  args:
+    - "--build"
+    - check
+    - "--"
+    - "--build"
+---
+success: false
+exit_code: 2
+----- stdout -----
+
+----- stderr -----
+error: unexpected argument '--build' found
+
+Usage: [PROJECT_NAME] check
+
+For more information, try '--help'.

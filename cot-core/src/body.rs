@@ -162,11 +162,27 @@ impl Body {
     pub async fn into_bytes_limited(self, limit: usize) -> Result<Bytes> {
         use http_body_util::BodyExt;
 
-        Ok(http_body_util::Limited::new(self, limit)
+        http_body_util::Limited::new(self, limit)
             .collect()
             .await
             .map(http_body_util::Collected::to_bytes)
-            .map_err(ReadRequestBody)?)
+            .map_err(request_body_error)
+    }
+    #[must_use]
+    #[doc(hidden)]
+    pub fn with_limit(self, limit: usize) -> Self {
+        use http_body_util::BodyExt;
+
+        let body = http_body_util::Limited::new(self, limit)
+            .map_err(move |error| {
+                if error.is::<http_body_util::LengthLimitError>() {
+                    RequestBodyTooLarge { limit }.into()
+                } else {
+                    request_body_error(error)
+                }
+            })
+            .boxed();
+        Self::wrapper(body)
     }
 
     #[must_use]
@@ -195,8 +211,8 @@ impl http_body::Body for Body {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<std::result::Result<Frame<Self::Data>, Self::Error>>> {
-        match self.get_mut().inner {
-            BodyInner::Fixed(ref mut data) => {
+        match &mut self.get_mut().inner {
+            BodyInner::Fixed(data) => {
                 if data.is_empty() {
                     Poll::Ready(None)
                 } else {
@@ -204,7 +220,7 @@ impl http_body::Body for Body {
                     Poll::Ready(Some(Ok(Frame::data(data))))
                 }
             }
-            BodyInner::Streaming(ref mut stream) => {
+            BodyInner::Streaming(stream) => {
                 let stream = Pin::as_mut(stream.get_mut());
                 match stream.poll_next(cx) {
                     Poll::Ready(Some(result)) => Poll::Ready(Some(result.map(Frame::data))),
@@ -212,15 +228,13 @@ impl http_body::Body for Body {
                     Poll::Pending => Poll::Pending,
                 }
             }
-            BodyInner::Axum(ref mut axum_body) => {
+            BodyInner::Axum(axum_body) => {
                 let axum_body = axum_body.get_mut();
                 Pin::new(axum_body)
                     .poll_frame(cx)
                     .map_err(|error| ReadRequestBody(Box::new(error)).into())
             }
-            BodyInner::Wrapper(ref mut http_body) => Pin::new(http_body)
-                .poll_frame(cx)
-                .map_err(|error| ReadRequestBody(Box::new(error)).into()),
+            BodyInner::Wrapper(http_body) => Pin::new(http_body).poll_frame(cx),
         }
     }
 
@@ -263,6 +277,23 @@ body_from_impl!(Bytes);
 #[error("could not retrieve request body: {0}")]
 struct ReadRequestBody(#[source] Box<dyn StdError + Send + Sync>);
 impl_into_cot_error!(ReadRequestBody, BAD_REQUEST);
+
+fn request_body_error(error: Box<dyn StdError + Send + Sync>) -> Error {
+    match error.downcast::<Error>() {
+        Ok(error) => *error,
+        Err(error) => ReadRequestBody(error).into(),
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "the max request body size of {limit} bytes has been exceeded; increase \
+     `max_request_body_size` in the project config if this request is expected"
+)]
+struct RequestBodyTooLarge {
+    limit: usize,
+}
+impl_into_cot_error!(RequestBodyTooLarge, PAYLOAD_TOO_LARGE);
 
 #[cfg(test)]
 mod tests {
@@ -358,5 +389,28 @@ mod tests {
         let content = "Hello, world!";
         let body = Body::fixed(content);
         assert_eq!(body.size_hint().exact(), Some(content.len() as u64));
+    }
+    #[cot::test]
+    async fn body_limit_enforces_aggregate_size() {
+        let bytes = Body::fixed("Hello")
+            .with_limit(5)
+            .into_bytes()
+            .await
+            .unwrap();
+        assert_eq!(bytes, "Hello");
+
+        let chunks = stream::iter([
+            Ok(Bytes::from_static(b"Hel")),
+            Ok(Bytes::from_static(b"lo!")),
+        ]);
+        let error = Body::streaming(chunks)
+            .with_limit(5)
+            .into_bytes()
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.status_code(), crate::StatusCode::PAYLOAD_TOO_LARGE);
+        assert!(error.to_string().contains("max request body size"));
+        assert!(error.to_string().contains("max_request_body_size"));
     }
 }

@@ -127,7 +127,8 @@ impl DbStore {
                     return Ok(());
                 }
                 Err(DatabaseError::UniqueViolation) => {
-                    // If a unique constraint violation occurs, we need to generate a new ID
+                    // If a unique constraint violation occurs, we need to
+                    // generate a new ID
                     record.id = Id::default();
                 }
                 Err(err) => return Err(DbStoreError::DatabaseError(err))?,

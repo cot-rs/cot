@@ -419,10 +419,10 @@ impl<'a> FormData<'a> {
             // * `Bytes` guarantees that `data` is non-null, valid for reads for
             //   `data.len()` bytes
             // * `data` is not mutated inside `Bytes`
-            // * data inside `slice` will not get deallocated as long as the underlying
-            //   `Bytes` object is alive
-            // * struct fields are dropped in the order of declaration, so `data` will be
-            //   dropped after `inner`
+            // * data inside `slice` will not get deallocated as long as the
+            //   underlying `Bytes` object is alive
+            // * struct fields are dropped in the order of declaration, so
+            //   `data` will be dropped after `inner`
             std::slice::from_raw_parts(data.as_ptr(), data.len())
         };
 

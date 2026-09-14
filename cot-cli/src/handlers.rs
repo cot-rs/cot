@@ -229,9 +229,10 @@ fn combined_help_command(project: Option<&ProjectBinary>) -> clap::Command {
             if cmd_set.insert(meta_cmd.name.clone()) {
                 cmd = cmd.subcommand(build_clap_subcommand(meta_cmd));
             } else {
-                // there's an existing command, let's merge them into one. For command
-                // collisions, metadata(such as name and about) of the command
-                // present in `cot-cli` will take precedence.
+                // there's an existing command, let's merge them into one. For
+                // command collisions, metadata(such as name and
+                // about) of the command present in `cot-cli`
+                // will take precedence.
                 cmd = cmd.mut_subcommand(&meta_cmd.name, |mut sc| {
                     for sub in &meta_cmd.subcommands {
                         sc = sc.subcommand(build_clap_subcommand(sub));

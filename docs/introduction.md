@@ -296,7 +296,7 @@ This registers all the apps that your project is using.
 # }
 ```
 
-This registers the middlewares that will be applied to all routes in the project. Note that the [`LiveReloadMiddleware`](struct@cot::middleware::LiveReloadMiddleware) may be dynamically disabled in runtime using config!
+This registers the middlewares that will be applied to all routes in the project. Each `.middleware(...)` call wraps the handler built so far, so middleware listed later runs earlier while processing a request. Register middleware dependencies after the middleware that needs them; for example, register [`SessionMiddleware`](struct@cot::middleware::SessionMiddleware) after [`AuthMiddleware`](struct@cot::middleware::AuthMiddleware). Note that the [`LiveReloadMiddleware`](struct@cot::middleware::LiveReloadMiddleware) may be dynamically disabled in runtime using config!
 
 ```rust,has_main
 # use cot::Project;

@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "cot"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "ahash",
  "aide",
@@ -1008,7 +1008,7 @@ dependencies = [
 
 [[package]]
 name = "cot-cli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1057,7 +1057,7 @@ dependencies = [
 
 [[package]]
 name = "cot_codegen"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "darling 0.24.1",
  "heck",
@@ -1069,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "cot_core"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "askama",
  "async-stream",
@@ -1102,7 +1102,7 @@ dependencies = [
 
 [[package]]
 name = "cot_macros"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "askama_derive",
  "cot",

@@ -3,6 +3,7 @@ source: cot-cli/tests/snapshot_testing/external/check.rs
 info:
   program: cot
   args:
+    - "--build"
     - banana
 ---
 success: false

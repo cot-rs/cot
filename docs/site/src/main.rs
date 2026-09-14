@@ -43,6 +43,7 @@ impl Project for CotSiteProject {
                                 md_page!("databases/overview"),
                                 md_page!("databases/queries"),
                                 md_page!("databases/transactions"),
+                                md_page!("databases/migrations"),
                             ],
                         },
                         GuideItem::Page(md_page!("admin-panel")),

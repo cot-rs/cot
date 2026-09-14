@@ -8,6 +8,25 @@ use std::future::Future;
 use std::io::Write;
 use std::{fmt, io};
 
+/// An attribute macro that defines a custom migration operation.
+///
+/// This macro simplifies writing custom migration operations by allowing you to
+/// write them as regular `async` functions. It handles the necessary pinning
+/// and boxing of the return type to make it compatible with the migration
+/// engine.
+///
+/// # Examples
+///
+/// ```
+/// use cot::db::Result;
+/// use cot::db::migrations::{MigrationContext, migration_op};
+///
+/// #[migration_op]
+/// async fn my_migration(ctx: MigrationContext<'_>) -> Result<()> {
+///     // Your migration logic here
+///     Ok(())
+/// }
+/// ```
 pub use cot_macros::migration_op;
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
@@ -434,8 +453,10 @@ impl MigrationEngine {
         while let Some(index) = queue.pop_front() {
             for &dependent_index in graph.get_edges(index) {
                 if rollback_indices.insert(dependent_index) {
-                    // we found a migration that depends on the one we're rolling back, so let's
-                    // add it to the queue which we will later traverse its dependents as well.
+                    // we found a migration that depends on the one we're
+                    // rolling back, so let's add it to the
+                    // queue which we will later traverse its dependents as
+                    // well.
                     queue.push_back(dependent_index);
                 }
             }

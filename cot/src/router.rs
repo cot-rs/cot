@@ -197,8 +197,8 @@ impl Router {
         matches: &CaptureResult<'_, '_>,
         mut path_params: Vec<(String, String)>,
     ) -> Vec<(String, String)> {
-        // Adding in reverse order, since we're doing this from the bottom up (we're
-        // going to reverse the order before running the handler)
+        // Adding in reverse order, since we're doing this from the bottom up
+        // (we're going to reverse the order before running the handler)
         for param in matches.params.iter().rev() {
             path_params.push((param.name.to_owned(), param.value.clone()));
         }

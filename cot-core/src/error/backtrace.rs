@@ -10,8 +10,8 @@ pub fn __cot_create_backtrace() -> Backtrace {
         if start {
             backtrace.push(frame);
         } else if frame.symbol_name().contains("__cot_create_backtrace") {
-            // TODO does this work with strip = true? (probably not, in that case we should
-            // return all frames instead)
+            // TODO does this work with strip = true? (probably not, in that
+            // case we should return all frames instead)
             start = true;
         }
 

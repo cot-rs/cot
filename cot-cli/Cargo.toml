@@ -21,6 +21,7 @@ workspace = true
 
 [dependencies]
 anyhow.workspace = true
+assert_cmd = { workspace = true, optional = true }
 cargo_toml.workspace = true
 cargo_metadata.workspace = true
 chrono.workspace = true
@@ -43,15 +44,16 @@ syn.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
+serde_json = { workspace = true}
+wait-timeout = { workspace = true }
 tempfile = { workspace = true, optional = true }
-wait-timeout.workspace = true
 
 [dev-dependencies]
 cot-cli = { path = ".", features = ["test_utils"] }
 assert_cmd.workspace = true
 insta.workspace = true
 insta-cmd.workspace = true
+
 trybuild.workspace = true
 
 [features]

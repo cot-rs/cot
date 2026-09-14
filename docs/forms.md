@@ -133,7 +133,7 @@ async fn handle_form(mut request: Request) -> cot::Result<Response> {
                 let mut context = ArticleForm::build_context(&mut request).await?;
                 context.add_error(
                     FormErrorTarget::Field("title"),
-                    FormFieldValidationError::from_static("Title contains spam")
+                    FormFieldValidationError::from_static("title contains spam")
                 );
 
                 // Re-render form with error

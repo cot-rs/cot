@@ -3,6 +3,7 @@ source: cot-cli/tests/snapshot_testing/help/external.rs
 info:
   program: cot
   args:
+    - "--build"
     - "--help"
 ---
 success: true

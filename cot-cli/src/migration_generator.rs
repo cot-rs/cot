@@ -4,6 +4,7 @@ use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process::{Command, ExitStatus};
 
 use anyhow::{Context, bail};
 use cot::db::migrations::{DynMigration, MigrationEngine};
@@ -20,6 +21,8 @@ use syn::{Meta, parse_quote};
 use tracing::{debug, trace};
 
 use crate::utils::{CargoTomlManager, PackageManager};
+
+const RUNTIME_MIGRATION_LIST_ENV: &str = "COT_RUNTIME_MIGRATION_LIST";
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
     let Some(manager) = CargoTomlManager::from_path(path)? else {
@@ -139,6 +142,57 @@ pub fn list_migrations(path: &Path) -> anyhow::Result<HashMap<String, Vec<String
     } else {
         bail!("Cargo.toml not found in the specified directory or any parent directory.")
     }
+}
+
+pub(crate) fn try_list_project_migrations(path: &Path) -> anyhow::Result<bool> {
+    try_list_project_migrations_with(path, Command::status)
+}
+
+fn try_list_project_migrations_with(
+    path: &Path,
+    run: impl FnOnce(&mut Command) -> std::io::Result<ExitStatus>,
+) -> anyhow::Result<bool> {
+    if std::env::var_os(RUNTIME_MIGRATION_LIST_ENV).is_some() {
+        return Ok(false);
+    }
+
+    let Some(manager) = CargoTomlManager::from_path(path)? else {
+        bail!("Cargo.toml not found in the specified directory or any parent directory.")
+    };
+
+    let package = match &manager {
+        CargoTomlManager::Workspace(workspace) => workspace.get_current_package_manager(),
+        CargoTomlManager::Package(package) => Some(package),
+    };
+    let Some(package) = package.filter(|package| package.is_runnable_cot_project()) else {
+        return Ok(false);
+    };
+
+    let status = run(&mut runtime_migration_list_command(package))
+        .with_context(|| "unable to run the Cot project to list migrations")?;
+    if !status.success() {
+        bail!("Cot project exited with {status} while listing migrations");
+    }
+
+    Ok(true)
+}
+
+fn runtime_migration_list_command(package: &PackageManager) -> Command {
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let mut command = Command::new(cargo);
+    command
+        .current_dir(package.get_package_path())
+        .env(RUNTIME_MIGRATION_LIST_ENV, "1")
+        .arg("run")
+        .arg("--quiet")
+        .arg("--manifest-path")
+        .arg(package.get_manifest_path())
+        .arg("--package")
+        .arg(package.get_package_name())
+        .arg("--")
+        .arg("migration")
+        .arg("list");
+    command
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1553,6 +1607,120 @@ mod tests {
     use cot_codegen::model::{ForeignKeyOnDeletePolicy, ForeignKeyOnUpdatePolicy, ForeignKeySpec};
 
     use super::*;
+
+    fn runtime_list_project(dependencies: &str) -> tempfile::TempDir {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(temp_dir.path().join("src")).unwrap();
+        std::fs::write(
+            temp_dir.path().join("Cargo.toml"),
+            format!(
+                r#"
+                    [package]
+                    name = "runtime-list-test"
+                    version = "0.1.0"
+                    edition = "2024"
+
+                    {dependencies}
+                "#
+            ),
+        )
+        .unwrap();
+        std::fs::write(temp_dir.path().join("src").join("main.rs"), "fn main() {}").unwrap();
+        temp_dir
+    }
+
+    #[test]
+    fn runtime_migration_list_runs_the_project_command() {
+        let temp_dir = runtime_list_project(
+            r#"
+                [dependencies]
+                cot = "0.7"
+            "#,
+        );
+
+        let CargoTomlManager::Package(package) = CargoTomlManager::from_path(temp_dir.path())
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("expected a package");
+        };
+
+        assert!(package.is_runnable_cot_project());
+        let command = runtime_migration_list_command(&package);
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+
+        assert_eq!(
+            args,
+            [
+                "run",
+                "--quiet",
+                "--manifest-path",
+                package.get_manifest_path().to_string_lossy().as_ref(),
+                "--package",
+                "runtime-list-test",
+                "--",
+                "migration",
+                "list",
+            ]
+        );
+        assert!(command.get_envs().any(|(name, value)| {
+            name == RUNTIME_MIGRATION_LIST_ENV && value == Some(std::ffi::OsStr::new("1"))
+        }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_migration_list_handles_process_outcomes_and_fallbacks() {
+        use std::os::unix::process::ExitStatusExt;
+
+        let project = runtime_list_project(
+            r#"
+                [dependencies]
+                cot = "0.7"
+            "#,
+        );
+        assert!(
+            try_list_project_migrations_with(project.path(), |_| Ok(ExitStatus::from_raw(0)))
+                .unwrap()
+        );
+
+        let error =
+            try_list_project_migrations_with(project.path(), |_| Ok(ExitStatus::from_raw(1 << 8)))
+                .unwrap_err();
+        assert!(error.to_string().contains("exited with"));
+
+        let non_cot_project = runtime_list_project("");
+        assert!(
+            !try_list_project_migrations_with(non_cot_project.path(), |_| {
+                panic!("non-Cot projects must not be run")
+            })
+            .unwrap()
+        );
+
+        let missing_manifest = tempfile::tempdir().unwrap();
+        assert!(
+            try_list_project_migrations_with(missing_manifest.path(), |_| {
+                panic!("projects without a manifest must not be run")
+            })
+            .is_err()
+        );
+
+        let workspace = tempfile::tempdir().unwrap();
+        std::fs::write(
+            workspace.path().join("Cargo.toml"),
+            "[workspace]\nresolver = \"3\"\nmembers = []\n",
+        )
+        .unwrap();
+        assert!(
+            !try_list_project_migrations_with(workspace.path(), |_| {
+                panic!("virtual workspaces must use the source fallback")
+            })
+            .unwrap()
+        );
+    }
 
     fn remove_whitespace<T: AsRef<str>>(s: &T) -> String {
         s.as_ref().chars().filter(|c| !c.is_whitespace()).collect()

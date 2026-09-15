@@ -49,7 +49,10 @@
 //! ```
 
 use std::future::Future;
+use std::net::IpAddr;
 
+use axum::extract::connect_info::Connected;
+use axum::serve::IncomingStream;
 use serde::de::DeserializeOwned;
 
 #[cfg(feature = "json")]
@@ -141,6 +144,83 @@ impl<D: DeserializeOwned> FromRequestHead for Path<D> {
             .expect("PathParams extension missing")
             .parse()?;
         Ok(Self(params))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+/// An extractor that extracts the IP address of the remote.
+/// This automatically checks for proxy IP headers and contains their IP if one such is specified.
+///
+/// # Examples
+/// ```rust
+/// async pub fn example_handler(RemoteAddr(ip): RemoteAddr) -> cot::Result<Html> {
+///     dbg!(ip); // Prints the IP as a debug statement
+///     ///...
+/// }
+/// ```
+pub struct RemoteAddr(IpAddr);
+
+impl RemoteAddr {
+    /// Create a new `RemoteAddr` with a given `ip`.
+    /// This should not be used directly.
+    pub fn with_ip(ip: IpAddr) -> Self {
+        Self(ip)
+    }
+
+    /// Get the remote address.
+    pub fn ip(&self) -> IpAddr {
+        self.0
+    }
+}
+
+impl<'a> Connected<IncomingStream<'a, tokio::net::TcpListener>> for RemoteAddr {
+    fn connect_info(stream: IncomingStream<'a, tokio::net::TcpListener>) -> Self {
+        RemoteAddr::with_ip(stream.remote_addr().ip())
+    }
+}
+
+/// Convert a `Result<IpAddr, client_ip::Error>` to a `cot::Result<Option<IpAddr>>`.
+/// The [`client_ip::Error`] has a variant [`client_ip::Error::AbsentHeader`] that is returned when
+/// a header is missing.
+/// In this case, we want to test all possible header combinations, so the `AbsentHeader` is converted
+/// to an [`Option::None`] and all other errors are stringified and returned as an internal error.
+fn client_ip_err_to_cot_err(res: Result<IpAddr, client_ip::Error>) -> crate::Result<Option<IpAddr>> {
+    match res {
+        Ok(ip) => Ok(Some(ip)),
+        Err(client_ip::Error::AbsentHeader { header_name: _ }) => Ok(None),
+        Err(e) => Err(crate::Error::internal(e.to_string()))
+    }
+}
+
+impl FromRequestHead for RemoteAddr {
+    #[expect(clippy::unused_async_trait_impl)]
+    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+        let addr = head
+            .extensions
+            .get::<RemoteAddr>()
+            .expect("Missing RemoteAddr extension");
+
+        let proxied = if let Some(ip) = client_ip_err_to_cot_err(client_ip::x_real_ip(&head.headers))? {
+            Some(ip)
+        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::fly_client_ip(&head.headers))? {
+            Some(ip)
+        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::true_client_ip(&head.headers))? {
+            Some(ip)
+        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::cf_connecting_ip(&head.headers))? {
+            Some(ip)
+        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::x_envoy_external_address(&head.headers))? {
+            Some(ip)
+        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::cloudfront_viewer_address(&head.headers))? {
+            Some(ip)
+        } else {
+            client_ip_err_to_cot_err(client_ip::rightmost_x_forwarded_for(&head.headers))?
+        };
+
+        if let Some(ip) = proxied {
+            return Ok(RemoteAddr(ip));
+        }
+        
+        Ok(*addr)
     }
 }
 
@@ -346,10 +426,11 @@ use crate::error::impl_into_cot_error;
 
 #[cfg(test)]
 mod tests {
-    use serde::Deserialize;
-
     use super::*;
     use crate::request::extractors::{FromRequest, Json, Path, UrlQuery};
+
+    use std::{net::{Ipv4Addr, Ipv6Addr}};
+    use serde::Deserialize;
 
     #[cfg(feature = "json")]
     #[cot::test]
@@ -488,5 +569,61 @@ mod tests {
         let (head, body) = request.into_parts();
         let result = Json::<serde_json::Value>::from_request(&head, body).await;
         assert!(result.is_err());
+    }
+
+    #[cot::test]
+    async fn remote_addr() {
+        const IP: IpAddr = IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4));
+
+        let mut request = http::Request::builder()
+            .method(http::Method::GET)
+            .header(http::header::CONTENT_TYPE, "text/plain")
+            .body(Body::fixed(r""))
+            .unwrap();
+
+        request.extensions_mut().insert(RemoteAddr(IP));
+
+        let (head, _) = request.into_parts();
+        let RemoteAddr(remote_addr) = RemoteAddr::from_request_head(&head).await.unwrap();
+
+        assert_eq!(remote_addr, IP);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_v6() {
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(8193, 3512, 0, 0, 0, 0, 0, 51966));
+
+        let mut request = http::Request::builder()
+            .method(http::Method::GET)
+            .header(http::header::CONTENT_TYPE, "text/plain")
+            .header("Forwarded", "for=[2001:db8::cafe]")
+            .body(Body::fixed(r""))
+            .unwrap();
+
+        request.extensions_mut().insert(RemoteAddr(IP_PROXY));
+
+        let (head, _) = request.into_parts();
+        let RemoteAddr(remote_addr) = RemoteAddr::from_request_head(&head).await.unwrap();
+
+        assert_eq!(remote_addr, IP_PROXY);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_v4() {
+        const IP_PROXY: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 0, 2, 60));
+
+        let mut request = http::Request::builder()
+            .method(http::Method::GET)
+            .header(http::header::CONTENT_TYPE, "text/plain")
+            .header("Forwarded", "for=192.0.2.60")
+            .body(Body::fixed(r""))
+            .unwrap();
+
+        request.extensions_mut().insert(RemoteAddr(IP_PROXY));
+
+        let (head, _) = request.into_parts();
+        let RemoteAddr(remote_addr) = RemoteAddr::from_request_head(&head).await.unwrap();
+
+        assert_eq!(remote_addr, IP_PROXY);
     }
 }

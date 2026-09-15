@@ -31,6 +31,7 @@ use cot::Template;
 use cot_core::error::impl_into_cot_error;
 use cot_core::handler::BoxedHandler;
 use cot_core::request::AppName;
+use cot_core::request::extractors::RemoteAddr;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;
@@ -2205,7 +2206,7 @@ pub async fn run_at_with_shutdown(
         };
         std::panic::set_hook(Box::new(new_hook));
     }
-    axum::serve(listener, handler.into_make_service())
+    axum::serve(listener, handler.into_make_service_with_connect_info::<RemoteAddr>())
         .with_graceful_shutdown(shutdown_signal)
         .await
         .map_err(StartServerError)?;

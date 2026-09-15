@@ -184,11 +184,13 @@ impl<'a> Connected<IncomingStream<'a, tokio::net::TcpListener>> for RemoteAddr {
 /// a header is missing.
 /// In this case, we want to test all possible header combinations, so the `AbsentHeader` is converted
 /// to an [`Option::None`] and all other errors are stringified and returned as an internal error.
-fn client_ip_err_to_cot_err(res: Result<IpAddr, client_ip::Error>) -> crate::Result<Option<IpAddr>> {
+fn client_ip_err_to_cot_err(
+    res: Result<IpAddr, client_ip::Error>,
+) -> crate::Result<Option<IpAddr>> {
     match res {
         Ok(ip) => Ok(Some(ip)),
         Err(client_ip::Error::AbsentHeader { header_name: _ }) => Ok(None),
-        Err(e) => Err(crate::Error::internal(e.to_string()))
+        Err(e) => Err(crate::Error::internal(e.to_string())),
     }
 }
 
@@ -200,17 +202,27 @@ impl FromRequestHead for RemoteAddr {
             .get::<RemoteAddr>()
             .expect("Missing RemoteAddr extension");
 
-        let proxied = if let Some(ip) = client_ip_err_to_cot_err(client_ip::x_real_ip(&head.headers))? {
+        let proxied = if let Some(ip) =
+            client_ip_err_to_cot_err(client_ip::x_real_ip(&head.headers))?
+        {
             Some(ip)
-        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::fly_client_ip(&head.headers))? {
+        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::fly_client_ip(&head.headers))?
+        {
             Some(ip)
-        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::true_client_ip(&head.headers))? {
+        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::true_client_ip(&head.headers))?
+        {
             Some(ip)
-        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::cf_connecting_ip(&head.headers))? {
+        } else if let Some(ip) =
+            client_ip_err_to_cot_err(client_ip::cf_connecting_ip(&head.headers))?
+        {
             Some(ip)
-        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::x_envoy_external_address(&head.headers))? {
+        } else if let Some(ip) =
+            client_ip_err_to_cot_err(client_ip::x_envoy_external_address(&head.headers))?
+        {
             Some(ip)
-        } else if let Some(ip) = client_ip_err_to_cot_err(client_ip::cloudfront_viewer_address(&head.headers))? {
+        } else if let Some(ip) =
+            client_ip_err_to_cot_err(client_ip::cloudfront_viewer_address(&head.headers))?
+        {
             Some(ip)
         } else {
             client_ip_err_to_cot_err(client_ip::rightmost_x_forwarded_for(&head.headers))?
@@ -219,7 +231,7 @@ impl FromRequestHead for RemoteAddr {
         if let Some(ip) = proxied {
             return Ok(RemoteAddr(ip));
         }
-        
+
         Ok(*addr)
     }
 }
@@ -429,8 +441,8 @@ mod tests {
     use super::*;
     use crate::request::extractors::{FromRequest, Json, Path, UrlQuery};
 
-    use std::{net::{Ipv4Addr, Ipv6Addr}};
     use serde::Deserialize;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
     #[cfg(feature = "json")]
     #[cot::test]

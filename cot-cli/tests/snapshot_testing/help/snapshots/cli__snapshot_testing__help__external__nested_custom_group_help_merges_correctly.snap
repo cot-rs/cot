@@ -3,6 +3,7 @@ source: cot-cli/tests/snapshot_testing/help/external.rs
 info:
   program: cot
   args:
+    - "--build"
     - fixture-group
     - "--help"
 ---
@@ -19,6 +20,5 @@ Commands:
 
 Options:
   -h, --help  Print help
-
 
 ----- stderr -----

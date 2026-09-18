@@ -53,7 +53,6 @@ cot-cli = { path = ".", features = ["test_utils"] }
 assert_cmd.workspace = true
 insta.workspace = true
 insta-cmd.workspace = true
-
 trybuild.workspace = true
 
 [features]

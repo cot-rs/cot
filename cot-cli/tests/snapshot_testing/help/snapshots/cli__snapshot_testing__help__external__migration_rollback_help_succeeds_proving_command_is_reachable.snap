@@ -22,5 +22,4 @@ Options:
       --dry-run    Print the Rollback Plan without changing the database
   -h, --help       Print help
 
-
 ----- stderr -----

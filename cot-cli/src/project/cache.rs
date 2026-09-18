@@ -16,9 +16,19 @@ use cot::utils::cli::{StatusType, print_status_msg};
 use serde::{Deserialize, Serialize};
 use wait_timeout::ChildExt;
 
-const METADATA_TIMEOUT: core::time::Duration = core::time::Duration::from_secs(5);
+const DEFAULT_METADATA_TIMEOUT_SECS: u64 = 10;
+const METADATA_TIMEOUT_ENV_VAR: &str = "COT_METADATA_TIMEOUT_SECS";
 const COT_DIR_NAME: &str = ".cot";
 const CACHE_FILE_NAME: &str = "command-cache.json";
+
+fn metadata_timeout() -> core::time::Duration {
+    let secs = std::env::var(METADATA_TIMEOUT_ENV_VAR)
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_METADATA_TIMEOUT_SECS);
+    core::time::Duration::from_secs(secs)
+}
+
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Cache {
     binary_mtime_secs: u64,
@@ -76,8 +86,9 @@ pub(crate) fn load_or_refresh(
         buf
     });
 
+    let timeout = metadata_timeout();
     let Some(status) = child
-        .wait_timeout(METADATA_TIMEOUT)
+        .wait_timeout(timeout)
         .with_context(|| format!("Failed to wait on {}", binary_path.display()))?
     else {
         let _ = child.kill();
@@ -85,7 +96,7 @@ pub(crate) fn load_or_refresh(
         bail!(
             "the `{}` binary did not respond within {:?} when queried for metadata.",
             binary_path.display(),
-            METADATA_TIMEOUT
+            timeout
         );
     };
 
@@ -164,7 +175,10 @@ pub(crate) fn write_cache(cache_path: &Path, cache: &Cache) -> anyhow::Result<()
         std::fs::create_dir_all(parent)?;
         ensure_cachedir_tag(parent)?;
     }
-    std::fs::write(cache_path, serde_json::to_string(cache)?)?;
+
+    let tmp_path = cache_path.with_extension("tmp");
+    std::fs::write(&tmp_path, serde_json::to_string(cache)?)?;
+    std::fs::rename(&tmp_path, cache_path)?;
     Ok(())
 }
 

@@ -3,6 +3,8 @@ source: cot-cli/tests/snapshot_testing/help/mod.rs
 info:
   program: cot
   args:
+    - "-p"
+    - cot-cli
     - "-h"
 ---
 success: true
@@ -27,6 +29,5 @@ Options:
   -q, --quiet...           Decrease logging verbosity
   -h, --help               Print help
   -V, --version            Print version
-
 
 ----- stderr -----

@@ -194,7 +194,6 @@ pub fn handle_combined_help(
     let cmd = combined_help_command(project);
     let mut target = navigate_to(cmd, path);
     target.print_help()?;
-    println!();
     Ok(())
 }
 

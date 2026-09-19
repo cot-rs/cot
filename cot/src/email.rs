@@ -178,7 +178,7 @@ pub enum EmailMessageError {
     #[error("{ERROR_PREFIX} failed to build email message: {0}")]
     BuildError(Box<dyn StdError + Send + Sync + 'static>),
     /// A required field is missing in the email message.
-    #[error("{ERROR_PREFIX} The `{0}` field is required but was not set")]
+    #[error("{ERROR_PREFIX} the `{0}` field is required but was not set")]
     MissingField(String),
 }
 
@@ -370,7 +370,7 @@ mod tests {
         let err = res.err().unwrap();
         assert_eq!(
             err.to_string(),
-            "email message build error: The `from` field is required but was not set"
+            "email message build error: the `from` field is required but was not set"
         );
     }
 

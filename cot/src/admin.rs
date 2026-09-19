@@ -109,7 +109,7 @@ async fn login(
                 let mut context = LoginForm::build_context(&mut request).await?;
                 context.add_error(
                     FormErrorTarget::Form,
-                    FormFieldValidationError::from_static("Invalid username or password"),
+                    FormFieldValidationError::from_static("invalid username or password"),
                 );
                 context
             }

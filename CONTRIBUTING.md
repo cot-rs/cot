@@ -43,6 +43,10 @@ We are using [prek](https://prek.j178.dev/) (`pre-commit` Rust alternative) hook
 
 Pre-commit still works for this project because `prek` and `pre-commit` share the same configuration file. However, the project may switch to a `prek`-specific configuration in the future.
 
+Error messages should begin with a lowercase letter and should not end with
+punctuation unless they contain multiple sentences. This follows the convention
+used by Rust's standard library and keeps chained errors readable.
+
 ### Tests that use database, cache, or other external resources
 
 Some tests use a database, cache, or other external resources. All these tests

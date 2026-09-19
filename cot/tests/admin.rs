@@ -53,7 +53,7 @@ impl Project for AdminProject {
 
     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
         apps.register(DatabaseUserApp::new());
-        apps.register_with_views(AdminApp::new(), "/admin");
+        apps.register_with_views(AdminApp::new(), "/admin/");
         apps.register(HelloApp);
     }
 

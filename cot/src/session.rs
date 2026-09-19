@@ -143,7 +143,7 @@ impl Session {
     pub(crate) fn from_extensions(extensions: &http::Extensions) -> &Self {
         extensions
             .get::<Self>()
-            .expect("Session extension missing. Did you forget to add the SessionMiddleware?")
+            .expect("Session extension missing. Add SessionMiddleware, and if using AuthMiddleware, register SessionMiddleware after AuthMiddleware.")
     }
 }
 

@@ -453,10 +453,14 @@ where
 /// user to the request extensions. This adds the [`crate::auth::Auth`] object
 /// to the request which can be accessed by the request handlers.
 ///
+/// This middleware requires [`SessionMiddleware`]. Since each
+/// [`RootHandlerBuilder::middleware`] call wraps the existing handler, register
+/// `SessionMiddleware` after `AuthMiddleware` so session handling runs first.
+///
 /// # Examples
 ///
 /// ```
-/// use cot::middleware::AuthMiddleware;
+/// use cot::middleware::{AuthMiddleware, SessionMiddleware};
 /// use cot::project::{MiddlewareContext, RootHandler, RootHandlerBuilder};
 /// use cot::{Project, ProjectContext};
 ///
@@ -467,7 +471,10 @@ where
 ///         handler: RootHandlerBuilder,
 ///         context: &MiddlewareContext,
 ///     ) -> RootHandler {
-///         handler.middleware(AuthMiddleware::new()).build()
+///         handler
+///             .middleware(AuthMiddleware::new())
+///             .middleware(SessionMiddleware::from_context(context))
+///             .build()
 ///     }
 /// }
 /// ```
@@ -663,7 +670,7 @@ mod tests {
 
     #[cot::test]
     #[should_panic(
-        expected = "Session extension missing. Did you forget to add the SessionMiddleware?"
+        expected = "Session extension missing. Add SessionMiddleware, and if using AuthMiddleware, register SessionMiddleware after AuthMiddleware."
     )]
     async fn auth_middleware_requires_session() {
         let svc = tower::service_fn(|_req: Request<Body>| async move {

@@ -864,9 +864,9 @@ checksum = "6e8ccc4ea9f6acc32d102c0f6d471d11d913ad15f20c04de743374861fa1d414"
 
 [[package]]
 name = "comrak"
-version = "0.54.0"
+version = "0.55.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d5910408554659ed848ff469e67ec83b30f179e72cec286cfdae64d1616f466"
+checksum = "daa3d1ea6b01ce72405fa3f826768f51c7a44917527c89b37856ffdd17ee57e4"
 dependencies = [
  "bon",
  "caseless",
@@ -1013,10 +1013,10 @@ checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
 [[package]]
 name = "cot"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4885a939f3f5911649f77328b1059a42b347d4159c460b8e91e624507fb49211"
+source = "git+https://github.com/cot-rs/cot.git?rev=1638ac877352d22ce98d1b7f2f6e75d13fc519e8#1638ac877352d22ce98d1b7f2f6e75d13fc519e8"
 dependencies = [
  "ahash 0.8.12",
+ "anstyle",
  "askama",
  "async-trait",
  "axum",
@@ -1047,6 +1047,7 @@ dependencies = [
  "pin-project-lite",
  "securer-string",
  "serde",
+ "serde_json",
  "subtle",
  "thiserror 2.0.20",
  "time",
@@ -1062,7 +1063,7 @@ dependencies = [
 [[package]]
 name = "cot-site"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=6c68a1b02d8aaba99eca6828101d77b55a0894f5#6c68a1b02d8aaba99eca6828101d77b55a0894f5"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=b67e46aaa6901913768ffd80a8737a79cba39db1#b67e46aaa6901913768ffd80a8737a79cba39db1"
 dependencies = [
  "askama",
  "async-trait",
@@ -1083,7 +1084,7 @@ dependencies = [
 [[package]]
 name = "cot-site-common"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=6c68a1b02d8aaba99eca6828101d77b55a0894f5#6c68a1b02d8aaba99eca6828101d77b55a0894f5"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=b67e46aaa6901913768ffd80a8737a79cba39db1#b67e46aaa6901913768ffd80a8737a79cba39db1"
 dependencies = [
  "comrak",
  "semver",
@@ -1094,7 +1095,7 @@ dependencies = [
 [[package]]
 name = "cot-site-macros"
 version = "0.1.0"
-source = "git+https://github.com/cot-rs/cot-site.git?rev=6c68a1b02d8aaba99eca6828101d77b55a0894f5#6c68a1b02d8aaba99eca6828101d77b55a0894f5"
+source = "git+https://github.com/cot-rs/cot-site.git?rev=b67e46aaa6901913768ffd80a8737a79cba39db1#b67e46aaa6901913768ffd80a8737a79cba39db1"
 dependencies = [
  "comrak",
  "cot-site-common",
@@ -1109,21 +1110,19 @@ dependencies = [
 [[package]]
 name = "cot_codegen"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc699bdab0ce9c3c5b78fa498071d07762ba451f0c8e27ea3c11e9b77f4722ca"
+source = "git+https://github.com/cot-rs/cot.git?rev=1638ac877352d22ce98d1b7f2f6e75d13fc519e8#1638ac877352d22ce98d1b7f2f6e75d13fc519e8"
 dependencies = [
- "darling 0.23.0",
+ "darling 0.24.1",
  "heck 0.5.0",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.6",
 ]
 
 [[package]]
 name = "cot_core"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6b20b72eb437a91f2876377a14edb358b1ba7cac016a90fcb0cc424ea5833bc"
+source = "git+https://github.com/cot-rs/cot.git?rev=1638ac877352d22ce98d1b7f2f6e75d13fc519e8#1638ac877352d22ce98d1b7f2f6e75d13fc519e8"
 dependencies = [
  "askama",
  "axum",
@@ -1151,17 +1150,16 @@ dependencies = [
 [[package]]
 name = "cot_macros"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7321f4664bea3ba6c2138343fa88e9b9c3e8e1d7ad68ff8ddad7d4c7ec771435"
+source = "git+https://github.com/cot-rs/cot.git?rev=1638ac877352d22ce98d1b7f2f6e75d13fc519e8#1638ac877352d22ce98d1b7f2f6e75d13fc519e8"
 dependencies = [
  "askama_derive",
  "cot_codegen",
- "darling 0.23.0",
+ "darling 0.24.1",
  "heck 0.5.0",
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.6",
 ]
 
 [[package]]
@@ -1302,16 +1300,6 @@ dependencies = [
 
 [[package]]
 name = "darling"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25ae13da2f202d56bd7f91c25fba009e7717a1e4a1cc98a76d844b65ae912e9d"
-dependencies = [
- "darling_core 0.23.0",
- "darling_macro 0.23.0",
-]
-
-[[package]]
-name = "darling"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed17f5901b6630b993ca003def43f2f8ef4014fc13b047b57aad617ff32bc2ec"
@@ -1327,19 +1315,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d00b9596d185e565c2207a0b01f8bd1a135483d02d9b7b0a54b11da8d53412e"
 dependencies = [
  "fnv",
- "ident_case",
- "proc-macro2",
- "quote",
- "strsim",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "darling_core"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9865a50f7c335f53564bb694ef660825eb8610e0a53d3e11bf1b0d3df31e03b0"
-dependencies = [
  "ident_case",
  "proc-macro2",
  "quote",
@@ -1367,17 +1342,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc34b93ccb385b40dc71c6fceac4b2ad23662c7eeb248cf10d529b7e055b6ead"
 dependencies = [
  "darling_core 0.20.11",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "darling_macro"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac3984ec7bd6cfa798e62b4a642426a5be0e68f9401cfc2a01e3fa9ea2fcdb8d"
-dependencies = [
- "darling_core 0.23.0",
  "quote",
  "syn 2.0.119",
 ]

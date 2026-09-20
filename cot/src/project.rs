@@ -25,13 +25,13 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::remote_addr::RemoteAddr;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
 use cot::Template;
 use cot_core::error::impl_into_cot_error;
 use cot_core::handler::BoxedHandler;
 use cot_core::request::AppName;
-use cot_core::request::extractors::RemoteAddr;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
 use thiserror::Error;

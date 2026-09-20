@@ -50,6 +50,8 @@
 
 extern crate self as cot;
 
+mod remote_addr;
+
 #[cfg(feature = "cache")]
 pub mod cache;
 

@@ -39,7 +39,6 @@ thiserror.workspace = true
 tower-sessions.workspace = true
 tower.workspace = true
 tokio.workspace = true
-client-ip.workspace = true
 
 [dev-dependencies]
 async-stream.workspace = true

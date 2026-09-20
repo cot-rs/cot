@@ -15,14 +15,17 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
-use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
+use std::{net::IpAddr, path::PathBuf};
 
 use chrono::{DateTime, FixedOffset, Utc};
 use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
+use http::HeaderName;
 use securer_string::SecureBytes;
+use serde::de::Visitor;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -252,6 +255,12 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub middlewares: MiddlewareConfig,
+    /// Configuration related to proxies before the application.
+    /// In case this application is behind a proxy, it would be reasonable to configure this proxy
+    /// here, so it can be appropriately handled for peer address detection.
+    ///
+    /// See [`ProxyConfig`] for further details.
+    pub trusted_proxy: ProxyConfig,
     /// Configuration related to the email backend.
     ///
     /// # Examples
@@ -412,6 +421,7 @@ impl ProjectConfigBuilder {
             #[cfg(feature = "cache")]
             cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
+            trusted_proxy: self.trusted_proxy.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
             #[cfg(feature = "email")]
             email: self.email.clone().unwrap_or_default(),
@@ -1176,6 +1186,221 @@ impl StaticFilesConfig {
     #[must_use]
     pub fn builder() -> StaticFilesConfigBuilder {
         StaticFilesConfigBuilder::default()
+    }
+}
+
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+/// Configure how proxies are handled for detecting peer IP addresses.
+/// 
+/// Supported headers are:
+/// - `Forwarded`
+/// - `X-Forwarded-For`
+/// - `CF-Connecting-IP`
+/// - `X-Real-IP`
+///
+/// A proxy must be specified in `CIDR` notation.
+/// Only configured headers from configured proxies will be accepted. All others will be ignored.
+///
+/// # Example
+/// ```
+/// use std::time::Duration;
+///
+/// use cot::config::ProjectConfig;
+///
+/// use std::net::IpAddr;
+///
+/// let config = ProjectConfig::from_toml(
+///     r#"
+/// [trusted_proxy]
+/// trusted_proxies = ["192.168.1.0/8"]
+/// trusted_headers = ["Forwarded"]
+/// "#,
+/// )?;
+///
+/// assert!(
+///     config.trusted_proxies.trusted_proxies[0].contains(IpAddr::from_str("192.168.82.1").unwrap()),
+/// );
+/// # Ok::<(), cot::Error>(())
+/// ```
+pub struct ProxyConfig {
+    trusted_proxies: Vec<IpWithSubnet>,
+    trusted_headers: Vec<String>,
+}
+
+impl ProxyConfig {
+    pub fn get_trusted_proxies(&self) -> Vec<IpWithSubnet> {
+        self.trusted_proxies.clone()
+    }
+
+    pub fn get_trusted_headers(&self) -> Vec<HeaderName> {
+        self.trusted_headers
+            .iter()
+            .filter_map(|h| HeaderName::from_str(h).ok())
+            .collect()
+    }
+
+    /// Create a new [`ProxyConfig`] with trusted proxies and trusted headers.
+    pub fn new(proxies: Vec<IpWithSubnet>, headers: Vec<String>) -> Self {
+        Self { trusted_proxies: proxies, trusted_headers: headers }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IpWithSubnet {
+    ip: IpAddr,
+    mask: Option<u8>,
+}
+
+impl Serialize for IpWithSubnet {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Some(mask) = self.mask {
+            serializer.serialize_str(&format!("{}/{}", self.ip, mask))
+        } else {
+            serializer.serialize_str(&self.ip.to_string())
+        }
+    }
+}
+
+struct IpWithSubnetVistor;
+
+impl Visitor<'_> for IpWithSubnetVistor {
+    type Value = String;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("a CIDR notation")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(v.to_string())
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(v)
+    }
+}
+
+impl<'de> Deserialize<'de> for IpWithSubnet {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match deserializer.deserialize_string(IpWithSubnetVistor {}) {
+            Ok(string) => {
+                let mut segments = string.split('/');
+                let segs_c = segments.clone().count();
+                if segs_c == 2 {
+                    let ip_seg = segments.next().unwrap();
+                    match IpAddr::from_str(ip_seg) {
+                        Ok(ip) => match segments.next().unwrap().parse::<u8>() {
+                            Ok(mask) => Ok(IpWithSubnet {
+                                ip,
+                                mask: Some(mask),
+                            }),
+                            Err(_err) => {
+                                Err(serde::de::Error::custom("invalid subnet mask description"))
+                            }
+                        },
+                        Err(_err) => Err(serde::de::Error::custom(format!(
+                            "malformed IP address: {ip_seg}"
+                        ))),
+                    }
+                } else if segs_c == 1 {
+                    let ip_seg = segments.next().unwrap();
+                    match IpAddr::from_str(ip_seg) {
+                        Ok(ip) => Ok(IpWithSubnet { ip, mask: None }),
+                        Err(_err) => Err(serde::de::Error::custom(format!(
+                            "malformed IP address: {ip_seg}"
+                        ))),
+                    }
+                } else {
+                    Err(serde::de::Error::custom(format!(
+                        "malformed CIDR notation: {string}"
+                    )))
+                }
+            }
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl IpWithSubnet {
+    /// Create a new [`IpWithSubnet`].
+    ///
+    /// `mask` must be between 0 and 32 for IPv4 and between 0 and 128 for IPv6.
+    pub(crate) fn new(ip: IpAddr, mask: u8) -> Option<IpWithSubnet> {
+        match ip {
+            IpAddr::V4(_) => {
+                if mask > 32 {
+                    return None;
+                }
+                Some(IpWithSubnet {
+                    ip,
+                    mask: Some(mask),
+                })
+            }
+            IpAddr::V6(_) => {
+                if mask > 128 {
+                    return None;
+                }
+                Some(IpWithSubnet {
+                    ip,
+                    mask: Some(mask),
+                })
+            }
+        }
+    }
+
+    #[must_use]
+    /// Check if an IP is contained in the subnet.
+    ///
+    /// # Example
+    /// ```rust
+    /// use std::net::IpAddr;
+    ///
+    /// let check_a = IpWithSubnet::new(IpAddr::from_str("1.2.3.0").unwrap(), 24).contains(IpAddr::from_str("1.2.3.4").unwrap());
+    /// assert!(check_a);
+    /// 
+    /// let check_b = IpWithSubnet::new(IpAddr::from_str("1.2.3.0").unwrap(), 32).contains(IpAddr::from_str("1.2.3.4").unwrap());
+    /// assert!(!check);
+    /// ```
+    pub fn contains(&self, ip: IpAddr) -> bool {
+        match ip {
+            IpAddr::V6(v6) => {
+                if let Some(mask) = self.mask {
+                    let int_a: u128 = v6.into();
+                    let int_b: u128 = match self.ip {
+                        IpAddr::V4(_) => return false,
+                        IpAddr::V6(ip) => ip.into(),
+                    };
+                    let mask = u128::MAX << (128 - mask);
+                    (int_a & mask) == (int_b & mask)
+                } else {
+                    v6 == self.ip
+                }
+            }
+            IpAddr::V4(v4) => {
+                if let Some(mask) = self.mask {
+                    let int_a: u32 = v4.into();
+                    let int_b: u32 = match self.ip {
+                        IpAddr::V6(_) => return false,
+                        IpAddr::V4(ip) => ip.into(),
+                    };
+                    let mask = u32::MAX << (32 - mask);
+                    (int_a & mask) == (int_b & mask)
+                } else {
+                    v4 == self.ip
+                }
+            }
+        }
     }
 }
 
@@ -2495,6 +2720,8 @@ impl From<&str> for EmailUrl {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{Ipv4Addr, Ipv6Addr};
+
     use serde_json;
     use time::OffsetDateTime;
 
@@ -3179,5 +3406,115 @@ mod tests {
             .try_into()
             .unwrap();
         assert_eq!(my_config.foo, "bar");
+    }
+
+    #[test]
+    fn ip_with_subnet() {
+        let a = IpWithSubnet::new(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 0)), 30).unwrap();
+        assert!(!a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 1, 1))));
+        assert!(a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 1))));
+        assert!(a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 2))));
+        assert!(a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 3))));
+        assert!(a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 0))));
+        assert!(!a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 4))));
+    }
+
+    #[test]
+    fn ip_with_subnet_v6() {
+        let a = IpWithSubnet::new(
+            IpAddr::V6(Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7334").unwrap()),
+            64,
+        )
+        .unwrap();
+        assert!(!a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 4))));
+        assert!(a.contains(IpAddr::V6(
+            Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7335").unwrap()
+        )));
+        assert!(a.contains(IpAddr::V6(
+            Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7336").unwrap()
+        )));
+        assert!(!a.contains(IpAddr::V6(
+            Ipv6Addr::from_str("2001:0db8:0000:1000:0000:8a2e:1370:7336").unwrap()
+        )));
+        assert!(!a.contains(IpAddr::V6(Ipv6Addr::from_str("::").unwrap())));
+    }
+
+    #[test]
+    #[cfg(feature = "email")]
+    fn proxy_config_from_toml() {
+        let toml_content = r#"
+            [trusted_proxy]
+            proxies = ["2001:0db8:85a3::/64", "203.0.113.0/24", "169.254.0.0/16", "fc00::/7", "::", "::/0", "242.222.194.242", "2001:0db8:0000:0000:0000:8a2e:0370:7334"]
+            headers = ["X-Forwarded-For", "Forwarded", "True-Client-IP"]
+            "#;
+        let config = ProjectConfig::from_toml(toml_content).unwrap();
+
+        assert_eq!(
+            config.trusted_proxy.trusted_proxies[0].ip,
+            Ipv6Addr::from_str("2001:0db8:85a3::").unwrap()
+        );
+        assert_eq!(
+            config.trusted_proxy.trusted_proxies[1].ip,
+            Ipv4Addr::from_str("203.0.113.0").unwrap()
+        );
+        assert_eq!(
+            config.trusted_proxy.trusted_proxies[2].ip,
+            Ipv4Addr::from_str("169.254.0.0").unwrap()
+        );
+        assert_eq!(
+            config.trusted_proxy.trusted_proxies[3].ip,
+            Ipv6Addr::from_str("fc00::").unwrap()
+        );
+        assert_eq!(
+            config.trusted_proxy.trusted_proxies[4].ip,
+            Ipv6Addr::from_str("::").unwrap()
+        );
+        assert_eq!(
+            config.trusted_proxy.trusted_proxies[5].ip,
+            Ipv6Addr::from_str("::").unwrap()
+        );
+        assert_eq!(
+            config.trusted_proxy.trusted_proxies[6].ip,
+            Ipv4Addr::from_str("242.222.194.242").unwrap()
+        );
+
+        assert_eq!(config.trusted_proxy.trusted_proxies[0].mask, Some(64));
+        assert_eq!(config.trusted_proxy.trusted_proxies[1].mask, Some(24));
+        assert_eq!(config.trusted_proxy.trusted_proxies[2].mask, Some(16));
+        assert_eq!(config.trusted_proxy.trusted_proxies[3].mask, Some(7));
+        assert_eq!(config.trusted_proxy.trusted_proxies[4].mask, None);
+        assert_eq!(config.trusted_proxy.trusted_proxies[5].mask, Some(0));
+        assert_eq!(config.trusted_proxy.trusted_proxies[6].mask, None);
+
+        assert!(
+            config.trusted_proxy.trusted_proxies[6]
+                .contains(IpAddr::V4(Ipv4Addr::from_str("242.222.194.242").unwrap()))
+        );
+        assert!(
+            !config.trusted_proxy.trusted_proxies[6]
+                .contains(IpAddr::V6(Ipv6Addr::from_str("::").unwrap()))
+        );
+        assert!(
+            !config.trusted_proxy.trusted_proxies[6]
+                .contains(IpAddr::V4(Ipv4Addr::from_str("242.222.194.243").unwrap()))
+        );
+        assert!(
+            !config.trusted_proxy.trusted_proxies[0]
+                .contains(IpAddr::V6(Ipv6Addr::from_str("::").unwrap()))
+        );
+        assert!(
+            config.trusted_proxy.trusted_proxies[0]
+                .contains(IpAddr::V6(Ipv6Addr::from_str("2001:0db8:85a3::").unwrap()))
+        );
+        assert!(
+            !config.trusted_proxy.trusted_proxies[0]
+                .contains(IpAddr::V6(Ipv6Addr::from_str("2001:0db8:85a4::").unwrap()))
+        );
+        assert!(!config.trusted_proxy.trusted_proxies[7].contains(IpAddr::V6(
+            Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7335").unwrap()
+        )));
+        assert!(config.trusted_proxy.trusted_proxies[7].contains(IpAddr::V6(
+            Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7334").unwrap()
+        )));
     }
 }

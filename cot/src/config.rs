@@ -1191,7 +1191,7 @@ impl StaticFilesConfig {
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 /// Configure how proxies are handled for detecting peer IP addresses.
-/// 
+///
 /// Supported headers are:
 /// - `Forwarded`
 /// - `X-Forwarded-For`
@@ -1204,10 +1204,9 @@ impl StaticFilesConfig {
 /// # Example
 /// ```
 /// use std::time::Duration;
-///
 /// use cot::config::ProjectConfig;
-///
 /// use std::net::IpAddr;
+/// use std::str::FromStr;
 ///
 /// let config = ProjectConfig::from_toml(
 ///     r#"
@@ -1218,7 +1217,7 @@ impl StaticFilesConfig {
 /// )?;
 ///
 /// assert!(
-///     config.trusted_proxies.trusted_proxies[0].contains(IpAddr::from_str("192.168.82.1").unwrap()),
+///     config.trusted_proxy.trusted_proxies[0].contains(IpAddr::from_str("192.168.82.1").unwrap()),
 /// );
 /// # Ok::<(), cot::Error>(())
 /// ```
@@ -1228,10 +1227,14 @@ pub struct ProxyConfig {
 }
 
 impl ProxyConfig {
+    #[must_use]
+    /// Get the proxies that have been configured to be trusted.
     pub fn get_trusted_proxies(&self) -> Vec<IpWithSubnet> {
         self.trusted_proxies.clone()
     }
 
+    #[must_use]
+    /// Get the proxy headers that have been configured to be trusted.
     pub fn get_trusted_headers(&self) -> Vec<HeaderName> {
         self.trusted_headers
             .iter()
@@ -1239,9 +1242,13 @@ impl ProxyConfig {
             .collect()
     }
 
+    #[must_use]
     /// Create a new [`ProxyConfig`] with trusted proxies and trusted headers.
     pub fn new(proxies: Vec<IpWithSubnet>, headers: Vec<String>) -> Self {
-        Self { trusted_proxies: proxies, trusted_headers: headers }
+        Self {
+            trusted_proxies: proxies,
+            trusted_headers: headers,
+        }
     }
 }
 
@@ -1333,44 +1340,20 @@ impl<'de> Deserialize<'de> for IpWithSubnet {
 }
 
 impl IpWithSubnet {
-    /// Create a new [`IpWithSubnet`].
-    ///
-    /// `mask` must be between 0 and 32 for IPv4 and between 0 and 128 for IPv6.
-    pub(crate) fn new(ip: IpAddr, mask: u8) -> Option<IpWithSubnet> {
-        match ip {
-            IpAddr::V4(_) => {
-                if mask > 32 {
-                    return None;
-                }
-                Some(IpWithSubnet {
-                    ip,
-                    mask: Some(mask),
-                })
-            }
-            IpAddr::V6(_) => {
-                if mask > 128 {
-                    return None;
-                }
-                Some(IpWithSubnet {
-                    ip,
-                    mask: Some(mask),
-                })
-            }
-        }
-    }
-
     #[must_use]
     /// Check if an IP is contained in the subnet.
     ///
     /// # Example
     /// ```rust
+    /// use cot::config::IpWithSubnet;
     /// use std::net::IpAddr;
+    /// use std::str::FromStr
     ///
     /// let check_a = IpWithSubnet::new(IpAddr::from_str("1.2.3.0").unwrap(), 24).contains(IpAddr::from_str("1.2.3.4").unwrap());
     /// assert!(check_a);
-    /// 
+    ///
     /// let check_b = IpWithSubnet::new(IpAddr::from_str("1.2.3.0").unwrap(), 32).contains(IpAddr::from_str("1.2.3.4").unwrap());
-    /// assert!(!check);
+    /// assert!(!check_b);
     /// ```
     pub fn contains(&self, ip: IpAddr) -> bool {
         match ip {
@@ -3444,8 +3427,8 @@ mod tests {
     fn proxy_config_from_toml() {
         let toml_content = r#"
             [trusted_proxy]
-            proxies = ["2001:0db8:85a3::/64", "203.0.113.0/24", "169.254.0.0/16", "fc00::/7", "::", "::/0", "242.222.194.242", "2001:0db8:0000:0000:0000:8a2e:0370:7334"]
-            headers = ["X-Forwarded-For", "Forwarded", "True-Client-IP"]
+            trusted_proxies = ["2001:0db8:85a3::/64", "203.0.113.0/24", "169.254.0.0/16", "fc00::/7", "::", "::/0", "242.222.194.242", "2001:0db8:0000:0000:0000:8a2e:0370:7334"]
+            trusted_headers = ["X-Forwarded-For", "Forwarded", "True-Client-IP"]
             "#;
         let config = ProjectConfig::from_toml(toml_content).unwrap();
 
@@ -3510,9 +3493,11 @@ mod tests {
             !config.trusted_proxy.trusted_proxies[0]
                 .contains(IpAddr::V6(Ipv6Addr::from_str("2001:0db8:85a4::").unwrap()))
         );
-        assert!(!config.trusted_proxy.trusted_proxies[7].contains(IpAddr::V6(
-            Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7335").unwrap()
-        )));
+        assert!(
+            !config.trusted_proxy.trusted_proxies[7].contains(IpAddr::V6(
+                Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7335").unwrap()
+            ))
+        );
         assert!(config.trusted_proxy.trusted_proxies[7].contains(IpAddr::V6(
             Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7334").unwrap()
         )));

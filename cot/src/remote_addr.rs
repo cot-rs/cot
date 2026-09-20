@@ -97,7 +97,7 @@ fn extract_x_real_ip(header: &HeaderValue) -> crate::Result<IpAddr> {
 ///
 /// # Examples
 /// ```rust
-/// async pub fn example_handler(ip: RemoteAddr) -> cot::Result<Html> {
+/// pub async fn example_handler(ip: RemoteAddr) -> cot::Result<Html> {
 ///     dbg!(ip.ip()); // Prints the IP as a debug statement
 ///     dbg!(ip.closest_ip()); // Prints the closest IP as a debug statement
 ///     ///...
@@ -111,12 +111,14 @@ pub struct RemoteAddr {
 }
 
 impl RemoteAddr {
+    #[must_use]
     /// Get the IP address of the peer.
     /// This automatically handles proxy IP headers.
     pub fn ip(&self) -> IpAddr {
         self.proxied.unwrap_or(self.direct)
     }
 
+    #[must_use]
     /// Get the IP address of the peer closest to this server.
     /// This does **not** handle proxies.
     ///

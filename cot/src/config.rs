@@ -15,9 +15,9 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
+use std::fmt::Display;
 use std::path::PathBuf;
 use std::time::Duration;
-use std::fmt::Display;
 
 use chrono::{DateTime, FixedOffset, Utc};
 use cot_core::error::impl_into_cot_error;

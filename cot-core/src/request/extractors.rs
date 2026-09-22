@@ -346,11 +346,10 @@ use crate::error::impl_into_cot_error;
 
 #[cfg(test)]
 mod tests {
+    use serde::Deserialize;
+
     use super::*;
     use crate::request::extractors::{FromRequest, Json, Path, UrlQuery};
-
-    use serde::Deserialize;
-    use std::net::{Ipv4Addr, Ipv6Addr};
 
     #[cfg(feature = "json")]
     #[cot::test]

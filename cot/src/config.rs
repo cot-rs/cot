@@ -15,18 +15,16 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
-use std::str::FromStr;
+use std::path::PathBuf;
 use std::time::Duration;
-use std::{net::IpAddr, path::PathBuf};
+use std::fmt::Display;
 
 use chrono::{DateTime, FixedOffset, Utc};
 use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
-use http::HeaderName;
 use securer_string::SecureBytes;
-use serde::de::Visitor;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Visitor};
 use thiserror::Error;
 
 #[cfg(feature = "email")]
@@ -259,8 +257,8 @@ pub struct ProjectConfig {
     /// In case this application is behind a proxy, it would be reasonable to configure this proxy
     /// here, so it can be appropriately handled for peer address detection.
     ///
-    /// See [`ProxyConfig`] for further details.
-    pub trusted_proxy: ProxyConfig,
+    /// See [`ClientIpConfig`] for further details.
+    pub client_ip: ClientIpConfig,
     /// Configuration related to the email backend.
     ///
     /// # Examples
@@ -421,7 +419,7 @@ impl ProjectConfigBuilder {
             #[cfg(feature = "cache")]
             cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
-            trusted_proxy: self.trusted_proxy.clone().unwrap_or_default(),
+            client_ip: self.client_ip.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
             #[cfg(feature = "email")]
             email: self.email.clone().unwrap_or_default(),
@@ -1189,7 +1187,8 @@ impl StaticFilesConfig {
     }
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Builder)]
+#[builder(build_fn(name = "build_impl"))]
 /// Configure how proxies are handled for detecting peer IP addresses.
 ///
 /// Supported headers are:
@@ -1200,9 +1199,12 @@ impl StaticFilesConfig {
 ///
 /// A proxy must be specified in `CIDR` notation.
 /// Only configured headers from configured proxies will be accepted. All others will be ignored.
+/// In order to accept any peer as a proxy, you may use `0.0.0.0/0` and `::/0`. Be aware that this is
+/// **hugely insecure** as it may allow bypassing IP checks!
 ///
 /// # Example
-/// ```
+///
+/// ```rust
 /// use std::time::Duration;
 /// use cot::config::ProjectConfig;
 /// use std::net::IpAddr;
@@ -1210,180 +1212,115 @@ impl StaticFilesConfig {
 ///
 /// let config = ProjectConfig::from_toml(
 ///     r#"
-/// [trusted_proxy]
-/// trusted_proxies = ["192.168.1.0/8"]
-/// trusted_headers = ["Forwarded"]
+/// [client_ip]
+/// proxies = ["192.168.1.0/8"]
+/// headers = ["Forwarded"]
 /// "#,
 /// )?;
 ///
-/// assert!(
-///     config.trusted_proxy.trusted_proxies[0].contains(IpAddr::from_str("192.168.82.1").unwrap()),
-/// );
 /// # Ok::<(), cot::Error>(())
 /// ```
-pub struct ProxyConfig {
-    trusted_proxies: Vec<IpWithSubnet>,
-    trusted_headers: Vec<String>,
+pub struct ClientIpConfig {
+    #[builder(default)]
+    #[serde(default)]
+    proxies: Vec<ipnet::IpNet>,
+
+    #[builder(default = "default_client_ip_headers()")]
+    #[serde(default = "default_client_ip_headers")]
+    headers: Vec<ClientIpHeader>,
 }
 
-impl ProxyConfig {
-    #[must_use]
-    /// Get the proxies that have been configured to be trusted.
-    pub fn get_trusted_proxies(&self) -> Vec<IpWithSubnet> {
-        self.trusted_proxies.clone()
-    }
-
-    #[must_use]
-    /// Get the proxy headers that have been configured to be trusted.
-    pub fn get_trusted_headers(&self) -> Vec<HeaderName> {
-        self.trusted_headers
-            .iter()
-            .filter_map(|h| HeaderName::from_str(h).ok())
-            .collect()
-    }
-
-    #[must_use]
-    /// Create a new [`ProxyConfig`] with trusted proxies and trusted headers.
-    pub fn new(proxies: Vec<IpWithSubnet>, headers: Vec<String>) -> Self {
-        Self {
-            trusted_proxies: proxies,
-            trusted_headers: headers,
-        }
-    }
+fn default_client_ip_headers() -> Vec<ClientIpHeader> {
+    vec![ClientIpHeader::XForwardedFor]
 }
 
-#[derive(Clone, Debug)]
-pub struct IpWithSubnet {
-    ip: IpAddr,
-    mask: Option<u8>,
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// A header used for deriving the IP of the client.
+pub enum ClientIpHeader {
+    /// `Forwarded`, a comma-separated list of hops, closest-to-origin first and further metadata.
+    Forwarded,
+    /// `X-Forwarded-For`, the de facto standard, a comma-separated list of
+    /// hops, closest-to-origin first.
+    XForwardedFor,
+    /// `X-Real-IP`, commonly set by nginx, a single address.
+    XRealIp,
+    /// `True-Client-IP`, used by Akamai and Cloudflare Enterprise.
+    TrueClientIp,
+    /// `CF-Connecting-IP` set by Cloudflare.
+    CfConnectingIp,
 }
 
-impl Serialize for IpWithSubnet {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        if let Some(mask) = self.mask {
-            serializer.serialize_str(&format!("{}/{}", self.ip, mask))
-        } else {
-            serializer.serialize_str(&self.ip.to_string())
-        }
-    }
-}
+struct ClientIpHeaderVisitor;
 
-struct IpWithSubnetVistor;
+impl Visitor<'_> for ClientIpHeaderVisitor {
+    type Value = ClientIpHeader;
 
-impl Visitor<'_> for IpWithSubnetVistor {
-    type Value = String;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("a CIDR notation")
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("expected supported HTTP header name")
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(v.to_string())
-    }
-
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Ok(v)
+        match v.to_lowercase().as_str() {
+            "forwarded" => Ok(Self::Value::Forwarded),
+            "x-forwarded-for" => Ok(Self::Value::XForwardedFor),
+            "x-real-ip" => Ok(Self::Value::XRealIp),
+            "true-client-ip" => Ok(Self::Value::TrueClientIp),
+            "cf-connecting-ip" => Ok(Self::Value::CfConnectingIp),
+            _ => Err(E::custom("Unknown header")),
+        }
     }
 }
 
-impl<'de> Deserialize<'de> for IpWithSubnet {
+impl<'de> Deserialize<'de> for ClientIpHeader {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        match deserializer.deserialize_string(IpWithSubnetVistor {}) {
-            Ok(string) => {
-                let mut segments = string.split('/');
-                let segs_c = segments.clone().count();
-                if segs_c == 2 {
-                    let ip_seg = segments.next().unwrap();
-                    match IpAddr::from_str(ip_seg) {
-                        Ok(ip) => match segments.next().unwrap().parse::<u8>() {
-                            Ok(mask) => Ok(IpWithSubnet {
-                                ip,
-                                mask: Some(mask),
-                            }),
-                            Err(_err) => {
-                                Err(serde::de::Error::custom("invalid subnet mask description"))
-                            }
-                        },
-                        Err(_err) => Err(serde::de::Error::custom(format!(
-                            "malformed IP address: {ip_seg}"
-                        ))),
-                    }
-                } else if segs_c == 1 {
-                    let ip_seg = segments.next().unwrap();
-                    match IpAddr::from_str(ip_seg) {
-                        Ok(ip) => Ok(IpWithSubnet { ip, mask: None }),
-                        Err(_err) => Err(serde::de::Error::custom(format!(
-                            "malformed IP address: {ip_seg}"
-                        ))),
-                    }
-                } else {
-                    Err(serde::de::Error::custom(format!(
-                        "malformed CIDR notation: {string}"
-                    )))
-                }
-            }
-            Err(err) => Err(err),
+        deserializer.deserialize_string(ClientIpHeaderVisitor)
+    }
+}
+
+impl Display for ClientIpHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CfConnectingIp => f.write_str("cf-connecting-ip"),
+            Self::TrueClientIp => f.write_str("true-client-ip"),
+            Self::XRealIp => f.write_str("x-real-ip"),
+            Self::Forwarded => f.write_str("forwarded"),
+            Self::XForwardedFor => f.write_str("x-forwarded-for"),
         }
     }
 }
 
-impl IpWithSubnet {
+impl Serialize for ClientIpHeader {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl ClientIpConfig {
     #[must_use]
-    /// Check if an IP is contained in the subnet.
-    ///
-    /// # Example
-    /// ```rust
-    /// use cot::config::IpWithSubnet;
-    /// use std::net::IpAddr;
-    /// use std::str::FromStr
-    ///
-    /// let check_a = IpWithSubnet::new(IpAddr::from_str("1.2.3.0").unwrap(), 24).contains(IpAddr::from_str("1.2.3.4").unwrap());
-    /// assert!(check_a);
-    ///
-    /// let check_b = IpWithSubnet::new(IpAddr::from_str("1.2.3.0").unwrap(), 32).contains(IpAddr::from_str("1.2.3.4").unwrap());
-    /// assert!(!check_b);
-    /// ```
-    pub fn contains(&self, ip: IpAddr) -> bool {
-        match ip {
-            IpAddr::V6(v6) => {
-                if let Some(mask) = self.mask {
-                    let int_a: u128 = v6.into();
-                    let int_b: u128 = match self.ip {
-                        IpAddr::V4(_) => return false,
-                        IpAddr::V6(ip) => ip.into(),
-                    };
-                    let mask = u128::MAX << (128 - mask);
-                    (int_a & mask) == (int_b & mask)
-                } else {
-                    v6 == self.ip
-                }
-            }
-            IpAddr::V4(v4) => {
-                if let Some(mask) = self.mask {
-                    let int_a: u32 = v4.into();
-                    let int_b: u32 = match self.ip {
-                        IpAddr::V6(_) => return false,
-                        IpAddr::V4(ip) => ip.into(),
-                    };
-                    let mask = u32::MAX << (32 - mask);
-                    (int_a & mask) == (int_b & mask)
-                } else {
-                    v4 == self.ip
-                }
-            }
-        }
+    /// Get the proxies that have been configured to be trusted.
+    pub fn get_proxies(&self) -> Vec<ipnet::IpNet> {
+        self.proxies.clone()
+    }
+
+    #[must_use]
+    /// Get the proxy headers that have been configured to be trusted.
+    pub fn get_trusted_headers(&self) -> Vec<ClientIpHeader> {
+        self.headers.clone()
+    }
+
+    #[must_use]
+    /// Create a new [`ProxyConfig`] with trusted proxies and trusted headers.
+    pub fn new(proxies: Vec<ipnet::IpNet>, headers: Vec<ClientIpHeader>) -> Self {
+        Self { proxies, headers }
     }
 }
 
@@ -2703,8 +2640,9 @@ impl From<&str> for EmailUrl {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+    use http::HeaderValue;
     use serde_json;
     use time::OffsetDateTime;
 
@@ -3392,114 +3330,37 @@ mod tests {
     }
 
     #[test]
-    fn ip_with_subnet() {
-        let a = IpWithSubnet::new(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 0)), 30).unwrap();
-        assert!(!a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 1, 1))));
-        assert!(a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 1))));
-        assert!(a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 2))));
-        assert!(a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 3))));
-        assert!(a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 0))));
-        assert!(!a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 4))));
-    }
-
-    #[test]
-    fn ip_with_subnet_v6() {
-        let a = IpWithSubnet::new(
-            IpAddr::V6(Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7334").unwrap()),
-            64,
-        )
-        .unwrap();
-        assert!(!a.contains(IpAddr::V4(Ipv4Addr::new(142, 124, 0, 4))));
-        assert!(a.contains(IpAddr::V6(
-            Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7335").unwrap()
-        )));
-        assert!(a.contains(IpAddr::V6(
-            Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7336").unwrap()
-        )));
-        assert!(!a.contains(IpAddr::V6(
-            Ipv6Addr::from_str("2001:0db8:0000:1000:0000:8a2e:1370:7336").unwrap()
-        )));
-        assert!(!a.contains(IpAddr::V6(Ipv6Addr::from_str("::").unwrap())));
-    }
-
-    #[test]
-    #[cfg(feature = "email")]
-    fn proxy_config_from_toml() {
-        let toml_content = r#"
-            [trusted_proxy]
-            trusted_proxies = ["2001:0db8:85a3::/64", "203.0.113.0/24", "169.254.0.0/16", "fc00::/7", "::", "::/0", "242.222.194.242", "2001:0db8:0000:0000:0000:8a2e:0370:7334"]
-            trusted_headers = ["X-Forwarded-For", "Forwarded", "True-Client-IP"]
-            "#;
-        let config = ProjectConfig::from_toml(toml_content).unwrap();
+    fn proxy() {
+        let config = ProjectConfig::from_toml(r#"
+            [client_ip]
+            proxies = ["0.0.0.0/8", "192.168.1.0/24", "::/0"]
+            headers = ["Forwarded", "X-Forwarded-For", "CF-Connecting-IP", "X-Real-IP", "True-Client-IP"]
+        "#).unwrap();
 
         assert_eq!(
-            config.trusted_proxy.trusted_proxies[0].ip,
-            Ipv6Addr::from_str("2001:0db8:85a3::").unwrap()
-        );
-        assert_eq!(
-            config.trusted_proxy.trusted_proxies[1].ip,
-            Ipv4Addr::from_str("203.0.113.0").unwrap()
-        );
-        assert_eq!(
-            config.trusted_proxy.trusted_proxies[2].ip,
-            Ipv4Addr::from_str("169.254.0.0").unwrap()
-        );
-        assert_eq!(
-            config.trusted_proxy.trusted_proxies[3].ip,
-            Ipv6Addr::from_str("fc00::").unwrap()
-        );
-        assert_eq!(
-            config.trusted_proxy.trusted_proxies[4].ip,
-            Ipv6Addr::from_str("::").unwrap()
-        );
-        assert_eq!(
-            config.trusted_proxy.trusted_proxies[5].ip,
-            Ipv6Addr::from_str("::").unwrap()
-        );
-        assert_eq!(
-            config.trusted_proxy.trusted_proxies[6].ip,
-            Ipv4Addr::from_str("242.222.194.242").unwrap()
+            config.client_ip.get_proxies(),
+            vec![
+                ipnet::IpNet::new(IpAddr::V4(Ipv4Addr::from_octets([0, 0, 0, 0])), 8).unwrap(),
+                ipnet::IpNet::new(IpAddr::V4(Ipv4Addr::from_octets([192, 168, 1, 0])), 24).unwrap(),
+                ipnet::IpNet::new(
+                    IpAddr::V6(Ipv6Addr::from_octets([
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                    ])),
+                    0
+                )
+                .unwrap(),
+            ]
         );
 
-        assert_eq!(config.trusted_proxy.trusted_proxies[0].mask, Some(64));
-        assert_eq!(config.trusted_proxy.trusted_proxies[1].mask, Some(24));
-        assert_eq!(config.trusted_proxy.trusted_proxies[2].mask, Some(16));
-        assert_eq!(config.trusted_proxy.trusted_proxies[3].mask, Some(7));
-        assert_eq!(config.trusted_proxy.trusted_proxies[4].mask, None);
-        assert_eq!(config.trusted_proxy.trusted_proxies[5].mask, Some(0));
-        assert_eq!(config.trusted_proxy.trusted_proxies[6].mask, None);
-
-        assert!(
-            config.trusted_proxy.trusted_proxies[6]
-                .contains(IpAddr::V4(Ipv4Addr::from_str("242.222.194.242").unwrap()))
+        assert_eq!(
+            config.client_ip.get_trusted_headers(),
+            vec![
+                ClientIpHeader::Forwarded,
+                ClientIpHeader::XForwardedFor,
+                ClientIpHeader::CfConnectingIp,
+                ClientIpHeader::XRealIp,
+                ClientIpHeader::TrueClientIp,
+            ]
         );
-        assert!(
-            !config.trusted_proxy.trusted_proxies[6]
-                .contains(IpAddr::V6(Ipv6Addr::from_str("::").unwrap()))
-        );
-        assert!(
-            !config.trusted_proxy.trusted_proxies[6]
-                .contains(IpAddr::V4(Ipv4Addr::from_str("242.222.194.243").unwrap()))
-        );
-        assert!(
-            !config.trusted_proxy.trusted_proxies[0]
-                .contains(IpAddr::V6(Ipv6Addr::from_str("::").unwrap()))
-        );
-        assert!(
-            config.trusted_proxy.trusted_proxies[0]
-                .contains(IpAddr::V6(Ipv6Addr::from_str("2001:0db8:85a3::").unwrap()))
-        );
-        assert!(
-            !config.trusted_proxy.trusted_proxies[0]
-                .contains(IpAddr::V6(Ipv6Addr::from_str("2001:0db8:85a4::").unwrap()))
-        );
-        assert!(
-            !config.trusted_proxy.trusted_proxies[7].contains(IpAddr::V6(
-                Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7335").unwrap()
-            ))
-        );
-        assert!(config.trusted_proxy.trusted_proxies[7].contains(IpAddr::V6(
-            Ipv6Addr::from_str("2001:0db8:0000:0000:0000:8a2e:0370:7334").unwrap()
-        )));
     }
 }

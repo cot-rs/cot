@@ -25,7 +25,6 @@ use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::remote_addr::RemoteAddr;
 use async_trait::async_trait;
 use axum::handler::HandlerWithoutStateExt;
 use cot::Template;
@@ -63,6 +62,7 @@ use crate::error_page::Diagnostics;
 use crate::html::Html;
 use crate::metadata::{METADATA_FLAG, ProjectMetadata};
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
+use crate::request::extractors::RemoteAddr;
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};

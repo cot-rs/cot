@@ -11,6 +11,10 @@ If you have a question, feedback, or feature request, please open an
 a [discussion](https://github.com/cot-rs/cot/discussions/new/choose), or
 join our [Discord server](https://discord.cot.rs/) to talk with us directly.
 
+## Using AI tools
+
+AI tools are welcome here, but they come with some ground rules. Before you use AI in your contribution, please read our [AI Policy](AI_POLICY.md). In short, you own what you submit, it shouldn't create extra work for maintainers, and `good first issue` tasks are for humans only.
+
 ## Submitting issues
 
 When reporting a bug or asking for help, please include enough details so that

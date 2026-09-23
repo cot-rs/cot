@@ -727,12 +727,52 @@ pub trait Model: Sized + Send + 'static {
     /// To force insert or force update, use the [`Self::insert`] or
     /// [`Self::update`] methods instead.
     ///
+    /// Any field still set to [`Auto::Auto`] (typically an auto-incrementing
+    /// primary key) will be populated with the value assigned by the
+    /// database, becoming [`Auto::Fixed`] once this method returns
+    /// successfully.
+    ///
     /// # Errors
     ///
     /// This method can return an error if the model instance could not be
     /// inserted into the database, for instance because the migrations
     /// haven't been applied, or there was a problem with the database
     /// connection.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::{Auto, Model, model};
+    /// # use cot::db::migrations::{Field, Operation};
+    /// # use cot::db::{Database, Identifier, DatabaseField};
+    /// # use cot::Result;
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: Auto<i32>,
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// # const OPERATION: Operation = Operation::create_model()
+    /// #     .table_name(Identifier::new("cot__my_model"))
+    /// #     .fields(&[
+    /// #         Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+    /// #             .primary_key()
+    /// #             .auto(),
+    /// #     ])
+    /// #     .build();
+    ///
+    /// let database = Database::new("sqlite::memory:").await?;
+    /// # OPERATION.forwards(&database).await?;
+    ///
+    /// let mut my_model = MyModel { id: Auto::auto() };
+    /// my_model.save(&database).await?;
+    /// assert!(matches!(my_model.id, Auto::Fixed(_)));
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn save<DB: DatabaseBackend>(&mut self, mut db: DB) -> Result<()> {
         db.insert_or_update(self).await?;
         Ok(())
@@ -740,18 +780,62 @@ pub trait Model: Sized + Send + 'static {
 
     /// Insert the model instance to the database.
     ///
+    /// Any field still set to [`Auto::Auto`] (typically an auto-incrementing
+    /// primary key) will be populated with the value assigned by the
+    /// database, becoming [`Auto::Fixed`] once this method returns
+    /// successfully.
+    ///
     /// # Errors
     ///
     /// This method can return an error if the model instance could not be
     /// inserted into the database, for instance because the migrations
     /// haven't been applied, or there was a problem with the database
     /// connection.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::{Auto, Model, model};
+    /// # use cot::db::migrations::{Field, Operation};
+    /// # use cot::db::{Database, Identifier, DatabaseField};
+    /// # use cot::Result;
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: Auto<i32>,
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// # const OPERATION: Operation = Operation::create_model()
+    /// #     .table_name(Identifier::new("cot__my_model"))
+    /// #     .fields(&[
+    /// #         Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+    /// #             .primary_key()
+    /// #             .auto(),
+    /// #     ])
+    /// #     .build();
+    ///
+    /// let database = Database::new("sqlite::memory:").await?;
+    /// # OPERATION.forwards(&database).await?;
+    ///
+    /// let mut my_model = MyModel { id: Auto::auto() };
+    /// my_model.insert(&database).await?;
+    /// assert!(matches!(my_model.id, Auto::Fixed(_)));
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn insert<DB: DatabaseBackend>(&mut self, mut db: DB) -> Result<()> {
         db.insert(self).await?;
         Ok(())
     }
 
     /// Update the model instance in the database.
+    ///
+    /// Unlike [`Self::save`] and [`Self::insert`], this method does not
+    /// populate [`Auto`] fields: every field, including the primary key,
+    /// must already be [`Auto::Fixed`] before calling this method.
     ///
     /// # Errors
     ///
@@ -762,6 +846,55 @@ pub trait Model: Sized + Send + 'static {
     ///
     /// This method can return an error if the model with the given primary key
     /// could not be found in the database.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if any field is still set to [`Auto::Auto`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::{Auto, Model, model};
+    /// # use cot::db::migrations::{Field, Operation};
+    /// # use cot::db::{Database, Identifier, DatabaseField};
+    /// # use cot::Result;
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: Auto<i32>,
+    ///     name: String,
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// # const OPERATION: Operation = Operation::create_model()
+    /// #     .table_name(Identifier::new("cot__my_model"))
+    /// #     .fields(&[
+    /// #         Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+    /// #             .primary_key()
+    /// #             .auto(),
+    /// #         Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE),
+    /// #     ])
+    /// #     .build();
+    ///
+    /// let database = Database::new("sqlite::memory:").await?;
+    /// # OPERATION.forwards(&database).await?;
+    ///
+    /// let mut my_model = MyModel {
+    ///     id: Auto::auto(),
+    ///     name: "first".to_string(),
+    /// };
+    /// // The primary key must already be `Auto::Fixed` before calling `update`,
+    /// // so insert the row first.
+    /// my_model.insert(&database).await?;
+    ///
+    /// my_model.name = "second".to_string();
+    /// my_model.update(&database).await?;
+    /// assert_eq!(my_model.name, "second");
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn update<DB: DatabaseBackend>(&mut self, mut db: DB) -> Result<()> {
         db.update(self).await?;
         Ok(())
@@ -2117,11 +2250,51 @@ impl Database {
 
     /// Inserts a new row into the database.
     ///
+    /// Any field of `data` still set to [`Auto::Auto`] (typically an
+    /// auto-incrementing primary key) will be populated with the value
+    /// assigned by the database, becoming [`Auto::Fixed`] once this method
+    /// returns successfully.
+    ///
     /// # Errors
     ///
     /// This method can return an error if the row could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::{Auto, Model, model};
+    /// # use cot::db::migrations::{Field, Operation};
+    /// # use cot::db::{Database, Identifier, DatabaseField};
+    /// # use cot::Result;
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: Auto<i32>,
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// # const OPERATION: Operation = Operation::create_model()
+    /// #     .table_name(Identifier::new("cot__my_model"))
+    /// #     .fields(&[
+    /// #         Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+    /// #             .primary_key()
+    /// #             .auto(),
+    /// #     ])
+    /// #     .build();
+    ///
+    /// let database = Database::new("sqlite::memory:").await?;
+    /// # OPERATION.forwards(&database).await?;
+    ///
+    /// let mut my_model = MyModel { id: Auto::auto() };
+    /// database.insert(&mut my_model).await?;
+    /// assert!(matches!(my_model.id, Auto::Fixed(_)));
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn insert<T: Model>(&self, data: &mut T) -> Result<()> {
         let span = span!(Level::TRACE, "insert", table = %T::TABLE_NAME);
 
@@ -2133,11 +2306,51 @@ impl Database {
     /// Inserts a new row into the database, or updates it if a row with the
     /// same primary key already exists.
     ///
+    /// Any field of `data` still set to [`Auto::Auto`] (typically an
+    /// auto-incrementing primary key) will be populated with the value
+    /// assigned by the database, becoming [`Auto::Fixed`] once this method
+    /// returns successfully.
+    ///
     /// # Errors
     ///
     /// This method can return an error if the row could not be inserted into
     /// the database, for instance because the migrations haven't been
     /// applied, or there was a problem with the database connection.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::{Auto, Model, model};
+    /// # use cot::db::migrations::{Field, Operation};
+    /// # use cot::db::{Database, Identifier, DatabaseField};
+    /// # use cot::Result;
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: Auto<i32>,
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// # const OPERATION: Operation = Operation::create_model()
+    /// #     .table_name(Identifier::new("cot__my_model"))
+    /// #     .fields(&[
+    /// #         Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+    /// #             .primary_key()
+    /// #             .auto(),
+    /// #     ])
+    /// #     .build();
+    ///
+    /// let database = Database::new("sqlite::memory:").await?;
+    /// # OPERATION.forwards(&database).await?;
+    ///
+    /// let mut my_model = MyModel { id: Auto::auto() };
+    /// database.insert_or_update(&mut my_model).await?;
+    /// assert!(matches!(my_model.id, Auto::Fixed(_)));
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn insert_or_update<T: Model>(&self, data: &mut T) -> Result<()> {
         let span = span!(
             Level::TRACE,
@@ -2244,6 +2457,11 @@ impl Database {
 
     /// Updates an existing row in a database.
     ///
+    /// Unlike [`Self::insert`] and [`Self::insert_or_update`], this method
+    /// does not populate [`Auto`] fields: every field of `data`, including
+    /// the primary key, must already be [`Auto::Fixed`] before calling this
+    /// method.
+    ///
     /// # Errors
     ///
     /// This method can return an error if the row could not be updated in
@@ -2252,6 +2470,56 @@ impl Database {
     ///
     /// This method can return an error if the row with the given primary key
     /// could not be found in the database.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if any field of `data` is still set to
+    /// [`Auto::Auto`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::db::{Auto, Model, model};
+    /// # use cot::db::migrations::{Field, Operation};
+    /// # use cot::db::{Database, Identifier, DatabaseField};
+    /// # use cot::Result;
+    ///
+    /// #[model]
+    /// struct MyModel {
+    ///     #[model(primary_key)]
+    ///     id: Auto<i32>,
+    ///     name: String,
+    /// }
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// # const OPERATION: Operation = Operation::create_model()
+    /// #     .table_name(Identifier::new("cot__my_model"))
+    /// #     .fields(&[
+    /// #         Field::new(Identifier::new("id"), <i32 as DatabaseField>::TYPE)
+    /// #             .primary_key()
+    /// #             .auto(),
+    /// #         Field::new(Identifier::new("name"), <String as DatabaseField>::TYPE),
+    /// #     ])
+    /// #     .build();
+    ///
+    /// let database = Database::new("sqlite::memory:").await?;
+    /// # OPERATION.forwards(&database).await?;
+    ///
+    /// let mut my_model = MyModel {
+    ///     id: Auto::auto(),
+    ///     name: "first".to_string(),
+    /// };
+    /// // The primary key must already be `Auto::Fixed` before calling `update`,
+    /// // so insert the row first.
+    /// database.insert(&mut my_model).await?;
+    ///
+    /// my_model.name = "second".to_string();
+    /// database.update(&mut my_model).await?;
+    /// assert_eq!(my_model.name, "second");
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn update<T: Model>(&self, data: &mut T) -> Result<()> {
         let span = span!(
             Level::TRACE,
@@ -2960,6 +3228,11 @@ pub trait DatabaseBackend: Send {
     /// Inserts a new row into the database, or updates an existing row if it
     /// already exists.
     ///
+    /// Any field of `data` still set to [`Auto::Auto`] (typically an
+    /// auto-incrementing primary key) will be populated with the value
+    /// assigned by the database, becoming [`Auto::Fixed`] once this method
+    /// returns successfully.
+    ///
     /// # Errors
     ///
     /// This method can return an error if the row could not be inserted into
@@ -2968,6 +3241,11 @@ pub trait DatabaseBackend: Send {
     async fn insert_or_update<T: Model>(&mut self, data: &mut T) -> Result<()>;
 
     /// Inserts a new row into the database.
+    ///
+    /// Any field of `data` still set to [`Auto::Auto`] (typically an
+    /// auto-incrementing primary key) will be populated with the value
+    /// assigned by the database, becoming [`Auto::Fixed`] once this method
+    /// returns successfully.
     ///
     /// # Errors
     ///
@@ -2978,11 +3256,21 @@ pub trait DatabaseBackend: Send {
 
     /// Updates an existing row in the database.
     ///
+    /// Unlike [`Self::insert`] and [`Self::insert_or_update`], this method
+    /// does not populate [`Auto`] fields: every field of `data`, including
+    /// the primary key, must already be [`Auto::Fixed`] before calling this
+    /// method.
+    ///
     /// # Errors
     ///
     /// This method can return an error if the row could not be updated in the
     /// database, for instance because the migrations haven't been applied, or
     /// there was a problem with the database connection.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if any field of `data` is still set to
+    /// [`Auto::Auto`].
     async fn update<T: Model>(&mut self, data: &mut T) -> Result<()>;
 
     /// Bulk inserts multiple rows into the database.

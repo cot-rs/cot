@@ -62,6 +62,7 @@ use crate::error_page::Diagnostics;
 use crate::html::Html;
 use crate::metadata::{METADATA_FLAG, ProjectMetadata};
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
+use crate::request::extractors::RemoteAddr;
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
@@ -2205,10 +2206,13 @@ pub async fn run_at_with_shutdown(
         };
         std::panic::set_hook(Box::new(new_hook));
     }
-    axum::serve(listener, handler.into_make_service())
-        .with_graceful_shutdown(shutdown_signal)
-        .await
-        .map_err(StartServerError)?;
+    axum::serve(
+        listener,
+        handler.into_make_service_with_connect_info::<RemoteAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal)
+    .await
+    .map_err(StartServerError)?;
     if register_panic_hook {
         let _ = std::panic::take_hook();
     }

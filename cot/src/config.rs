@@ -15,6 +15,7 @@
 // not implementing Copy for them
 #![allow(missing_copy_implementations)]
 
+use std::fmt::Display;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -23,7 +24,7 @@ use cot_core::error::impl_into_cot_error;
 use derive_builder::Builder;
 use derive_more::with_trait::{Debug, From};
 use securer_string::SecureBytes;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Visitor};
 use thiserror::Error;
 
 #[cfg(feature = "email")]
@@ -252,6 +253,12 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub middlewares: MiddlewareConfig,
+    /// Configuration related to proxies before the application.
+    /// In case this application is behind a proxy, it would be reasonable to configure this proxy
+    /// here, so it can be appropriately handled for peer address detection.
+    ///
+    /// See [`ClientIpConfig`] for further details.
+    pub client_ip: ClientIpConfig,
     /// Configuration related to the email backend.
     ///
     /// # Examples
@@ -412,6 +419,7 @@ impl ProjectConfigBuilder {
             #[cfg(feature = "cache")]
             cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
+            client_ip: self.client_ip.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
             #[cfg(feature = "email")]
             email: self.email.clone().unwrap_or_default(),
@@ -1176,6 +1184,143 @@ impl StaticFilesConfig {
     #[must_use]
     pub fn builder() -> StaticFilesConfigBuilder {
         StaticFilesConfigBuilder::default()
+    }
+}
+
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Builder)]
+#[builder(build_fn(name = "build_impl"))]
+/// Configure how proxies are handled for detecting peer IP addresses.
+///
+/// Supported headers are:
+/// - `Forwarded`
+/// - `X-Forwarded-For`
+/// - `CF-Connecting-IP`
+/// - `X-Real-IP`
+///
+/// A proxy must be specified in `CIDR` notation.
+/// Only configured headers from configured proxies will be accepted. All others will be ignored.
+/// In order to accept any peer as a proxy, you may use `0.0.0.0/0` and `::/0`. Be aware that this is
+/// **hugely insecure** as it may allow bypassing IP checks!
+///
+/// # Example
+///
+/// ```rust
+/// use std::time::Duration;
+/// use cot::config::ProjectConfig;
+/// use std::net::IpAddr;
+/// use std::str::FromStr;
+///
+/// let config = ProjectConfig::from_toml(
+///     r#"
+/// [client_ip]
+/// proxies = ["192.168.1.0/8"]
+/// headers = ["Forwarded"]
+/// "#,
+/// )?;
+///
+/// # Ok::<(), cot::Error>(())
+/// ```
+pub struct ClientIpConfig {
+    #[builder(default)]
+    #[serde(default)]
+    proxies: Vec<ipnet::IpNet>,
+
+    #[builder(default = "default_client_ip_headers()")]
+    #[serde(default = "default_client_ip_headers")]
+    headers: Vec<ClientIpHeader>,
+}
+
+fn default_client_ip_headers() -> Vec<ClientIpHeader> {
+    vec![ClientIpHeader::XForwardedFor]
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// A header used for deriving the IP of the client.
+pub enum ClientIpHeader {
+    /// `Forwarded`, a comma-separated list of hops, closest-to-origin first and further metadata.
+    Forwarded,
+    /// `X-Forwarded-For`, the de facto standard, a comma-separated list of
+    /// hops, closest-to-origin first.
+    XForwardedFor,
+    /// `X-Real-IP`, commonly set by nginx, a single address.
+    XRealIp,
+    /// `True-Client-IP`, used by Akamai and Cloudflare Enterprise.
+    TrueClientIp,
+    /// `CF-Connecting-IP` set by Cloudflare.
+    CfConnectingIp,
+}
+
+struct ClientIpHeaderVisitor;
+
+impl Visitor<'_> for ClientIpHeaderVisitor {
+    type Value = ClientIpHeader;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("expected supported HTTP header name")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        match v.to_lowercase().as_str() {
+            "forwarded" => Ok(Self::Value::Forwarded),
+            "x-forwarded-for" => Ok(Self::Value::XForwardedFor),
+            "x-real-ip" => Ok(Self::Value::XRealIp),
+            "true-client-ip" => Ok(Self::Value::TrueClientIp),
+            "cf-connecting-ip" => Ok(Self::Value::CfConnectingIp),
+            _ => Err(E::custom("Unknown header")),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ClientIpHeader {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(ClientIpHeaderVisitor)
+    }
+}
+
+impl Display for ClientIpHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CfConnectingIp => f.write_str("cf-connecting-ip"),
+            Self::TrueClientIp => f.write_str("true-client-ip"),
+            Self::XRealIp => f.write_str("x-real-ip"),
+            Self::Forwarded => f.write_str("forwarded"),
+            Self::XForwardedFor => f.write_str("x-forwarded-for"),
+        }
+    }
+}
+
+impl Serialize for ClientIpHeader {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl ClientIpConfig {
+    #[must_use]
+    /// Get the proxies that have been configured to be trusted.
+    pub fn get_proxies(&self) -> Vec<ipnet::IpNet> {
+        self.proxies.clone()
+    }
+
+    #[must_use]
+    /// Get the proxy headers that have been configured to be trusted.
+    pub fn get_trusted_headers(&self) -> Vec<ClientIpHeader> {
+        self.headers.clone()
+    }
+
+    #[must_use]
+    /// Create a new [`ProxyConfig`] with trusted proxies and trusted headers.
+    pub fn new(proxies: Vec<ipnet::IpNet>, headers: Vec<ClientIpHeader>) -> Self {
+        Self { proxies, headers }
     }
 }
 
@@ -2495,6 +2640,9 @@ impl From<&str> for EmailUrl {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    use http::HeaderValue;
     use serde_json;
     use time::OffsetDateTime;
 
@@ -3179,5 +3327,40 @@ mod tests {
             .try_into()
             .unwrap();
         assert_eq!(my_config.foo, "bar");
+    }
+
+    #[test]
+    fn proxy() {
+        let config = ProjectConfig::from_toml(r#"
+            [client_ip]
+            proxies = ["0.0.0.0/8", "192.168.1.0/24", "::/0"]
+            headers = ["Forwarded", "X-Forwarded-For", "CF-Connecting-IP", "X-Real-IP", "True-Client-IP"]
+        "#).unwrap();
+
+        assert_eq!(
+            config.client_ip.get_proxies(),
+            vec![
+                ipnet::IpNet::new(IpAddr::V4(Ipv4Addr::from_octets([0, 0, 0, 0])), 8).unwrap(),
+                ipnet::IpNet::new(IpAddr::V4(Ipv4Addr::from_octets([192, 168, 1, 0])), 24).unwrap(),
+                ipnet::IpNet::new(
+                    IpAddr::V6(Ipv6Addr::from_octets([
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                    ])),
+                    0
+                )
+                .unwrap(),
+            ]
+        );
+
+        assert_eq!(
+            config.client_ip.get_trusted_headers(),
+            vec![
+                ClientIpHeader::Forwarded,
+                ClientIpHeader::XForwardedFor,
+                ClientIpHeader::CfConnectingIp,
+                ClientIpHeader::XRealIp,
+                ClientIpHeader::TrueClientIp,
+            ]
+        );
     }
 }

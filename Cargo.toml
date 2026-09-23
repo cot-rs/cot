@@ -159,6 +159,7 @@ tracing-test = "0.2"
 trybuild = { version = "1", features = ["diff"] }
 url = "2"
 wait-timeout = { version = "0.2", default-features = false }
+ipnet = { version = "2.12.2", features = ["serde"] }
 
 [profile.dev.package]
 insta.opt-level = 3

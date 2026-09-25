@@ -3,6 +3,8 @@ source: cot-cli/tests/snapshot_testing/help/mod.rs
 info:
   program: cot
   args:
+    - "-p"
+    - cot-cli
     - "-h"
 ---
 success: true

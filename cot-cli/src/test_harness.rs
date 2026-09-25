@@ -847,6 +847,15 @@ pub fn standard_project(cot_binary: PathBuf) -> Result<&'static CompiledCotProje
         .and_then(CotProject::compile)
     {
         Ok(proj) => {
+            // warm up project cache so help related UI tests can find it on the
+            // hot path
+            let warmup = proj.cot_cmd(&["--help"]).output();
+            if let Err(e) = warmup {
+                let msg = format!("failed to warm up standard project cache: {e}");
+                let _ = ERROR.set(msg.clone());
+                bail!(msg);
+            }
+
             let _ = PROJECT.set(proj);
             Ok(PROJECT.get().unwrap())
         }

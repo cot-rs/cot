@@ -69,6 +69,8 @@ pub mod config;
 #[cfg(feature = "email")]
 pub mod email;
 mod error_page;
+// not part of the public API; used in cot-cli
+#[doc(hidden)]
 pub mod metadata;
 pub mod middleware;
 #[cfg(feature = "openapi")]

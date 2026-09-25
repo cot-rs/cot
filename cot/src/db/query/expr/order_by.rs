@@ -105,10 +105,10 @@ impl OrderByExpr {
         }
     }
 
-    pub(crate) fn field_value(target: OrderTarget, values: sea_query::Values) -> Self {
+    pub(crate) fn by_values(target: OrderTarget, values: sea_query::Values) -> Self {
         assert!(
             !values.0.is_empty(),
-            "`field_value` requires at least one value to rank by"
+            "`by_values` requires at least one value to rank by"
         );
         Self {
             target,
@@ -121,10 +121,9 @@ impl OrderByExpr {
     ///
     /// # Panics
     ///
-    /// Panics if this term was built with [`ExprSort::field_value`]. A
-    /// `field_value` term never produces a `NULL` sort key,
-    /// so an explicit `NULLS` placement on top of it can never have any
-    /// effect.
+    /// Panics if this term was built with [`ExprSort::by_values`]. A
+    /// `by_values` term never produces a `NULL` sort key,
+    /// so an explicit `NULLS` placement would have no effect.
     #[must_use]
     pub fn nulls_first(mut self) -> Self {
         self.set_nulls(NullsOrder::First);
@@ -135,7 +134,9 @@ impl OrderByExpr {
     ///
     /// # Panics
     ///
-    /// See [`Self::nulls_first`].
+    /// Panics if this term was built with [`ExprSort::by_values`]. A
+    /// `by_values` term never produces a `NULL` sort key,
+    /// so an explicit `NULLS` placement would have no effect.
     #[must_use]
     pub fn nulls_last(mut self) -> Self {
         self.set_nulls(NullsOrder::Last);
@@ -147,7 +148,7 @@ impl OrderByExpr {
         match &mut self.mode {
             OrderMode::Directional { nulls: n, .. } => *n = nulls,
             OrderMode::FieldValue(_) => panic!(
-                "`nulls_first`/`nulls_last` can't be combined with `field_value`: a field_value \
+                "`nulls_first`/`nulls_last` can't be combined with `by_values`: a by_values \
                  term never produces a NULL sort key, so an explicit NULLS placement would \
                  have no effect"
             ),
@@ -209,7 +210,7 @@ pub trait ExprSort<T> {
     fn desc(&self) -> OrderByExpr;
 
     /// Sorts rows by the position of this field's value
-    fn field_value<I>(&self, values: I) -> OrderByExpr
+    fn by_values<I>(&self, values: I) -> OrderByExpr
     where
         I: IntoIterator,
         I::Item: IntoField<T>;
@@ -224,7 +225,7 @@ impl<T: ToDbFieldValue + 'static> ExprSort<T> for FieldRef<T> {
         OrderByExpr::directional(OrderTarget::Column(self.identifier()), SortOrder::Desc)
     }
 
-    fn field_value<I>(&self, values: I) -> OrderByExpr
+    fn by_values<I>(&self, values: I) -> OrderByExpr
     where
         I: IntoIterator,
         I::Item: IntoField<T>,
@@ -238,7 +239,7 @@ impl<T: ToDbFieldValue + 'static> ExprSort<T> for FieldRef<T> {
                 }
             })
             .collect();
-        OrderByExpr::field_value(
+        OrderByExpr::by_values(
             OrderTarget::Column(self.identifier()),
             sea_query::Values(values),
         )

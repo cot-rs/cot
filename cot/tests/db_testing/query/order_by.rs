@@ -508,7 +508,7 @@ async fn order_by_desc_default_nulls_first(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_field_value_ranking(test_db: &mut TestDatabase) {
+async fn order_by_by_values_ranking(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -524,7 +524,7 @@ async fn order_by_field_value_ranking(test_db: &mut TestDatabase) {
     // or insertion order.
     let objects = OrderTestModel::objects()
         .order_by([
-            <OrderTestModel as Model>::Fields::category.field_value(["cherry", "apple", "banana"])
+            <OrderTestModel as Model>::Fields::category.by_values(["cherry", "apple", "banana"])
         ])
         .all(&**test_db)
         .await
@@ -534,7 +534,7 @@ async fn order_by_field_value_ranking(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_field_value_keeps_remaining_rows(test_db: &mut TestDatabase) {
+async fn order_by_by_values_keeps_remaining_rows(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
     seed_order_test_model(
         test_db,
@@ -549,7 +549,7 @@ async fn order_by_field_value_keeps_remaining_rows(test_db: &mut TestDatabase) {
     // Only rank "banana" explicitly. the rest keep arbitrary (but present)
     // positions after it.
     let objects = OrderTestModel::objects()
-        .order_by([<OrderTestModel as Model>::Fields::category.field_value(["banana"])])
+        .order_by([<OrderTestModel as Model>::Fields::category.by_values(["banana"])])
         .all(&**test_db)
         .await
         .unwrap();
@@ -561,7 +561,7 @@ async fn order_by_field_value_keeps_remaining_rows(test_db: &mut TestDatabase) {
 }
 
 #[cot_macros::dbtest]
-async fn order_by_field_value_then_secondary_order(test_db: &mut TestDatabase) {
+async fn order_by_by_values_then_secondary_order(test_db: &mut TestDatabase) {
     migrate_order_test_model(&*test_db).await;
 
     seed_order_test_model(
@@ -578,7 +578,7 @@ async fn order_by_field_value_then_secondary_order(test_db: &mut TestDatabase) {
 
     let objects = OrderTestModel::objects()
         .order_by([
-            <OrderTestModel as Model>::Fields::category.field_value(["cherry", "apple", "banana"]),
+            <OrderTestModel as Model>::Fields::category.by_values(["cherry", "apple", "banana"]),
             <OrderTestModel as Model>::Fields::priority.desc(),
         ])
         .all(&**test_db)
@@ -721,28 +721,28 @@ async fn order_by_empty_table_returns_empty(test_db: &mut TestDatabase) {
 
 #[test]
 #[should_panic(expected = "requires at least one value to rank by")]
-fn field_value_panics_on_empty_values() {
-    let _ = <OrderTestModel as Model>::Fields::category.field_value(Vec::<&str>::new());
+fn by_values_panics_on_empty_values() {
+    let _ = <OrderTestModel as Model>::Fields::category.by_values(Vec::<&str>::new());
 }
 
 #[test]
 #[should_panic(expected = "cannot use an auto-generated value as a field value ordering key")]
-fn field_value_panic_auto_generated_value() {
-    let _ = <OrderTestModel as Model>::Fields::id.field_value([Auto::auto()]);
+fn by_values_panic_auto_generated_value() {
+    let _ = <OrderTestModel as Model>::Fields::id.by_values([Auto::auto()]);
 }
 
 #[test]
-#[should_panic(expected = "can't be combined with `field_value`")]
-fn nulls_first_panics_after_field_value() {
+#[should_panic(expected = "can't be combined with `by_values`")]
+fn nulls_first_panics_after_by_values() {
     let _ = <OrderTestModel as Model>::Fields::category
-        .field_value(["a"])
+        .by_values(["a"])
         .nulls_first();
 }
 
 #[test]
-#[should_panic(expected = "can't be combined with `field_value`")]
-fn nulls_last_panics_after_field_value() {
+#[should_panic(expected = "can't be combined with `by_values`")]
+fn nulls_last_panics_after_by_values() {
     let _ = <OrderTestModel as Model>::Fields::category
-        .field_value(["a"])
+        .by_values(["a"])
         .nulls_last();
 }

@@ -1267,20 +1267,20 @@ impl Expr {
     ///     filename: String,
     /// }
     ///
-    /// let _ = Expr::field("filename").field_value(vec![
+    /// let _ = Expr::field("filename").by_values(vec![
     ///     "foo".to_string(),
     ///     "bar".to_string(),
     ///     "baz".to_string(),
     /// ]);
     /// ```
     #[must_use]
-    pub fn field_value<I>(self, values: I) -> OrderByExpr
+    pub fn by_values<I>(self, values: I) -> OrderByExpr
     where
         I: IntoIterator,
         I::Item: ToDbValue,
     {
         let values = values.into_iter().map(|v| v.to_db_value()).collect();
-        OrderByExpr::field_value(OrderTarget::Expression(self), sea_query::Values(values))
+        OrderByExpr::by_values(OrderTarget::Expression(self), sea_query::Values(values))
     }
 
     /// Returns the expression as a [`sea_query::SimpleExpr`].

@@ -1,0 +1,16 @@
+threshold = 30
+fail-above = true
+min = 30
+missing = "pessimistic"
+# Suppress non-shipped code so the gate only measures real library logic.
+# NOTE: must use `allow` (matches a function's defining file) rather than
+# `exclude` (filesystem-walk only — does not filter functions read from the
+# lcov file). Globs match absolute paths, hence the `**/` prefixes.
+allow = [
+    "**/cot-codegen/**",       # generated AST/codegen helpers
+    "**/cot-macros/**",        # proc-macro implementations
+    "**/tests/**",             # integration & e2e test code
+    "**/src/test.rs",          # in-crate test utilities (TestDatabase, etc.)
+    "**/src/test_utils.rs",    # in-crate test helpers
+    "**/examples/**",          # example applications
+]

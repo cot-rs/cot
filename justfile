@@ -43,6 +43,20 @@ coverage:
     # requires cargo-llvm-cov installed and nightly toolchain
     cargo llvm-cov --all-features --workspace --branch --doctests --html --open
 
+alias cr := crap
+
+crap:
+    #!/usr/bin/env bash
+    # compute the CRAP metric the same way CI does (absolute-threshold gate)
+    # requires cargo-llvm-cov + cargo-crap installed and the nightly toolchain
+    set -euxo pipefail
+    docker compose up -d --wait
+    cargo llvm-cov --all-features --workspace --no-report -- --include-ignored
+    cargo llvm-cov --all-features --workspace --doc --no-report
+    cargo llvm-cov report --lcov --output-path lcov.info
+    docker compose down
+    cargo crap --lcov lcov.info --workspace
+
 alias d := docs
 
 docs:

@@ -496,7 +496,8 @@ where
     /// therefore runs earlier while processing a request. Register middleware
     /// dependencies after the middleware that needs them; for example,
     /// [`crate::middleware::SessionMiddleware`] must be registered after
-    /// [`crate::middleware::AuthMiddleware`] so that session handling runs first.
+    /// [`crate::middleware::AuthMiddleware`] so that session handling runs
+    /// first.
     ///
     /// # Examples
     ///

@@ -54,10 +54,7 @@ use std::sync::Arc;
 use axum::extract::connect_info::Connected;
 use axum::serve::IncomingStream;
 use cot_core::error::impl_into_cot_error;
-use cot_core::remote_addr::extract_cf_connecting_ip;
-use cot_core::remote_addr::extract_forwarded;
-use cot_core::remote_addr::extract_x_forwarded_for;
-use cot_core::remote_addr::extract_x_real_ip;
+use cot_core::remote_addr::{extract_forwarded, extract_single_ip, extract_x_forwarded_for};
 /// Trait for extractors that consume the request body.
 ///
 /// Extractors implementing this trait are used in route handlers that consume
@@ -304,7 +301,8 @@ impl FromRequestHead for Auth {
 
 #[derive(Clone, Copy, Debug)]
 /// An extractor that extracts the IP address of the remote.
-/// This automatically checks for proxy IP headers and contains their IP if one such is specified.
+/// This automatically checks for proxy IP headers and contains their IP if one
+/// such is specified.
 ///
 /// # Examples
 /// ```rust
@@ -369,7 +367,7 @@ impl FromRequestHead for RemoteAddr {
 
         if trusted_proxies.iter().any(|proxy| proxy.contains(&closest)) {
             for h in trusted_headers {
-                if let Some(v) = head.headers.get(&h.to_string())
+                if let Some(v) = head.headers.get(h.to_string())
                     && proxy.is_none()
                 {
                     match h {
@@ -379,12 +377,8 @@ impl FromRequestHead for RemoteAddr {
                         crate::config::ClientIpHeader::XForwardedFor => {
                             proxy = extract_x_forwarded_for(v)?;
                         }
-                        crate::config::ClientIpHeader::CfConnectingIp
-                        | crate::config::ClientIpHeader::TrueClientIp => {
-                            proxy = Some(extract_cf_connecting_ip(v)?);
-                        }
-                        crate::config::ClientIpHeader::XRealIp => {
-                            proxy = Some(extract_x_real_ip(v)?);
+                        crate::config::ClientIpHeader::Custom(_) => {
+                            proxy = Some(extract_single_ip(v)?);
                         }
                     }
                 }
@@ -743,7 +737,7 @@ mod tests {
             vec![ipnet::IpNet::new(IP, 128).unwrap()],
             vec![
                 ClientIpHeader::XForwardedFor,
-                ClientIpHeader::CfConnectingIp,
+                ClientIpHeader::Custom("Cf-cOnnecting-iP".to_string()),
             ],
         );
 
@@ -767,6 +761,40 @@ mod tests {
     }
 
     #[cot::test]
+    async fn remote_addr_proxied_configured_g() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![
+                ClientIpHeader::XForwardedFor,
+                ClientIpHeader::Custom("Cf-cOnnecting-iP".to_string()),
+            ],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(RemoteAddr {
+            direct: IP,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("Unknown-Header").unwrap(),
+            HeaderValue::from_str(&format!("{IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<RemoteAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP);
+    }
+
+    #[cot::test]
     async fn remote_addr_proxied_configured_malformed() {
         const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
         const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
@@ -777,7 +805,7 @@ mod tests {
             vec![ipnet::IpNet::new(IP, 128).unwrap()],
             vec![
                 ClientIpHeader::XForwardedFor,
-                ClientIpHeader::CfConnectingIp,
+                ClientIpHeader::Custom("Cf-cOnnecting-iP".to_string()),
             ],
         );
 

@@ -1,7 +1,5 @@
-use std::{
-    net::{IpAddr, SocketAddr},
-    str::FromStr,
-};
+use std::net::{IpAddr, SocketAddr};
+use std::str::FromStr;
 
 use http::HeaderValue;
 
@@ -70,25 +68,11 @@ pub fn extract_x_forwarded_for(header: &HeaderValue) -> crate::Result<Option<IpA
     }
 }
 
-/// Extract the IP from the HTTP `CF-Connecting-IP` header.
+/// Extract a single IP from a header value
 ///
 /// # Errors
-/// The function will fail if the header is malformed.
-pub fn extract_cf_connecting_ip(header: &HeaderValue) -> crate::Result<IpAddr> {
-    match header.to_str() {
-        Ok(v) => IpAddr::from_str(v)
-            .map_err(|err| crate::Error::internal(format!("Malformed IP address: {err}"))),
-        Err(err) => Err(crate::Error::internal(format!(
-            "HTTP header containing non-ASCII characters: {err}"
-        ))),
-    }
-}
-
-/// Extract the IP from the HTTP `X-Real-IP` header.
-///
-/// # Errors
-/// The function will fail if the header is malformed.
-pub fn extract_x_real_ip(header: &HeaderValue) -> crate::Result<IpAddr> {
+/// If the IP address or header value is malformed.
+pub fn extract_single_ip(header: &HeaderValue) -> crate::Result<IpAddr> {
     match header.to_str() {
         Ok(v) => IpAddr::from_str(v)
             .map_err(|err| crate::Error::internal(format!("Malformed IP address: {err}"))),
@@ -173,7 +157,7 @@ mod tests {
     #[cot::test]
     async fn extract_cf_connecting_ip_valid_v4() {
         assert_eq!(
-            extract_cf_connecting_ip(&HeaderValue::from_str("1.2.3.4").unwrap()).unwrap(),
+            extract_single_ip(&HeaderValue::from_str("1.2.3.4").unwrap()).unwrap(),
             Ipv4Addr::new(1, 2, 3, 4)
         );
     }
@@ -181,24 +165,8 @@ mod tests {
     #[cot::test]
     async fn extract_cf_connecting_ip_valid_v6() {
         assert_eq!(
-            extract_cf_connecting_ip(&HeaderValue::from_str("2001:db8:cafe::17").unwrap()).unwrap(),
+            extract_single_ip(&HeaderValue::from_str("2001:db8:cafe::17").unwrap()).unwrap(),
             IP_V6_CAFE_17
-        );
-    }
-
-    #[cot::test]
-    async fn extract_x_real_ip_valid_v6() {
-        assert_eq!(
-            extract_x_real_ip(&HeaderValue::from_str("2001:db8:cafe::17").unwrap()).unwrap(),
-            IP_V6_CAFE_17
-        );
-    }
-
-    #[cot::test]
-    async fn extract_x_real_ip_valid_v4() {
-        assert_eq!(
-            extract_x_real_ip(&HeaderValue::from_str("1.2.3.4").unwrap()).unwrap(),
-            Ipv4Addr::new(1, 2, 3, 4)
         );
     }
 }

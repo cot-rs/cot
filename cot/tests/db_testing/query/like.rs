@@ -48,7 +48,7 @@ async fn model_query_contains_case_sensitive(test_db: &mut TestDatabase) {
         .all(&**test_db)
         .await
         .unwrap();
-    assert!(objects.is_empty());
+    assert_eq!(objects, []);
 
     let objects = query!(TestModel, $name.contains(""))
         .all(&**test_db)
@@ -73,7 +73,7 @@ async fn model_query_icontains(test_db: &mut TestDatabase) {
         .all(&**test_db)
         .await
         .unwrap();
-    assert!(objects.is_empty());
+    assert_eq!(objects, []);
 }
 
 #[cot_macros::dbtest]
@@ -99,7 +99,7 @@ async fn model_query_starts_with(test_db: &mut TestDatabase) {
         .all(&**test_db)
         .await
         .unwrap();
-    assert!(objects.is_empty());
+    assert_eq!(objects, []);
 }
 
 #[cot_macros::dbtest]
@@ -130,7 +130,7 @@ async fn model_query_ends_with(test_db: &mut TestDatabase) {
         .all(&**test_db)
         .await
         .unwrap();
-    assert!(objects.is_empty());
+    assert_eq!(objects, []);
 }
 
 #[cot_macros::dbtest]

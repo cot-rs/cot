@@ -319,7 +319,7 @@ async fn transaction_query(test_db: &mut TestDatabase) {
     transaction.rollback().await.unwrap();
 
     let objects = query!(TestModel, $name == "queried").all(db).await.unwrap();
-    assert!(objects.is_empty());
+    assert_eq!(objects, []);
 }
 
 #[cot_macros::dbtest]

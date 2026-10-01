@@ -382,10 +382,10 @@ mod tests {
             .expect("should build with defaults");
         assert_eq!(msg.subject, "");
         assert_eq!(msg.body, "");
-        assert!(msg.to.is_empty());
-        assert!(msg.cc.is_empty());
-        assert!(msg.bcc.is_empty());
-        assert!(msg.reply_to.is_empty());
+        assert_eq!(msg.to, []);
+        assert_eq!(msg.cc, []);
+        assert_eq!(msg.bcc, []);
+        assert_eq!(msg.reply_to, []);
         assert!(msg.attachments.is_empty());
     }
 

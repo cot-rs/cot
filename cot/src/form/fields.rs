@@ -1720,7 +1720,6 @@ mod tests {
     }
 
     #[cot::test]
-    #[expect(clippy::float_cmp)]
     async fn float_field_clean_value() {
         let mut field = FloatField::<f32>::with_options(
             FormFieldOptions::builder()

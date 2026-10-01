@@ -267,7 +267,7 @@ mod tests {
 
         generate_completions(clap_complete::Shell::Bash, &mut output);
 
-        assert!(!output.is_empty());
+        assert_ne!(output, b"");
     }
 
     #[test]

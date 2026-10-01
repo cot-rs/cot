@@ -1773,7 +1773,7 @@ mod tests {
         } = &operations[0]
         {
             assert_eq!(table_name, "table1");
-            assert!(!fields.is_empty());
+            assert_ne!(fields.as_slice(), []);
         } else {
             panic!("Expected CreateModel operation");
         }
@@ -1782,7 +1782,7 @@ mod tests {
         } = &operations[1]
         {
             assert_eq!(table_name, "table2");
-            assert!(fields.is_empty());
+            assert_eq!(fields.as_slice(), []);
         } else {
             panic!("Expected CreateModel operation");
         }
@@ -1847,7 +1847,7 @@ mod tests {
         }];
 
         let external_dependencies = GeneratedMigration::get_foreign_key_dependencies(&operations);
-        assert!(external_dependencies.is_empty());
+        assert_eq!(external_dependencies, []);
     }
 
     #[test]

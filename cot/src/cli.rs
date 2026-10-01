@@ -772,7 +772,7 @@ mod tests {
     #[test]
     fn cli_new() {
         let cli = Cli::new();
-        assert!(cli.command.get_name().is_empty());
+        assert_eq!(cli.command.get_name(), "");
         assert!(cli.tasks.contains_key(&None));
     }
 

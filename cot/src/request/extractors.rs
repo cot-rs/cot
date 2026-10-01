@@ -351,6 +351,7 @@ impl<'a> Connected<IncomingStream<'a, tokio::net::TcpListener>> for RemoteAddr {
 }
 
 impl FromRequestHead for RemoteAddr {
+    #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
         let addr = head
             .extensions

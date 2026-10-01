@@ -1188,8 +1188,6 @@ impl StaticFilesConfig {
     }
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, Builder)]
-#[builder(build_fn(name = "build_impl"))]
 /// Configure how proxies are handled for detecting peer IP addresses.
 ///
 /// Supported headers are:
@@ -1223,14 +1221,18 @@ impl StaticFilesConfig {
 ///
 /// # Ok::<(), cot::Error>(())
 /// ```
+#[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[builder(build_fn(name = "build_impl"))]
 pub struct ClientIpConfig {
     #[builder(default)]
     #[serde(default)]
-    proxies: Vec<ipnet::IpNet>,
+    /// IP addresses to accept as proxies.
+    pub proxies: Vec<ipnet::IpNet>,
 
     #[builder(default = "default_client_ip_headers()")]
     #[serde(default = "default_client_ip_headers")]
-    headers: Vec<ClientIpHeader>,
+    /// Headers to look for when receiving a request from a proxy.
+    pub headers: Vec<ClientIpHeader>,
 }
 
 fn default_client_ip_headers() -> Vec<ClientIpHeader> {

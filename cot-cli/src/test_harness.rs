@@ -753,6 +753,11 @@ impl CompiledCotProject {
     ///
     /// Automatically adds the `--release` arg if the project was compiled in
     /// release mode so `cot-cli` resolves the correct binary.
+    ///
+    /// `CARGO_TARGET_DIR` is pinned to the project's own target directory
+    /// (where the compiled binary is bridged to), so that the user's cargo
+    /// configuration (e.g. a global `build.target-dir`) or environment can't
+    /// make `cot-cli` look elsewhere and rebuild the binary.
     #[must_use]
     pub fn cot_cmd(&self, args: &[&str]) -> Command {
         // ensure that the binary always exists before invoking it
@@ -762,7 +767,9 @@ impl CompiledCotProject {
         }
         final_args.extend_from_slice(args);
 
-        self.inner.cot_cmd(&final_args)
+        let mut cmd = self.inner.cot_cmd(&final_args);
+        cmd.env("CARGO_TARGET_DIR", self.path().join("target"));
+        cmd
     }
 
     /// Build a `cot` CLI command without any automatic flags.

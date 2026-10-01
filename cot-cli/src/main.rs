@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn forwarded_args_empty_inputs_produce_empty_vec() {
-        assert!(forwarded_args(&[], &[]).is_empty());
+        assert_eq!(forwarded_args(&[], &[]), Vec::<OsString>::new());
     }
 
     #[test]
@@ -130,6 +130,6 @@ mod tests {
         let (before, after) = split_on_double_dash(&raw);
 
         assert_eq!(before, &raw[..]);
-        assert!(after.is_empty());
+        assert_eq!(after, [""; 0]);
     }
 }

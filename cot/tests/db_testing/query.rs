@@ -173,7 +173,7 @@ async fn model_macro_filtering(test_db: &mut TestDatabase) {
         .all(&**test_db)
         .await
         .unwrap();
-    assert!(objects.is_empty());
+    assert_eq!(objects, []);
 }
 
 #[cot_macros::dbtest]

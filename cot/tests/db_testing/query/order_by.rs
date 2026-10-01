@@ -716,7 +716,7 @@ async fn order_by_empty_table_returns_empty(test_db: &mut TestDatabase) {
         .await
         .unwrap();
 
-    assert!(objects.is_empty());
+    assert_eq!(objects, []);
 }
 
 #[test]

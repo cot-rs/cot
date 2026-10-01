@@ -25,7 +25,7 @@ fn create_model_state_test() {
         .unwrap();
 
     assert_eq!(migration.migration_name, "m_0001_initial");
-    assert!(migration.dependencies.is_empty());
+    assert_eq!(migration.dependencies, []);
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
     assert_eq!(table_name, "cot__parent");
@@ -172,7 +172,7 @@ fn create_model_keywords() {
         .unwrap();
 
     assert_eq!(migration.migration_name, "m_0001_initial");
-    assert!(migration.dependencies.is_empty());
+    assert_eq!(migration.dependencies, []);
 
     let (table_name, fields) = unwrap_create_model(&migration.operations[1]);
     assert_eq!(table_name, "cot__const");

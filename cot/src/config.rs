@@ -3076,7 +3076,8 @@ mod tests {
                 assert_eq!(dt.offset().local_minus_utc(), 0);
                 // dt should be >= before
                 assert!(dt >= before);
-                // dt should be reasonably close to before + duration (allow 1s slack)
+                // dt should be reasonably close to before + duration (allow 1s
+                // slack)
                 let max_allowed = before
                     + chrono::Duration::from_std(duration).unwrap()
                     + chrono::Duration::seconds(1);

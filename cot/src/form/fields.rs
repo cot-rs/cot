@@ -530,7 +530,7 @@ impl AsFormField for Email {
             && min > max
         {
             return Err(FormFieldValidationError::from_string(format!(
-                "min_length ({min}) exceeds max_length ({max})"
+                "min_length ({min}) exceeds max_length ({max})."
             )));
         }
 
@@ -1066,7 +1066,7 @@ macro_rules! impl_float_as_form_field {
 
                 if parsed.is_nan() || parsed.is_infinite() {
                     return Err(FormFieldValidationError::from_static(
-                        "Cannot have NaN or inf as form input values",
+                        "Cannot have NaN or inf as form input values.",
                     ));
                 }
 
@@ -1720,7 +1720,6 @@ mod tests {
     }
 
     #[cot::test]
-    #[expect(clippy::float_cmp)]
     async fn float_field_clean_value() {
         let mut field = FloatField::<f32>::with_options(
             FormFieldOptions::builder()
@@ -1801,7 +1800,7 @@ mod tests {
             assert_eq!(
                 value,
                 Err(FormFieldValidationError::from_static(
-                    "Cannot have NaN or inf as form input values"
+                    "Cannot have NaN or inf as form input values."
                 ))
             );
         }

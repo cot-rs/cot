@@ -69,6 +69,7 @@ pub mod config;
 #[cfg(feature = "email")]
 pub mod email;
 mod error_page;
+pub mod metadata;
 pub mod middleware;
 #[cfg(feature = "openapi")]
 pub mod openapi;

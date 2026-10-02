@@ -250,5 +250,5 @@ async fn foreign_keys_cascade(db: &mut TestDatabase) {
         .delete(&**db)
         .await
         .unwrap();
-    assert!(Child::objects().all(&**db).await.unwrap().is_empty());
+    assert_eq!(Child::objects().all(&**db).await.unwrap(), []);
 }

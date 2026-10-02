@@ -1035,12 +1035,13 @@ fn extract_is_required(object_item: &mut Schema) -> bool {
             types.retain(|t| t != &null_value);
             false
         } else {
-            // If "null" is not in the types, we assume it's a required parameter
+            // If "null" is not in the types, we assume it's a required
+            // parameter
             true
         }
     } else {
-        // If the type is a single string (or some other unknown value), we assume it's
-        // a required parameter
+        // If the type is a single string (or some other unknown value), we
+        // assume it's a required parameter
         true
     }
 }
@@ -1303,11 +1304,11 @@ mod tests {
     fn route_context() {
         let context = RouteContext::default();
         assert!(context.method.is_none());
-        assert!(context.param_names.is_empty());
+        assert_eq!(context.param_names, [""; 0]);
 
         let context = RouteContext::new();
         assert!(context.method.is_none());
-        assert!(context.param_names.is_empty());
+        assert_eq!(context.param_names, [""; 0]);
     }
 
     #[test]

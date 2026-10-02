@@ -17,7 +17,7 @@ Any top-level table not listed below is preserved as-is and made available to yo
 
 ## Top-level keys
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `debug` | boolean | `true` | Debug mode flag. |
 | `register_panic_hook` | boolean | `true` | Whether to register a panic hook. |
@@ -44,13 +44,13 @@ Database authentication backend.
 
 ## `[database]`
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `url` | string | — | The URL of the database, possibly with username, password, and other options. |
 
 ## `[cache]`
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `max_retries` | integer | `3` | Maximum number of retries for cache operations. |
 | `timeout` | string | `"5m"` | Timeout for cache operations. |
@@ -69,7 +69,7 @@ In-memory cache store.
 
 Redis cache store. This stores cache data in a Redis instance. The URL to the Redis server must be specified, and additional Redis-specific options can be configured.
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `url` | string | — | The URL of the Redis server. |
 | `pool_size` | integer | — | Connection pool size for Redis connections. This controls how many connections to maintain in the connection pool. When not specified, a default pool size of `10` is used. |
@@ -78,13 +78,13 @@ Redis cache store. This stores cache data in a Redis instance. The URL to the Re
 
 File-based cache store. This stores cache data in files on the local filesystem. The path to the directory where the cache files will be stored must be specified.
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `path` | string | — | The path to the directory where cache files will be stored. |
 
 ## `[static_files]`
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `url` | string | `"/static/"` | The URL prefix for the static files to be served at (which should typically end with a slash). |
 | `rewrite` | `"none"`, `"query_param"` | `"none"` | The URL rewriting mode for the static files. This is useful to allow long-lived caching of static files, while still allowing to invalidate the cache when the file changes. |
@@ -92,20 +92,20 @@ File-based cache store. This stores cache data in files on the local filesystem.
 
 ## `[middlewares]`
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `live_reload` | table | [*(see below)*](#middlewareslive_reload) | The configuration for the live reload middleware. |
 | `session` | table | [*(see below)*](#middlewaressession) | The configuration for the session middleware. |
 
 ### `[middlewares.live_reload]`
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `enabled` | boolean | `false` | Whether the live reload middleware is enabled. |
 
 ### `[middlewares.session]`
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `secure` | boolean | `true` | The [`Secure`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies) of the cookie determines whether the session middleware is secure. |
 | `http_only` | boolean | `true` | The [`HttpOnly`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies) of the cookie used for the session. It is set to `true` by default. |
@@ -133,7 +133,7 @@ Database-backed session storage.
 
 File-based session storage.
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `path` | string | — | The path to the directory where session files will be stored. |
 
@@ -141,13 +141,13 @@ File-based session storage.
 
 Cache-based session storage.
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `uri` | string | — | The URI to the cache service. |
 
 ## `[email]`
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `transport` | table | [`type = "console"`](#emailtransport) | The type of email transport backend to use. |
 
@@ -163,7 +163,7 @@ Console email transport backend that prints the contents to the standard output.
 
 SMTP email transport backend.
 
-| Key | Type | Default | Description |
+| Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `url` | string | — | The SMTP connection URL. |
 | `mechanism` | `"plain"`, `"login"`, `"xoauth2"` | — | The authentication mechanism to use. |

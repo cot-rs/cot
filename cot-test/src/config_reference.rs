@@ -85,7 +85,7 @@ fn render_fields(
     md: &mut String,
     default_toml: &mut String,
 ) {
-    md.push_str("| Key | Type | Default | Description |\n|---|---|---|---|\n");
+    md.push_str("| Key | TOML Type | Default | Description |\n|---|---|---|---|\n");
     let mut own_toml = String::new();
     let mut pending: Vec<PendingChild<'_>> = Vec::new();
 
@@ -234,7 +234,7 @@ fn render_tagged(
         if other_props.is_empty() {
             continue;
         }
-        md.push_str("| Key | Type | Default | Description |\n|---|---|---|---|\n");
+        md.push_str("| Key | TOML Type | Default | Description |\n|---|---|---|---|\n");
         for (key, prop_value) in other_props {
             let prop = prop_value
                 .as_object()

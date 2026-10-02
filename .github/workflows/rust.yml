@@ -192,6 +192,11 @@ jobs:
     name: Test coverage checks
     runs-on: ubuntu-latest
     needs: ["check"]
+    env:
+      # Source-based coverage doesn't need full debuginfo; this roughly halves
+      # the size of the instrumented build, which otherwise runs out of disk
+      # space. Line tables are kept so that backtraces still work.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - name: Checkout source
         uses: actions/checkout@v7

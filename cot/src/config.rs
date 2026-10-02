@@ -86,6 +86,27 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub register_panic_hook: bool,
+    /// The maximum allowed request body size, in bytes.
+    ///
+    /// Requests whose bodies exceed this limit fail with HTTP 413 Content Too
+    /// Large. This protects the process from unbounded memory use while
+    /// parsing forms, uploads, and other request bodies. The default is 2 MiB.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// max_request_body_size = 10485760
+    /// "#,
+    /// )?;
+    ///
+    /// assert_eq!(config.max_request_body_size, 10 * 1024 * 1024);
+    /// # Ok::<(), cot::Error>(())
+    /// ```
+    pub max_request_body_size: usize,
     /// The secret key used for signing cookies and other sensitive data. This
     /// is a cryptographic key, should be kept secret, and should be set to a
     /// random and unique value for each project.
@@ -311,6 +332,8 @@ const fn default_debug() -> bool {
     cfg!(debug_assertions)
 }
 
+const DEFAULT_MAX_REQUEST_BODY_SIZE: usize = 2 * 1024 * 1024;
+
 impl Default for ProjectConfig {
     fn default() -> Self {
         ProjectConfig::builder().build()
@@ -404,6 +427,9 @@ impl ProjectConfigBuilder {
         ProjectConfig {
             debug,
             register_panic_hook: self.register_panic_hook.unwrap_or(true),
+            max_request_body_size: self
+                .max_request_body_size
+                .unwrap_or(DEFAULT_MAX_REQUEST_BODY_SIZE),
             secret_key: self.secret_key.clone().unwrap_or_default(),
             fallback_secret_keys: self.fallback_secret_keys.clone().unwrap_or_default(),
             auth_backend: self.auth_backend.unwrap_or_default(),
@@ -2499,6 +2525,15 @@ mod tests {
     use time::OffsetDateTime;
 
     use super::*;
+
+    #[test]
+    fn request_body_limit_config() {
+        let default_config = ProjectConfig::default();
+        assert_eq!(default_config.max_request_body_size, 2 * 1024 * 1024);
+
+        let config = ProjectConfig::from_toml("max_request_body_size = 4096").unwrap();
+        assert_eq!(config.max_request_body_size, 4096);
+    }
 
     #[test]
     fn from_toml_valid() {

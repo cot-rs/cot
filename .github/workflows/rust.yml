@@ -95,7 +95,7 @@ jobs:
           version: "v0.16.0"
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.87.1
+        uses: taiki-e/install-action@v2.87.21
         with:
           tool: nextest
 
@@ -170,7 +170,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.87.1
+        uses: taiki-e/install-action@v2.87.21
         with:
           tool: nextest
 
@@ -393,7 +393,7 @@ jobs:
           save-if: 'false'
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.87.1
+        uses: taiki-e/install-action@v2.87.21
         with:
           tool: nextest
 

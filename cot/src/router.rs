@@ -529,6 +529,22 @@ pub fn split_view_name(view_name: &str) -> (Option<&str>, &str) {
     }
 }
 
+// used in the reverse! macro; not part of public API
+#[doc(hidden)]
+#[must_use]
+pub fn reverse_with_query(url: String, query_params: &[(&str, String)]) -> String {
+    if query_params.is_empty() {
+        return url;
+    }
+
+    let mut serializer = form_urlencoded::Serializer::new(String::new());
+    for (key, value) in query_params {
+        serializer.append_pair(key, value);
+    }
+
+    format!("{url}?{}", serializer.finish())
+}
+
 /// A route that can be used to route requests to their respective views.
 ///
 /// Non-empty route paths may omit the leading slash. Cot normalizes them by
@@ -807,6 +823,14 @@ enum RouteInner {
 /// Returns a [`cot::Result<String>`] that contains the URL for the view. You
 /// will typically want to append `?` to the macro call to get the URL.
 ///
+/// # Query parameters
+///
+/// Path parameters are passed as `key = value` pairs right after the view name.
+/// Query parameters can be added after a semicolon, using the same syntax. They
+/// are appended to the generated URL as a percent-encoded query string, so
+/// `reverse!(request, "home"; page = 2)` returns `/?page=2`. The values only
+/// need to implement [`ToString`], just like path parameters do.
+///
 /// # Examples
 ///
 /// ```
@@ -820,6 +844,9 @@ enum RouteInner {
 ///     // any of below two lines returns the same:
 ///     let url = reverse!(request, "home")?;
 ///     let url = reverse!(request, "my_custom_app:home")?;
+///
+///     // with query parameters, this returns `/?page=2&search=cot`:
+///     let url = reverse!(request, "home"; page = 2, search = "cot")?;
 ///
 ///     Ok(Html::new(format!(
 ///         "Hello! The URL for this view is: {}",
@@ -851,7 +878,10 @@ enum RouteInner {
 /// ```
 #[macro_export]
 macro_rules! reverse {
-    ($request:expr, $view_name:literal $(, $($key:ident = $value:expr),*)?) => {{
+    ($request:expr, $view_name:literal
+        $(, $($key:ident = $value:expr),* )?
+        $(; $($query_key:ident = $query_value:expr),* )?
+    ) => {{
         #[allow(
             clippy::allow_attributes,
             unused_imports,
@@ -863,6 +893,10 @@ macro_rules! reverse {
         $request
             .router()
             .reverse(app_name, view_name, &$crate::reverse_param_map!($( $($key = $value),* )?))
+            .map(|url| $crate::router::reverse_with_query(
+                url,
+                &[$( $( (stringify!($query_key), ::std::string::ToString::to_string(&$query_value)) ),* )?],
+            ))
     }};
 }
 
@@ -1294,6 +1328,44 @@ mod tests {
         let url = reverse!(request, "test", id = 123).unwrap();
 
         assert_eq!(url, "/test/123");
+    }
+
+    #[test]
+    fn test_reverse_macro_query_params() {
+        let route = Route::with_handler_and_name("/", MockHandler, "home");
+        let router = Router::with_urls(vec![route]);
+
+        let request = TestRequestBuilder::get("/").router(router).build();
+        let url = reverse!(request, "home"; page = 2, search = "cot").unwrap();
+
+        assert_eq!(url, "/?page=2&search=cot");
+    }
+
+    #[test]
+    fn test_reverse_macro_path_and_query_params() {
+        let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
+        let router = Router::with_urls(vec![route]);
+
+        let request = TestRequestBuilder::get("/").router(router).build();
+        let url = reverse!(request, "test", id = 123; page = 2).unwrap();
+
+        assert_eq!(url, "/test/123?page=2");
+    }
+
+    #[test]
+    fn test_reverse_macro_query_params_are_encoded() {
+        let route = Route::with_handler_and_name("/", MockHandler, "home");
+        let router = Router::with_urls(vec![route]);
+
+        let request = TestRequestBuilder::get("/").router(router).build();
+        let url = reverse!(request, "home"; search = "hello world & cot").unwrap();
+
+        assert_eq!(url, "/?search=hello+world+%26+cot");
+    }
+
+    #[test]
+    fn reverse_with_query_leaves_url_unchanged_when_empty() {
+        assert_eq!(reverse_with_query("/test".to_string(), &[]), "/test");
     }
 
     #[test]

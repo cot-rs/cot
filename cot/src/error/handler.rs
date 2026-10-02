@@ -214,7 +214,7 @@ impl FromRequestHead for RequestOuterError {
         let error = head.extensions.get::<RequestOuterError>();
         error
             .ok_or_else(|| {
-                Error::internal("No error found in request head. Make sure you use this extractor in an error handler.")
+                Error::internal("no error found in request head. Make sure you use this extractor in an error handler.")
             }).cloned()
     }
 }

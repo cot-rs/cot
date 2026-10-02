@@ -47,21 +47,22 @@
             <div class="pagination">
                 <select id="page-size-selector">
                     {% for option in [10, 20, 30, 40] %}
-                        <option value="{{ option }}" {% if option == page_size %}selected{% endif %}>{{ option }}</option>
+                        <option value="{{ option }}"
+                                {% if option == page_size %}selected{% endif %}>{{ option }}</option>
                     {% endfor %}
                 </select>
                 {% if page > 1 %}
                     <a href="?page={{ page - 1 }}&page_size={{ page_size }}"
                        class="btn secondary">Previous</a>
                 {% else %}
-                    <button class="btn disabled">Previous</button>
+                    <button class="btn disabled" type="button">Previous</button>
                 {% endif %}
                 <span>Page {{ page }} of {{ total_pages }}</span>
                 {% if page < total_pages %}
                     <a href="?page={{ page + 1 }}&page_size={{ page_size }}"
                        class="btn secondary">Next</a>
                 {% else %}
-                    <button class="btn disabled">Next</button>
+                    <button class="btn disabled" type="button">Next</button>
                 {% endif %}
             </div>
         </footer>

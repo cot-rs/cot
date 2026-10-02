@@ -60,6 +60,7 @@ use crate::error::UncaughtPanic;
 use crate::error::handler::{DynErrorPageHandler, RequestOuterError};
 use crate::error_page::Diagnostics;
 use crate::html::Html;
+use crate::metadata::{METADATA_FLAG, ProjectMetadata};
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
@@ -490,6 +491,13 @@ where
     ///
     /// This method is used to add middleware to the project. The middleware
     /// will be applied to all routes in the project.
+    ///
+    /// Each call wraps the handler built so far. Middleware registered later
+    /// therefore runs earlier while processing a request. Register middleware
+    /// dependencies after the middleware that needs them; for example,
+    /// [`crate::middleware::SessionMiddleware`] must be registered after
+    /// [`crate::middleware::AuthMiddleware`] so that session handling runs
+    /// first.
     ///
     /// # Examples
     ///
@@ -938,6 +946,23 @@ impl Bootstrapper<Uninitialized> {
 
         cli.set_metadata(self.project.cli_metadata());
         self.project.register_tasks(&mut cli);
+
+        let args = std::env::args().collect::<Vec<_>>();
+        // get all args before any double dash(--)
+        let cot_args = match args.iter().position(|a| a == "--") {
+            Some(idx) => &args[..idx],
+            None => args.as_slice(),
+        };
+
+        if cot_args.iter().any(|arg| arg == METADATA_FLAG) {
+            let meta = ProjectMetadata::from(cli.command());
+
+            println!(
+                "{}",
+                serde_json::to_string(&meta).expect("parsing metadata to string should not fail.")
+            );
+            std::process::exit(0);
+        }
 
         let common_options = cli.common_options();
         let self_with_context = self.with_config_name(common_options.config())?;

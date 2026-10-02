@@ -28,7 +28,7 @@ async fn context_display_non_empty() {
 
     let context = MyForm::build_context(&mut request).await.unwrap();
     let form_rendered = context.to_string();
-    assert!(!form_rendered.is_empty());
+    assert_ne!(form_rendered, "");
 }
 
 #[cot::test]

@@ -1304,11 +1304,11 @@ mod tests {
     fn route_context() {
         let context = RouteContext::default();
         assert!(context.method.is_none());
-        assert!(context.param_names.is_empty());
+        assert_eq!(context.param_names, [""; 0]);
 
         let context = RouteContext::new();
         assert!(context.method.is_none());
-        assert!(context.param_names.is_empty());
+        assert_eq!(context.param_names, [""; 0]);
     }
 
     #[test]

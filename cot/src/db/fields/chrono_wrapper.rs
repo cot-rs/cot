@@ -206,7 +206,7 @@ mod tests {
     fn weekday_set_empty() {
         let set = WeekdaySet::EMPTY;
         assert_eq!(set.0, 0);
-        assert!(set.weekdays().is_empty());
+        assert_eq!(set.weekdays(), []);
     }
 
     #[test]

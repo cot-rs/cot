@@ -250,11 +250,11 @@ impl FormDeriveBuilder {
         let fields_as_dyn_field_ref = &self.fields_as_dyn_field_ref;
         let fields_as_display = &self.fields_as_display;
 
-        // <'dummy> is here because we can't directly create trivial constraints in
-        // where clauses
+        // <'dummy> is here because we can't directly create trivial constraints
+        // in where clauses
         // see https://github.com/rust-lang/rust/issues/48214 for details
-        // and the following comment for the details on the workaround being used here:
-        // https://github.com/rust-lang/rust/issues/48214#issuecomment-2557829956
+        // and the following comment for the details on the workaround being
+        // used here: https://github.com/rust-lang/rust/issues/48214#issuecomment-2557829956
         let fields_as_display_trait_bound = &self.fields_as_display_trait_bound;
         let display_where_clause = if fields_as_display_trait_bound.is_empty() {
             quote! {}

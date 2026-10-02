@@ -419,10 +419,10 @@ impl<'a> FormData<'a> {
             // * `Bytes` guarantees that `data` is non-null, valid for reads for
             //   `data.len()` bytes
             // * `data` is not mutated inside `Bytes`
-            // * data inside `slice` will not get deallocated as long as the underlying
-            //   `Bytes` object is alive
-            // * struct fields are dropped in the order of declaration, so `data` will be
-            //   dropped after `inner`
+            // * data inside `slice` will not get deallocated as long as the
+            //   underlying `Bytes` object is alive
+            // * struct fields are dropped in the order of declaration, so
+            //   `data` will be dropped after `inner`
             std::slice::from_raw_parts(data.as_ptr(), data.len())
         };
 
@@ -867,5 +867,25 @@ mod tests {
         } else {
             panic!("Expected RequestError");
         }
+    }
+
+    #[test]
+    fn built_in_validation_errors_have_sentence_messages() {
+        assert_eq!(
+            FormFieldValidationError::Required.to_string(),
+            "This field is required."
+        );
+        assert_eq!(
+            FormFieldValidationError::maximum_length_exceeded(10).to_string(),
+            "This exceeds the maximum length of 10."
+        );
+        assert_eq!(
+            FormFieldValidationError::minimum_length_not_met(2).to_string(),
+            "This is below the minimum length of 2."
+        );
+        assert_eq!(
+            FormFieldValidationError::invalid_value("invalid").to_string(),
+            "Value is not valid for this field."
+        );
     }
 }

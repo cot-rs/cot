@@ -24,8 +24,10 @@ impl DatabaseSqlite {
             .await
     }
 
-    fn prepare_values(_values: &mut SqlxValues) {
-        // No changes are needed for SQLite
+    fn prepare_values(values: &mut SqlxValues) {
+        for value in &mut values.0.0 {
+            crate::db::fields::jiff_to_sqlite_text_value(value);
+        }
     }
 
     #[expect(clippy::unnecessary_wraps)] // to have a unified interface between database impls

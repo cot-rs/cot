@@ -1,5 +1,6 @@
 use chrono::Weekday;
 
+use crate::common_types::WeekdaySet;
 #[cfg(feature = "mysql")]
 use crate::db::impl_mysql::MySqlValueRef;
 #[cfg(feature = "postgres")]
@@ -8,154 +9,33 @@ use crate::db::impl_postgres::PostgresValueRef;
 use crate::db::impl_sqlite::SqliteValueRef;
 use crate::db::{DatabaseError, DbValue, FromDbValue, SqlxValueRef, ToDbValue};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WeekdaySet(u8);
+fn weekday_from_chrono(weekday: Weekday) -> jiff::civil::Weekday {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the value is always in 0..7"
+    )]
+    jiff::civil::Weekday::from_monday_zero_offset(weekday.num_days_from_monday() as i8)
+        .expect("chrono::Weekday is always a valid weekday")
+}
 
-impl WeekdaySet {
-    pub const EMPTY: WeekdaySet = WeekdaySet(0);
-    pub(crate) const fn single(weekday: Weekday) -> Self {
-        match weekday {
-            Weekday::Mon => Self(0b000_0001),
-            Weekday::Tue => Self(0b000_0010),
-            Weekday::Wed => Self(0b000_0100),
-            Weekday::Thu => Self(0b000_1000),
-            Weekday::Fri => Self(0b001_0000),
-            Weekday::Sat => Self(0b010_0000),
-            Weekday::Sun => Self(0b100_0000),
-        }
-    }
-
-    pub(crate) const fn contains(self, day: Weekday) -> bool {
-        self.0 & Self::single(day).0 != 0
-    }
-
-    pub(crate) fn insert(&mut self, day: Weekday) -> bool {
-        if self.contains(day) {
-            return false;
-        }
-        self.0 |= Self::single(day).0;
-        true
-    }
-
-    pub(crate) fn weekdays(self) -> Vec<Weekday> {
-        let mut weekdays = Vec::new();
-        for weekday in [
-            Weekday::Mon,
-            Weekday::Tue,
-            Weekday::Wed,
-            Weekday::Thu,
-            Weekday::Fri,
-            Weekday::Sat,
-            Weekday::Sun,
-        ] {
-            if self.contains(weekday) {
-                weekdays.push(weekday);
-            }
-        }
-        weekdays
-    }
+fn weekday_to_chrono(weekday: jiff::civil::Weekday) -> Weekday {
+    Weekday::try_from(weekday.to_monday_zero_offset().cast_unsigned())
+        .expect("jiff::civil::Weekday is always a valid weekday")
 }
 
 impl From<chrono::WeekdaySet> for WeekdaySet {
     fn from(set: chrono::WeekdaySet) -> Self {
-        let mut new_set = WeekdaySet::EMPTY;
-
-        for weekday in set.iter(Weekday::Mon) {
-            new_set.insert(weekday);
-        }
-
-        new_set
+        set.iter(Weekday::Mon).map(weekday_from_chrono).collect()
     }
 }
 
 impl From<WeekdaySet> for chrono::WeekdaySet {
     fn from(set: WeekdaySet) -> Self {
         let mut new_set = chrono::WeekdaySet::EMPTY;
-
-        for weekday in set.weekdays() {
-            new_set.insert(weekday);
+        for weekday in set.iter() {
+            new_set.insert(weekday_to_chrono(weekday));
         }
-
         new_set
-    }
-}
-impl From<WeekdaySet> for u8 {
-    fn from(set: WeekdaySet) -> Self {
-        set.0
-    }
-}
-
-impl From<u8> for WeekdaySet {
-    fn from(value: u8) -> Self {
-        WeekdaySet(value)
-    }
-}
-
-impl FromDbValue for WeekdaySet {
-    #[cfg(feature = "sqlite")]
-    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        value.get::<u8>().map(WeekdaySet::from)
-    }
-
-    #[cfg(feature = "postgres")]
-    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        value.get::<i16>().map(|v| WeekdaySet::from(v as u8))
-    }
-
-    #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        value.get::<u8>().map(WeekdaySet::from)
-    }
-}
-
-impl FromDbValue for Option<WeekdaySet> {
-    #[cfg(feature = "sqlite")]
-    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        value.get::<Option<u8>>().map(|v| v.map(WeekdaySet::from))
-    }
-
-    #[cfg(feature = "postgres")]
-    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        value
-            .get::<Option<i16>>()
-            .map(|v| v.map(|v| WeekdaySet::from(v as u8)))
-    }
-
-    #[cfg(feature = "mysql")]
-    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
-    where
-        Self: Sized,
-    {
-        value.get::<Option<u8>>().map(|v| v.map(WeekdaySet::from))
-    }
-}
-
-impl ToDbValue for WeekdaySet {
-    fn to_db_value(&self) -> DbValue {
-        self.0.to_db_value()
-    }
-}
-
-impl ToDbValue for Option<WeekdaySet> {
-    fn to_db_value(&self) -> DbValue {
-        self.map(|val| val.0).to_db_value()
     }
 }
 
@@ -200,139 +80,44 @@ impl ToDbValue for Weekday {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::DbValue;
 
     #[test]
-    fn weekday_set_empty() {
-        let set = WeekdaySet::EMPTY;
-        assert_eq!(set.0, 0);
-        assert_eq!(set.weekdays(), []);
-    }
-
-    #[test]
-    fn weekday_set_single() {
-        let monday = WeekdaySet::single(Weekday::Mon);
-        assert_eq!(monday.0, 0b000_0001);
-        assert!(monday.contains(Weekday::Mon));
-        assert!(!monday.contains(Weekday::Tue));
-
-        let friday = WeekdaySet::single(Weekday::Fri);
-        assert_eq!(friday.0, 0b001_0000);
-        assert!(friday.contains(Weekday::Fri));
-        assert!(!friday.contains(Weekday::Mon));
-    }
-
-    #[test]
-    fn weekday_set_insert() {
-        let mut set = WeekdaySet::EMPTY;
-
-        assert!(set.insert(Weekday::Mon));
-        assert!(set.contains(Weekday::Mon));
-        assert!(!set.insert(Weekday::Mon));
-
-        assert!(set.insert(Weekday::Fri));
-        assert!(set.contains(Weekday::Fri));
-        assert!(set.contains(Weekday::Mon));
-    }
-
-    #[test]
-    fn weekday_set_weekdays() {
-        let mut set = WeekdaySet::EMPTY;
-        set.insert(Weekday::Mon);
-        set.insert(Weekday::Wed);
-        set.insert(Weekday::Fri);
-
-        let weekdays = set.weekdays();
-        assert_eq!(weekdays, vec![Weekday::Mon, Weekday::Wed, Weekday::Fri]);
+    fn weekday_conversion() {
+        for (chrono_weekday, jiff_weekday) in [
+            (Weekday::Mon, jiff::civil::Weekday::Monday),
+            (Weekday::Wed, jiff::civil::Weekday::Wednesday),
+            (Weekday::Sun, jiff::civil::Weekday::Sunday),
+        ] {
+            assert_eq!(weekday_from_chrono(chrono_weekday), jiff_weekday);
+            assert_eq!(weekday_to_chrono(jiff_weekday), chrono_weekday);
+        }
     }
 
     #[test]
     fn weekday_set_chrono_conversion() {
         let mut chrono_set = chrono::WeekdaySet::EMPTY;
         chrono_set.insert(Weekday::Mon);
-        chrono_set.insert(Weekday::Wed);
+        chrono_set.insert(Weekday::Sun);
 
-        // Test conversion from chrono to our type
-        let our_set = WeekdaySet::from(chrono_set);
-        assert!(our_set.contains(Weekday::Mon));
-        assert!(our_set.contains(Weekday::Wed));
-        assert!(!our_set.contains(Weekday::Tue));
+        let set = WeekdaySet::from(chrono_set);
+        assert_eq!(
+            set.iter().collect::<Vec<_>>(),
+            [jiff::civil::Weekday::Monday, jiff::civil::Weekday::Sunday]
+        );
 
-        // Test conversion back to chrono
-        let back_to_chrono = chrono::WeekdaySet::from(our_set);
-        assert!(back_to_chrono.contains(Weekday::Mon));
-        assert!(back_to_chrono.contains(Weekday::Wed));
-        assert!(!back_to_chrono.contains(Weekday::Tue));
-
-        assert_eq!(chrono_set, back_to_chrono);
+        assert_eq!(chrono::WeekdaySet::from(set), chrono_set);
     }
 
     #[test]
-    fn weekday_set_from_u8() {
-        let set = WeekdaySet::from(0b101_0101);
-        assert!(set.contains(Weekday::Mon));
-        assert!(!set.contains(Weekday::Tue));
-        assert!(set.contains(Weekday::Wed));
-        assert!(!set.contains(Weekday::Thu));
-        assert!(set.contains(Weekday::Fri));
-        assert!(!set.contains(Weekday::Sat));
-        assert!(set.contains(Weekday::Sun));
-    }
-
-    #[test]
-    fn weekday_set_to_u8() {
-        let mut set = WeekdaySet::EMPTY;
-        set.insert(Weekday::Mon);
-        set.insert(Weekday::Wed);
-        set.insert(Weekday::Fri);
-        set.insert(Weekday::Sun);
-
-        let value: u8 = set.into();
-        assert_eq!(value, 0b101_0101);
-    }
-
-    #[test]
-    fn weekday_set_all_weekdays() {
-        let all_weekdays = 0b111_1111u8;
-        let set = WeekdaySet::from(all_weekdays);
-
-        for weekday in [
-            Weekday::Mon,
-            Weekday::Tue,
-            Weekday::Wed,
-            Weekday::Thu,
-            Weekday::Fri,
-            Weekday::Sat,
-            Weekday::Sun,
-        ] {
-            assert!(set.contains(weekday));
-        }
-
-        assert_eq!(set.weekdays().len(), 7);
-    }
-
-    #[test]
-    fn weekday_set_to_db_value() {
-        let mut set = WeekdaySet::EMPTY;
+    fn chrono_weekday_set_to_db_value() {
+        let mut set = chrono::WeekdaySet::EMPTY;
         set.insert(Weekday::Mon);
         set.insert(Weekday::Fri);
 
-        let db_value = set.to_db_value();
-        assert_eq!(db_value, DbValue::TinyUnsigned(Some(0b001_0001)));
-    }
-
-    #[test]
-    fn weekday_set_option_to_db_value() {
-        let mut set = WeekdaySet::EMPTY;
-        set.insert(Weekday::Tue);
-        set.insert(Weekday::Thu);
-
-        let some_set = Some(set);
-        let db_value = some_set.to_db_value();
-        assert_eq!(db_value, DbValue::TinyUnsigned(Some(0b000_1010)));
-
-        let none_set: Option<WeekdaySet> = None;
-        let db_value = none_set.to_db_value();
-        assert_eq!(db_value, DbValue::TinyUnsigned(None));
+        assert_eq!(set.to_db_value(), DbValue::TinyUnsigned(Some(0b001_0001)));
+        assert_eq!(
+            None::<chrono::WeekdaySet>.to_db_value(),
+            DbValue::TinyUnsigned(None)
+        );
     }
 }

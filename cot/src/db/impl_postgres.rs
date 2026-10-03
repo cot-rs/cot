@@ -19,6 +19,7 @@ impl DatabasePostgres {
     fn prepare_values(values: &mut sea_query_sqlx::SqlxValues) {
         for value in &mut values.0.0 {
             Self::tinyint_to_smallint(value);
+            crate::db::fields::jiff_to_time_value(value);
         }
     }
 

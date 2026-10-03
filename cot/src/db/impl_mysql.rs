@@ -17,8 +17,10 @@ impl DatabaseMySql {
         Ok(())
     }
 
-    fn prepare_values(_values: &mut sea_query_sqlx::SqlxValues) {
-        // No changes are needed for MySQL
+    fn prepare_values(values: &mut sea_query_sqlx::SqlxValues) {
+        for value in &mut values.0.0 {
+            crate::db::fields::jiff_to_time_value(value);
+        }
     }
 
     #[expect(clippy::unnecessary_wraps)] // to have a unified interface between database impls

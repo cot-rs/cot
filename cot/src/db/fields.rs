@@ -15,6 +15,12 @@ use crate::db::{
 
 mod chrono_fields;
 mod chrono_wrapper;
+mod jiff_fields;
+
+#[cfg(feature = "sqlite")]
+pub(crate) use jiff_fields::jiff_to_sqlite_text_value;
+#[cfg(any(feature = "postgres", feature = "mysql"))]
+pub(crate) use jiff_fields::jiff_to_time_value;
 
 macro_rules! impl_from_sqlite_default {
     () => {
@@ -241,7 +247,7 @@ impl_db_field!(chrono::NaiveDateTime, DateTime);
 impl_db_field!(
     chrono::WeekdaySet,
     TinyUnsignedInteger,
-    with chrono_wrapper::WeekdaySet
+    with crate::common_types::WeekdaySet
 );
 impl_db_field!(String, Text);
 impl_db_field!(Vec<u8>, Blob);

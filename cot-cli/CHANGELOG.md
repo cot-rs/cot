@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.7.0...cot-cli-v0.8.0) - 2026-10-03
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.7.0/cot-cli/0.8.0/Cargo.toml)
+
+### New features
+
+- [**breaking**] Support for rolling back migrations ([#583](https://github.com/cot-rs/cot/pull/583)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- *(cli)* Merge help output across builtin and project commands ([#666](https://github.com/cot-rs/cot/pull/666)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- *(cli)* Proxy unrecognized commands to the project binary ([#665](https://github.com/cot-rs/cot/pull/665)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- *(cli)* Discover, build, and cache project binary metadata ([#664](https://github.com/cot-rs/cot/pull/664)) (by [@ElijahAhianyo](https://github.com/ElijahAhianyo))
+- Add trailing slash redirect middleware ([#633](https://github.com/cot-rs/cot/pull/633)) (by [@Guflly](https://github.com/Guflly))
+
+### Fixes
+
+- Set cargo target dir explicitly ([#683](https://github.com/cot-rs/cot/pull/683)) (by [@m4tx](https://github.com/m4tx))
+
+### Other
+
+- Fix clippy warnings ([#682](https://github.com/cot-rs/cot/pull/682)) (by [@m4tx](https://github.com/m4tx))
+- *(build)* Bump all deps ([#676](https://github.com/cot-rs/cot/pull/676)) (by [@m4tx](https://github.com/m4tx))
+- Update Rust nightly, reformat ([#668](https://github.com/cot-rs/cot/pull/668)) (by [@m4tx](https://github.com/m4tx))
+- Make error messages idiomatic ([#660](https://github.com/cot-rs/cot/pull/660)) (by [@oxura](https://github.com/oxura))
+- Update Star History links in README ([#646](https://github.com/cot-rs/cot/pull/646)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump all deps ([#627](https://github.com/cot-rs/cot/pull/627)) (by [@m4tx](https://github.com/m4tx))
+- *(deps)* Bump all deps ([#616](https://github.com/cot-rs/cot/pull/616)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.7.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.6.0...cot-cli-v0.7.0) - 2026-07-11
 
 [View diff on diff.rs](https://diff.rs/cot-cli/0.6.0/cot-cli/0.7.0/Cargo.toml)

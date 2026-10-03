@@ -300,29 +300,29 @@ impl FromRequestHead for Auth {
 }
 
 #[derive(Clone, Copy, Debug)]
-/// An extractor that extracts the IP address of the remote.
-/// This automatically checks for proxy IP headers and contains their IP if one
-/// such is specified.
+/// Extractor that extracts the IP address of the remote peer.
 ///
 /// # Examples
 /// ```rust
-/// use cot::request::extractors::RemoteAddr;
+/// use cot::request::extractors::ClientIpAddr;
 /// use cot_core::html::Html;
 ///
-/// pub async fn example_handler(ip: RemoteAddr) -> cot::Result<Html> {
-///     dbg!(ip.ip()); // Prints the IP as a debug statement
-///     dbg!(ip.direct_peer_ip()); // Prints the closest IP as a debug statement
-///     todo!()
+/// pub async fn example_handler(ip: ClientIpAddr) -> cot::Result<Html> {
+///     // Prints the IP as a debug statement, with proxy headers being taken care of already.
+///     dbg!(ip.ip());
+///     // Prints the IP of the closest peer.
+///     dbg!(ip.direct_peer_ip());
+///     # unimplemented!()
 /// }
 /// ```
-pub struct RemoteAddr {
+pub struct ClientIpAddr {
     /// IP of the closest peer
     direct: IpAddr,
     /// IP behind the proxy if such exist
     proxied: Option<IpAddr>,
 }
 
-impl RemoteAddr {
+impl ClientIpAddr {
     #[must_use]
     /// Get the IP address of the peer.
     /// This automatically handles proxy IP headers.
@@ -340,29 +340,28 @@ impl RemoteAddr {
     }
 }
 
-impl<'a> Connected<IncomingStream<'a, tokio::net::TcpListener>> for RemoteAddr {
+impl<'a> Connected<IncomingStream<'a, tokio::net::TcpListener>> for ClientIpAddr {
     fn connect_info(stream: IncomingStream<'a, tokio::net::TcpListener>) -> Self {
         let closest_ip = stream.remote_addr().ip();
-        RemoteAddr {
+        ClientIpAddr {
             direct: closest_ip,
             proxied: None,
         }
     }
 }
 
-impl FromRequestHead for RemoteAddr {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+impl ClientIpAddr {
+    pub(crate) fn from_request_head_sync(head: &RequestHead) -> crate::Result<Self> {
         let addr = head
             .extensions
-            .get::<RemoteAddr>()
-            .expect("Missing RemoteAddr extension");
+            .get::<ClientIpAddr>()
+            .expect("Missing ClientIpAddr extension");
 
         let closest = addr.direct;
 
-        let config = head.project_config().clone().client_ip;
-        let trusted_proxies = config.get_proxies();
-        let trusted_headers = config.get_trusted_headers();
+        let config = &head.project_config().client_ip;
+        let trusted_proxies = &config.proxies;
+        let trusted_headers = &config.headers;
 
         let mut proxy: Option<IpAddr> = None;
 
@@ -386,10 +385,17 @@ impl FromRequestHead for RemoteAddr {
             }
         }
 
-        Ok(RemoteAddr {
+        Ok(ClientIpAddr {
             direct: addr.direct,
             proxied: proxy,
         })
+    }
+}
+
+impl FromRequestHead for ClientIpAddr {
+    #[expect(clippy::unused_async_trait_impl)]
+    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+        Self::from_request_head_sync(head)
     }
 }
 
@@ -502,11 +508,11 @@ mod tests {
         const IP: IpAddr = IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4));
 
         let mut request = TestRequestBuilder::get("/").with_default_config().build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
-        let RemoteAddr { direct, proxied: _ } = request.extract_from_head().await.unwrap();
+        let ClientIpAddr { direct, proxied: _ } = request.extract_from_head().await.unwrap();
 
         assert_eq!(direct, IP);
     }
@@ -516,11 +522,11 @@ mod tests {
         const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
 
         let mut request = TestRequestBuilder::get("/").with_default_config().build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
-        let RemoteAddr { direct, proxied: _ } = request.extract_from_head().await.unwrap();
+        let ClientIpAddr { direct, proxied: _ } = request.extract_from_head().await.unwrap();
 
         assert_eq!(direct, IP);
     }
@@ -530,11 +536,11 @@ mod tests {
         const IP: IpAddr = IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4));
 
         let mut request = TestRequestBuilder::get("/").with_default_config().build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
-        let RemoteAddr { direct: _, proxied } = request.extract_from_head().await.unwrap();
+        let ClientIpAddr { direct: _, proxied } = request.extract_from_head().await.unwrap();
 
         assert_eq!(proxied, None);
     }
@@ -552,7 +558,7 @@ mod tests {
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
@@ -562,7 +568,7 @@ mod tests {
         );
 
         let ip = request
-            .extract_from_head::<RemoteAddr>()
+            .extract_from_head::<ClientIpAddr>()
             .await
             .unwrap()
             .ip();
@@ -583,7 +589,7 @@ mod tests {
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
@@ -593,7 +599,7 @@ mod tests {
         );
 
         let ip = request
-            .extract_from_head::<RemoteAddr>()
+            .extract_from_head::<ClientIpAddr>()
             .await
             .unwrap()
             .ip();
@@ -615,7 +621,7 @@ mod tests {
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP_WRONG,
             proxied: None,
         });
@@ -625,7 +631,7 @@ mod tests {
         );
 
         let ip = request
-            .extract_from_head::<RemoteAddr>()
+            .extract_from_head::<ClientIpAddr>()
             .await
             .unwrap()
             .ip();
@@ -647,7 +653,7 @@ mod tests {
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP_WRONG,
             proxied: None,
         });
@@ -657,7 +663,7 @@ mod tests {
         );
 
         let ip = request
-            .extract_from_head::<RemoteAddr>()
+            .extract_from_head::<ClientIpAddr>()
             .await
             .unwrap()
             .ip();
@@ -678,7 +684,7 @@ mod tests {
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
@@ -688,7 +694,7 @@ mod tests {
         );
 
         let ip = request
-            .extract_from_head::<RemoteAddr>()
+            .extract_from_head::<ClientIpAddr>()
             .await
             .unwrap()
             .ip();
@@ -709,7 +715,7 @@ mod tests {
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
@@ -719,7 +725,7 @@ mod tests {
         );
 
         let ip = request
-            .extract_from_head::<RemoteAddr>()
+            .extract_from_head::<ClientIpAddr>()
             .await
             .unwrap()
             .ip();
@@ -738,12 +744,12 @@ mod tests {
             vec![ipnet::IpNet::new(IP, 128).unwrap()],
             vec![
                 ClientIpHeader::XForwardedFor,
-                ClientIpHeader::Custom("Cf-cOnnecting-iP".to_string()),
+                ClientIpHeader::Custom(HeaderName::from_str("Cf-cOnnecting-iP").unwrap()),
             ],
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
@@ -753,7 +759,7 @@ mod tests {
         );
 
         let ip = request
-            .extract_from_head::<RemoteAddr>()
+            .extract_from_head::<ClientIpAddr>()
             .await
             .unwrap()
             .ip();
@@ -772,12 +778,12 @@ mod tests {
             vec![ipnet::IpNet::new(IP, 128).unwrap()],
             vec![
                 ClientIpHeader::XForwardedFor,
-                ClientIpHeader::Custom("Cf-cOnnecting-iP".to_string()),
+                ClientIpHeader::Custom(HeaderName::from_str("Cf-cOnnecting-iP").unwrap()),
             ],
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
@@ -787,7 +793,7 @@ mod tests {
         );
 
         let ip = request
-            .extract_from_head::<RemoteAddr>()
+            .extract_from_head::<ClientIpAddr>()
             .await
             .unwrap()
             .ip();
@@ -806,12 +812,12 @@ mod tests {
             vec![ipnet::IpNet::new(IP, 128).unwrap()],
             vec![
                 ClientIpHeader::XForwardedFor,
-                ClientIpHeader::Custom("Cf-cOnnecting-iP".to_string()),
+                ClientIpHeader::Custom(HeaderName::from_str("Cf-cOnnecting-iP").unwrap()),
             ],
         );
 
         let mut request = TestRequestBuilder::get("/").config(config).build();
-        request.extensions_mut().insert(RemoteAddr {
+        request.extensions_mut().insert(ClientIpAddr {
             direct: IP,
             proxied: None,
         });
@@ -820,7 +826,7 @@ mod tests {
             HeaderValue::from_str(&format!("AAA{IP_PROXY}")).unwrap(),
         );
 
-        let ip = request.extract_from_head::<RemoteAddr>().await;
+        let ip = request.extract_from_head::<ClientIpAddr>().await;
 
         assert!(ip.is_err());
     }

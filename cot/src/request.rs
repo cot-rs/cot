@@ -21,7 +21,7 @@ pub use cot_core::request::{PathParams, PathParamsDeserializerError, Request, Re
 use http::Extensions;
 
 use crate::Result;
-use crate::request::extractors::FromRequestHead;
+use crate::request::extractors::{ClientIpAddr, FromRequestHead};
 use crate::router::Router;
 
 pub mod extractors;
@@ -235,6 +235,23 @@ pub trait RequestExt: private::Sealed {
         }
     }
 
+    /// Get the client IP of the request.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::request::{Request, RequestExt};
+    /// use cot::response::Response;
+    ///
+    /// async fn my_handler(mut request: Request) -> cot::Result<Response> {
+    ///     let client_ip = request.client_ip();
+    ///     // ... do something with the client ip
+    ///     # unimplemented!()
+    /// }
+    /// ```
+    #[must_use]
+    fn client_ip(&mut self) -> Option<ClientIpAddr>;
+
     #[doc(hidden)]
     fn extensions(&self) -> &Extensions;
 }
@@ -300,6 +317,16 @@ impl RequestExt for Request {
     fn extensions(&self) -> &Extensions {
         self.extensions()
     }
+
+    fn client_ip(&mut self) -> Option<ClientIpAddr> {
+        let request = std::mem::take(self);
+
+        let (head, body) = request.into_parts();
+        let result = ClientIpAddr::from_request_head_sync(&head);
+
+        *self = Request::from_parts(head, body);
+        result.ok()
+    }
 }
 
 impl private::Sealed for RequestHead {}
@@ -354,6 +381,10 @@ impl RequestExt for RequestHead {
 
     fn extensions(&self) -> &Extensions {
         &self.extensions
+    }
+
+    fn client_ip(&mut self) -> Option<ClientIpAddr> {
+        ClientIpAddr::from_request_head_sync(self).ok()
     }
 }
 

@@ -16,6 +16,7 @@
 #![allow(missing_copy_implementations)]
 
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, Utc};
@@ -1249,7 +1250,7 @@ pub enum ClientIpHeader {
     /// hops, closest-to-origin first.
     XForwardedFor,
     /// Option for any header which simply contains a single IP address.
-    Custom(String),
+    Custom(http::HeaderName),
 }
 
 struct ClientIpHeaderVisitor;
@@ -1268,7 +1269,10 @@ impl Visitor<'_> for ClientIpHeaderVisitor {
         match v.to_lowercase().as_str() {
             "forwarded" => Ok(Self::Value::Forwarded),
             "x-forwarded-for" => Ok(Self::Value::XForwardedFor),
-            s => Ok(Self::Value::Custom(s.to_string())),
+            s => Ok(Self::Value::Custom(
+                http::HeaderName::from_str(s)
+                    .map_err(|_| serde::de::Error::custom("malformed header"))?,
+            )),
         }
     }
 }
@@ -1285,7 +1289,7 @@ impl<'de> Deserialize<'de> for ClientIpHeader {
 impl std::fmt::Display for ClientIpHeader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Custom(v) => f.write_str(v),
+            Self::Custom(v) => f.write_str(v.as_str()),
             Self::Forwarded => f.write_str("forwarded"),
             Self::XForwardedFor => f.write_str("x-forwarded-for"),
         }
@@ -2464,7 +2468,7 @@ impl TryFrom<&str> for CacheType {
 }
 
 #[cfg(feature = "cache")]
-impl std::str::FromStr for CacheType {
+impl FromStr for CacheType {
     type Err = ParseCacheTypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -3353,9 +3357,9 @@ mod tests {
             vec![
                 ClientIpHeader::Forwarded,
                 ClientIpHeader::XForwardedFor,
-                ClientIpHeader::Custom("cf-connecting-ip".to_string()),
-                ClientIpHeader::Custom("x-real-ip".to_string()),
-                ClientIpHeader::Custom("true-client-ip".to_string()),
+                ClientIpHeader::Custom(http::HeaderName::from_str("cf-connecting-ip").unwrap()),
+                ClientIpHeader::Custom(http::HeaderName::from_str("x-real-ip").unwrap()),
+                ClientIpHeader::Custom(http::HeaderName::from_str("true-client-ip").unwrap()),
             ]
         );
     }

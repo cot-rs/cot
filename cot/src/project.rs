@@ -62,7 +62,7 @@ use crate::error_page::Diagnostics;
 use crate::html::Html;
 use crate::metadata::{METADATA_FLAG, ProjectMetadata};
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::request::extractors::RemoteAddr;
+use crate::request::extractors::ClientIpAddr;
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
@@ -2208,7 +2208,7 @@ pub async fn run_at_with_shutdown(
     }
     axum::serve(
         listener,
-        handler.into_make_service_with_connect_info::<RemoteAddr>(),
+        handler.into_make_service_with_connect_info::<ClientIpAddr>(),
     )
     .with_graceful_shutdown(shutdown_signal)
     .await

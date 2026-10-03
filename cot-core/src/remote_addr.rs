@@ -3,14 +3,16 @@ use std::str::FromStr;
 
 use http::HeaderValue;
 
-fn ip_or_socket_string_to_ip<'a, T>(s: T) -> Option<IpAddr>
-where
-    T: Into<&'a str> + Clone,
-{
-    if let Ok(ip) = IpAddr::from_str(s.clone().into()) {
+fn ip_or_socket_string_to_ip(s: &str) -> Option<IpAddr> {
+    if let Ok(ip) = IpAddr::from_str(
+        s.strip_prefix('[')
+            .unwrap_or(s)
+            .strip_suffix(']')
+            .unwrap_or(s),
+    ) {
         return Some(ip);
     }
-    if let Ok(socket_addr) = SocketAddr::from_str(s.into()) {
+    if let Ok(socket_addr) = SocketAddr::from_str(s) {
         return Some(socket_addr.ip());
     }
     None
@@ -25,21 +27,27 @@ pub fn extract_forwarded(header: &HeaderValue) -> crate::Result<Option<IpAddr>> 
         Ok(v) => {
             match v
                 .to_lowercase()
-                .split(';')
-                .find(|seg| seg.starts_with("for="))
-                .map(|for_segments| {
-                    for ele in for_segments
-                        .split(',')
-                        .map(|s| s.trim().trim_start_matches("for="))
-                        .map(|s| s.trim_matches('"'))
-                    {
-                        if let Some(addr) = ip_or_socket_string_to_ip(ele) {
-                            return Some(addr);
-                        }
-                    }
-                    None
+                .split(',')
+                .map(str::trim)
+                .next()
+                .map(|first| {
+                    first
+                        .split(';')
+                        .find(|seg| seg.starts_with("for="))
+                        .map(|for_segments| {
+                            for ele in for_segments
+                                .split(',')
+                                .map(|s| s.trim().trim_start_matches("for="))
+                                .map(|s| s.trim_matches('"'))
+                            {
+                                if let Some(addr) = ip_or_socket_string_to_ip(dbg!(ele)) {
+                                    return Some(dbg!(addr));
+                                }
+                            }
+                            None
+                        })
                 }) {
-                Some(Some(ip)) => Ok(Some(ip)),
+                Some(Some(ip)) => Ok(dbg!(ip)),
                 Some(None) | None => Err(crate::Error::internal("No valid IP address was found.")),
             }
         }
@@ -104,6 +112,35 @@ mod tests {
     }
 
     #[cot::test]
+    async fn forwarded_valid_v4_alternative() {
+        assert_eq!(
+            extract_forwarded(
+                &HeaderValue::from_str("by=10.0.0.1;for=203.0.113.95, by=10.0.0.2;for=10.0.0.1")
+                    .unwrap()
+            )
+            .unwrap()
+            .unwrap(),
+            Ipv4Addr::new(203, 0, 113, 95)
+        );
+    }
+
+    #[cot::test]
+    async fn forwarded_v4_malformed() {
+        assert!(
+            extract_forwarded(&HeaderValue::from_str("by=10.0.0.1; for=203.0.113.95").unwrap())
+                .is_err()
+        );
+    }
+
+    #[cot::test]
+    async fn forwarded_v4_malformed_alternative() {
+        assert!(
+            extract_forwarded(&HeaderValue::from_str("by=10.0.0.1, for=203.0.113.95").unwrap())
+                .is_err()
+        );
+    }
+
+    #[cot::test]
     async fn forwarded_valid_v4_with_port() {
         assert_eq!(
             extract_forwarded(
@@ -119,6 +156,26 @@ mod tests {
     async fn forwarded_valid_v6() {
         assert_eq!(
             extract_forwarded(&HeaderValue::from_str("For=\"[2001:db8:cafe::17]:4711\"").unwrap())
+                .unwrap()
+                .unwrap(),
+            IP_V6_CAFE_17
+        );
+    }
+
+    #[cot::test]
+    async fn forwarded_valid_v6_no_port() {
+        assert_eq!(
+            extract_forwarded(&HeaderValue::from_str("For=\"[2001:db8:cafe::17]\"").unwrap())
+                .unwrap()
+                .unwrap(),
+            IP_V6_CAFE_17
+        );
+    }
+
+    #[cot::test]
+    async fn forwarded_valid_v6_no_port_brackets() {
+        assert_eq!(
+            extract_forwarded(&HeaderValue::from_str("For=\"2001:db8:cafe::17\"").unwrap())
                 .unwrap()
                 .unwrap(),
             IP_V6_CAFE_17

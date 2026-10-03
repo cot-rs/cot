@@ -106,6 +106,15 @@ mod tests {
     pub(crate) fn canonical_temp_dir() -> (TempDir, PathBuf) {
         let temp_dir = TempDir::new().unwrap();
         let tmp_path = temp_dir.path().canonicalize().unwrap();
+        // Pin the target dir so that the user's global cargo config (e.g.
+        // `build.target-dir` in `$CARGO_HOME/config.toml`) doesn't affect
+        // where `cot-cli` looks for the binary.
+        fs::create_dir(tmp_path.join(".cargo")).unwrap();
+        fs::write(
+            tmp_path.join(".cargo/config.toml"),
+            "[build]\ntarget-dir = \"target\"\n",
+        )
+        .unwrap();
         (temp_dir, tmp_path)
     }
 
@@ -184,7 +193,7 @@ edition = "2024"
     #[test]
     #[cfg_attr(
         miri,
-        ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
+        ignore = "unsupported operation: socketpair: type 0x5 is unsupported, only SOCK_STREAM, SOCK_CLOEXEC and SOCK_NONBLOCK are allowed"
     )]
     fn load_returns_none_without_cargo_manifest() {
         let (_guard, temp_dir) = canonical_temp_dir();
@@ -212,7 +221,7 @@ edition = "2024"
     #[test]
     #[cfg_attr(
         miri,
-        ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
+        ignore = "unsupported operation: socketpair: type 0x5 is unsupported, only SOCK_STREAM, SOCK_CLOEXEC and SOCK_NONBLOCK are allowed"
     )]
     fn load_returns_none_when_expected_binary_is_missing() {
         let (_guard, temp_dir) = canonical_temp_dir();
@@ -331,7 +340,7 @@ path = "src/worker.rs"
     #[test]
     #[cfg_attr(
         miri,
-        ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
+        ignore = "unsupported operation: socketpair: type 0x5 is unsupported, only SOCK_STREAM, SOCK_CLOEXEC and SOCK_NONBLOCK are allowed"
     )]
     fn load_errors_on_multiple_bin_targets_without_override() {
         let (_guard, temp_dir) = canonical_temp_dir();
@@ -397,7 +406,7 @@ path = "src/worker.rs"
     #[test]
     #[cfg_attr(
         miri,
-        ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
+        ignore = "unsupported operation: socketpair: type 0x5 is unsupported, only SOCK_STREAM, SOCK_CLOEXEC and SOCK_NONBLOCK are allowed"
     )]
     fn workspace_root_requires_package_when_ambiguous() {
         let (_guard, temp_dir) = canonical_temp_dir();
@@ -417,7 +426,7 @@ path = "src/worker.rs"
     #[test]
     #[cfg_attr(
         miri,
-        ignore = "unsupported operation: socketpair: type 0x5 is unsupported"
+        ignore = "unsupported operation: socketpair: type 0x5 is unsupported, only SOCK_STREAM, SOCK_CLOEXEC and SOCK_NONBLOCK are allowed"
     )]
     fn workspace_package_flag_must_match_member() {
         let (_guard, temp_dir) = canonical_temp_dir();

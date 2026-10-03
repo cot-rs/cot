@@ -1,0 +1,13 @@
+---
+source: cot-cli/tests/snapshot_testing/external/check.rs
+info:
+  program: cot
+  args:
+    - check
+---
+success: true
+exit_code: 0
+----- stdout -----
+Success verifying the configuration
+
+----- stderr -----

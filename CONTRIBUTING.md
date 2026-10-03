@@ -11,6 +11,10 @@ If you have a question, feedback, or feature request, please open an
 a [discussion](https://github.com/cot-rs/cot/discussions/new/choose), or
 join our [Discord server](https://discord.cot.rs/) to talk with us directly.
 
+## Using AI tools
+
+AI tools are welcome here, but they come with some ground rules. Before you use AI in your contribution, please read our [AI Policy](AI_POLICY.md). In short, you own what you submit, it shouldn't create extra work for maintainers, and `good first issue` tasks are for humans only.
+
 ## Submitting issues
 
 When reporting a bug or asking for help, please include enough details so that
@@ -42,6 +46,10 @@ tests for you.
 We are using [prek](https://prek.j178.dev/) (`pre-commit` Rust alternative) hooks to handle formatting and linting. See the `prek` website for installation instructions.
 
 Pre-commit still works for this project because `prek` and `pre-commit` share the same configuration file. However, the project may switch to a `prek`-specific configuration in the future.
+
+Error messages should begin with a lowercase letter and should not end with
+punctuation unless they contain multiple sentences. This follows the convention
+used by Rust's standard library and keeps chained errors readable.
 
 ### Tests that use database, cache, or other external resources
 

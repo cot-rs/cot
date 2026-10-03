@@ -868,4 +868,24 @@ mod tests {
             panic!("Expected RequestError");
         }
     }
+
+    #[test]
+    fn built_in_validation_errors_have_sentence_messages() {
+        assert_eq!(
+            FormFieldValidationError::Required.to_string(),
+            "This field is required."
+        );
+        assert_eq!(
+            FormFieldValidationError::maximum_length_exceeded(10).to_string(),
+            "This exceeds the maximum length of 10."
+        );
+        assert_eq!(
+            FormFieldValidationError::minimum_length_not_met(2).to_string(),
+            "This is below the minimum length of 2."
+        );
+        assert_eq!(
+            FormFieldValidationError::invalid_value("invalid").to_string(),
+            "Value is not valid for this field."
+        );
+    }
 }

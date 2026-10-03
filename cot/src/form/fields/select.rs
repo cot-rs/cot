@@ -929,7 +929,7 @@ mod tests {
         );
 
         let values: Vec<&str> = field.values().collect();
-        assert!(values.is_empty());
+        assert_eq!(values, [""; 0]);
 
         field
             .set_value(FormFieldValue::new_text("opt2"))

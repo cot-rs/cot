@@ -55,7 +55,7 @@ Sometimes, though, the changes need to be made in a backwards-incompatible manne
 ## From 0.7 to 0.8
 
 ### Routing
-* **Route Conflicts**: Route registration now uses a radix trie and rejects ambiguous routes when the router is built. Routes that capture a parameter at the same position must use the same parameter name. Duplicate handler routes also fail during router construction.
+* **Route Conflicts**: Route registration now rejects ambiguous routes when the router is built. Routes that capture a parameter at the same position must use the same parameter name. Duplicate handler routes also fail during router construction.
     ```rust,ignore
     // Before: these conflicting routes could be registered
     Route::with_handler("/foo/{bar}", handler),

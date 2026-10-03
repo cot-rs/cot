@@ -41,12 +41,15 @@ pub fn generate_config_reference() -> String {
     md.push_str(
         "Cot projects are configured via a TOML file (typically `config/dev.toml` and \
          `config/prod.toml`, loaded with\n\
-         [`ProjectConfig::from_toml`](https://docs.rs/cot/latest/cot/config/struct.ProjectConfig.html#method.from_toml)).\n\
-         This page lists every table and key that `ProjectConfig` understands.\n\n",
+         [`ProjectConfig::from_toml`](struct@cot::config::ProjectConfig#method.from_toml)).\n\
+         This page lists every table and key that \
+         [`ProjectConfig`](struct@cot::config::ProjectConfig) understands.\n\n",
     );
     md.push_str(
         "Any top-level table not listed below is preserved as-is and made available to your \
-         application through `ProjectConfig::extra`, for app-specific configuration.\n\n",
+         application through \
+         [`ProjectConfig::extra`](struct@cot::config::ProjectConfig#structfield.extra), for \
+         app-specific configuration.\n\n",
     );
 
     md.push_str("## Top-level keys\n\n");
@@ -513,8 +516,8 @@ fn escape_table_cell(s: &str) -> String {
 ///
 /// Extraction stops early at the first section heading or code block, so the
 /// second paragraph is only included if nothing like that comes before it.
-/// Intra-doc links are replaced with their plain text (see
-/// [`strip_intra_doc_links`]).
+/// Intra-doc links are converted to the docs site's syntax (see
+/// [`rewrite_intra_doc_links`]).
 fn doc_summary(desc: &str) -> String {
     const MAX_PARAGRAPHS: usize = 2;
 
@@ -539,14 +542,24 @@ fn doc_summary(desc: &str) -> String {
         in_paragraph = true;
         lines.push(trimmed);
     }
-    strip_intra_doc_links(&lines.join(" "))
+    rewrite_intra_doc_links(&lines.join(" "))
 }
 
-/// Replaces rustdoc intra-doc links (`` [`Foo`] `` and
-/// `` [`Foo`](crate::Foo) ``), which don't resolve outside of rustdoc, with
-/// their link text. Links to external URLs and text inside code spans are left
-/// intact.
-fn strip_intra_doc_links(text: &str) -> String {
+/// Converts rustdoc intra-doc links to the docs site's `type@cot::path` link
+/// syntax, which it resolves to docs.rs URLs.
+///
+/// Links with an explicit `cot::` or `crate::` path and a rustdoc
+/// disambiguator (e.g. `` [`Foo`](enum@crate::a::Foo) ``) become
+/// `` [`Foo`](enum@cot::a::Foo) ``. Any other intra-doc link (e.g. the
+/// shortcut `` [`Foo`] ``, whose path rustdoc resolves from the scope it's
+/// written in) is replaced with its link text. Links to external URLs and text
+/// inside code spans are left intact.
+///
+/// # Panics
+///
+/// Panics if a link with a `cot::` or `crate::` path has no disambiguator, as
+/// the docs site needs one to build the docs.rs URL.
+fn rewrite_intra_doc_links(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(start) = rest.find(['[', '`']) {
@@ -572,6 +585,8 @@ fn strip_intra_doc_links(text: &str) -> String {
             if target.contains("://") {
                 let link_len = close + 1 + 1 + target_end + 1;
                 out.push_str(&rest[..link_len]);
+            } else if let Some(target) = docs_site_target(target) {
+                let _ = write!(out, "[{label}]({target})");
             } else {
                 out.push_str(label);
             }
@@ -583,6 +598,29 @@ fn strip_intra_doc_links(text: &str) -> String {
     }
     out.push_str(rest);
     out
+}
+
+/// Maps a rustdoc intra-doc link target with a `cot::` or `crate::` path to
+/// the docs site's `type@cot::path` syntax.
+///
+/// # Panics
+///
+/// Panics if the target has such a path, but no disambiguator.
+fn docs_site_target(target: &str) -> Option<String> {
+    let (kind, path) = match target.split_once('@') {
+        Some((kind, path)) => (Some(kind), path),
+        None => (None, target),
+    };
+    let path = path
+        .strip_prefix("crate::")
+        .or_else(|| path.strip_prefix("cot::"))?;
+    let kind = kind.unwrap_or_else(|| {
+        panic!(
+            "intra-doc link `{target}` must have a disambiguator (e.g. `struct@{target}`) \
+             for the docs site to resolve it"
+        )
+    });
+    Some(format!("{kind}@cot::{path}"))
 }
 
 #[cfg(test)]
@@ -604,10 +642,26 @@ mod tests {
     }
 
     #[test]
-    fn strip_intra_doc_links_keeps_external_links_and_code() {
+    fn rewrite_intra_doc_links_converts_paths() {
         assert_eq!(
-            strip_intra_doc_links("[`A`] and [`B`](crate::B), [`C`](https://example.com), `[d]`"),
-            "`A` and `B`, [`C`](https://example.com), `[d]`"
+            rewrite_intra_doc_links(
+                "[`A`](struct@crate::a::A), [`B`](trait@cot::B), [`C`](Self::C)"
+            ),
+            "[`A`](struct@cot::a::A), [`B`](trait@cot::B), `C`"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "must have a disambiguator")]
+    fn rewrite_intra_doc_links_requires_disambiguator() {
+        rewrite_intra_doc_links("[`A`](crate::a::A)");
+    }
+
+    #[test]
+    fn rewrite_intra_doc_links_keeps_external_links_and_code() {
+        assert_eq!(
+            rewrite_intra_doc_links("[`A`] and [`C`](https://example.com), `[d]`"),
+            "`A` and [`C`](https://example.com), `[d]`"
         );
     }
 }

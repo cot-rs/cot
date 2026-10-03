@@ -10,10 +10,10 @@ Do not edit it by hand -- run `just generate-config-docs` instead.
 The configuration for a project. This is all the project-specific configuration data that can (and makes sense to) be expressed in a TOML configuration file.
 
 Cot projects are configured via a TOML file (typically `config/dev.toml` and `config/prod.toml`, loaded with
-[`ProjectConfig::from_toml`](https://docs.rs/cot/latest/cot/config/struct.ProjectConfig.html#method.from_toml)).
-This page lists every table and key that `ProjectConfig` understands.
+[`ProjectConfig::from_toml`](struct@cot::config::ProjectConfig#method.from_toml)).
+This page lists every table and key that [`ProjectConfig`](struct@cot::config::ProjectConfig) understands.
 
-Any top-level table not listed below is preserved as-is and made available to your application through `ProjectConfig::extra`, for app-specific configuration.
+Any top-level table not listed below is preserved as-is and made available to your application through [`ProjectConfig::extra`](struct@cot::config::ProjectConfig#structfield.extra), for app-specific configuration.
 
 ## Top-level keys
 
@@ -36,11 +36,11 @@ Select the variant with the `type` key:
 
 ### `type = "none"` (default)
 
-No authentication backend. This enables `NoAuthBackend` to be used as the authentication backend, which effectively disables authentication.
+No authentication backend. This enables [`NoAuthBackend`](struct@cot::auth::NoAuthBackend) to be used as the authentication backend, which effectively disables authentication.
 
 ### `type = "database"`
 
-Database authentication backend. This enables `DatabaseUserBackend` to be used as the authentication backend.
+Database authentication backend. This enables [`DatabaseUserBackend`](struct@cot::auth::db::DatabaseUserBackend) to be used as the authentication backend.
 
 ## `[database]`
 
@@ -166,7 +166,7 @@ SMTP email transport backend. This transport backend sends emails using the Simp
 | Key | TOML Type | Default | Description |
 |---|---|---|---|
 | `url` | string | — | The SMTP connection URL. This specifies the protocol, credentials, host, port, and EHLO domain for connecting to the SMTP server. |
-| `mechanism` | `"plain"`, `"login"`, `"xoauth2"` | — | The authentication mechanism to use. Supported mechanisms are `plain`, `login`, and `xoauth2`. |
+| `mechanism` | `"plain"`, `"login"`, `"xoauth2"` | — | The authentication mechanism to use. |
 
 ## Full default configuration
 

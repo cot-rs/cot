@@ -442,14 +442,15 @@ impl ProjectConfigBuilder {
 pub enum AuthBackendConfig {
     /// No authentication backend.
     ///
-    /// This enables [`NoAuthBackend`](cot::auth::NoAuthBackend) to be used as
-    /// the authentication backend, which effectively disables
+    /// This enables [`NoAuthBackend`](struct@cot::auth::NoAuthBackend) to be
+    /// used as the authentication backend, which effectively disables
     /// authentication.
     #[default]
     None,
     /// Database authentication backend.
     ///
-    /// This enables [`DatabaseUserBackend`](cot::auth::db::DatabaseUserBackend)
+    /// This enables
+    /// [`DatabaseUserBackend`](struct@cot::auth::db::DatabaseUserBackend)
     /// to be used as the authentication backend.
     #[cfg(feature = "db")]
     Database,
@@ -1970,8 +1971,6 @@ pub enum EmailTransportTypeConfig {
         /// ```
         url: EmailUrl,
         /// The authentication mechanism to use.
-        ///
-        /// Supported mechanisms are `plain`, `login`, and `xoauth2`.
         ///
         /// # TOML Configuration
         ///

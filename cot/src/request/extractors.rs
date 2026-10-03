@@ -48,9 +48,13 @@
 //! # }
 //! ```
 
+use std::net::IpAddr;
 use std::sync::Arc;
 
+use axum::extract::connect_info::Connected;
+use axum::serve::IncomingStream;
 use cot_core::error::impl_into_cot_error;
+use cot_core::remote_addr::{extract_forwarded, extract_single_ip, extract_x_forwarded_for};
 /// Trait for extractors that consume the request body.
 ///
 /// Extractors implementing this trait are used in route handlers that consume
@@ -295,12 +299,117 @@ impl FromRequestHead for Auth {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+/// Extractor that extracts the IP address of the remote peer.
+///
+/// # Examples
+/// ```rust
+/// use cot::request::extractors::ClientIpAddr;
+/// use cot_core::html::Html;
+///
+/// pub async fn example_handler(ip: ClientIpAddr) -> cot::Result<Html> {
+///     // Prints the IP as a debug statement, with proxy headers being taken care of already.
+///     dbg!(ip.ip());
+///     // Prints the IP of the closest peer.
+///     dbg!(ip.direct_peer_ip());
+///     # unimplemented!()
+/// }
+/// ```
+pub struct ClientIpAddr {
+    /// IP of the closest peer
+    direct: IpAddr,
+    /// IP behind the proxy if such exist
+    proxied: Option<IpAddr>,
+}
+
+impl ClientIpAddr {
+    #[must_use]
+    /// Get the IP address of the peer.
+    /// This automatically handles proxy IP headers.
+    pub fn ip(&self) -> IpAddr {
+        self.proxied.unwrap_or(self.direct)
+    }
+
+    #[must_use]
+    /// Get the IP address of the peer closest to this server.
+    /// This does **not** handle proxies.
+    ///
+    /// In most use-cases [`Self::ip`] is more appropriate.
+    pub fn direct_peer_ip(&self) -> IpAddr {
+        self.direct
+    }
+}
+
+impl<'a> Connected<IncomingStream<'a, tokio::net::TcpListener>> for ClientIpAddr {
+    fn connect_info(stream: IncomingStream<'a, tokio::net::TcpListener>) -> Self {
+        let closest_ip = stream.remote_addr().ip();
+        ClientIpAddr {
+            direct: closest_ip,
+            proxied: None,
+        }
+    }
+}
+
+impl ClientIpAddr {
+    pub(crate) fn from_request_head_sync(head: &RequestHead) -> crate::Result<Self> {
+        let addr = head
+            .extensions
+            .get::<ClientIpAddr>()
+            .expect("Missing ClientIpAddr extension");
+
+        let closest = addr.direct;
+
+        let config = &head.project_config().client_ip;
+        let trusted_proxies = &config.proxies;
+        let trusted_headers = &config.headers;
+
+        let mut proxy: Option<IpAddr> = None;
+
+        if trusted_proxies.iter().any(|proxy| proxy.contains(&closest)) {
+            for h in trusted_headers {
+                if let Some(v) = head.headers.get(h.to_string())
+                    && proxy.is_none()
+                {
+                    match h {
+                        crate::config::ClientIpHeader::Forwarded => {
+                            proxy = extract_forwarded(v)?;
+                        }
+                        crate::config::ClientIpHeader::XForwardedFor => {
+                            proxy = extract_x_forwarded_for(v)?;
+                        }
+                        crate::config::ClientIpHeader::Custom(_) => {
+                            proxy = Some(extract_single_ip(v)?);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(ClientIpAddr {
+            direct: addr.direct,
+            proxied: proxy,
+        })
+    }
+}
+
+impl FromRequestHead for ClientIpAddr {
+    #[expect(clippy::unused_async_trait_impl)]
+    async fn from_request_head(head: &RequestHead) -> crate::Result<Self> {
+        Self::from_request_head_sync(head)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::str::FromStr;
+
     use cot_core::Method;
     use cot_core::html::Html;
+    use http::{HeaderName, HeaderValue};
 
     use super::*;
+    use crate::config::{ClientIpConfig, ClientIpHeader, ProjectConfig};
     use crate::request::extractors::FromRequest;
     use crate::reverse;
     use crate::router::{Route, Router};
@@ -392,5 +501,333 @@ mod tests {
 
         let email_service = request.extract_from_head::<crate::email::Email>().await;
         assert!(email_service.is_ok());
+    }
+
+    #[cot::test]
+    async fn remote_addr() {
+        const IP: IpAddr = IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4));
+
+        let mut request = TestRequestBuilder::get("/").with_default_config().build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        let ClientIpAddr { direct, proxied: _ } = request.extract_from_head().await.unwrap();
+
+        assert_eq!(direct, IP);
+    }
+
+    #[cot::test]
+    async fn remote_addr_v6() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+
+        let mut request = TestRequestBuilder::get("/").with_default_config().build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        let ClientIpAddr { direct, proxied: _ } = request.extract_from_head().await.unwrap();
+
+        assert_eq!(direct, IP);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_unconfigured() {
+        const IP: IpAddr = IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4));
+
+        let mut request = TestRequestBuilder::get("/").with_default_config().build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        let ClientIpAddr { direct: _, proxied } = request.extract_from_head().await.unwrap();
+
+        assert_eq!(proxied, None);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 64).unwrap()],
+            vec![ClientIpHeader::Forwarded],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("Forwarded").unwrap(),
+            HeaderValue::from_str(&format!("for={IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP_PROXY);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured_b() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![ClientIpHeader::XForwardedFor],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("Forwarded").unwrap(),
+            HeaderValue::from_str(&format!("for={IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured_c() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_WRONG: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 9));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![ClientIpHeader::Forwarded],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP_WRONG,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("Forwarded").unwrap(),
+            HeaderValue::from_str(&format!("for={IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP_WRONG);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured_c_in_range() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_WRONG: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 9));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 64).unwrap()],
+            vec![ClientIpHeader::Forwarded],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP_WRONG,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("Forwarded").unwrap(),
+            HeaderValue::from_str(&format!("for={IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP_PROXY);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured_d() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![ClientIpHeader::Forwarded],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("X-Forwarded-For").unwrap(),
+            HeaderValue::from_str(&format!("{IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured_e() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![ClientIpHeader::XForwardedFor],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("X-Forwarded-For").unwrap(),
+            HeaderValue::from_str(&format!("{IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP_PROXY);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured_f() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![
+                ClientIpHeader::XForwardedFor,
+                ClientIpHeader::Custom(HeaderName::from_str("Cf-cOnnecting-iP").unwrap()),
+            ],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("CF-Connecting-IP").unwrap(),
+            HeaderValue::from_str(&format!("{IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP_PROXY);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured_g() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![
+                ClientIpHeader::XForwardedFor,
+                ClientIpHeader::Custom(HeaderName::from_str("Cf-cOnnecting-iP").unwrap()),
+            ],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("Unknown-Header").unwrap(),
+            HeaderValue::from_str(&format!("{IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_configured_malformed() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![
+                ClientIpHeader::XForwardedFor,
+                ClientIpHeader::Custom(HeaderName::from_str("Cf-cOnnecting-iP").unwrap()),
+            ],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request.extensions_mut().insert(ClientIpAddr {
+            direct: IP,
+            proxied: None,
+        });
+        request.headers_mut().insert(
+            HeaderName::from_str("CF-Connecting-IP").unwrap(),
+            HeaderValue::from_str(&format!("AAA{IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request.extract_from_head::<ClientIpAddr>().await;
+
+        assert!(ip.is_err());
     }
 }

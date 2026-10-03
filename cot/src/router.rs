@@ -112,7 +112,7 @@ impl Router {
     /// Panics when a url string could not be parsed into a [`Route`]
     #[must_use]
     pub fn with_urls<T: Into<Vec<Route>>>(urls: T) -> Self {
-        Self::try_with_urls(urls).unwrap_or_else(|err| panic!("{err}"))
+        Self::try_with_urls(urls).expect("could not construct `Router` with given routes")
     }
 
     /// Create a router with the given routes. This is a fallible version
@@ -442,8 +442,8 @@ impl Router {
                 // we are in a sub-router, and if its parent does not end in a
                 // trailing slash (eg. `foo`) and the found route is the
                 // sub-router's root (`/`), then we can safely assume that
-                //  the trailing-slash version (eg. `foo/`) does not exist.
-                //  We return its parent and must not join
+                // the trailing-slash version (eg. `foo/`) does not exist.
+                // We return its parent and must not join
                 let combined = if !prefix.as_str().ends_with('/') && suffix.as_str() == "/" {
                     prefix
                 } else {

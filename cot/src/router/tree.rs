@@ -49,11 +49,10 @@ impl RouteTrie {
         for (i, route) in routes.iter().enumerate() {
             let pattern = if route.kind() == RouteKind::Router {
                 // normalize path of sub-routers since we will attach an
-                // internal wildcard sentinel. This should also
-                // allow us reject routes for
-                // routers(sub-routers) who's version without a trailing slash
-                // already exist. (eg. `foo` and `foo/`cannot overlap as
-                // sub-routers)
+                // internal wildcard sentinel. This should also reject routes
+                // for routers(sub-routers) who's version without a trailing
+                // slash already exist. (eg. `foo` and `foo/` cannot overlap
+                // as sub-routers)
                 router_mount_pattern(route)
             } else {
                 MatchitPattern::try_from(route.url.clone())?

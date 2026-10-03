@@ -116,8 +116,9 @@ fn test_md(
                     let runner = *runner;
                     let file_name = file_name.to_string();
 
-                    // Rust and Askama tests invoke `cargo check`, which spawns a subprocess via
-                    // `pidfd_spawnp` - an operation Miri doesn't support.
+                    // Rust and Askama tests invoke `cargo check`, which spawns
+                    // a subprocess via `pidfd_spawnp` - an
+                    // operation Miri doesn't support.
                     let needs_subprocess =
                         matches!(lang, TestLanguage::Rust | TestLanguage::AskamaTemplate);
 

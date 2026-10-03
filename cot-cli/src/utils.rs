@@ -102,7 +102,7 @@ impl CargoTomlManager {
             }
 
             (None, None) => {
-                bail!("Cargo.toml is not a valid workspace or package manifest");
+                bail!("invalid Cargo.toml: expected a workspace or package manifest");
             }
         };
 
@@ -419,7 +419,8 @@ mod tests {
             let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
             test_utils::make_package(temp_dir.path()).unwrap();
 
-            // ensure the tests run sequentially when setting the current directory
+            // ensure the tests run sequentially when setting the current
+            // directory
             let _guard = serial_guard();
             std::env::set_current_dir(temp_dir.path().join("src")).unwrap();
 

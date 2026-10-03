@@ -1,5 +1,6 @@
 //! Database migrations.
 
+mod graph_export;
 mod sorter;
 
 use std::collections::{HashSet, VecDeque};
@@ -28,6 +29,7 @@ use std::{fmt, io};
 /// }
 /// ```
 pub use cot_macros::migration_op;
+pub(crate) use graph_export::{GraphExporter, GraphFormat};
 use sea_query::{ColumnDef, StringLen};
 use thiserror::Error;
 use tracing::{Level, info};
@@ -50,7 +52,7 @@ pub enum MigrationEngineError {
     #[error("error running migration: {0}")]
     Custom(String),
     /// An I/O error occurred while writing output (e.g. during dry-run).
-    #[error("I/O error while writing migration output: {0}")]
+    #[error("failed to write migration output: {0}")]
     Io(#[from] io::Error),
 }
 
@@ -453,8 +455,10 @@ impl MigrationEngine {
         while let Some(index) = queue.pop_front() {
             for &dependent_index in graph.get_edges(index) {
                 if rollback_indices.insert(dependent_index) {
-                    // we found a migration that depends on the one we're rolling back, so let's
-                    // add it to the queue which we will later traverse its dependents as well.
+                    // we found a migration that depends on the one we're
+                    // rolling back, so let's add it to the
+                    // queue which we will later traverse its dependents as
+                    // well.
                     queue.push_back(dependent_index);
                 }
             }
@@ -504,6 +508,10 @@ impl MigrationEngine {
             .delete(database)
             .await?;
         Ok(())
+    }
+
+    pub(crate) fn migrations(&self) -> &[MigrationWrapper] {
+        &self.migrations
     }
 }
 

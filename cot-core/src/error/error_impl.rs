@@ -1,5 +1,6 @@
 use std::error::Error as StdError;
 use std::fmt::Display;
+use std::io;
 use std::ops::Deref;
 
 use derive_more::with_trait::Debug;
@@ -51,10 +52,10 @@ impl Error {
     /// ```
     /// use cot::Error;
     ///
-    /// let error = Error::internal("An error occurred");
+    /// let error = Error::internal("an error occurred");
     /// let error = Error::internal(std::io::Error::new(
     ///     std::io::ErrorKind::Other,
-    ///     "An error occurred",
+    ///     "an error occurred",
     /// ));
     /// ```
     #[must_use]
@@ -79,10 +80,10 @@ impl Error {
     /// use cot::{Error, StatusCode};
     ///
     /// // Create a 400 Bad Request error
-    /// let error = Error::with_status("Invalid input", StatusCode::BAD_REQUEST);
+    /// let error = Error::with_status("invalid input", StatusCode::BAD_REQUEST);
     ///
     /// // Create a 403 Forbidden error
-    /// let error = Error::with_status("Access denied", StatusCode::FORBIDDEN);
+    /// let error = Error::with_status("access denied", StatusCode::FORBIDDEN);
     /// ```
     #[must_use]
     pub fn with_status<E>(error: E, status_code: StatusCode) -> Self
@@ -109,10 +110,10 @@ impl Error {
     /// ```
     /// use cot::{Error, StatusCode};
     ///
-    /// let error = Error::internal("Something went wrong");
+    /// let error = Error::internal("something went wrong");
     /// assert_eq!(error.status_code(), StatusCode::INTERNAL_SERVER_ERROR);
     ///
-    /// let error = Error::with_status("Bad request", StatusCode::BAD_REQUEST);
+    /// let error = Error::with_status("bad request", StatusCode::BAD_REQUEST);
     /// assert_eq!(error.status_code(), StatusCode::BAD_REQUEST);
     /// ```
     #[must_use]
@@ -171,9 +172,10 @@ impl Error {
 
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // If the alternate (`{:#?}`) formatting has been specified, print out the
-        // `Debug` formatting normally. If not, (which is the case when using
-        // `Result::unwrap()` or `Result::expect()`) pretty print the error.
+        // If the alternate (`{:#?}`) formatting has been specified, print out
+        // the `Debug` formatting normally. If not, (which is the case
+        // when using `Result::unwrap()` or `Result::expect()`) pretty
+        // print the error.
         if f.alternate() {
             Debug::fmt(&self.repr, f)
         } else {
@@ -291,6 +293,8 @@ impl From<tower_sessions::session::Error> for Error {
     }
 }
 
+impl_into_cot_error!(io::Error);
+
 #[cfg(test)]
 mod tests {
     use derive_more::with_trait::Debug;
@@ -301,11 +305,11 @@ mod tests {
 
     #[derive(Debug, thiserror::Error)]
     #[error("outer error")]
-    struct OuterError(#[source] std::io::Error);
+    struct OuterError(#[source] io::Error);
 
     #[test]
     fn error_new() {
-        let inner = std::io::Error::other("server error");
+        let inner = io::Error::other("server error");
         let error = Error::wrap(inner);
 
         assert!(StdError::source(&error).is_none());
@@ -314,7 +318,7 @@ mod tests {
 
     #[test]
     fn error_display() {
-        let inner = std::io::Error::other("server error");
+        let inner = io::Error::other("server error");
         let error = Error::internal(inner);
 
         let display = format!("{error}");
@@ -324,7 +328,7 @@ mod tests {
 
     #[test]
     fn error_wrap_and_is_wrapper() {
-        let inner = std::io::Error::other("wrapped");
+        let inner = io::Error::other("wrapped");
         let error = Error::wrap(inner);
 
         assert!(error.is_wrapper());
@@ -375,7 +379,7 @@ mod tests {
 
     #[test]
     fn error_from_template_render() {
-        let askama_err = askama::Error::Custom(Box::new(std::io::Error::other("fail")));
+        let askama_err = askama::Error::Custom(Box::new(io::Error::other("fail")));
         let error: Error = askama_err.into();
 
         assert!(error.to_string().contains("failed to render template"));
@@ -407,10 +411,10 @@ mod tests {
         let err = Error::with_status("root error", StatusCode::BAD_REQUEST);
         assert_snapshot!(format!("{err:?}"), @"root error");
 
-        let err = Error::wrap(std::io::Error::other("io error"));
+        let err = Error::wrap(io::Error::other("io error"));
         assert_snapshot!(format!("{err:?}"), @"io error");
 
-        let io_err = std::io::Error::other("inner io error");
+        let io_err = io::Error::other("inner io error");
         let err = Error::wrap(OuterError(io_err));
         assert_snapshot!(format!("{err:?}"), @r###"
         outer error
@@ -419,7 +423,7 @@ mod tests {
            0: inner io error
         "###);
 
-        let err = Error::internal(OuterError(std::io::Error::other("inner io error")));
+        let err = Error::internal(OuterError(io::Error::other("inner io error")));
         assert_snapshot!(format!("{err:?}"), @r###"
         outer error
 
@@ -438,9 +442,7 @@ mod tests {
         #[error("wrapper error")]
         struct WrapperError(#[source] OuterError);
 
-        let err = Error::internal(WrapperError(OuterError(std::io::Error::other(
-            "inner io error",
-        ))));
+        let err = Error::internal(WrapperError(OuterError(io::Error::other("inner io error"))));
 
         assert_snapshot!(format!("{err:?}"), @"
         wrapper error
@@ -458,7 +460,7 @@ mod tests {
     )]
     fn error_debug_printing_alternate() {
         let err = Error::with_status(
-            OuterError(std::io::Error::other("inner io error")),
+            OuterError(io::Error::other("inner io error")),
             StatusCode::INTERNAL_SERVER_ERROR,
         );
         assert_snapshot!(format!("{err:#?}"), @r#"

@@ -23,15 +23,15 @@ use crate::utils::{CargoTomlManager, PackageManager};
 
 pub fn make_migrations(path: &Path, options: MigrationGeneratorOptions) -> anyhow::Result<()> {
     let Some(manager) = CargoTomlManager::from_path(path)? else {
-        bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        bail!("no Cargo.toml found in the specified directory or any parent directory")
     };
 
     match manager {
         CargoTomlManager::Workspace(workspace) => {
             let Some(package) = workspace.get_current_package_manager() else {
                 bail!(
-                    "Generating migrations for workspaces is not supported yet. \
-                        Please generate migrations for each package separately."
+                    "generating migrations for workspaces is not supported yet. \
+                        Please generate migrations for each package separately"
                 );
             };
             make_package_migrations(package, options)
@@ -75,15 +75,15 @@ pub fn create_new_migration(
     options: MigrationGeneratorOptions,
 ) -> anyhow::Result<()> {
     let Some(manager) = CargoTomlManager::from_path(path)? else {
-        bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        bail!("no Cargo.toml found in the specified directory or any parent directory")
     };
 
     match manager {
         CargoTomlManager::Workspace(workspace) => {
             let Some(package) = workspace.get_current_package_manager() else {
                 bail!(
-                    "Generating migrations for workspaces is not supported yet. \
-                        Please generate migrations for each package separately."
+                    "generating migrations for workspaces is not supported yet. \
+                        Please generate migrations for each package separately"
                 );
             };
             create_package_new_migration(package, name, options)
@@ -137,7 +137,7 @@ pub fn list_migrations(path: &Path) -> anyhow::Result<HashMap<String, Vec<String
         }
         Ok(migration_list)
     } else {
-        bail!("Cargo.toml not found in the specified directory or any parent directory.")
+        bail!("no Cargo.toml found in the specified directory or any parent directory")
     }
 }
 
@@ -1172,11 +1172,13 @@ impl GeneratedMigration {
                 unreachable!("AddField operation should never create cycles")
             }
             DynOperation::RemoveField { .. } => {
-                // RemoveField doesn't create dependencies, it only removes a field
+                // RemoveField doesn't create dependencies, it only removes a
+                // field
                 unreachable!("RemoveField operation should never create cycles")
             }
             DynOperation::RemoveModel { .. } => {
-                // RemoveModel doesn't create dependencies, it only removes a model
+                // RemoveModel doesn't create dependencies, it only removes a
+                // model
                 unreachable!("RemoveModel operation should never create cycles")
             }
         }
@@ -1771,7 +1773,7 @@ mod tests {
         } = &operations[0]
         {
             assert_eq!(table_name, "table1");
-            assert!(!fields.is_empty());
+            assert_ne!(fields.as_slice(), []);
         } else {
             panic!("Expected CreateModel operation");
         }
@@ -1780,7 +1782,7 @@ mod tests {
         } = &operations[1]
         {
             assert_eq!(table_name, "table2");
-            assert!(fields.is_empty());
+            assert_eq!(fields.as_slice(), []);
         } else {
             panic!("Expected CreateModel operation");
         }
@@ -1845,7 +1847,7 @@ mod tests {
         }];
 
         let external_dependencies = GeneratedMigration::get_foreign_key_dependencies(&operations);
-        assert!(external_dependencies.is_empty());
+        assert_eq!(external_dependencies, []);
     }
 
     #[test]

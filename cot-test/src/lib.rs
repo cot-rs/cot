@@ -85,8 +85,8 @@ impl DocTestProject {
         cargo_toml.push_str("askama = { version = \"0.16\", features = [\"std\"] }\n");
         cargo_toml.push_str("async-trait = \"0.1\"\n");
 
-        // Add empty workspace info to prevent Cargo from trying to build the entire
-        // workspace when running tests
+        // Add empty workspace info to prevent Cargo from trying to build the
+        // entire workspace when running tests
         cargo_toml.push_str("[workspace]\n");
 
         fs::write(cargo_toml_path, cargo_toml).expect("failed to write Cargo.toml");
@@ -117,13 +117,14 @@ impl DocTestProject {
                 .map_or(symbol_part, |(_, s)| s);
 
             if symbol_name == "*" {
-                // For wildcards, only add if not already present as a wildcard from the same
-                // path
+                // For wildcards, only add if not already present as a wildcard
+                // from the same path
                 if !code.contains(symbol_part) {
                     preamble.push_str(&import);
                 }
             } else {
-                // For specific symbols, only add if the symbol is NOT already imported
+                // For specific symbols, only add if the symbol is NOT already
+                // imported
                 let mut found = false;
                 for line in code.lines() {
                     if line.starts_with("use ") && line.contains(symbol_name) {

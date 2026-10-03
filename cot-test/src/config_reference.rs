@@ -35,7 +35,7 @@ pub fn generate_config_reference() -> String {
          Do not edit it by hand -- run `just generate-config-docs` instead.\n-->\n\n",
     );
     if let Some(desc) = root.get("description").and_then(Value::as_str) {
-        md.push_str(&first_paragraph(desc));
+        md.push_str(&doc_summary(desc));
         md.push_str("\n\n");
     }
     md.push_str(
@@ -56,8 +56,9 @@ pub fn generate_config_reference() -> String {
     md.push_str("## Full default configuration\n\n");
     md.push_str(
         "This is a complete example with every key set explicitly to its default value. \
-         Fields without a well-defined default (like `secret_key`) are shown as `\"...\"` \
-         and must be set explicitly:\n\n",
+         Keys that are unset by default, or whose default isn't a single value (like `debug`), \
+         are commented out. Keys without a default (like `secret_key`) are shown as \
+         `\"...\"` and must be set explicitly:\n\n",
     );
     // `ignore`: this includes "..." placeholders, so it's not a valid,
     // parseable config on its own
@@ -93,7 +94,7 @@ fn render_fields(
         let prop = prop_value
             .as_object()
             .expect("property schema must be an object");
-        let description = escape_table_cell(&first_paragraph(
+        let description = escape_table_cell(&doc_summary(
             prop.get("description")
                 .and_then(Value::as_str)
                 .unwrap_or(""),
@@ -120,21 +121,23 @@ fn render_fields(
             }
             Kind::LeafEnum(variants) => {
                 let ty = leaf_enum_type_name(variants);
+                let default = field_default(prop, ScalarKind::String);
                 let _ = writeln!(
                     md,
                     "| `{key}` | {ty} | {} | {description} |",
-                    default_cell(default_val, ScalarKind::String)
+                    default_cell(&default)
                 );
-                own_toml.push_str(&default_line(key, default_val, ScalarKind::String));
+                own_toml.push_str(&default_line(key, &default));
             }
             Kind::Scalar(kind) => {
                 let ty = scalar_type_name(kind);
+                let default = field_default(prop, kind);
                 let _ = writeln!(
                     md,
                     "| `{key}` | {ty} | {} | {description} |",
-                    default_cell(default_val, kind)
+                    default_cell(&default)
                 );
-                own_toml.push_str(&default_line(key, default_val, kind));
+                own_toml.push_str(&default_line(key, &default));
             }
         }
     }
@@ -220,7 +223,7 @@ fn render_tagged(
             heading_hashes(level + 1)
         );
         if let Some(desc) = variant.get("description").and_then(Value::as_str) {
-            md.push_str(&first_paragraph(desc));
+            md.push_str(&doc_summary(desc));
             md.push_str("\n\n");
         }
 
@@ -239,12 +242,11 @@ fn render_tagged(
             let prop = prop_value
                 .as_object()
                 .expect("property schema must be an object");
-            let description = escape_table_cell(&first_paragraph(
+            let description = escape_table_cell(&doc_summary(
                 prop.get("description")
                     .and_then(Value::as_str)
                     .unwrap_or(""),
             ));
-            let default_val = prop.get("default");
             let resolved = deref(prop_value, defs);
             match classify(resolved) {
                 Kind::Scalar(kind) => {
@@ -252,7 +254,7 @@ fn render_tagged(
                     let _ = writeln!(
                         md,
                         "| `{key}` | {ty} | {} | {description} |",
-                        default_cell(default_val, kind)
+                        default_cell(&field_default(prop, kind))
                     );
                 }
                 Kind::LeafEnum(variants) => {
@@ -260,7 +262,7 @@ fn render_tagged(
                     let _ = writeln!(
                         md,
                         "| `{key}` | {ty} | {} | {description} |",
-                        default_cell(default_val, ScalarKind::String)
+                        default_cell(&field_default(prop, ScalarKind::String))
                     );
                 }
                 Kind::Table(_) | Kind::TaggedTable(_) => {
@@ -376,10 +378,42 @@ fn leaf_enum_type_name(variants: &[Value]) -> String {
     values.join(", ")
 }
 
-fn default_cell(default_val: Option<&Value>, kind: ScalarKind) -> String {
-    match json_scalar_repr(default_val, kind) {
-        Some(s) => format!("`{s}`"),
-        None => "—".to_string(),
+/// Schema extension key overriding a field's `default` with a Markdown
+/// description, for defaults that can't be expressed as a single value (e.g.
+/// ones that depend on the build profile).
+const DEFAULT_DESCRIPTION_KEY: &str = "x-default-description";
+
+/// A field's default, as far as the reference is concerned.
+enum FieldDefault<'a> {
+    /// A fixed default, rendered as a TOML literal.
+    Value(String),
+    /// The field is unset by default (e.g. `Option::None`).
+    Unset,
+    /// The default can't be expressed as a single value; this is a Markdown
+    /// description of it instead.
+    Described(&'a str),
+    /// The field has no representable default and must be set explicitly.
+    Required,
+}
+
+fn field_default(prop: &Map<String, Value>, kind: ScalarKind) -> FieldDefault<'_> {
+    if let Some(description) = prop.get(DEFAULT_DESCRIPTION_KEY).and_then(Value::as_str) {
+        return FieldDefault::Described(description);
+    }
+    match prop.get("default") {
+        Some(Value::Null) => FieldDefault::Unset,
+        default_val => {
+            json_scalar_repr(default_val, kind).map_or(FieldDefault::Required, FieldDefault::Value)
+        }
+    }
+}
+
+fn default_cell(default: &FieldDefault<'_>) -> String {
+    match default {
+        FieldDefault::Value(s) => format!("`{s}`"),
+        FieldDefault::Unset => "*(unset)*".to_string(),
+        FieldDefault::Described(description) => escape_table_cell(description),
+        FieldDefault::Required => "—".to_string(),
     }
 }
 
@@ -411,14 +445,18 @@ fn heading_anchor(path: &[String]) -> String {
 
 /// Renders a field's line for the "full default configuration" TOML example.
 ///
-/// Fields with a representable default (see [`json_scalar_repr`]) get that
-/// default; fields without one (e.g. `secret_key`, which is required and has
-/// no sensible default) get a `"..."` placeholder instead, so every key the
-/// config accepts still shows up in the example rather than being silently
-/// dropped from it.
-fn default_line(key: &str, default_val: Option<&Value>, kind: ScalarKind) -> String {
-    let value = json_scalar_repr(default_val, kind).unwrap_or_else(|| "\"...\"".to_string());
-    format!("{key} = {value}\n")
+/// Fields with a fixed default get that default; fields that are unset by
+/// default or whose default isn't a single value are commented out; fields
+/// without a default (e.g. `secret_key`, which is required and has no sensible
+/// default) get a `"..."` placeholder instead. This way, every key the config
+/// accepts still shows up in the example rather than being silently dropped
+/// from it.
+fn default_line(key: &str, default: &FieldDefault<'_>) -> String {
+    match default {
+        FieldDefault::Value(value) => format!("{key} = {value}\n"),
+        FieldDefault::Unset | FieldDefault::Described(_) => format!("# {key} = ...\n"),
+        FieldDefault::Required => format!("{key} = \"...\"\n"),
+    }
 }
 
 /// Renders a schema `default` value as a TOML-literal string, but only when it
@@ -469,21 +507,107 @@ fn escape_table_cell(s: &str) -> String {
     s.replace('|', "\\|")
 }
 
-/// Extracts the first paragraph of a rustdoc description.
-fn first_paragraph(desc: &str) -> String {
+/// Extracts the summary of a rustdoc description: its first paragraph (the
+/// short summary line) followed by the second one (the longer explanation),
+/// joined into a single paragraph.
+///
+/// Extraction stops early at the first section heading or code block, so the
+/// second paragraph is only included if nothing like that comes before it.
+/// Intra-doc links are replaced with their plain text (see
+/// [`strip_intra_doc_links`]).
+fn doc_summary(desc: &str) -> String {
+    const MAX_PARAGRAPHS: usize = 2;
+
     let mut lines = Vec::new();
+    let mut paragraphs = 0;
+    let mut in_paragraph = false;
     for line in desc.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with('#') || trimmed.starts_with("```") {
             break;
         }
         if trimmed.is_empty() {
-            if lines.is_empty() {
-                continue;
+            if in_paragraph {
+                in_paragraph = false;
+                paragraphs += 1;
+                if paragraphs == MAX_PARAGRAPHS {
+                    break;
+                }
             }
-            break;
+            continue;
         }
+        in_paragraph = true;
         lines.push(trimmed);
     }
-    lines.join(" ")
+    strip_intra_doc_links(&lines.join(" "))
+}
+
+/// Replaces rustdoc intra-doc links (`` [`Foo`] `` and
+/// `` [`Foo`](crate::Foo) ``), which don't resolve outside of rustdoc, with
+/// their link text. Links to external URLs and text inside code spans are left
+/// intact.
+fn strip_intra_doc_links(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find(['[', '`']) {
+        out.push_str(&rest[..start]);
+        rest = &rest[start..];
+
+        if rest.starts_with('`') {
+            let end = rest[1..].find('`').map_or(rest.len(), |i| i + 2);
+            out.push_str(&rest[..end]);
+            rest = &rest[end..];
+            continue;
+        }
+
+        let Some(close) = rest.find(']') else {
+            break;
+        };
+        let label = &rest[1..close];
+        let after = &rest[close + 1..];
+        if let Some(target_and_rest) = after.strip_prefix('(')
+            && let Some(target_end) = target_and_rest.find(')')
+        {
+            let target = &target_and_rest[..target_end];
+            if target.contains("://") {
+                let link_len = close + 1 + 1 + target_end + 1;
+                out.push_str(&rest[..link_len]);
+            } else {
+                out.push_str(label);
+            }
+            rest = &target_and_rest[target_end + 1..];
+        } else {
+            out.push_str(label);
+            rest = after;
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn doc_summary_takes_two_paragraphs() {
+        assert_eq!(
+            doc_summary("Short.\n\nLonger\nexplanation.\n\nMore details."),
+            "Short. Longer explanation."
+        );
+    }
+
+    #[test]
+    fn doc_summary_stops_at_section() {
+        assert_eq!(doc_summary("Short.\n\n# Examples\n\nExample."), "Short.");
+        assert_eq!(doc_summary("Short.\n\n```\ncode\n```\n\nMore."), "Short.");
+    }
+
+    #[test]
+    fn strip_intra_doc_links_keeps_external_links_and_code() {
+        assert_eq!(
+            strip_intra_doc_links("[`A`] and [`B`](crate::B), [`C`](https://example.com), `[d]`"),
+            "`A` and `B`, [`C`](https://example.com), `[d]`"
+        );
+    }
 }

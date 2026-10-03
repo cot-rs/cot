@@ -66,6 +66,12 @@ pub struct ProjectConfig {
     /// assert_eq!(config.debug, true);
     /// # Ok::<(), cot::Error>(())
     /// ```
+    #[cfg_attr(
+        feature = "_internal_config-docs",
+        schemars(extend(
+            "x-default-description" = "`true` in debug builds, `false` in release builds"
+        ))
+    )]
     pub debug: bool,
     /// Whether to register a panic hook.
     ///
@@ -87,9 +93,10 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub register_panic_hook: bool,
-    /// The secret key used for signing cookies and other sensitive data. This
-    /// is a cryptographic key, should be kept secret, and should be set to a
-    /// random and unique value for each project.
+    /// The secret key used for signing cookies and other sensitive data.
+    ///
+    /// This is a cryptographic key, should be kept secret, and should be set to
+    /// a random and unique value for each project.
     ///
     /// When you want to rotate the secret key, you can move the current key to
     /// the `fallback_secret_keys` list, and set a new key here. Eventually, you
@@ -131,9 +138,6 @@ pub struct ProjectConfig {
     /// ```
     pub fallback_secret_keys: Vec<SecretKey>,
     /// The authentication backend to use.
-    ///
-    /// This is the backend that is used to authenticate users. The default is
-    /// the database backend, which stores user data in the database.
     ///
     /// # Examples
     ///
@@ -635,7 +639,9 @@ pub struct CacheConfig {
     /// Maximum number of retries for cache operations.
     ///
     /// This controls how many times the cache will attempt to retry failed
-    /// operations before giving up. The default is `3` retries.
+    /// operations before giving up.
+    ///
+    /// The default is `3` retries.
     ///
     /// # Examples
     ///
@@ -657,7 +663,9 @@ pub struct CacheConfig {
     /// Timeout for cache operations.
     ///
     /// This controls how long to wait for cache operations to complete before
-    /// timing out. The default is 300 seconds (5 minutes).
+    /// timing out.
+    ///
+    /// The default is 300 seconds (5 minutes).
     ///
     /// # Examples
     ///
@@ -709,8 +717,8 @@ pub struct CacheConfig {
 
     /// The cache store configuration.
     ///
-    /// This determines which type of cache backend to use (`memory`, `redis`,
-    /// `file`) and its specific configuration options.
+    /// This determines which type of cache backend to use and its specific
+    /// configuration options.
     ///
     /// # Examples
     ///
@@ -931,7 +939,7 @@ pub enum CacheStoreTypeConfig {
     /// ```
     Memory,
     /// Redis cache store.
-
+    ///
     /// This stores cache data in a Redis instance. The URL to the Redis server
     /// must be specified, and additional Redis-specific options can be
     /// configured.
@@ -950,17 +958,21 @@ pub enum CacheStoreTypeConfig {
         /// ```
         url: CacheUrl,
         /// Connection pool size for Redis connections.
-
+        ///
         /// This controls how many connections to maintain in the connection
-        /// pool. When not specified, a default pool size of `10` is used.
+        /// pool.
+        ///
+        /// When not specified, a default pool size of `10` is used.
         #[serde(
             default = "default_redis_pool_size",
             skip_serializing_if = "is_default_redis_pool_size"
         )]
+        // keep the default in the schema despite `skip_serializing_if` omitting it
+        #[cfg_attr(feature = "_internal_config-docs", schemars(!skip_serializing_if))]
         pool_size: usize,
     },
     /// File-based cache store.
-
+    ///
     /// This stores cache data in files on the local filesystem. The path to
     /// the directory where the cache files will be stored must be specified.
     File {
@@ -1050,9 +1062,10 @@ pub struct StaticFilesConfig {
     #[builder(setter(into))]
     pub url: String,
 
-    /// The URL rewriting mode for the static files. This is useful to allow
-    /// long-lived caching of static files, while still allowing to invalidate
-    /// the cache when the file changes.
+    /// The URL rewriting mode for the static files.
+    ///
+    /// This is useful to allow long-lived caching of static files, while still
+    /// allowing to invalidate the cache when the file changes.
     ///
     /// This affects the URL that is returned by
     /// [`StaticFiles::url_for`](crate::request::extractors::StaticFiles::url_for)
@@ -1438,8 +1451,9 @@ pub enum SessionStoreTypeConfig {
 pub struct SessionStoreConfig {
     /// The type of session store to use.
     ///
-    /// This determines how and where session data is stored. The default is
-    /// to use an in-memory store.
+    /// This determines how and where session data is stored.
+    ///
+    /// The default is to use an in-memory store.
     ///
     /// # Examples
     ///
@@ -1639,7 +1653,9 @@ pub struct SessionMiddlewareConfig {
     pub secure: bool,
     /// The
     /// [`HttpOnly`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies)
-    /// of the cookie used for the session. It is set to `true` by default.
+    /// of the cookie used for the session.
+    ///
+    /// It is set to `true` by default.
     ///
     ///  # Examples
     ///
@@ -1652,6 +1668,8 @@ pub struct SessionMiddlewareConfig {
     /// The
     /// [`SameSite`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite)
     /// attribute of the cookie used for the session.
+    ///
+    /// This lets you specify whether cookies are sent with cross-site requests.
     ///
     /// The default value is [`SameSite::Strict`].
     ///
@@ -1716,6 +1734,7 @@ pub struct SessionMiddlewareConfig {
     /// ```
     pub name: String,
     /// Whether the unmodified session should be saved on read or not.
+    ///
     /// If set to `true`, the session will be saved even if it was not modified.
     ///
     /// It is set to `false` by default.
@@ -1888,6 +1907,7 @@ impl Default for SessionMiddlewareConfig {
 /// The type of email transport backend to use.
 ///
 /// This specifies what email backend is used for sending emails.
+///
 /// The default backend if not specified is `console`.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]

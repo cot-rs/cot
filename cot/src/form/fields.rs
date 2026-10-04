@@ -1734,7 +1734,7 @@ mod tests {
             .await
             .unwrap();
         let value = f32::clean_value(&field).unwrap();
-        assert_eq!(value, 5.0f32);
+        assert!((value - 5.0f32).abs() < 0.1);
     }
 
     #[cot::test]

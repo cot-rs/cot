@@ -118,6 +118,7 @@ impl PathMatcher {
     #[must_use]
     pub(crate) fn new<T: Into<String>>(path_pattern: T) -> Self {
         Self::try_new(path_pattern)
+            .map_err(cot_core::Error::from)
             .expect("could not construct `PathMatcher` with given path pattern")
     }
 
@@ -490,7 +491,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "invalid route pattern: consecutive parameters are not allowed in pattern `/users/{id}{post_id}`"
+        expected = "could not construct `PathMatcher` with given path pattern: invalid route pattern: consecutive parameters are not allowed in pattern `/users/{id}{post_id}`"
     )]
     fn path_parser_consecutive_params() {
         let _ = PathMatcher::new("/users/{id}{post_id}");
@@ -498,7 +499,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "invalid route pattern: invalid parameter name `` in pattern `/users/{}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
+        expected = "could not construct `PathMatcher` with given path pattern: invalid route pattern: invalid parameter name `` in pattern `/users/{}`; parameter names must start with a letter or underscore and contain only letters, digits, or underscores"
     )]
     fn path_parser_invalid_name_empty() {
         let _ = PathMatcher::new("/users/{}");
@@ -554,7 +555,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "invalid route pattern: closing brace `}` without a matching opening `{` in pattern `/users/{{{foo}}/bar`"
+        expected = "could not construct `PathMatcher` with given path pattern: invalid route pattern: closing brace `}` without a matching opening `{` in pattern `/users/{{{foo}}/bar`"
     )]
     fn path_parser_escaping_unclosed() {
         let _ = PathMatcher::new("/users/{{{foo}}/bar");

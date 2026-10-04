@@ -1487,7 +1487,8 @@ mod tests {
         let found = router.get_handler("/users").unwrap();
 
         assert_eq!(found.name, Some(RouteName("users".to_string())));
-        assert!(found.params.is_empty());
+        let expected: [(String, String); 0] = [];
+        assert_eq!(found.params, expected);
     }
 
     #[test]

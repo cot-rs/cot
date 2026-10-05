@@ -35,6 +35,7 @@ use crate::utils::chrono::DateTimeWithOffsetAdapter;
 /// This is all the project-specific configuration data that can (and makes
 /// sense to) be expressed in a TOML configuration file.
 #[derive(Debug, Clone, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -65,6 +66,12 @@ pub struct ProjectConfig {
     /// assert_eq!(config.debug, true);
     /// # Ok::<(), cot::Error>(())
     /// ```
+    #[cfg_attr(
+        feature = "_internal_config-docs",
+        schemars(extend(
+            "x-default-description" = "`true` in debug builds, `false` in release builds"
+        ))
+    )]
     pub debug: bool,
     /// Whether to register a panic hook.
     ///
@@ -86,9 +93,10 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub register_panic_hook: bool,
-    /// The secret key used for signing cookies and other sensitive data. This
-    /// is a cryptographic key, should be kept secret, and should be set to a
-    /// random and unique value for each project.
+    /// The secret key used for signing cookies and other sensitive data.
+    ///
+    /// This is a cryptographic key, should be kept secret, and should be set to
+    /// a random and unique value for each project.
     ///
     /// When you want to rotate the secret key, you can move the current key to
     /// the `fallback_secret_keys` list, and set a new key here. Eventually, you
@@ -131,9 +139,6 @@ pub struct ProjectConfig {
     pub fallback_secret_keys: Vec<SecretKey>,
     /// The authentication backend to use.
     ///
-    /// This is the backend that is used to authenticate users. The default is
-    /// the database backend, which stores user data in the database.
-    ///
     /// # Examples
     ///
     /// ```
@@ -150,7 +155,7 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub auth_backend: AuthBackendConfig,
-    /// Configuration related to the database.
+    /// Database configuration.
     ///
     /// # Examples
     ///
@@ -172,7 +177,7 @@ pub struct ProjectConfig {
     /// ```
     #[cfg(feature = "db")]
     pub database: DatabaseConfig,
-    /// Configuration related to the cache.
+    /// Cache subsystem configuration.
     ///
     /// # Examples
     ///
@@ -204,7 +209,7 @@ pub struct ProjectConfig {
     /// ```
     #[cfg(feature = "cache")]
     pub cache: CacheConfig,
-    /// Configuration related to the static files.
+    /// Static files configuration.
     ///
     /// # Examples
     ///
@@ -234,7 +239,7 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub static_files: StaticFilesConfig,
-    /// Configuration related to the middlewares.
+    /// Middleware configuration.
     ///
     /// # Examples
     ///
@@ -252,7 +257,7 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub middlewares: MiddlewareConfig,
-    /// Configuration related to the email backend.
+    /// Email backend configuration.
     ///
     /// # Examples
     ///
@@ -304,6 +309,7 @@ pub struct ProjectConfig {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[serde(flatten)]
+    #[cfg_attr(feature = "_internal_config-docs", schemars(skip))]
     pub extra: toml::Table,
 }
 
@@ -430,19 +436,21 @@ impl ProjectConfigBuilder {
 /// let config = AuthBackendConfig::Database;
 /// ```
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum AuthBackendConfig {
     /// No authentication backend.
     ///
-    /// This enables [`NoAuthBackend`](cot::auth::NoAuthBackend) to be used as
-    /// the authentication backend, which effectively disables
+    /// This enables [`NoAuthBackend`](struct@cot::auth::NoAuthBackend) to be
+    /// used as the authentication backend, which effectively disables
     /// authentication.
     #[default]
     None,
     /// Database authentication backend.
     ///
-    /// This enables [`DatabaseUserBackend`](cot::auth::db::DatabaseUserBackend)
+    /// This enables
+    /// [`DatabaseUserBackend`](struct@cot::auth::db::DatabaseUserBackend)
     /// to be used as the authentication backend.
     #[cfg(feature = "db")]
     Database,
@@ -461,6 +469,7 @@ pub enum AuthBackendConfig {
 /// ```
 #[cfg(feature = "db")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -605,6 +614,7 @@ const MAX_RETRIES_DEFAULT: u32 = 3;
 
 #[cfg(feature = "cache")]
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -630,7 +640,9 @@ pub struct CacheConfig {
     /// Maximum number of retries for cache operations.
     ///
     /// This controls how many times the cache will attempt to retry failed
-    /// operations before giving up. The default is `3` retries.
+    /// operations before giving up.
+    ///
+    /// The default is `3` retries.
     ///
     /// # Examples
     ///
@@ -652,7 +664,9 @@ pub struct CacheConfig {
     /// Timeout for cache operations.
     ///
     /// This controls how long to wait for cache operations to complete before
-    /// timing out. The default is 300 seconds (5 minutes).
+    /// timing out.
+    ///
+    /// The default is 300 seconds (5 minutes).
     ///
     /// # Examples
     ///
@@ -674,6 +688,8 @@ pub struct CacheConfig {
     /// timeout = "2h"
     /// ```
     #[serde(with = "crate::serializers::cache_timeout")]
+    #[cfg_attr(feature = "_internal_config-docs", schemars(with = "String"))]
+    // TODO: Option<String> is wrong
     pub timeout: Timeout,
 
     /// Prefix for cache keys.
@@ -702,8 +718,8 @@ pub struct CacheConfig {
 
     /// The cache store configuration.
     ///
-    /// This determines which type of cache backend to use (`memory`, `redis`,
-    /// `file`) and its specific configuration options.
+    /// This determines which type of cache backend to use and its specific
+    /// configuration options.
     ///
     /// # Examples
     ///
@@ -792,6 +808,7 @@ impl CacheConfig {
 
 #[cfg(feature = "cache")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 /// Configuration for the cache store backend.
@@ -903,6 +920,7 @@ const fn is_default_redis_pool_size(size: &usize) -> bool {
 /// assert_eq!(mem, CacheStoreTypeConfig::Memory);
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 #[cfg(feature = "cache")]
@@ -922,11 +940,13 @@ pub enum CacheStoreTypeConfig {
     /// ```
     Memory,
     /// Redis cache store.
-
+    ///
     /// This stores cache data in a Redis instance. The URL to the Redis server
     /// must be specified, and additional Redis-specific options can be
     /// configured.
     Redis {
+        /// The URL of the Redis server.
+        ///
         /// # Examples
         ///
         /// ```
@@ -937,23 +957,28 @@ pub enum CacheStoreTypeConfig {
         ///     pool_size: 20,
         /// };
         /// ```
-        /// The URL of the Redis server.
         url: CacheUrl,
         /// Connection pool size for Redis connections.
-
+        ///
         /// This controls how many connections to maintain in the connection
-        /// pool. When not specified, a default pool size of `10` is used.
+        /// pool.
+        ///
+        /// When not specified, a default pool size of `10` is used.
         #[serde(
             default = "default_redis_pool_size",
             skip_serializing_if = "is_default_redis_pool_size"
         )]
+        // keep the default in the schema despite `skip_serializing_if` omitting it
+        #[cfg_attr(feature = "_internal_config-docs", schemars(!skip_serializing_if))]
         pool_size: usize,
     },
     /// File-based cache store.
-
+    ///
     /// This stores cache data in files on the local filesystem. The path to
     /// the directory where the cache files will be stored must be specified.
     File {
+        /// The path to the directory where cache files will be stored.
+        ///
         /// # Examples
         ///
         /// ```
@@ -965,7 +990,6 @@ pub enum CacheStoreTypeConfig {
         ///     path: PathBuf::from("/tmp/cache"),
         /// };
         /// ```
-        /// The path to the directory where cache files will be stored.
         path: PathBuf,
     },
 }
@@ -1013,17 +1037,20 @@ pub enum CacheStoreTypeConfig {
 ///     .build();
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
 pub struct StaticFilesConfig {
     /// The URL prefix for the static files to be served at (which should
-    /// typically end with a slash). The default is `/static/`.
+    /// typically end with a slash).
     ///
     /// This prefix is used to determine which requests should be handled by the
     /// static files middleware. For example, if set to `/assets/`, then
     /// requests to `/assets/style.css` will be served from the static files
     /// directory.
+    ///
+    /// The default is `/static/`.
     ///
     /// # Examples
     ///
@@ -1036,9 +1063,10 @@ pub struct StaticFilesConfig {
     #[builder(setter(into))]
     pub url: String,
 
-    /// The URL rewriting mode for the static files. This is useful to allow
-    /// long-lived caching of static files, while still allowing to invalidate
-    /// the cache when the file changes.
+    /// The URL rewriting mode for the static files.
+    ///
+    /// This is useful to allow long-lived caching of static files, while still
+    /// allowing to invalidate the cache when the file changes.
     ///
     /// This affects the URL that is returned by
     /// [`StaticFiles::url_for`](crate::request::extractors::StaticFiles::url_for)
@@ -1104,6 +1132,7 @@ pub struct StaticFilesConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     #[serde(with = "crate::serializers::humantime")]
+    #[cfg_attr(feature = "_internal_config-docs", schemars(with = "Option<String>"))]
     #[builder(setter(strip_option), default)]
     pub cache_timeout: Option<Duration>,
 }
@@ -1112,6 +1141,7 @@ pub struct StaticFilesConfig {
 ///
 /// This is used as part of the [`StaticFilesConfig`] struct.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum StaticFilesPathRewriteMode {
@@ -1193,6 +1223,7 @@ impl StaticFilesConfig {
 ///     .build();
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -1254,6 +1285,7 @@ impl MiddlewareConfigBuilder {
 /// let config = LiveReloadMiddlewareConfig::builder().enabled(true).build();
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
@@ -1333,6 +1365,7 @@ impl LiveReloadMiddlewareConfigBuilder {
 /// };
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SessionStoreTypeConfig {
     /// In-memory session storage.
@@ -1413,13 +1446,15 @@ pub enum SessionStoreTypeConfig {
 /// ```
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct SessionStoreConfig {
     /// The type of session store to use.
     ///
-    /// This determines how and where session data is stored. The default is
-    /// to use an in-memory store.
+    /// This determines how and where session data is stored.
+    ///
+    /// The default is to use an in-memory store.
     ///
     /// # Examples
     ///
@@ -1489,6 +1524,7 @@ impl SessionStoreConfigBuilder {
 ///
 ///  [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SameSite {
@@ -1599,14 +1635,15 @@ impl From<Expiry> for tower_sessions::Expiry {
 /// let config = SessionMiddlewareConfig::builder().secure(false).build();
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 #[non_exhaustive]
 pub struct SessionMiddlewareConfig {
-    /// The [`Secure`] of the cookie determines whether the session middleware
-    /// is secure.
+    /// The
+    /// [`Secure`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies)
+    /// of the cookie determines whether the session middleware is secure.
     ///
-    ///  [`Secure`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies
     /// # Examples
     ///
     /// ```
@@ -1615,10 +1652,11 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().secure(false).build();
     /// ```
     pub secure: bool,
-    /// The [`HttpOnly`] of the cookie used for the session. It is set to `true`
-    /// by default.
+    /// The
+    /// [`HttpOnly`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies)
+    /// of the cookie used for the session.
     ///
-    /// [`HttpOnly`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#block_access_to_your_cookies
+    /// It is set to `true` by default.
     ///
     ///  # Examples
     ///
@@ -1628,10 +1666,13 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().http_only(true).build();
     /// ```
     pub http_only: bool,
-    /// The [`SameSite`] attribute of the cookie used for the session.
-    /// The default value is [`SameSite::Strict`]
+    /// The
+    /// [`SameSite`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite)
+    /// attribute of the cookie used for the session.
     ///
-    /// [`SameSite`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#controlling_third-party_cookies_with_samesite
+    /// This lets you specify whether cookies are sent with cross-site requests.
+    ///
+    /// The default value is [`SameSite::Strict`].
     ///
     /// # Examples
     ///
@@ -1644,10 +1685,11 @@ pub struct SessionMiddlewareConfig {
     /// ```
     pub same_site: SameSite,
 
-    /// The [`Domain`] attribute of the cookie used for the session. When not
-    /// explicitly configured, it is set to `None` by default.
+    /// The
+    /// [`Domain`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent)
+    /// attribute of the cookie used for the session.
     ///
-    /// [`Domain`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
+    /// When not explicitly configured, it is set to [`None`] by default.
     ///
     /// # Examples
     ///
@@ -1660,10 +1702,11 @@ pub struct SessionMiddlewareConfig {
     /// ```
     #[builder(setter(strip_option), default)]
     pub domain: Option<String>,
-    /// The [`Path`] attribute of the cookie used for the session. It is set to
-    /// `/` by default.
+    /// The
+    /// [`Path`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent)
+    /// attribute of the cookie used for the session.
     ///
-    /// [`Path`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#define_where_cookies_are_sent
+    /// It is set to `/` by default.
     ///
     /// # Examples
     ///
@@ -1677,8 +1720,9 @@ pub struct SessionMiddlewareConfig {
     ///     .build();
     /// ```
     pub path: String,
-    /// The name of the cookie used for the session. It is set to "id" by
-    /// default.
+    /// The name of the cookie used for the session.
+    ///
+    /// It is set to "id" by default.
     ///
     /// # Examples
     ///
@@ -1691,8 +1735,11 @@ pub struct SessionMiddlewareConfig {
     /// ```
     pub name: String,
     /// Whether the unmodified session should be saved on read or not.
+    ///
     /// If set to `true`, the session will be saved even if it was not modified.
+    ///
     /// It is set to `false` by default.
+    ///
     /// # Examples
     ///
     /// ```
@@ -1701,7 +1748,9 @@ pub struct SessionMiddlewareConfig {
     /// let config = SessionMiddlewareConfig::builder().always_save(true).build();
     /// ```
     pub always_save: bool,
-    /// The [`Expiry`] behavior for session cookies.
+    /// The
+    /// [`Expiry`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie)
+    /// behavior for session cookies.
     ///
     /// This controls when the session cookie expires and how long it remains
     /// valid. The expiry behavior affects how the cookie's `max-age` and
@@ -1726,8 +1775,6 @@ pub struct SessionMiddlewareConfig {
     ///   documentation for supported formats.
     /// - For `AtDateTime`: Use a valid RFC 3339/ISO 8601 formatted timestamp
     ///   (e.g., `"2025-12-31T23:59:59+00:00"`).
-    ///
-    /// [`Expiry`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie
     ///
     /// # Examples
     ///
@@ -1777,6 +1824,7 @@ pub struct SessionMiddlewareConfig {
     /// );
     /// ```
     #[serde(with = "crate::serializers::session_expiry_time")]
+    #[cfg_attr(feature = "_internal_config-docs", schemars(with = "String"))]
     pub expiry: Expiry,
 
     /// What session store to use.
@@ -1860,13 +1908,16 @@ impl Default for SessionMiddlewareConfig {
 /// The type of email transport backend to use.
 ///
 /// This specifies what email backend is used for sending emails.
+///
 /// The default backend if not specified is `console`.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum EmailTransportTypeConfig {
-    /// Console email transport backend.
+    /// Console email transport backend that prints the contents to the standard
+    /// output.
     ///
     /// This is a convenient transport backend for development and testing that
     /// simply prints the email contents to the console instead of actually
@@ -1920,7 +1971,6 @@ pub enum EmailTransportTypeConfig {
         /// ```
         url: EmailUrl,
         /// The authentication mechanism to use.
-        /// Supported mechanisms are `plain`, `login`, and `xoauth2`.
         ///
         /// # TOML Configuration
         ///
@@ -1940,6 +1990,7 @@ pub enum EmailTransportTypeConfig {
 /// configuration.
 #[cfg(feature = "email")]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct EmailTransportConfig {
@@ -2018,6 +2069,7 @@ impl EmailTransportConfigBuilder {
 /// ```
 #[cfg(feature = "email")]
 #[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(skip, error = std::convert::Infallible))]
 #[serde(default)]
 pub struct EmailConfig {
@@ -2132,7 +2184,9 @@ impl Default for EmailConfig {
 /// ```
 #[repr(transparent)]
 #[derive(Clone, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(from = "String")]
+#[cfg_attr(feature = "_internal_config-docs", schemars(with = "String"))]
 pub struct SecretKey(SecureBytes);
 
 impl Serialize for SecretKey {
@@ -2239,7 +2293,9 @@ impl From<&str> for SecretKey {
 /// let url = DatabaseUrl::from("postgres://user:password@localhost:5432/database");
 /// ```
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(transparent)]
+#[cfg_attr(feature = "_internal_config-docs", schemars(with = "String"))]
 #[cfg(feature = "db")]
 pub struct DatabaseUrl(url::Url);
 
@@ -2348,7 +2404,9 @@ impl std::str::FromStr for CacheType {
 /// let url = CacheUrl::from("redis://user:password@localhost:6379/0");
 /// ```
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(transparent)]
+#[cfg_attr(feature = "_internal_config-docs", schemars(with = "String"))]
 #[cfg(feature = "cache")]
 pub struct CacheUrl(url::Url);
 
@@ -2457,7 +2515,9 @@ impl std::fmt::Display for CacheUrl {
 /// let url = EmailUrl::from("smtp://user:pass@hostname:587");
 /// ```
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[serde(transparent)]
+#[cfg_attr(feature = "_internal_config-docs", schemars(with = "String"))]
 #[cfg(feature = "email")]
 pub struct EmailUrl(url::Url);
 

@@ -558,7 +558,12 @@ impl CliTask for CliTaskGroup {
         }
 
         cmd = cmd.subcommand_required(true).arg_required_else_help(true);
-        for task in self.tasks.values() {
+
+        let mut tasks: Vec<_> = self.tasks.iter().collect();
+        // sort for deterministic output in UI tests
+        tasks.sort_by_key(|(a, _)| *a);
+
+        for (_, task) in tasks {
             cmd = cmd.subcommand(task.subcommand());
         }
         cmd

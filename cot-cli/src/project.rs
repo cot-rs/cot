@@ -106,6 +106,15 @@ mod tests {
     pub(crate) fn canonical_temp_dir() -> (TempDir, PathBuf) {
         let temp_dir = TempDir::new().unwrap();
         let tmp_path = temp_dir.path().canonicalize().unwrap();
+        // Pin the target dir so that the user's global cargo config (e.g.
+        // `build.target-dir` in `$CARGO_HOME/config.toml`) doesn't affect
+        // where `cot-cli` looks for the binary.
+        fs::create_dir(tmp_path.join(".cargo")).unwrap();
+        fs::write(
+            tmp_path.join(".cargo/config.toml"),
+            "[build]\ntarget-dir = \"target\"\n",
+        )
+        .unwrap();
         (temp_dir, tmp_path)
     }
 

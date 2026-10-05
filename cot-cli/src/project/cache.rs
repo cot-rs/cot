@@ -304,9 +304,9 @@ mod tests {
 
         assert!(result.is_err());
         let message = format!("{:#}", result.unwrap_err());
-        assert!(message.contains("exited unexpectedly"));
-        assert!(message.contains("stdout message"));
-        assert!(message.contains("stderr message"));
+        assert!(message.contains("exited unexpectedly"), "{message}");
+        assert!(message.contains("stdout message"), "{message}");
+        assert!(message.contains("stderr message"), "{message}");
     }
 
     #[test]

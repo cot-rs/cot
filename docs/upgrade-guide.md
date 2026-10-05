@@ -51,3 +51,48 @@ Sometimes, though, the changes need to be made in a backwards-incompatible manne
 ### Dependencies
 
 * `schemars` dependency has been updated to `0.9`. If you have any custom code to generate OpenAPI specs, (usually by implementing `AsApiOperation`, `ApiOperationPart`, or `AsApiOperation` traits inside `cot::openapi`) you may need to update it accordingly. If you're only using Cot's built-in OpenAPI support, you don't need to do anything except updating your `Cargo.toml` file.
+
+## From 0.7 to 0.8
+
+### Routing
+* **Route Conflicts**: Route registration now rejects ambiguous routes when the router is built. Routes that capture a parameter at the same position must use the same parameter name. Duplicate handler routes also fail during router construction.
+    ```rust,ignore
+    // Before: these conflicting routes could be registered
+    Route::with_handler("/foo/{bar}", handler),
+    Route::with_handler("/foo/{baz}", other_handler),
+
+    // After: keep one route for this path pattern
+    Route::with_handler("/foo/{bar}", handler),
+    ```
+* **Handler Takes Precedence Over an Overlapping Router**: If a handler route overlaps with a nested router at the same path, the handler takes precedence for requests matching that path.
+    ```rust,ignore
+    let nested = Router::with_urls([
+        Route::with_handler("/", nested_index),
+        Route::with_handler("/details", details),
+    ]);
+
+    let router = Router::with_urls([
+        Route::with_handler("/foo", foo),
+        Route::with_router("/foo", nested),
+    ]);
+
+    // GET /foo calls `foo`; the nested router's `/` handler is not reached.
+    // GET /foo/details is still served by the nested router.
+    ```
+* **Trailing Slashes**: Handler routes with and without a trailing slash are distinct routes. Register a handler for each path if both should be available:
+    ```rust,ignore
+    Route::with_handler("/foo", foo),
+    Route::with_handler("/foo/", foo_slash),
+    ```
+    Nested routers mounted at the same path are merged, including mounts that differ only by a trailing slash. Conflicting routes inside merged routers still fail during router construction.
+    ```rust,ignore
+    let first = Router::with_urls([Route::with_handler("/a", a)]);
+    let second = Router::with_urls([Route::with_handler("/b", b)]);
+
+    let router = Router::with_urls([
+        Route::with_router("/users", first),
+        Route::with_router("/users/", second),
+    ]);
+
+    // Both GET /users/a and GET /users/b are routed successfully.
+    ```

@@ -86,7 +86,7 @@
 //!     }
 //!
 //!     fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
-//!         apps.register_with_views(SwaggerUi::new(), "/swagger");
+//!         apps.register_with_views(SwaggerUi::new(), "/swagger/");
 //!         apps.register_with_views(AddApp, "");
 //!     }
 //! }

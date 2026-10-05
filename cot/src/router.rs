@@ -1344,7 +1344,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_macro_query_params() {
+    fn reverse_macro_query_params() {
         let route = Route::with_handler_and_name("/", MockHandler, "home");
         let router = Router::with_urls(vec![route]);
 
@@ -1355,7 +1355,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_macro_path_and_query_params() {
+    fn reverse_macro_path_and_query_params() {
         let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
         let router = Router::with_urls(vec![route]);
 
@@ -1366,7 +1366,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_macro_query_params_are_encoded() {
+    fn reverse_macro_query_params_are_encoded() {
         let route = Route::with_handler_and_name("/", MockHandler, "home");
         let router = Router::with_urls(vec![route]);
 
@@ -1377,7 +1377,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_macros_distinguish_query_path_parameter() {
+    fn reverse_macros_distinguish_query_path_parameter() {
         let route = Route::with_handler_and_name("/search/{query}/{id}", MockHandler, "search");
         let request = TestRequestBuilder::get("/")
             .router(Router::with_urls([route]))
@@ -1397,7 +1397,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_macros_without_query_params() {
+    fn reverse_macros_without_query_params() {
         let request = TestRequestBuilder::get("/")
             .router(Router::with_urls([
                 Route::with_handler_and_name("/", MockHandler, "home"),
@@ -1432,7 +1432,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_macros_query_params_with_urls() {
+    fn reverse_macros_query_params_with_urls() {
         let route = Route::with_handler_and_name("/", MockHandler, "home");
         let request = TestRequestBuilder::get("/")
             .router(Router::with_urls([route]))
@@ -1452,7 +1452,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_macros_query_params_preserve_errors() {
+    fn reverse_macros_query_params_preserve_errors() {
         let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
         let request = TestRequestBuilder::get("/")
             .router(Router::with_urls([route]))
@@ -1482,7 +1482,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_redirect_macro_query_params() {
+    fn reverse_redirect_macro_query_params() {
         let route = Route::with_handler_and_name("/test/{id}", MockHandler, "test");
         let router = Router::with_urls(vec![route]);
 

@@ -16,6 +16,7 @@ use cot::db::impl_postgres::PostgresValueRef;
 use cot::db::impl_sqlite::SqliteValueRef;
 use cot::form::FormFieldValidationError;
 use email_address::EmailAddress;
+use jiff::civil::Weekday;
 use securer_string::SecureString;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -813,12 +814,347 @@ impl Display for Email {
 #[cfg(feature = "db")]
 impl TextField for Email {}
 
+/// A set of weekdays.
+///
+/// This is useful, for instance, for storing a weekly schedule in the
+/// database. The set is stored as a single integer, where each bit represents
+/// one weekday.
+///
+/// # Examples
+///
+/// ```
+/// use cot::common_types::WeekdaySet;
+/// use jiff::civil::Weekday;
+///
+/// let mut set = WeekdaySet::EMPTY;
+/// set.insert(Weekday::Monday);
+/// set.insert(Weekday::Friday);
+///
+/// assert!(set.contains(Weekday::Monday));
+/// assert!(!set.contains(Weekday::Tuesday));
+/// assert_eq!(
+///     set.iter().collect::<Vec<_>>(),
+///     [Weekday::Monday, Weekday::Friday]
+/// );
+/// ```
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct WeekdaySet(u8);
+
+impl WeekdaySet {
+    /// An empty set.
+    pub const EMPTY: Self = Self(0);
+
+    /// A set containing all the weekdays.
+    pub const ALL: Self = Self(0b111_1111);
+
+    /// Creates a set containing a single weekday.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::WeekdaySet;
+    /// use jiff::civil::Weekday;
+    ///
+    /// let set = WeekdaySet::single(Weekday::Sunday);
+    /// assert_eq!(set.len(), 1);
+    /// assert!(set.contains(Weekday::Sunday));
+    /// ```
+    #[must_use]
+    pub fn single(weekday: Weekday) -> Self {
+        Self(1 << weekday.to_monday_zero_offset())
+    }
+
+    /// Returns `true` if the set contains the given weekday.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::WeekdaySet;
+    /// use jiff::civil::Weekday;
+    ///
+    /// assert!(WeekdaySet::ALL.contains(Weekday::Monday));
+    /// assert!(!WeekdaySet::EMPTY.contains(Weekday::Monday));
+    /// ```
+    #[must_use]
+    pub fn contains(self, weekday: Weekday) -> bool {
+        self.0 & Self::single(weekday).0 != 0
+    }
+
+    /// Adds a weekday to the set.
+    ///
+    /// Returns `true` if the weekday was not already in the set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::WeekdaySet;
+    /// use jiff::civil::Weekday;
+    ///
+    /// let mut set = WeekdaySet::EMPTY;
+    /// assert!(set.insert(Weekday::Monday));
+    /// assert!(!set.insert(Weekday::Monday));
+    /// ```
+    pub fn insert(&mut self, weekday: Weekday) -> bool {
+        let was_missing = !self.contains(weekday);
+        self.0 |= Self::single(weekday).0;
+        was_missing
+    }
+
+    /// Removes a weekday from the set.
+    ///
+    /// Returns `true` if the weekday was in the set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::WeekdaySet;
+    /// use jiff::civil::Weekday;
+    ///
+    /// let mut set = WeekdaySet::ALL;
+    /// assert!(set.remove(Weekday::Monday));
+    /// assert!(!set.remove(Weekday::Monday));
+    /// ```
+    pub fn remove(&mut self, weekday: Weekday) -> bool {
+        let was_present = self.contains(weekday);
+        self.0 &= !Self::single(weekday).0;
+        was_present
+    }
+
+    /// Returns `true` if the set contains no weekdays.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::WeekdaySet;
+    ///
+    /// assert!(WeekdaySet::EMPTY.is_empty());
+    /// assert!(!WeekdaySet::ALL.is_empty());
+    /// ```
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    /// Returns the number of weekdays in the set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::WeekdaySet;
+    ///
+    /// assert_eq!(WeekdaySet::EMPTY.len(), 0);
+    /// assert_eq!(WeekdaySet::ALL.len(), 7);
+    /// ```
+    #[must_use]
+    pub const fn len(self) -> u32 {
+        self.0.count_ones()
+    }
+
+    /// Returns an iterator over the weekdays in the set, starting from Monday.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::common_types::WeekdaySet;
+    /// use jiff::civil::Weekday;
+    ///
+    /// let set: WeekdaySet = [Weekday::Sunday, Weekday::Monday].into_iter().collect();
+    /// assert_eq!(
+    ///     set.iter().collect::<Vec<_>>(),
+    ///     [Weekday::Monday, Weekday::Sunday]
+    /// );
+    /// ```
+    pub fn iter(self) -> impl Iterator<Item = Weekday> {
+        Weekday::Monday
+            .cycle_forward()
+            .take(7)
+            .filter(move |&weekday| self.contains(weekday))
+    }
+
+    #[cfg(feature = "db")]
+    const fn from_bits(bits: u8) -> Self {
+        Self(bits & Self::ALL.0)
+    }
+}
+
+impl FromIterator<Weekday> for WeekdaySet {
+    fn from_iter<T: IntoIterator<Item = Weekday>>(iter: T) -> Self {
+        let mut set = Self::EMPTY;
+        for weekday in iter {
+            set.insert(weekday);
+        }
+        set
+    }
+}
+
+#[cfg(feature = "fake")]
+impl fake::Dummy<fake::Faker> for WeekdaySet {
+    fn dummy_with_rng<R: fake::rand::Rng + ?Sized>(_: &fake::Faker, rng: &mut R) -> Self {
+        Self(rng.next_u32().to_le_bytes()[0] & Self::ALL.0)
+    }
+}
+
+/// Weekday sets are stored as a bit mask, where the least significant bit
+/// represents Monday.
+#[cfg(feature = "db")]
+impl DatabaseField for WeekdaySet {
+    const TYPE: ColumnType = ColumnType::TinyUnsignedInteger;
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for WeekdaySet {
+    fn to_db_value(&self) -> DbValue {
+        self.0.to_db_value()
+    }
+}
+
+#[cfg(feature = "db")]
+impl ToDbValue for Option<WeekdaySet> {
+    fn to_db_value(&self) -> DbValue {
+        self.map(|set| set.0).to_db_value()
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for WeekdaySet {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        <u8 as FromDbValue>::from_sqlite(value).map(Self::from_bits)
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        <u8 as FromDbValue>::from_postgres(value).map(Self::from_bits)
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        <u8 as FromDbValue>::from_mysql(value).map(Self::from_bits)
+    }
+}
+
+#[cfg(feature = "db")]
+impl FromDbValue for Option<WeekdaySet> {
+    #[cfg(feature = "sqlite")]
+    fn from_sqlite(value: SqliteValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        <Option<u8> as FromDbValue>::from_sqlite(value).map(|bits| bits.map(WeekdaySet::from_bits))
+    }
+
+    #[cfg(feature = "postgres")]
+    fn from_postgres(value: PostgresValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        <Option<u8> as FromDbValue>::from_postgres(value)
+            .map(|bits| bits.map(WeekdaySet::from_bits))
+    }
+
+    #[cfg(feature = "mysql")]
+    fn from_mysql(value: MySqlValueRef<'_>) -> cot::db::Result<Self>
+    where
+        Self: Sized,
+    {
+        <Option<u8> as FromDbValue>::from_mysql(value).map(|bits| bits.map(WeekdaySet::from_bits))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryFrom;
 
     use super::*;
     use crate::Template;
+
+    #[test]
+    fn weekday_set_empty() {
+        assert!(WeekdaySet::EMPTY.is_empty());
+        assert_eq!(WeekdaySet::EMPTY.len(), 0);
+        assert_eq!(WeekdaySet::EMPTY.iter().count(), 0);
+        assert_eq!(WeekdaySet::default(), WeekdaySet::EMPTY);
+    }
+
+    #[test]
+    fn weekday_set_single() {
+        let monday = WeekdaySet::single(Weekday::Monday);
+        assert_eq!(monday.0, 0b000_0001);
+        assert!(monday.contains(Weekday::Monday));
+        assert!(!monday.contains(Weekday::Tuesday));
+
+        let sunday = WeekdaySet::single(Weekday::Sunday);
+        assert_eq!(sunday.0, 0b100_0000);
+    }
+
+    #[test]
+    fn weekday_set_insert_remove() {
+        let mut set = WeekdaySet::EMPTY;
+
+        assert!(set.insert(Weekday::Monday));
+        assert!(!set.insert(Weekday::Monday));
+        assert!(set.insert(Weekday::Friday));
+        assert_eq!(set.len(), 2);
+
+        assert!(set.remove(Weekday::Monday));
+        assert!(!set.remove(Weekday::Monday));
+        assert_eq!(set, WeekdaySet::single(Weekday::Friday));
+    }
+
+    #[test]
+    fn weekday_set_iter() {
+        let set: WeekdaySet = [Weekday::Sunday, Weekday::Wednesday, Weekday::Monday]
+            .into_iter()
+            .collect();
+
+        assert_eq!(
+            set.iter().collect::<Vec<_>>(),
+            [Weekday::Monday, Weekday::Wednesday, Weekday::Sunday]
+        );
+        assert_eq!(WeekdaySet::ALL.iter().count(), 7);
+    }
+
+    #[cfg(feature = "db")]
+    #[test]
+    fn weekday_set_from_bits() {
+        assert_eq!(WeekdaySet::from_bits(0b101_0101).0, 0b101_0101);
+        // the most significant bit is ignored
+        assert_eq!(WeekdaySet::from_bits(0b1111_1111), WeekdaySet::ALL);
+    }
+
+    #[cfg(feature = "db")]
+    #[test]
+    fn weekday_set_to_db_value() {
+        let set: WeekdaySet = [Weekday::Monday, Weekday::Friday].into_iter().collect();
+
+        assert_eq!(set.to_db_value(), DbValue::TinyUnsigned(Some(0b001_0001)));
+        assert_eq!(
+            Some(set).to_db_value(),
+            DbValue::TinyUnsigned(Some(0b001_0001))
+        );
+        assert_eq!(
+            None::<WeekdaySet>.to_db_value(),
+            DbValue::TinyUnsigned(None)
+        );
+    }
+
+    #[cfg(feature = "db")]
+    #[test]
+    fn weekday_set_column_type() {
+        assert_eq!(
+            <WeekdaySet as DatabaseField>::TYPE,
+            ColumnType::TinyUnsignedInteger
+        );
+    }
 
     #[test]
     fn url_new() {

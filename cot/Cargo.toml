@@ -43,6 +43,7 @@ humantime.workspace = true
 idna = { workspace = true, optional = true }
 indexmap.workspace = true
 is_terminal_polyfill.workspace = true
+jiff = { workspace = true, features = ["default", "serde"] }
 lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"], optional = true }
 matchit.workspace = true
 mime.workspace = true
@@ -53,11 +54,11 @@ securer-string.workspace = true
 pin-project-lite.workspace = true
 redis = { workspace = true, features = ["aio", "tokio-comp"], optional = true }
 schemars = { workspace = true, optional = true, features = ["derive"] }
-sea-query = { workspace = true, optional = true }
-sea-query-sqlx = { workspace = true, features = ["with-chrono"], optional = true }
+sea-query = { workspace = true, features = ["with-jiff"], optional = true }
+sea-query-sqlx = { workspace = true, features = ["with-chrono", "with-jiff", "with-time", "unimplemented-jiff-sqlx"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-sqlx = { workspace = true, features = ["runtime-tokio", "chrono"], optional = true }
+sqlx = { workspace = true, features = ["runtime-tokio", "chrono", "time"], optional = true }
 subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
 thiserror.workspace = true

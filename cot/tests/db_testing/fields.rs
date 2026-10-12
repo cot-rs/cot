@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use cot::auth::PasswordHash;
-use cot::common_types::{Email, Password, Url};
+use cot::common_types::{Email, Password, Url, WeekdaySet};
 use cot::db::migrations::{Field, Operation};
 use cot::db::{Auto, Database, DatabaseField, Identifier, LimitedString, Model};
 use cot::test::TestDatabase;
@@ -63,6 +63,58 @@ impl Dummy<UrlFaker> for Url {
     }
 }
 
+struct JiffDateFaker;
+
+impl Dummy<JiffDateFaker> for jiff::civil::Date {
+    fn dummy_with_rng<R: RngExt + ?Sized>(_: &JiffDateFaker, rng: &mut R) -> Self {
+        jiff::civil::date(
+            rng.random_range(1..=9999),
+            rng.random_range(1..=12),
+            rng.random_range(1..=28),
+        )
+    }
+}
+
+struct JiffTimeFaker;
+
+impl Dummy<JiffTimeFaker> for jiff::civil::Time {
+    // MySQL doesn't store fractional seconds in `TIME` columns
+    fn dummy_with_rng<R: RngExt + ?Sized>(_: &JiffTimeFaker, rng: &mut R) -> Self {
+        jiff::civil::time(
+            rng.random_range(0..24),
+            rng.random_range(0..60),
+            rng.random_range(0..60),
+            0,
+        )
+    }
+}
+
+struct JiffDateTimeFaker;
+
+impl Dummy<JiffDateTimeFaker> for jiff::civil::DateTime {
+    fn dummy_with_rng<R: RngExt + ?Sized>(_: &JiffDateTimeFaker, rng: &mut R) -> Self {
+        let date: jiff::civil::Date = JiffDateFaker.fake_with_rng(rng);
+        // PostgreSQL and MySQL only support microsecond precision
+        date.at(
+            rng.random_range(0..24),
+            rng.random_range(0..60),
+            rng.random_range(0..60),
+            rng.random_range(0..1_000_000) * 1000,
+        )
+    }
+}
+
+struct JiffTimestampFaker;
+
+impl Dummy<JiffTimestampFaker> for jiff::Timestamp {
+    fn dummy_with_rng<R: RngExt + ?Sized>(_: &JiffTimestampFaker, rng: &mut R) -> Self {
+        // PostgreSQL and MySQL only support microsecond precision; MySQL's
+        // `TIMESTAMP` only supports dates between 1970 and 2038
+        jiff::Timestamp::from_microsecond(rng.random_range(0..2_000_000_000_000_000))
+            .expect("the value is in range")
+    }
+}
+
 #[derive(Debug, PartialEq, Dummy)]
 #[model]
 struct AllFieldsModel {
@@ -89,6 +141,14 @@ struct AllFieldsModel {
     field_datetime: chrono::NaiveDateTime,
     #[dummy(faker = "fake::chrono::Precision::<6>")]
     field_datetime_timezone: chrono::DateTime<chrono::FixedOffset>,
+    #[dummy(faker = "JiffDateFaker")]
+    field_jiff_date: jiff::civil::Date,
+    #[dummy(faker = "JiffTimeFaker")]
+    field_jiff_time: jiff::civil::Time,
+    #[dummy(faker = "JiffDateTimeFaker")]
+    field_jiff_datetime: jiff::civil::DateTime,
+    #[dummy(faker = "JiffTimestampFaker")]
+    field_jiff_timestamp: jiff::Timestamp,
     field_string: String,
     field_blob: Vec<u8>,
     #[dummy(expr = "Bytes::from_static(b\"test bytes\")")]
@@ -98,6 +158,7 @@ struct AllFieldsModel {
     field_option_limited_string: Option<LimitedString<10>>,
     #[dummy(faker = "WeekdaySetFaker")]
     field_weekday_set: chrono::WeekdaySet,
+    field_jiff_weekday_set: WeekdaySet,
     #[dummy(faker = "EmailFaker")]
     field_email: Email,
     #[dummy(faker = "EmailFaker")]
@@ -150,6 +211,10 @@ const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
         all_fields_migration_field!(time, chrono::NaiveTime),
         all_fields_migration_field!(datetime, chrono::NaiveDateTime),
         all_fields_migration_field!(datetime_timezone, chrono::DateTime<chrono::FixedOffset>),
+        all_fields_migration_field!(jiff_date, jiff::civil::Date),
+        all_fields_migration_field!(jiff_time, jiff::civil::Time),
+        all_fields_migration_field!(jiff_datetime, jiff::civil::DateTime),
+        all_fields_migration_field!(jiff_timestamp, jiff::Timestamp),
         all_fields_migration_field!(string, String),
         all_fields_migration_field!(blob, Vec<u8>),
         all_fields_migration_field!(bytes, Bytes),
@@ -157,6 +222,7 @@ const CREATE_ALL_FIELDS_MODEL: Operation = Operation::create_model()
         all_fields_migration_field!(limited_string, LimitedString<10>),
         all_fields_migration_field!(option_limited_string, Option<LimitedString<10>>),
         all_fields_migration_field!(weekday_set, chrono::WeekdaySet),
+        all_fields_migration_field!(jiff_weekday_set, WeekdaySet),
         all_fields_migration_field!(email, Email),
         all_fields_migration_field!(option_email, Option<Email>),
         all_fields_migration_field!(url, Url),

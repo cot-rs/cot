@@ -4,3 +4,5 @@ pub(crate) mod chrono;
 pub mod cli;
 #[cfg(feature = "db")]
 pub(crate) mod graph;
+#[cfg(feature = "db")]
+pub(crate) mod jiff;

@@ -168,53 +168,42 @@ impl Transport for Smtp {
     }
 }
 
+/// Converts an address to a lettre [`Mailbox`], keeping its display name.
+fn to_mailbox(email: &crate::common_types::Email) -> Result<Mailbox, EmailMessageError> {
+    let address = email
+        .email()
+        .parse()
+        .map_err(|err| EmailMessageError::InvalidEmailAddress(Box::new(err)))?;
+    let name = Some(email.display_part())
+        .filter(|name| !name.is_empty())
+        .map(ToOwned::to_owned);
+    Ok(Mailbox::new(name, address))
+}
+
 fn convert_email_message_to_lettre_message(
     message: EmailMessage,
 ) -> Result<Message, EmailMessageError> {
-    let from_mailbox = message
-        .from
-        .email()
-        .as_str()
-        .parse::<Mailbox>()
-        .map_err(|err| EmailMessageError::InvalidEmailAddress(Box::new(err)))?;
-
     let mut builder = Message::builder()
-        .from(from_mailbox)
+        .from(to_mailbox(&message.from)?)
         .subject(message.subject);
 
     for to in message.to {
-        let mb = to
-            .email()
-            .as_str()
-            .parse::<Mailbox>()
-            .map_err(|err| EmailMessageError::InvalidEmailAddress(Box::new(err)))?;
+        let mb = to_mailbox(&to)?;
         builder = builder.to(mb);
     }
 
     for cc in message.cc {
-        let mb = cc
-            .email()
-            .as_str()
-            .parse::<Mailbox>()
-            .map_err(|err| EmailMessageError::InvalidEmailAddress(Box::new(err)))?;
+        let mb = to_mailbox(&cc)?;
         builder = builder.cc(mb);
     }
 
     for bcc in message.bcc {
-        let mb = bcc
-            .email()
-            .as_str()
-            .parse::<Mailbox>()
-            .map_err(|err| EmailMessageError::InvalidEmailAddress(Box::new(err)))?;
+        let mb = to_mailbox(&bcc)?;
         builder = builder.bcc(mb);
     }
 
     for r in message.reply_to {
-        let mb = r
-            .email()
-            .as_str()
-            .parse::<Mailbox>()
-            .map_err(|err| EmailMessageError::InvalidEmailAddress(Box::new(err)))?;
+        let mb = to_mailbox(&r)?;
         builder = builder.reply_to(mb);
     }
 
@@ -309,6 +298,26 @@ mod tests {
         assert!(formatted.contains("Subject: Hello World"),);
         assert!(formatted.contains("Content-Type: multipart/mixed"),);
         assert!(formatted.contains("This is the body."),);
+    }
+
+    #[cot::test]
+    async fn try_from_keeps_display_names() {
+        let msg = EmailMessage::builder()
+            .from(crate::common_types::Email::new("Jane Doe <from@example.com>").unwrap())
+            .to(vec![
+                crate::common_types::Email::new("John Doe <to@example.com>").unwrap(),
+            ])
+            .subject("Hello World")
+            .body("This is the body.")
+            .build()
+            .unwrap();
+
+        let built: Message =
+            convert_email_message_to_lettre_message(msg).expect("conversion to lettre::Message");
+        let formatted = String::from_utf8_lossy(&built.formatted()).to_string();
+
+        assert!(formatted.contains("From: \"Jane Doe\" <from@example.com>"));
+        assert!(formatted.contains("To: \"John Doe\" <to@example.com>"));
     }
 
     #[cot::test]

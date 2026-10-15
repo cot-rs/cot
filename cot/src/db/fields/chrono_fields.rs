@@ -3,7 +3,9 @@ use crate::db::fields::{
 };
 #[cfg(feature = "mysql")]
 use crate::db::impl_mysql::MySqlValueRef;
-use crate::db::{ColumnType, DatabaseField, FromDbValue, Result, SqlxValueRef};
+use crate::db::{ColumnType, DatabaseField, FromDbValue};
+#[cfg(feature = "mysql")]
+use crate::db::{Result, SqlxValueRef};
 
 impl DatabaseField for chrono::DateTime<chrono::FixedOffset> {
     const TYPE: ColumnType = ColumnType::DateTimeWithTimeZone;

@@ -49,6 +49,10 @@ pub enum Commands {
     #[command(subcommand)]
     Cli(CliCommands),
 
+    /// Collection of Cot tools
+    #[command(subcommand)]
+    Tools(ToolCommands),
+
     #[command(external_subcommand)]
     External(Vec<OsString>),
 }
@@ -144,6 +148,15 @@ pub struct CompletionsArgs {
     /// Shell to generate completions for
     pub shell: clap_complete::Shell,
 }
+
+#[derive(Debug, Clone, Copy, Subcommand)]
+pub enum ToolCommands {
+    /// Generate a new secret key
+    Keygen(KeyGenerateArgs),
+}
+
+#[derive(Debug, Clone, Copy, Args)]
+pub struct KeyGenerateArgs {}
 
 /// Pulls `-p <name>` / `--package <name>` / `--package=<name>` out of raw
 /// argv, before clap has parsed anything. Needed because `project::load`

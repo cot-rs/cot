@@ -10,13 +10,13 @@ use cot::metadata::{ArgMeta, CommandMeta};
 use cot::utils::cli::{StatusType, print_status_msg};
 
 use crate::args::{
-    Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, MigrationNewArgs,
-    ProjectNewArgs,
+    Cli, CompletionsArgs, KeyGenerateArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs,
+    MigrationNewArgs, ProjectNewArgs,
 };
 use crate::migration_generator::{
     MigrationGeneratorOptions, create_new_migration, list_migrations, make_migrations,
 };
-use crate::new_project::{CotSource, new_project};
+use crate::new_project::{self, CotSource, new_project};
 use crate::project::ProjectBinary;
 
 pub fn handle_new_project(
@@ -98,6 +98,14 @@ pub fn handle_cli_manpages(
 #[expect(clippy::unnecessary_wraps)] // return Result<()> for consistency
 pub fn handle_cli_completions(CompletionsArgs { shell }: CompletionsArgs) -> anyhow::Result<()> {
     generate_completions(shell, &mut std::io::stdout());
+
+    Ok(())
+}
+
+#[expect(clippy::unnecessary_wraps)]
+pub fn handle_keygen(_args: KeyGenerateArgs) -> anyhow::Result<()> {
+    let secret_key = new_project::generate_secret_key();
+    println!("{secret_key}");
 
     Ok(())
 }

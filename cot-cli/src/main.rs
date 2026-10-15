@@ -5,7 +5,7 @@ use std::ffi::OsString;
 use clap::Parser;
 use cot_cli::args::{
     BUILD_FLAG, Cli, CliCommands, Commands, HELP_LONG_FLAG, HELP_SHORT_FLAG, MigrationCommands,
-    PACKAGE_LONG_FLAG, PACKAGE_SHORT_FLAG, RELEASE_FLAG, extract_package_arg,
+    PACKAGE_LONG_FLAG, PACKAGE_SHORT_FLAG, RELEASE_FLAG, ToolCommands, extract_package_arg,
 };
 use cot_cli::{handlers, project};
 use tracing_subscriber::util::SubscriberInitExt;
@@ -112,6 +112,9 @@ fn main() -> anyhow::Result<()> {
                 let remaining = forwarded_args(&args[1..], forwarded_remaining_args);
                 handlers::handle_external(&path, &remaining, project, release)
             }
+        },
+        Commands::Tools(cmd) => match cmd {
+            ToolCommands::Keygen(args) => handlers::handle_keygen(args),
         },
         Commands::External(args) => {
             let project = project::load(

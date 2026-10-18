@@ -9,3 +9,5 @@ edition = "2024"
 [dependencies]
 cot = { path = "../../cot", features = ["email", "live-reload"] }
 serde = { version = "1", features = ["derive"] }
+
+[lints]

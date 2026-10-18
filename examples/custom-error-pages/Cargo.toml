@@ -8,3 +8,5 @@ edition = "2024"
 
 [dependencies]
 cot = { path = "../../cot" }
+
+[lints]

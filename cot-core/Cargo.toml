@@ -17,7 +17,6 @@ workspace = true
 
 [dependencies]
 askama = { workspace = true, features = ["alloc"] }
-axum.workspace = true
 backtrace.workspace = true
 bytes.workspace = true
 cot_macros.workspace = true
@@ -37,7 +36,7 @@ serde_path_to_error.workspace = true
 sync_wrapper.workspace = true
 thiserror.workspace = true
 tower-sessions.workspace = true
-tower.workspace = true
+tower = { workspace = true, features = ["util"] }
 
 [dev-dependencies]
 async-stream.workspace = true

@@ -20,19 +20,24 @@
 //!     MyProject
 //! }
 //! ```
+use std::convert::Infallible;
 use std::future::poll_fn;
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
+use std::pin::pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
-use axum::handler::HandlerWithoutStateExt;
 use cot::Template;
 use cot_core::error::impl_into_cot_error;
 use cot_core::handler::BoxedHandler;
 use cot_core::request::AppName;
 use derive_more::with_trait::Debug;
 use futures_util::FutureExt;
+use hyper::body::Incoming;
+use hyper_util::rt::TokioIo;
+use hyper_util::server::graceful::GracefulShutdown;
 use thiserror::Error;
 use tower::util::BoxCloneSyncService;
 use tower::{Layer, Service};
@@ -2155,22 +2160,21 @@ pub async fn run_at_with_shutdown(
     #[cfg(feature = "db")]
     let context_cleanup = context.clone();
 
-    let handler = move |axum_request: axum::extract::Request| async move {
+    let handler = move |mut request: Request| async move {
         // todo root tracing span
         // todo per-router error handlers
-        let request = request_axum_to_cot(axum_request, Arc::clone(&context));
+        prepare_request(&mut request, Arc::clone(&context));
         let (head, request) = request.into_parts();
         let head_for_error_handler = head.clone();
         let request = Request::from_parts(head, request);
 
         let (request_head, request) = request_parts_for_diagnostics(request);
 
-        let catch_unwind_response = AssertUnwindSafe(pass_to_axum(request, &mut handler))
+        let catch_unwind_response = AssertUnwindSafe(call_handler(request, &mut handler))
             .catch_unwind()
             .await;
 
-        let response: Result<axum::response::Response, ErrorResponse> = match catch_unwind_response
-        {
+        let response: Result<Response, ErrorResponse> = match catch_unwind_response {
             Ok(Ok(response)) => Ok(response),
             Ok(Err(error)) => Err(ErrorResponse::ErrorReturned(error)),
             Err(error) => Err(ErrorResponse::Panic(error)),
@@ -2212,10 +2216,7 @@ pub async fn run_at_with_shutdown(
         };
         std::panic::set_hook(Box::new(new_hook));
     }
-    axum::serve(listener, handler.into_make_service())
-        .with_graceful_shutdown(shutdown_signal)
-        .await
-        .map_err(StartServerError)?;
+    serve(listener, handler, shutdown_signal).await;
     if register_panic_hook {
         let _ = std::panic::take_hook();
     }
@@ -2225,6 +2226,80 @@ pub async fn run_at_with_shutdown(
     }
 
     Ok(())
+}
+
+/// Serves HTTP/1.1 connections accepted from the given listener until the
+/// shutdown signal completes, and then waits for all the open connections to
+/// finish.
+async fn serve<F, Fut>(
+    listener: tokio::net::TcpListener,
+    handler: F,
+    shutdown_signal: impl Future<Output = ()>,
+) where
+    F: FnOnce(Request) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = Response> + Send,
+{
+    let graceful = GracefulShutdown::new();
+    let mut shutdown_signal = pin!(shutdown_signal);
+
+    loop {
+        let stream = tokio::select! {
+            result = listener.accept() => match result {
+                Ok((stream, remote_addr)) => {
+                    trace!(?remote_addr, "connection accepted");
+                    stream
+                }
+                Err(error) => {
+                    handle_accept_error(error).await;
+                    continue;
+                }
+            },
+            () = &mut shutdown_signal => {
+                trace!("shutdown signal received; not accepting new connections");
+                break;
+            }
+        };
+
+        let handler = handler.clone();
+        let service = hyper::service::service_fn(move |request: http::Request<Incoming>| {
+            let handler = handler.clone();
+            async move { Ok::<_, Infallible>(handler(request.map(Body::incoming)).await) }
+        });
+        let connection = graceful.watch(
+            hyper::server::conn::http1::Builder::new()
+                .serve_connection(TokioIo::new(stream), service),
+        );
+
+        tokio::spawn(async move {
+            if let Err(error) = connection.await {
+                trace!(?error, "failed to serve connection");
+            }
+        });
+    }
+
+    drop(listener);
+    trace!("waiting for {} connection(s) to finish", graceful.count());
+    graceful.shutdown().await;
+}
+
+async fn handle_accept_error(error: std::io::Error) {
+    // these errors are specific to a single connection, so we can just
+    // accept the next one
+    if matches!(
+        error.kind(),
+        std::io::ErrorKind::ConnectionRefused
+            | std::io::ErrorKind::ConnectionAborted
+            | std::io::ErrorKind::ConnectionReset
+    ) {
+        return;
+    }
+
+    // other errors (e.g. `EMFILE` when the process has hit the limit of open
+    // files) are likely not going to go away immediately, so we wait a bit
+    // instead of spinning in a loop. This is the same strategy as used by
+    // axum.
+    error!(?error, "failed to accept connection");
+    tokio::time::sleep(Duration::from_secs(1)).await;
 }
 
 #[derive(Debug, Error)]
@@ -2254,10 +2329,7 @@ enum ErrorResponse {
     Panic(Box<dyn std::any::Any + Send>),
 }
 
-fn build_cot_error_page(
-    error_response: ErrorResponse,
-    diagnostics: &Diagnostics,
-) -> axum::response::Response {
+fn build_cot_error_page(error_response: ErrorResponse, diagnostics: &Diagnostics) -> Response {
     match error_response {
         ErrorResponse::ErrorReturned(error) => {
             error_page::handle_response_error(&error, diagnostics)
@@ -2270,7 +2342,7 @@ async fn build_custom_error_page(
     error_handler: &mut BoxCloneSyncService<Request, Response, Error>,
     error_response: ErrorResponse,
     mut request_head: RequestHead,
-) -> axum::response::Response {
+) -> Response {
     let error = match error_response {
         ErrorResponse::ErrorReturned(error) => error,
         ErrorResponse::Panic(payload) => Error::from(UncaughtPanic::new(payload)),
@@ -2291,18 +2363,15 @@ async fn build_custom_error_page(
 
     let request = Request::from_parts(request_head, Body::empty());
     let response = error_handler.call(request).await;
-    response.map_or_else(
-        |error| {
-            error!(
-                ?error,
-                "Error occurred while running custom server error handler; \
-                returning default error page"
-            );
+    response.unwrap_or_else(|error| {
+        error!(
+            ?error,
+            "Error occurred while running custom server error handler; \
+            returning default error page"
+        );
 
-            error_page::build_cot_server_error_page()
-        },
-        response_cot_to_axum,
-    )
+        error_page::build_cot_server_error_page()
+    })
 }
 
 pub(crate) fn prepare_request_for_error_handler(request_head: &mut RequestHead, error: Error) {
@@ -2351,31 +2420,13 @@ fn request_parts_for_diagnostics(request: Request) -> (Option<RequestHead>, Requ
     }
 }
 
-fn request_axum_to_cot(
-    axum_request: axum::extract::Request,
-    context: Arc<ProjectContext>,
-) -> Request {
-    let mut request = axum_request.map(Body::axum);
-    prepare_request(&mut request, context);
-    request
-}
-
 pub(crate) fn prepare_request(request: &mut Request, context: Arc<ProjectContext>) {
     request.extensions_mut().insert(context);
 }
 
-async fn pass_to_axum(
-    request: Request,
-    handler: &mut BoxedHandler,
-) -> cot::Result<axum::response::Response> {
+async fn call_handler(request: Request, handler: &mut BoxedHandler) -> cot::Result<Response> {
     poll_fn(|cx| handler.poll_ready(cx)).await?;
-    let response = handler.call(request).await?;
-
-    Ok(response_cot_to_axum(response))
-}
-
-fn response_cot_to_axum(response: Response) -> axum::response::Response {
-    response.map(axum::body::Body::new)
+    handler.call(request).await
 }
 
 async fn shutdown_signal() {
@@ -2406,18 +2457,19 @@ async fn shutdown_signal() {
 mod tests {
     use std::task::{Context, Poll};
 
-    use cot::cache;
+    use http_body_util::BodyExt;
+    use tokio::sync::Notify;
     use tower::util::MapResultLayer;
     use tower::{ServiceExt, service_fn};
 
     use super::*;
-    use crate::StatusCode;
     use crate::auth::UserId;
     use crate::config::{SecretKey, Timeout};
     use crate::error::handler::{RequestError, RequestOuterError};
     use crate::html::Html;
     use crate::request::extractors::FromRequestHead;
     use crate::test::serial_guard;
+    use crate::{StatusCode, cache};
 
     struct TestApp;
 
@@ -2708,7 +2760,7 @@ mod tests {
             build_custom_error_page(&mut error_handler, error_response, request_head).await;
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        let body_string = axum_response_into_body(response).await;
+        let body_string = response_into_body(response).await;
         assert!(body_string.contains("Custom error page content"));
     }
 
@@ -2733,15 +2785,15 @@ mod tests {
             build_custom_error_page(&mut error_handler, error_response, request_head).await;
 
         assert_eq!(response.status(), StatusCode::OK);
-        let body_string = axum_response_into_body(response).await;
+        let body_string = response_into_body(response).await;
         assert!(body_string.contains("Panic error handled"));
     }
 
     /// Test that last-resort error page (500.html) is returned
-    async fn test_last_resort_error(response: axum::response::Response) {
+    async fn test_last_resort_error(response: Response) {
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
-        let body_string = axum_response_into_body(response).await;
+        let body_string = response_into_body(response).await;
 
         assert!(body_string.contains("Server Error"));
         assert!(
@@ -2749,10 +2801,8 @@ mod tests {
         );
     }
 
-    async fn axum_response_into_body(response: axum::response::Response) -> String {
-        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
+    async fn response_into_body(response: Response) -> String {
+        let body_bytes = response.into_body().into_bytes().await.unwrap();
         let body_string = String::from_utf8_lossy(&body_bytes);
         body_string.into_owned()
     }
@@ -2766,5 +2816,135 @@ mod tests {
 
         let request_error = head.extensions.get::<RequestOuterError>().unwrap();
         assert_eq!(request_error.to_string(), "test error");
+    }
+
+    /// A helper function that adds a 10sec timeout to the passed future.
+    async fn with_timeout<F: Future>(future: F) -> F::Output {
+        tokio::time::timeout(Duration::from_secs(10), future)
+            .await
+            .expect("timed out")
+    }
+
+    struct TestServer {
+        addr: std::net::SocketAddr,
+        shutdown_tx: tokio::sync::oneshot::Sender<()>,
+        task: tokio::task::JoinHandle<()>,
+    }
+
+    impl TestServer {
+        async fn start<F, Fut>(handler: F) -> Self
+        where
+            F: FnOnce(Request) -> Fut + Clone + Send + 'static,
+            Fut: Future<Output = Response> + Send + 'static,
+        {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+            let task = tokio::spawn(serve(listener, handler, async {
+                let _ = shutdown_rx.await;
+            }));
+            Self {
+                addr,
+                shutdown_tx,
+                task,
+            }
+        }
+
+        async fn connect(&self) -> TestConnection {
+            let stream = tokio::net::TcpStream::connect(self.addr).await.unwrap();
+            let (sender, connection) = hyper::client::conn::http1::handshake(TokioIo::new(stream))
+                .await
+                .unwrap();
+            let closed = tokio::spawn(async move {
+                let _ = connection.await;
+            });
+            TestConnection { sender, closed }
+        }
+
+        fn shutdown(self) -> tokio::task::JoinHandle<()> {
+            self.shutdown_tx.send(()).unwrap();
+            self.task
+        }
+    }
+
+    struct TestConnection {
+        sender: hyper::client::conn::http1::SendRequest<Body>,
+        closed: tokio::task::JoinHandle<()>,
+    }
+
+    impl TestConnection {
+        fn get(&mut self, path: &str) -> impl Future<Output = String> + use<> {
+            let request = http::Request::get(path)
+                .header(http::header::HOST, "localhost")
+                .body(Body::empty())
+                .unwrap();
+            let response = self.sender.send_request(request);
+            async move {
+                let body = response.await.unwrap().into_body().collect().await.unwrap();
+                String::from_utf8(body.to_bytes().to_vec()).unwrap()
+            }
+        }
+
+        async fn wait_closed(self) {
+            with_timeout(self.closed).await.unwrap();
+        }
+    }
+
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `socket`"
+    )]
+    async fn serve_graceful_shutdown_closes_idle_connection() {
+        let server = TestServer::start(async |_| Response::new(Body::fixed("hello"))).await;
+        let mut connection = server.connect().await;
+        assert_eq!(with_timeout(connection.get("/")).await, "hello");
+
+        let server_task = server.shutdown();
+
+        connection.wait_closed().await;
+        with_timeout(server_task).await.unwrap();
+    }
+
+    #[cot::test]
+    #[cfg_attr(
+        miri,
+        ignore = "unsupported operation: can't call foreign function `socket`"
+    )]
+    async fn serve_graceful_shutdown_waits_for_in_flight_response() {
+        let started = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let server = TestServer::start({
+            let (started, release) = (Arc::clone(&started), Arc::clone(&release));
+            async move |request: Request| {
+                if request.uri().path() == "/slow" {
+                    started.notify_one();
+                    release.notified().await;
+                }
+                Response::new(Body::fixed("done"))
+            }
+        })
+        .await;
+
+        // closing of this connection shows that the shutdown has reached the
+        // open connections
+        let mut idle = server.connect().await;
+        with_timeout(idle.get("/")).await;
+        let mut active = server.connect().await;
+        let response = active.get("/slow");
+        with_timeout(started.notified()).await;
+
+        let server_task = server.shutdown();
+
+        idle.wait_closed().await;
+        assert!(
+            !server_task.is_finished(),
+            "server should wait for the in-flight response"
+        );
+
+        release.notify_one();
+        assert_eq!(with_timeout(response).await, "done");
+        active.wait_closed().await;
+        with_timeout(server_task).await.unwrap();
     }
 }

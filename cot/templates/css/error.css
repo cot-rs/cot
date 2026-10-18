@@ -1,0 +1,146 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
+}
+
+body {
+  line-height: 1.5;
+  font-family: "Open Sans", sans-serif;
+  font-size: small;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+em {
+  font-style: italic;
+}
+
+body {
+  background-color: #f6f6f6;
+  padding: 1rem;
+}
+
+h1 {
+  margin: -1rem -1rem 1rem -1rem;
+  padding: 0.5rem;
+  font-size: 2rem;
+  font-weight: lighter;
+}
+h1.error {
+  background-color: #ff3f4fff;
+  color: #fff;
+}
+h1.warning {
+  background-color: #ffdb5b;
+  color: #000;
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin-top: 0.75rem;
+}
+
+h3 {
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+  font-weight: bold;
+}
+
+table {
+  font-size: 0.9rem;
+  background-color: #fff;
+}
+table, table th, table td {
+  border: 1px solid #d9dde1;
+  border-collapse: collapse;
+}
+table > thead {
+  vertical-align: bottom;
+}
+table th {
+  font-weight: bold;
+}
+table th.index {
+  text-align: right;
+}
+table th, table td {
+  padding: 0.4rem;
+  border-bottom-color: #d9dde1;
+  border-bottom-width: 1px;
+}
+table.compact {
+  font-size: 0.75rem;
+}
+table.compact th, table.compact td {
+  padding: 0.1rem 0.25rem;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: "Noto Sans Mono", monospace;
+}
+pre.small {
+  font-size: 0.75rem;
+}
+pre.config {
+  background-color: #fff;
+  border: 1px solid #d9dde1;
+  padding: 1em;
+}
+
+samp {
+  font-family: "Noto Sans Mono", monospace;
+}
+
+.badge {
+  color: #fff;
+  background-color: #1876ff;
+  display: inline-block;
+  font-size: 0.7em;
+  padding: 0.25em 0.5em;
+  border-radius: 1em;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.backtrace-table {
+  display: table;
+}
+.backtrace-table .backtrace-row {
+  display: table-row;
+}
+.backtrace-table .backtrace-cell {
+  display: table-cell;
+}
+.backtrace-table .frame-index {
+  text-align: right;
+  padding-right: 0.5em;
+}
+.backtrace-table .backtrace-table .frame .symbol-name {
+  font-weight: bold;
+}
+.backtrace-table .backtrace-table .frame .symbol-location {
+  padding-left: 4em;
+}

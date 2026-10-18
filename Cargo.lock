@@ -946,7 +946,6 @@ dependencies = [
 name = "cot"
 version = "0.7.0"
 dependencies = [
- "ahash",
  "aide",
  "anstyle",
  "askama",
@@ -969,7 +968,6 @@ dependencies = [
  "form_urlencoded",
  "futures-core",
  "futures-util",
- "grass_compiler",
  "hex",
  "http 1.5.0",
  "http-body-util",
@@ -1058,6 +1056,7 @@ dependencies = [
  "cot",
  "cot-cli",
  "glob",
+ "grass_compiler",
  "libtest-mimic",
  "schemars",
  "serde_json",

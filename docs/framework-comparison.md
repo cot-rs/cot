@@ -11,7 +11,7 @@ Cot takes a different approach by providing a cohesive, integrated experience ou
 |                       | Cot                                      | Axum                      | Actix-web                  | Rocket                                   | Loco                            |
 |:----------------------|:-----------------------------------------|:--------------------------|:---------------------------|:-----------------------------------------|:--------------------------------|
 | **Philosophy**        | Batteries-included (Django-like)         | Modular / Micro-framework | Modular / High-performance | Batteries-included                       | Batteries-included (Rails-like) |
-| **Underlying Engine** | [Axum](https://github.com/tokio-rs/axum) | Hyper / Tokio             | Actix                      | Hyper / Tokio                            | Axum                            |
+| **Underlying Engine** | Hyper / Tokio                            | Hyper / Tokio             | Actix                      | Hyper / Tokio                            | Axum                            |
 | **ORM**               | Integrated (Cot ORM, based on SeaORM)    | Agnostic                  | Agnostic                   | Agnostic                                 | SeaORM                          |
 | **Admin Panel**       | **Built-in**                             | ❌                         | ❌                          | ❌                                        | ❌                               |
 | **Migrations**        | Auto-generated from structs              | External (e.g., sqlx-cli) | External                   | External                                 | External / CLI                  |
@@ -21,17 +21,17 @@ Cot takes a different approach by providing a cohesive, integrated experience ou
 
 ## Cot vs. Axum
 
-[Axum](https://github.com/tokio-rs/axum) is currently one of the most popular web frameworks in the Rust ecosystem. In fact, **Cot is built on top of Axum**.
+[Axum](https://github.com/tokio-rs/axum) is currently one of the most popular web frameworks in the Rust ecosystem. Cot and Axum share the same foundations: both are built on top of Hyper, Tokio, and the Tower ecosystem.
 
 * **Choose Axum if:** You want full control over every component of your stack, prefer a minimalist approach, or are building a microservice that doesn't need a UI or database management.
-* **Choose Cot if:** You want a full-stack experience with standard conventions. Cot handles the "glue code" for databases, authentication, and sessions so you can focus on business logic. Since Cot uses Axum internally, you often benefit from Axum's performance and compatibility with the Tower ecosystem.
+* **Choose Cot if:** You want a full-stack experience with standard conventions. Cot handles the "glue code" for databases, authentication, and sessions so you can focus on business logic. Since Cot is built on the same foundations as Axum, you benefit from similar performance and compatibility with the Tower ecosystem.
 
 ## Cot vs. Actix-web
 
 [Actix-web](https://actix.rs/) is known for its extreme performance and maturity.
 
 * **Choose Actix-web if:** Raw request-per-second performance is your primary metric, or you are deeply invested in the Actor model.
-* **Choose Cot if:** You prioritize developer velocity and ease of use over squeezing the last microsecond of performance. Cot is still very fast (thanks to Rust and Axum), but it prioritizes "getting things done" with tools like the Admin panel and auto-migrations.
+* **Choose Cot if:** You prioritize developer velocity and ease of use over squeezing the last microsecond of performance. Cot is still very fast (thanks to Rust, Hyper, and Tokio), but it prioritizes "getting things done" with tools like the Admin panel and auto-migrations.
 
 ## Cot vs. Rocket
 

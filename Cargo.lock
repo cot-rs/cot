@@ -430,34 +430,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
-name = "axum"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31b698c5f9a010f6573133b09e0de5408834d0c82f8d7475a89fc1867a71cd90"
-dependencies = [
- "axum-core",
- "bytes",
- "futures-util",
- "http 1.5.0",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-util",
- "itoa",
- "matchit 0.8.4",
- "memchr",
- "mime",
- "percent-encoding",
- "pin-project-lite",
- "serde_core",
- "sync_wrapper",
- "tokio",
- "tower",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
 name = "axum-core"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -951,7 +923,6 @@ dependencies = [
  "anstyle",
  "askama",
  "async-trait",
- "axum",
  "blake3",
  "bytes",
  "chrono",
@@ -974,12 +945,14 @@ dependencies = [
  "http 1.5.0",
  "http-body-util",
  "humantime",
+ "hyper",
+ "hyper-util",
  "idna",
  "indexmap",
  "insta",
  "is_terminal_polyfill",
  "lettre",
- "matchit 0.9.2",
+ "matchit",
  "mime",
  "mime_guess",
  "mockall",
@@ -1082,7 +1055,6 @@ version = "0.7.0"
 dependencies = [
  "askama",
  "async-stream",
- "axum",
  "backtrace",
  "bytes",
  "cot",
@@ -2706,12 +2678,6 @@ checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
 dependencies = [
  "regex-automata",
 ]
-
-[[package]]
-name = "matchit"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
 name = "matchit"

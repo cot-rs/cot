@@ -2255,7 +2255,7 @@ async fn serve<F, Fut>(
                 }
             },
             () = &mut shutdown_signal => {
-                trace!("shutdown signal received; not accepting new connections");
+                trace!("shutdown signal received; no longer accepting new connections");
                 break;
             }
         };

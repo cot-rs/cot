@@ -62,7 +62,6 @@ allow_attributes = "warn"
 needless_continue = "allow"
 
 [workspace.dependencies]
-ahash = { version = "0.8.12", default-features = false }
 aide = { version = "=0.16.0-alpha.4", default-features = false }
 anstyle = "1.0.14"
 anyhow = "1.0.104"

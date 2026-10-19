@@ -2133,7 +2133,7 @@ pub async fn run_at_with_shutdown(
     let BootstrappedProject {
         mut context,
         mut handler,
-        mut error_handler,
+        error_handler,
     } = bootstrapper.finish();
 
     #[cfg(feature = "db")]
@@ -2155,6 +2155,7 @@ pub async fn run_at_with_shutdown(
     context.apps = apps;
 
     let context = Arc::new(context);
+    let error_handler = Arc::new(error_handler);
     let is_debug = context.config().debug;
     let register_panic_hook = context.config().register_panic_hook;
     #[cfg(feature = "db")]
@@ -2193,7 +2194,7 @@ pub async fn run_at_with_shutdown(
                     build_cot_error_page(error_response, &diagnostics)
                 } else {
                     build_custom_error_page(
-                        &mut error_handler,
+                        &mut BoxedHandler::clone(&error_handler),
                         error_response,
                         head_for_error_handler,
                     )

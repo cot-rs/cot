@@ -380,10 +380,14 @@ impl Display for DateTimeWithTimezoneField {
         if self.options.required {
             tag.bool_attr("required");
         }
+        // `datetime-local` inputs don't support offsets, so the bounds and the
+        // value are all rendered in the configured timezone.
+        let tz = self.custom_options.timezone.unwrap_or(Tz::UTC);
         if let Some(max) = self.custom_options.max {
             tag.attr(
                 "max",
-                max.naive_local()
+                max.with_timezone(&tz)
+                    .naive_local()
                     .format(BROWSER_DATETIME_WITHOUT_SEC_FMT)
                     .to_string(),
             );
@@ -391,7 +395,8 @@ impl Display for DateTimeWithTimezoneField {
         if let Some(min) = self.custom_options.min {
             tag.attr(
                 "min",
-                min.naive_local()
+                min.with_timezone(&tz)
+                    .naive_local()
                     .format(BROWSER_DATETIME_WITHOUT_SEC_FMT)
                     .to_string(),
             );
@@ -404,12 +409,10 @@ impl Display for DateTimeWithTimezoneField {
         }
 
         if let Some(value) = &self.value {
-            // Values set with `to_field_value` carry an offset, which
-            // `datetime-local` inputs don't support, so convert them to the
-            // configured timezone first.
+            // Values set with `to_field_value` carry an offset, so convert
+            // them to the configured timezone first.
             let value = match DateTime::parse_from_rfc3339(value) {
                 Ok(date_time) => {
-                    let tz = self.custom_options.timezone.unwrap_or(Tz::UTC);
                     format_browser_datetime(&date_time.with_timezone(&tz).naive_local())
                 }
                 Err(_) => value.clone(),
@@ -487,13 +490,14 @@ impl AsFormField for DateTime<FixedOffset> {
         Ok(date_time)
     }
 
-    /// Formats the value as an RFC 3339 string with millisecond precision.
+    /// Formats the value as an RFC 3339 string with full subsecond precision.
     ///
-    /// The offset is kept so that the exact instant is preserved;
-    /// [`DateTimeWithTimezoneField`] converts it to its configured timezone
-    /// when rendering the `datetime-local` input.
+    /// The offset and precision are kept so that the exact instant is
+    /// preserved; [`DateTimeWithTimezoneField`] converts it to its configured
+    /// timezone and limits the precision when rendering the `datetime-local`
+    /// input.
     fn to_field_value(&self) -> String {
-        self.to_rfc3339_opts(SecondsFormat::Millis, false)
+        self.to_rfc3339_opts(SecondsFormat::AutoSi, false)
     }
 }
 
@@ -1455,6 +1459,80 @@ mod tests {
             .set_value(FormFieldValue::new_text("2025-05-27T01:23:00"))
             .await
             .unwrap();
+        assert_eq!(DateTime::<FixedOffset>::clean_value(&field).unwrap(), dt);
+    }
+
+    #[cot::test]
+    async fn datetime_with_tz_render_bounds_in_configured_timezone() {
+        let min = DateTime::parse_from_rfc3339("2025-05-27T14:00:00+02:00").unwrap();
+        let max = DateTime::parse_from_rfc3339("2025-05-27T10:00:00-04:00").unwrap();
+        let value = DateTime::parse_from_rfc3339("2025-05-27T14:30:00+02:00").unwrap();
+
+        let options = FormFieldOptions::builder()
+            .id("dt".into())
+            .name("dt".into())
+            .build();
+
+        // UTC by default
+        let mut field = DateTimeWithTimezoneField::with_options(
+            options.clone(),
+            DateTimeWithTimezoneFieldOptions::builder()
+                .min(min)
+                .max(max)
+                .build(),
+        );
+        field
+            .set_value(FormFieldValue::new_text(value.to_field_value()))
+            .await
+            .unwrap();
+        let html = field.to_string();
+        assert!(html.contains("min=\"2025-05-27T12:00\""));
+        assert!(html.contains("max=\"2025-05-27T14:00\""));
+        assert!(html.contains("value=\"2025-05-27T12:30:00\""));
+
+        // custom timezone
+        let mut field = DateTimeWithTimezoneField::with_options(
+            options,
+            DateTimeWithTimezoneFieldOptions::builder()
+                .min(min)
+                .max(max)
+                .timezone(Tz::America__New_York)
+                .build(),
+        );
+        field
+            .set_value(FormFieldValue::new_text(value.to_field_value()))
+            .await
+            .unwrap();
+        let html = field.to_string();
+        assert!(html.contains("min=\"2025-05-27T08:00\""));
+        assert!(html.contains("max=\"2025-05-27T10:00\""));
+        assert!(html.contains("value=\"2025-05-27T08:30:00\""));
+    }
+
+    #[cot::test]
+    async fn datetime_with_tz_to_field_value_preserves_subsecond_precision() {
+        let dt = DateTime::parse_from_rfc3339("2025-05-27T12:34:56.789123+02:00").unwrap();
+        assert_eq!(dt.to_field_value(), "2025-05-27T12:34:56.789123+02:00");
+
+        let mut field = DateTimeWithTimezoneField::with_options(
+            FormFieldOptions::builder()
+                .id("dt".into())
+                .name("dt".into())
+                .required(true)
+                .build(),
+            DateTimeWithTimezoneFieldOptions::builder().min(dt).build(),
+        );
+        field
+            .set_value(FormFieldValue::new_text(dt.to_field_value()))
+            .await
+            .unwrap();
+        // browsers only get millisecond precision
+        assert!(
+            field
+                .to_string()
+                .contains("value=\"2025-05-27T10:34:56.789\"")
+        );
+        // but the stored value keeps the exact instant, so it passes `min`
         assert_eq!(DateTime::<FixedOffset>::clean_value(&field).unwrap(), dt);
     }
 

@@ -37,8 +37,8 @@ impl SymbolResolver {
         Self::new(imports)
     }
 
-    /// Return the list of top-level `use` statements, structs, and constants as
-    /// a list of [`VisibleSymbol`]s from the file.
+    /// Return the list of top-level `use` statements, structs, enums, type
+    /// aliases, and constants as a list of [`VisibleSymbol`]s from the file.
     #[cfg(feature = "symbol-resolver")]
     fn get_imports(file: &syn::File, module_path: &ModulePath) -> Vec<VisibleSymbol> {
         let mut imports = Vec::new();
@@ -50,6 +50,12 @@ impl SymbolResolver {
                 }
                 syn::Item::Struct(item_struct) => {
                     imports.push(VisibleSymbol::from_item_struct(item_struct, module_path));
+                }
+                syn::Item::Enum(item_enum) => {
+                    imports.push(VisibleSymbol::from_item_enum(item_enum, module_path));
+                }
+                syn::Item::Type(item_type) => {
+                    imports.push(VisibleSymbol::from_item_type(item_type, module_path));
                 }
                 syn::Item::Const(item_const) => {
                     imports.push(VisibleSymbol::from_item_const(item_const, module_path));
@@ -186,6 +192,8 @@ pub struct VisibleSymbol {
 pub enum VisibleSymbolKind {
     Use,
     Struct,
+    Enum,
+    TypeAlias,
     Const,
 }
 
@@ -224,6 +232,30 @@ impl VisibleSymbol {
             alias: ident,
             full_path,
             kind: VisibleSymbolKind::Struct,
+        }
+    }
+
+    #[cfg(feature = "symbol-resolver")]
+    fn from_item_enum(item: &syn::ItemEnum, module_path: &ModulePath) -> Self {
+        let ident = item.ident.to_string();
+        let full_path = Self::module_path(module_path, &ident);
+
+        Self {
+            alias: ident,
+            full_path,
+            kind: VisibleSymbolKind::Enum,
+        }
+    }
+
+    #[cfg(feature = "symbol-resolver")]
+    fn from_item_type(item: &syn::ItemType, module_path: &ModulePath) -> Self {
+        let ident = item.ident.to_string();
+        let full_path = Self::module_path(module_path, &ident);
+
+        Self {
+            alias: ident,
+            full_path,
+            kind: VisibleSymbolKind::TypeAlias,
         }
     }
 
@@ -377,6 +409,10 @@ use self::MyThirdModel;
 
 struct MyFourthModel {}
 
+enum MyEnum {}
+
+type MyAlias = u8;
+
 const MY_CONSTANT: u8 = 42;
         ";
 
@@ -434,6 +470,16 @@ const MY_CONSTANT: u8 = 42;
                 alias: "MyFourthModel".to_string(),
                 full_path: "crate::foo::bar::MyFourthModel".to_string(),
                 kind: VisibleSymbolKind::Struct,
+            },
+            VisibleSymbol {
+                alias: "MyEnum".to_string(),
+                full_path: "crate::foo::bar::MyEnum".to_string(),
+                kind: VisibleSymbolKind::Enum,
+            },
+            VisibleSymbol {
+                alias: "MyAlias".to_string(),
+                full_path: "crate::foo::bar::MyAlias".to_string(),
+                kind: VisibleSymbolKind::TypeAlias,
             },
             VisibleSymbol {
                 alias: "MY_CONSTANT".to_string(),

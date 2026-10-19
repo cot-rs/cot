@@ -2236,11 +2236,12 @@ async fn serve<F, Fut>(
     handler: F,
     shutdown_signal: impl Future<Output = ()>,
 ) where
-    F: FnOnce(Request) -> Fut + Clone + Send + 'static,
+    F: FnOnce(Request) -> Fut + Clone + Send + Sync + 'static,
     Fut: Future<Output = Response> + Send,
 {
     let graceful = GracefulShutdown::new();
     let mut shutdown_signal = pin!(shutdown_signal);
+    let handler = Arc::new(handler);
 
     loop {
         let stream = tokio::select! {
@@ -2260,9 +2261,9 @@ async fn serve<F, Fut>(
             }
         };
 
-        let handler = handler.clone();
+        let handler = Arc::clone(&handler);
         let service = hyper::service::service_fn(move |request: http::Request<Incoming>| {
-            let handler = handler.clone();
+            let handler = F::clone(&handler);
             async move { Ok::<_, Infallible>(handler(request.map(Body::incoming)).await) }
         });
         let connection = graceful.watch(
@@ -2834,7 +2835,7 @@ mod tests {
     impl TestServer {
         async fn start<F, Fut>(handler: F) -> Self
         where
-            F: FnOnce(Request) -> Fut + Clone + Send + 'static,
+            F: FnOnce(Request) -> Fut + Clone + Send + Sync + 'static,
             Fut: Future<Output = Response> + Send + 'static,
         {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

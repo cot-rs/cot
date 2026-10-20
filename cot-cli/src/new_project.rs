@@ -101,7 +101,7 @@ pub fn new_project(
     Ok(())
 }
 
-fn generate_secret_key() -> String {
+pub fn generate_secret_key() -> String {
     // Cryptographically secure random number generator:
     // https://rust-random.github.io/book/guide-rngs.html#cryptographically-secure-pseudo-random-number-generators-csprngs
     // https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html#secure-random-number-generation

@@ -6,11 +6,11 @@ use std::marker::PhantomData;
 use std::ops::{Add, Div, Mul, Sub};
 
 use cot::db::query::{IntoField, QueryBuildingError};
-use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, ToDbFieldValue};
+use cot::db::{DbFieldValue, DbValue, FromDbValue, Identifier, TextField, ToDbFieldValue};
 pub use like::ExprLike;
 use like::{CaseSensitivity, LikeExprBuilder, LikeMode};
 pub use order_by::{ExprSort, NullsOrder, OrderByExpr, SortOrder};
-use sea_query::{ExprTrait, IntoColumnRef, SimpleExpr};
+use sea_query::{ExprTrait, Func, IntoColumnRef, SimpleExpr};
 
 use crate::db::ToDbValue;
 use crate::db::query::expr::order_by::OrderTarget;
@@ -302,6 +302,8 @@ pub enum Expr {
     /// );
     /// ```
     Add(Box<Expr>, Box<Expr>),
+    /// A string concatenation expression.
+    Concat(Box<Expr>, Box<Expr>),
     /// A `-` expression.
     ///
     /// # Example
@@ -789,6 +791,14 @@ impl Expr {
     #[must_use]
     pub fn add(lhs: Self, rhs: Self) -> Self {
         Self::Add(Box::new(lhs), Box::new(rhs))
+    }
+
+    /// Creates a string concatenation expression.
+    ///
+    /// This is translated to the portable SQL `CONCAT(lhs, rhs)` function.
+    #[must_use]
+    pub fn concat(lhs: Self, rhs: Self) -> Self {
+        Self::Concat(Box::new(lhs), Box::new(rhs))
     }
 
     /// Create a new `-` expression.
@@ -1345,6 +1355,10 @@ impl Expr {
             Self::Add(lhs, rhs) => Ok(lhs
                 .as_sea_query_expr(sql_builder)?
                 .add(rhs.as_sea_query_expr(sql_builder)?)),
+            Self::Concat(lhs, rhs) => Ok(Func::cust(Identifier::new("CONCAT"))
+                .arg(lhs.as_sea_query_expr(sql_builder)?)
+                .arg(rhs.as_sea_query_expr(sql_builder)?)
+                .into()),
             Self::Sub(lhs, rhs) => Ok(lhs
                 .as_sea_query_expr(sql_builder)?
                 .sub(rhs.as_sea_query_expr(sql_builder)?)),
@@ -1500,6 +1514,18 @@ impl<T: ToDbFieldValue + 'static> ExprEq<T> for FieldRef<T> {
 
     fn ne<V: IntoField<T>>(self, other: V) -> Expr {
         Expr::ne(self.as_expr(), Expr::value(other.into_field()))
+    }
+}
+
+/// Concatenates a text database field with another text value.
+pub trait ExprConcat {
+    /// Creates a string concatenation expression.
+    fn concat<V: ToDbFieldValue>(self, other: V) -> Expr;
+}
+
+impl<T: TextField> ExprConcat for FieldRef<T> {
+    fn concat<V: ToDbFieldValue>(self, other: V) -> Expr {
+        Expr::concat(self.as_expr(), Expr::value(other))
     }
 }
 

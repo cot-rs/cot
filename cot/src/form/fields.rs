@@ -1308,7 +1308,7 @@ mod tests {
         assert!(html.contains("dirname=\"dir\""));
         assert!(html.contains("placeholder=\"Enter text\""));
         assert!(html.contains("readonly"));
-        assert!(html.contains("<datalist id=\"__test_datalist\"><option value=\"bar\"/><option value=\"baz\"/></datalist>"));
+        assert!(html.contains("<datalist id=\"__test_datalist\"><option value=\"bar\"></option><option value=\"baz\"></option></datalist>"));
     }
 
     #[cot::test]
@@ -1423,7 +1423,7 @@ mod tests {
         assert!(html.contains("dir=\"ltr\""));
         assert!(html.contains("dirname=\"dir\""));
         assert!(html.contains("list=\"__test_id_datalist\""));
-        assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com"/><option value="baz@example.com"/></datalist>"#));
+        assert!(html.contains(r#"<datalist id="__test_id_datalist"><option value="foo@example.com"></option><option value="baz@example.com"></option></datalist>"#));
     }
 
     #[cot::test]

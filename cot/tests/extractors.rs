@@ -39,3 +39,65 @@ async fn request_email() {
 
     assert!(email_service.send(message).await.is_ok());
 }
+
+#[cot::e2e_test]
+#[cfg_attr(
+    miri,
+    ignore = "unsupported operation: setsockopt: option 0x4 is unsupported for level IPPROTO_TCP"
+)]
+async fn client_ip_addr() {
+    use cot::cli::CliMetadata;
+    use cot::config::ProjectConfig;
+    use cot::html::Html;
+    use cot::project::RegisterAppsContext;
+    use cot::request::extractors::ClientIpAddr;
+    use cot::router::{Route, Router};
+    use cot::test::TestServerBuilder;
+    use cot::{App, AppBuilder, Project};
+
+    async fn client_ip(client_ip: ClientIpAddr) -> Html {
+        Html::new(client_ip.ip().to_string())
+    }
+
+    struct ClientIpApp;
+    impl App for ClientIpApp {
+        fn name(&self) -> &'static str {
+            "client_ip"
+        }
+
+        fn router(&self) -> Router {
+            Router::with_urls([Route::with_handler("/", client_ip)])
+        }
+    }
+
+    struct ClientIpProject;
+    impl Project for ClientIpProject {
+        fn cli_metadata(&self) -> CliMetadata {
+            cot::cli::metadata!()
+        }
+
+        fn config(&self, _config_name: &str) -> cot::Result<ProjectConfig> {
+            ProjectConfig::from_toml(
+                r#"
+                [client_ip]
+                proxies = ["127.0.0.1/32"]
+                "#,
+            )
+        }
+
+        fn register_apps(&self, apps: &mut AppBuilder, _context: &RegisterAppsContext) {
+            apps.register_with_views(ClientIpApp, "");
+        }
+    }
+
+    let server = TestServerBuilder::new(ClientIpProject).start().await;
+    let response = reqwest::Client::new()
+        .get(server.url())
+        .header("X-Forwarded-For", "6.6.6.6, 203.0.113.1")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.text().await.unwrap(), "203.0.113.1");
+    server.close().await;
+}

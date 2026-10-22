@@ -28,7 +28,7 @@ Any top-level table not listed below is preserved as-is and made available to yo
 | `cache` | table | [*(see below)*](#cache) | Cache subsystem configuration. |
 | `static_files` | table | [*(see below)*](#static_files) | Static files configuration. |
 | `middlewares` | table | [*(see below)*](#middlewares) | Middleware configuration. |
-| `client_ip` | table | [*(see below)*](#client_ip) | Configuration related to proxies before the application. In case this application is behind a proxy, it would be reasonable to configure this proxy here, so it can be appropriately handled for peer address detection. See `ClientIpConfig` for further details. |
+| `client_ip` | table | [*(see below)*](#client_ip) | Client IP address detection configuration. |
 | `email` | table | [*(see below)*](#email) | Email backend configuration. |
 
 ## `[auth_backend]`
@@ -150,8 +150,8 @@ Cache-based session storage. This stores session data in a cache service like Re
 
 | Key | TOML Type | Default | Description |
 |---|---|---|---|
-| `proxies` | array of strings | `[]` | IP addresses to accept as proxies. |
-| `headers` | array of strings | `["x-forwarded-for"]` | Headers to look for when receiving a request from a proxy. |
+| `proxies` | array of strings | `[]` | The networks of the proxies, in CIDR notation, whose headers are trusted. Trusting `0.0.0.0/0` or `::/0` allows any client to spoof its IP address. |
+| `headers` | array of strings | `["x-forwarded-for"]` | The headers to read the client IP from when the request comes from a trusted proxy. The first header present in the request is used. Besides `Forwarded` and `X-Forwarded-For`, any header containing a single IP address can be used, such as `X-Real-IP` or `CF-Connecting-IP`. Only list headers that your proxies set or overwrite; otherwise, clients can set them. |
 
 ## `[email]`
 

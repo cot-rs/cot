@@ -38,7 +38,7 @@ use tracing::debug;
 use crate::error::NotFound;
 use crate::request::{PathParams, Request, RequestExt, RequestHead};
 use crate::response::Response;
-use crate::router::path::{PathMatcher, ReverseParamMap};
+use crate::router::path::{PathMatcher, ReverseParamMap, normalize_percent_encoding};
 use crate::router::tree::{Entry, MatchitPattern, RouteTrie};
 use crate::{Error, ProjectContext, Result};
 
@@ -252,7 +252,10 @@ impl Router {
         if let Some(result) = self.get_handler(request_path) {
             let mut path_params = PathParams::new();
             for (key, value) in &result.params {
-                let value = percent_decode_str(value).decode_utf8_lossy();
+                let Ok(value) = percent_decode_str(value).decode_utf8() else {
+                    debug!("Invalid UTF-8 in path parameter: {}", request_path);
+                    return Err(Error::from(NotFound::router()));
+                };
                 path_params.insert(key.clone(), value.into_owned());
             }
             request.extensions_mut().insert(path_params);
@@ -270,7 +273,8 @@ impl Router {
     }
 
     fn get_handler(&self, request_path: &str) -> Option<HandlerFound<'_>> {
-        let m = self.route_tree.at(request_path)?;
+        let request_path = normalize_percent_encoding(request_path);
+        let m = self.route_tree.at(&request_path)?;
 
         let (route_index, remaining_path) = match m.value {
             Entry::Handler(idx) => (*idx, String::new()),
@@ -1532,6 +1536,24 @@ mod tests {
         let request = TestRequestBuilder::get("/caf%C3%A9/za%C5%BC%C3%B3%C5%82%C4%87/").build();
         let response = router.handle(request).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[cot::test]
+    async fn router_normalizes_percent_encoding() {
+        let router = Router::with_urls([Route::with_handler("/café/", MockHandler)]);
+
+        let request = TestRequestBuilder::get("/%63af%c3%a9/").build();
+        let response = router.handle(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[cot::test]
+    async fn router_rejects_invalid_utf8_params() {
+        let router = Router::with_urls([Route::with_handler("/{slug}/", MockHandler)]);
+
+        let request = TestRequestBuilder::get("/%FF/").build();
+        let error = router.handle(request).await.unwrap_err();
+        assert_eq!(error.status_code(), StatusCode::NOT_FOUND);
     }
 
     #[cot::test]

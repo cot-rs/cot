@@ -125,6 +125,11 @@ impl AsRef<str> for Html {
     }
 }
 
+const VOID_ELEMENTS: &[&str] = &[
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
+    "wbr",
+];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HtmlNode {
     /// An HTML tag with attributes and potential children.
@@ -179,7 +184,7 @@ impl HtmlTag {
     /// use cot::html::HtmlTag;
     ///
     /// let tag = HtmlTag::new("div");
-    /// assert_eq!(tag.render().as_str(), "<div/>");
+    /// assert_eq!(tag.render().as_str(), "<div></div>");
     /// ```
     #[must_use]
     pub fn new(tag: &str) -> Self {
@@ -333,13 +338,14 @@ impl HtmlTag {
     /// let mut div = HtmlTag::new("div");
     /// let span = HtmlTag::new("span");
     /// div.push_tag(span);
-    /// assert_eq!(div.render().as_str(), "<div><span/></div>");
+    /// assert_eq!(div.render().as_str(), "<div><span></span></div>");
     /// ```
     pub fn push_tag<T: Into<HtmlTag>>(&mut self, tag: T) -> &mut Self {
         self.push_child(HtmlNode::Tag(tag.into()))
     }
 
-    /// Renders the HTML tag.
+    /// Renders the HTML tag. Only [void elements](https://developer.mozilla.org/en-US/docs/Glossary/Void_element)
+    /// are rendered as self-closing tags.
     ///
     /// # Panics
     ///
@@ -351,7 +357,7 @@ impl HtmlTag {
     /// use cot::html::HtmlTag;
     ///
     /// let tag = HtmlTag::new("div");
-    /// assert_eq!(tag.render().as_str(), "<div/>");
+    /// assert_eq!(tag.render().as_str(), "<div></div>");
     /// ```
     #[must_use]
     pub fn render(&self) -> Html {
@@ -371,7 +377,7 @@ impl HtmlTag {
             write!(&mut result, " {key}").expect(FAIL_MSG);
         }
 
-        if self.children.is_empty() {
+        if self.children.is_empty() && VOID_ELEMENTS.contains(&self.tag.as_str()) {
             write!(&mut result, "/>").expect(FAIL_MSG);
         } else {
             write!(&mut result, ">").expect(FAIL_MSG);
@@ -457,13 +463,13 @@ mod tests {
     fn test_html_node_tag() {
         let tag = HtmlTag::new("div");
         let node = HtmlNode::Tag(tag);
-        assert_eq!(node.render().as_str(), "<div/>");
+        assert_eq!(node.render().as_str(), "<div></div>");
     }
 
     #[test]
     fn test_html_tag_new() {
         let tag = HtmlTag::new("div");
-        assert_eq!(tag.render().as_str(), "<div/>");
+        assert_eq!(tag.render().as_str(), "<div></div>");
     }
 
     #[test]

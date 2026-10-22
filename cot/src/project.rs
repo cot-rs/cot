@@ -67,7 +67,7 @@ use crate::error_page::Diagnostics;
 use crate::html::Html;
 use crate::metadata::{METADATA_FLAG, ProjectMetadata};
 use crate::middleware::{IntoCotError, IntoCotErrorLayer, IntoCotResponse, IntoCotResponseLayer};
-use crate::request::{Request, RequestExt, RequestHead};
+use crate::request::{RemoteAddr, Request, RequestExt, RequestHead};
 use crate::response::{IntoResponse, Response};
 use crate::router::{Route, Router, RouterService};
 use crate::static_files::StaticFile;
@@ -2244,11 +2244,11 @@ async fn serve<F, Fut>(
     let handler = Arc::new(handler);
 
     loop {
-        let stream = tokio::select! {
+        let (stream, remote_addr) = tokio::select! {
             result = listener.accept() => match result {
                 Ok((stream, remote_addr)) => {
                     trace!(?remote_addr, "connection accepted");
-                    stream
+                    (stream, remote_addr)
                 }
                 Err(error) => {
                     handle_accept_error(error).await;
@@ -2262,7 +2262,8 @@ async fn serve<F, Fut>(
         };
 
         let handler = Arc::clone(&handler);
-        let service = hyper::service::service_fn(move |request: http::Request<Incoming>| {
+        let service = hyper::service::service_fn(move |mut request: http::Request<Incoming>| {
+            request.extensions_mut().insert(RemoteAddr(remote_addr));
             let handler = F::clone(&handler);
             async move { Ok::<_, Infallible>(handler(request.map(Body::incoming)).await) }
         });

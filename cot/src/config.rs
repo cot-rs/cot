@@ -1221,11 +1221,10 @@ impl StaticFilesConfig {
 
 /// Configure how proxies are handled for detecting peer IP addresses.
 ///
-/// Supported headers are:
-/// - `Forwarded`
-/// - `X-Forwarded-For`
-/// - `CF-Connecting-IP`
-/// - `X-Real-IP`
+/// Supported headers are `Forwarded`, `X-Forwarded-For` and, using the
+/// [`ClientIpHeader::Custom`] variant, any header containing a single IP
+/// address, such as `CF-Connecting-IP` or `X-Real-IP`. Only list headers that
+/// your proxies set or overwrite; otherwise, clients can set them.
 ///
 /// A proxy must be specified in `CIDR` notation.
 /// Only configured headers from configured proxies will be accepted. All others
@@ -1236,16 +1235,12 @@ impl StaticFilesConfig {
 /// # Example
 ///
 /// ```rust
-/// use std::net::IpAddr;
-/// use std::str::FromStr;
-/// use std::time::Duration;
-///
 /// use cot::config::ProjectConfig;
 ///
 /// let config = ProjectConfig::from_toml(
 ///     r#"
 /// [client_ip]
-/// proxies = ["192.168.1.0/8"]
+/// proxies = ["10.0.0.0/8"]
 /// headers = ["Forwarded"]
 /// "#,
 /// )?;
@@ -1253,15 +1248,18 @@ impl StaticFilesConfig {
 /// # Ok::<(), cot::Error>(())
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
 #[builder(build_fn(name = "build_impl"))]
 pub struct ClientIpConfig {
     #[builder(default)]
     #[serde(default)]
+    #[cfg_attr(feature = "_internal_config-docs", schemars(with = "Vec<String>"))]
     /// IP addresses to accept as proxies.
     pub proxies: Vec<ipnet::IpNet>,
 
     #[builder(default = "default_client_ip_headers()")]
     #[serde(default = "default_client_ip_headers")]
+    #[cfg_attr(feature = "_internal_config-docs", schemars(with = "Vec<String>"))]
     /// Headers to look for when receiving a request from a proxy.
     pub headers: Vec<ClientIpHeader>,
 }

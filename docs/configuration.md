@@ -28,6 +28,7 @@ Any top-level table not listed below is preserved as-is and made available to yo
 | `cache` | table | [*(see below)*](#cache) | Cache subsystem configuration. |
 | `static_files` | table | [*(see below)*](#static_files) | Static files configuration. |
 | `middlewares` | table | [*(see below)*](#middlewares) | Middleware configuration. |
+| `client_ip` | table | [*(see below)*](#client_ip) | Configuration related to proxies before the application. In case this application is behind a proxy, it would be reasonable to configure this proxy here, so it can be appropriately handled for peer address detection. See `ClientIpConfig` for further details. |
 | `email` | table | [*(see below)*](#email) | Email backend configuration. |
 
 ## `[auth_backend]`
@@ -145,6 +146,13 @@ Cache-based session storage. This stores session data in a cache service like Re
 |---|---|---|---|
 | `uri` | string | — | The URI to the cache service. |
 
+## `[client_ip]`
+
+| Key | TOML Type | Default | Description |
+|---|---|---|---|
+| `proxies` | array of strings | `[]` | IP addresses to accept as proxies. |
+| `headers` | array of strings | `["x-forwarded-for"]` | Headers to look for when receiving a request from a proxy. |
+
 ## `[email]`
 
 | Key | TOML Type | Default | Description |
@@ -212,6 +220,10 @@ always_save = false
 
 [middlewares.session.store]
 type = "memory"
+
+[client_ip]
+proxies = []
+headers = ["x-forwarded-for"]
 
 [email.transport]
 type = "console"

@@ -18,76 +18,37 @@ fn ip_or_socket_string_to_ip(s: &str) -> Option<IpAddr> {
     None
 }
 
-/// Extracts the left-most remote address from an HTTP `Forwarded` header.
-///
-/// # Errors
-/// The function will fail if the header is malformed.
-pub fn extract_forwarded(header: &HeaderValue) -> crate::Result<Option<IpAddr>> {
-    match header.to_str() {
-        Ok(v) => {
-            match v
-                .to_lowercase()
-                .split(',')
-                .map(str::trim)
-                .next()
-                .map(|first| {
-                    first
-                        .split(';')
-                        .find(|seg| seg.starts_with("for="))
-                        .map(|for_segments| {
-                            for ele in for_segments
-                                .split(',')
-                                .map(|s| s.trim().trim_start_matches("for="))
-                                .map(|s| s.trim_matches('"'))
-                            {
-                                if let Some(addr) = ip_or_socket_string_to_ip(dbg!(ele)) {
-                                    return Some(dbg!(addr));
-                                }
-                            }
-                            None
-                        })
-                }) {
-                Some(Some(ip)) => Ok(dbg!(ip)),
-                Some(None) | None => Err(crate::Error::internal("No valid IP address was found.")),
-            }
-        }
-        Err(err) => Err(crate::Error::internal(format!(
-            "HTTP header containing non-ASCII characters: {err}"
-        ))),
-    }
+/// Extracts the remote addresses from an HTTP `Forwarded` header, in order.
+/// Invalid or obfuscated addresses are returned as `None`.
+pub fn extract_forwarded(header: &HeaderValue) -> Vec<Option<IpAddr>> {
+    header
+        .to_str()
+        .unwrap_or_default()
+        .split(',')
+        .map(|element| {
+            element
+                .split(';')
+                .filter_map(|pair| pair.split_once('='))
+                .find(|(key, _)| key.trim().eq_ignore_ascii_case("for"))
+                .and_then(|(_, node)| ip_or_socket_string_to_ip(node.trim().trim_matches('"')))
+        })
+        .collect()
 }
 
-/// Extract the left-most remote address from an HTTP `X-Forwarded-For` header.
-///
-/// # Errors
-/// The function will fail if the header is malformed.
-pub fn extract_x_forwarded_for(header: &HeaderValue) -> crate::Result<Option<IpAddr>> {
-    match header.to_str() {
-        Ok(v) => match v.split(',').map(str::trim).next().map(IpAddr::from_str) {
-            Some(Ok(ip)) => Ok(Some(ip)),
-            Some(Err(err)) => Err(crate::Error::internal(format!(
-                "Malformed IP address: {err}"
-            ))),
-            None => Ok(None),
-        },
-        Err(err) => Err(crate::Error::internal(format!(
-            "HTTP header containing non-ASCII characters: {err}"
-        ))),
-    }
+/// Extracts the remote addresses from an HTTP `X-Forwarded-For` header, in
+/// order. Invalid addresses are returned as `None`.
+pub fn extract_x_forwarded_for(header: &HeaderValue) -> Vec<Option<IpAddr>> {
+    header
+        .to_str()
+        .unwrap_or_default()
+        .split(',')
+        .map(|ip| IpAddr::from_str(ip.trim()).ok())
+        .collect()
 }
 
-/// Extract a single IP from a header value
-///
-/// # Errors
-/// If the IP address or header value is malformed.
-pub fn extract_single_ip(header: &HeaderValue) -> crate::Result<IpAddr> {
-    match header.to_str() {
-        Ok(v) => IpAddr::from_str(v)
-            .map_err(|err| crate::Error::internal(format!("Malformed IP address: {err}"))),
-        Err(err) => Err(crate::Error::internal(format!(
-            "HTTP header containing non-ASCII characters: {err}"
-        ))),
-    }
+/// Extracts a single IP address from a header value.
+pub fn extract_single_ip(header: &HeaderValue) -> Option<IpAddr> {
+    IpAddr::from_str(header.to_str().ok()?.trim()).ok()
 }
 
 #[cfg(test)]
@@ -104,8 +65,7 @@ mod tests {
         assert_eq!(
             extract_forwarded(
                 &HeaderValue::from_str("proto=http;for=1.2.3.4;by=32.4.2.5").unwrap()
-            )
-            .unwrap()
+            )[0]
             .unwrap(),
             Ipv4Addr::new(1, 2, 3, 4)
         );
@@ -117,26 +77,26 @@ mod tests {
             extract_forwarded(
                 &HeaderValue::from_str("by=10.0.0.1;for=203.0.113.95, by=10.0.0.2;for=10.0.0.1")
                     .unwrap()
-            )
-            .unwrap()
+            )[0]
             .unwrap(),
             Ipv4Addr::new(203, 0, 113, 95)
         );
     }
 
     #[cot::test]
-    async fn forwarded_v4_malformed() {
-        assert!(
-            extract_forwarded(&HeaderValue::from_str("by=10.0.0.1; for=203.0.113.95").unwrap())
-                .is_err()
+    async fn forwarded_v4_whitespace() {
+        assert_eq!(
+            extract_forwarded(&HeaderValue::from_str("by=10.0.0.1; for=203.0.113.95").unwrap())[0]
+                .unwrap(),
+            Ipv4Addr::new(203, 0, 113, 95)
         );
     }
 
     #[cot::test]
-    async fn forwarded_v4_malformed_alternative() {
+    async fn forwarded_v4_element_without_for() {
         assert!(
-            extract_forwarded(&HeaderValue::from_str("by=10.0.0.1, for=203.0.113.95").unwrap())
-                .is_err()
+            extract_forwarded(&HeaderValue::from_str("by=10.0.0.1, for=203.0.113.95").unwrap())[0]
+                .is_none()
         );
     }
 
@@ -145,8 +105,7 @@ mod tests {
         assert_eq!(
             extract_forwarded(
                 &HeaderValue::from_str("proto=http;for=1.2.3.4:3489;by=32.4.2.5").unwrap()
-            )
-            .unwrap()
+            )[0]
             .unwrap(),
             Ipv4Addr::new(1, 2, 3, 4)
         );
@@ -156,8 +115,8 @@ mod tests {
     async fn forwarded_valid_v6() {
         assert_eq!(
             extract_forwarded(&HeaderValue::from_str("For=\"[2001:db8:cafe::17]:4711\"").unwrap())
-                .unwrap()
-                .unwrap(),
+                [0]
+            .unwrap(),
             IP_V6_CAFE_17
         );
     }
@@ -165,8 +124,7 @@ mod tests {
     #[cot::test]
     async fn forwarded_valid_v6_no_port() {
         assert_eq!(
-            extract_forwarded(&HeaderValue::from_str("For=\"[2001:db8:cafe::17]\"").unwrap())
-                .unwrap()
+            extract_forwarded(&HeaderValue::from_str("For=\"[2001:db8:cafe::17]\"").unwrap())[0]
                 .unwrap(),
             IP_V6_CAFE_17
         );
@@ -175,8 +133,7 @@ mod tests {
     #[cot::test]
     async fn forwarded_valid_v6_no_port_brackets() {
         assert_eq!(
-            extract_forwarded(&HeaderValue::from_str("For=\"2001:db8:cafe::17\"").unwrap())
-                .unwrap()
+            extract_forwarded(&HeaderValue::from_str("For=\"2001:db8:cafe::17\"").unwrap())[0]
                 .unwrap(),
             IP_V6_CAFE_17
         );
@@ -184,7 +141,7 @@ mod tests {
 
     #[cot::test]
     async fn multiple_forwarded_header_valid_v6() {
-        assert_eq!(extract_forwarded(&HeaderValue::from_str("BY=32.234.40.5;For=\"[2001:db8:cafe::17]:4711\", \"[2003:db8:caff::17]:4711\";proto=http").unwrap()).unwrap().unwrap(), IP_V6_CAFE_17);
+        assert_eq!(extract_forwarded(&HeaderValue::from_str("BY=32.234.40.5;For=\"[2001:db8:cafe::17]:4711\", \"[2003:db8:caff::17]:4711\";proto=http").unwrap())[0].unwrap(), IP_V6_CAFE_17);
     }
 
     #[cot::test]
@@ -192,8 +149,7 @@ mod tests {
         assert_eq!(
             extract_x_forwarded_for(
                 &HeaderValue::from_str("1.2.3.4,2003:db8:caff::17, 3.45.3.2").unwrap()
-            )
-            .unwrap()
+            )[0]
             .unwrap(),
             Ipv4Addr::new(1, 2, 3, 4)
         );
@@ -204,8 +160,7 @@ mod tests {
         assert_eq!(
             extract_x_forwarded_for(
                 &HeaderValue::from_str("2001:db8:cafe::17,1.2.3.4,3.45.3.2").unwrap()
-            )
-            .unwrap()
+            )[0]
             .unwrap(),
             IP_V6_CAFE_17
         );

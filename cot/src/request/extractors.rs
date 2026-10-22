@@ -340,10 +340,9 @@ impl ClientIpAddr {
 
 impl ClientIpAddr {
     pub(crate) fn from_request_head_sync(head: &RequestHead) -> crate::Result<Self> {
-        let RemoteAddr(remote_addr) = head
-            .extensions
-            .get::<RemoteAddr>()
-            .expect("Missing RemoteAddr extension");
+        let RemoteAddr(remote_addr) = head.extensions.get::<RemoteAddr>().ok_or_else(|| {
+            crate::Error::internal("the remote address of the request is unknown")
+        })?;
 
         let closest = remote_addr.ip();
 
@@ -352,24 +351,36 @@ impl ClientIpAddr {
         let trusted_headers = &config.headers;
 
         let mut proxy: Option<IpAddr> = None;
+        let is_trusted = |ip: &IpAddr| trusted_proxies.iter().any(|proxy| proxy.contains(ip));
 
-        if trusted_proxies.iter().any(|proxy| proxy.contains(&closest)) {
+        if is_trusted(&closest) {
             for h in trusted_headers {
-                if let Some(v) = head.headers.get(h.to_string())
-                    && proxy.is_none()
-                {
-                    match h {
-                        crate::config::ClientIpHeader::Forwarded => {
-                            proxy = extract_forwarded(v)?;
-                        }
-                        crate::config::ClientIpHeader::XForwardedFor => {
-                            proxy = extract_x_forwarded_for(v)?;
-                        }
-                        crate::config::ClientIpHeader::Custom(_) => {
-                            proxy = Some(extract_single_ip(v)?);
-                        }
+                let values = head.headers.get_all(h.to_string());
+                let hops: Vec<Option<IpAddr>> = match h {
+                    crate::config::ClientIpHeader::Forwarded => {
+                        values.iter().flat_map(extract_forwarded).collect()
+                    }
+                    crate::config::ClientIpHeader::XForwardedFor => {
+                        values.iter().flat_map(extract_x_forwarded_for).collect()
+                    }
+                    crate::config::ClientIpHeader::Custom(_) => {
+                        values.iter().map(extract_single_ip).collect()
+                    }
+                };
+                if hops.is_empty() {
+                    continue;
+                }
+
+                // Proxies append to the list, so only the right-most entries
+                // can be trusted
+                for hop in hops.into_iter().rev() {
+                    let Some(hop) = hop else { break };
+                    proxy = Some(hop);
+                    if !is_trusted(&hop) {
+                        break;
                     }
                 }
+                break;
             }
         }
 
@@ -802,8 +813,42 @@ mod tests {
             HeaderValue::from_str(&format!("AAA{IP_PROXY}")).unwrap(),
         );
 
-        let ip = request.extract_from_head::<ClientIpAddr>().await;
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
 
-        assert!(ip.is_err());
+        assert_eq!(ip, IP);
+    }
+
+    #[cot::test]
+    async fn remote_addr_proxied_spoofed() {
+        const IP: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
+        const IP_PROXY: IpAddr = IpAddr::V6(Ipv6Addr::new(21, 32, 43, 54, 65, 76, 87, 98));
+
+        let mut config = ProjectConfig::dev_default();
+
+        config.client_ip = ClientIpConfig::new(
+            vec![ipnet::IpNet::new(IP, 128).unwrap()],
+            vec![ClientIpHeader::XForwardedFor],
+        );
+
+        let mut request = TestRequestBuilder::get("/").config(config).build();
+        request
+            .extensions_mut()
+            .insert(RemoteAddr(SocketAddr::new(IP, 0)));
+        request.headers_mut().insert(
+            HeaderName::from_str("X-Forwarded-For").unwrap(),
+            HeaderValue::from_str(&format!("6.6.6.6, {IP_PROXY}")).unwrap(),
+        );
+
+        let ip = request
+            .extract_from_head::<ClientIpAddr>()
+            .await
+            .unwrap()
+            .ip();
+
+        assert_eq!(ip, IP_PROXY);
     }
 }

@@ -131,6 +131,7 @@ mod tests {
     use http::{HeaderName, HeaderValue};
 
     use super::*;
+    use crate::test::TestRequestBuilder;
 
     const PEER: &str = "10.0.0.1";
 
@@ -233,5 +234,23 @@ mod tests {
             client_ip_for(PEER, &config, &[("x-forwarded-for", "203.0.113.1")]),
             PEER
         );
+    }
+
+    #[cot::test]
+    async fn extract() {
+        let mut request = TestRequestBuilder::get("/")
+            .remote_addr("203.0.113.1:4711".parse().unwrap())
+            .build();
+
+        let client_ip: ClientIpAddr = request.extract_from_head().await.unwrap();
+        assert_eq!(client_ip.ip().to_string(), "203.0.113.1");
+        assert_eq!(client_ip.peer_ip().to_string(), "203.0.113.1");
+    }
+
+    #[cot::test]
+    async fn extract_without_remote_addr() {
+        let mut request = TestRequestBuilder::get("/").build();
+
+        assert!(request.extract_from_head::<ClientIpAddr>().await.is_err());
     }
 }

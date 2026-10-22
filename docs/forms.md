@@ -15,10 +15,12 @@ use cot::form::Form;
 struct ContactForm {
     name: String,
     email: String,
-    #[form(opts(max_length = 1000))]
+    #[form(opts(max_length = 1000, multiline = true))]
     message: String,
 }
 ```
+
+The `opts` attribute configures the field: here, `max_length` limits the message length and `multiline` renders it as a `<textarea>`.
 
 And here is how you can process the form inside a request handler:
 

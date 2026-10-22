@@ -191,11 +191,19 @@ pub struct StringFieldOptions {
     pub placeholder: Option<String>,
     /// If `true`, the field is read-only and cannot be modified by the user.
     pub readonly: Option<bool>,
+    /// If `true`, the field is rendered as a `<textarea>` instead of an
+    /// `<input>`.
+    pub multiline: Option<bool>,
 }
 
 impl Display for StringField {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut tag = HtmlTag::input("text");
+        let multiline = self.custom_options.multiline.unwrap_or(false);
+        let mut tag = if multiline {
+            HtmlTag::new("textarea")
+        } else {
+            HtmlTag::input("text")
+        };
         tag.attr("name", self.id());
         tag.attr("id", self.id());
         if self.options.required {
@@ -247,7 +255,15 @@ impl Display for StringField {
         }
 
         if let Some(value) = &self.value {
-            tag.attr("value", value);
+            if multiline {
+                // Browsers strip a single newline right after the opening tag
+                if value.starts_with('\n') {
+                    tag.push_str("\n");
+                }
+                tag.push_str(value);
+            } else {
+                tag.attr("value", value);
+            }
         }
 
         write!(f, "{}", tag.render())
@@ -1225,7 +1241,8 @@ impl_field_options_builder!(
         dirname,
         list,
         placeholder,
-        readonly
+        readonly,
+        multiline
     }
 );
 impl_field_options_builder!(
@@ -1353,6 +1370,41 @@ mod tests {
         assert!(html.contains("placeholder=\"Enter text\""));
         assert!(html.contains("readonly"));
         assert!(html.contains("<datalist id=\"__test_datalist\"><option value=\"bar\"></option><option value=\"baz\"></option></datalist>"));
+    }
+
+    #[test]
+    fn string_field_render_multiline() {
+        let mut field = StringField::with_options(
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .build(),
+            StringFieldOptions::builder().multiline(true).build(),
+        );
+        assert_eq!(
+            field.to_string(),
+            r#"<textarea name="test" id="test"></textarea>"#
+        );
+
+        field.value = Some("<b>".to_owned());
+        assert_eq!(
+            field.to_string(),
+            r#"<textarea name="test" id="test">&#60;b&#62;</textarea>"#
+        );
+    }
+
+    #[test]
+    fn string_field_render_multiline_leading_newline() {
+        let mut field = StringField::with_options(
+            FormFieldOptions::builder()
+                .id("test".to_owned())
+                .name("test".to_owned())
+                .build(),
+            StringFieldOptions::builder().multiline(true).build(),
+        );
+        field.value = Some("\nindented".to_owned());
+
+        assert!(field.to_string().ends_with(">\n\nindented</textarea>"));
     }
 
     #[cot::test]

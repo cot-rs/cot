@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use cot::router::tree::MatchitPattern;
 use cot_core::error::impl_into_cot_error;
+use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use thiserror::Error;
 
 const PATH_MATCHER_ERROR_PREFIX: &str = "invalid route pattern:";
@@ -113,6 +114,20 @@ impl From<AbsolutePath> for String {
 pub(super) struct PathMatcher {
     parts: Vec<PathPart>,
 }
+
+/// The URL standard's path percent-encode set, plus `%`.
+const PATH_ENCODE_SET: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'%')
+    .add(b'<')
+    .add(b'>')
+    .add(b'?')
+    .add(b'`')
+    .add(b'{')
+    .add(b'}');
+const SEGMENT_ENCODE_SET: &AsciiSet = &PATH_ENCODE_SET.add(b'/');
 
 impl PathMatcher {
     #[must_use]
@@ -259,7 +274,11 @@ impl PathMatcher {
                     let value = params
                         .get(name)
                         .ok_or_else(|| ReverseError::MissingParam(name.clone()))?;
-                    result.push_str(value);
+                    let encode_set = match part {
+                        PathPart::Wildcard { .. } => PATH_ENCODE_SET,
+                        _ => SEGMENT_ENCODE_SET,
+                    };
+                    result.extend(utf8_percent_encode(value, encode_set));
                 }
             }
         }
@@ -602,6 +621,30 @@ mod tests {
         assert_eq!(
             path_parser.reverse(&params).unwrap(),
             "/users/123/posts/456"
+        );
+    }
+
+    #[test]
+    fn reverse_encodes_params() {
+        let path_parser = PathMatcher::new("/posts/{slug}");
+        let mut params = ReverseParamMap::new();
+        params.insert("slug", "zażółć a/b?");
+
+        assert_eq!(
+            path_parser.reverse(&params).unwrap(),
+            "/posts/za%C5%BC%C3%B3%C5%82%C4%87%20a%2Fb%3F"
+        );
+    }
+
+    #[test]
+    fn reverse_encodes_wildcard_except_slashes() {
+        let path_parser = PathMatcher::new("/static/{*path}");
+        let mut params = ReverseParamMap::new();
+        params.insert("path", "my dir/ż.css");
+
+        assert_eq!(
+            path_parser.reverse(&params).unwrap(),
+            "/static/my%20dir/%C5%BC.css"
         );
     }
 

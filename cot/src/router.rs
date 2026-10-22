@@ -32,6 +32,7 @@ use cot_core::error::impl_into_cot_error;
 use cot_core::handler::{BoxRequestHandler, RequestHandler, into_box_request_handler};
 use cot_core::request::{AppName, RouteName};
 use derive_more::with_trait::Debug;
+use percent_encoding::percent_decode_str;
 use tracing::debug;
 
 use crate::error::NotFound;
@@ -251,7 +252,8 @@ impl Router {
         if let Some(result) = self.get_handler(request_path) {
             let mut path_params = PathParams::new();
             for (key, value) in &result.params {
-                path_params.insert(key.clone(), value.clone());
+                let value = percent_decode_str(value).decode_utf8_lossy();
+                path_params.insert(key.clone(), value.into_owned());
             }
             request.extensions_mut().insert(path_params);
             if let Some(app_name) = result.app_name {
@@ -1349,6 +1351,7 @@ mod tests {
     use crate::StatusCode;
     use crate::html::Html;
     use crate::request::Request;
+    use crate::request::extractors::Path;
     use crate::response::{IntoResponse, Response};
     use crate::test::TestRequestBuilder;
 
@@ -1495,6 +1498,30 @@ mod tests {
             .reverse(None, "test", &ReverseParamMap::new())
             .unwrap();
         assert_eq!(url, "/test");
+    }
+
+    #[cot::test]
+    async fn router_decodes_params() {
+        async fn echo(Path(slug): Path<String>) -> Html {
+            Html::new(slug)
+        }
+
+        let router =
+            Router::with_urls([Route::with_handler_and_name("/posts/{slug}/", echo, "post")]);
+        let url = router
+            .reverse(
+                None,
+                "post",
+                &crate::reverse_param_map!(slug = "zażółć a/b?"),
+            )
+            .unwrap();
+        let response = router
+            .handle(TestRequestBuilder::get(&url).build())
+            .await
+            .unwrap();
+
+        let body = response.into_body().into_bytes().await.unwrap();
+        assert_eq!(body, "zażółć a/b?");
     }
 
     #[cot::test]

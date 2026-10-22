@@ -282,8 +282,20 @@ table.models {
             width: 15em;
         }
 
-        input {
+        input,
+        select {
             width: 25em;
+        }
+
+        input[type="checkbox"] {
+            width: auto;
+            margin-top: var(--input-y-padding);
+        }
+
+        textarea {
+            width: 40em;
+            min-height: 10em;
+            resize: vertical;
         }
     }
 
@@ -299,9 +311,12 @@ table.models {
     }
 }
 
-input {
+input,
+select,
+textarea {
     background-color: #fff;
     color: #000;
+    font: inherit;
     padding: var(--input-y-padding) var(--input-x-padding);
     border: 1px solid #e5e7eb;
     border-radius: .35rem;

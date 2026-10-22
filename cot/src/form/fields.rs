@@ -916,6 +916,8 @@ where
     where
         Self: Sized,
     {
+        // `Auto` primary keys would otherwise accept empty values
+        check_required(field)?;
         let value = <T as Model>::PrimaryKey::clean_value(field);
         match value {
             Ok(value) => Ok(ForeignKey::PrimaryKey(value)),
@@ -1273,6 +1275,48 @@ impl_field_options_builder!(BoolFieldOptions, BoolFieldOptionsBuilder { must_be_
 mod tests {
     use super::*;
     use crate::form::FormFieldValue;
+
+    #[cfg(feature = "db")]
+    mod foreign_key {
+        use super::*;
+        use crate::db::model;
+
+        #[derive(Debug)]
+        #[model]
+        struct Parent {
+            #[model(primary_key)]
+            id: Auto<i64>,
+        }
+
+        async fn field_with_value<T: AsFormField>(value: &str) -> T::Type {
+            let options = FormFieldOptions::builder()
+                .id("parent".to_owned())
+                .name("parent".to_owned())
+                .build();
+            let mut field = T::new_field(options, Default::default());
+            field
+                .set_value(FormFieldValue::new_text(value))
+                .await
+                .unwrap();
+            field
+        }
+
+        #[cot::test]
+        async fn empty_is_required() {
+            let field = field_with_value::<ForeignKey<Parent>>("").await;
+
+            let error = ForeignKey::<Parent>::clean_value(&field).unwrap_err();
+            assert_eq!(error, FormFieldValidationError::Required);
+        }
+
+        #[cot::test]
+        async fn optional_empty_is_none() {
+            let field = field_with_value::<Option<ForeignKey<Parent>>>("").await;
+
+            let value = Option::<ForeignKey<Parent>>::clean_value(&field).unwrap();
+            assert!(value.is_none());
+        }
+    }
 
     #[test]
     fn string_field_render() {

@@ -269,7 +269,7 @@ impl PathMatcher {
 
         for part in &self.parts {
             match part {
-                PathPart::Literal(s) => result.push_str(s),
+                PathPart::Literal(s) => result.extend(utf8_percent_encode(s, PATH_ENCODE_SET)),
                 PathPart::Param { name } | PathPart::Wildcard { name } => {
                     let value = params
                         .get(name)
@@ -311,7 +311,7 @@ impl TryFrom<Arc<PathMatcher>> for MatchitPattern {
                         pattern: value.to_string(),
                     });
                 }
-                PathPart::Literal(s) => pattern.push_str(s),
+                PathPart::Literal(s) => pattern.extend(utf8_percent_encode(s, PATH_ENCODE_SET)),
                 PathPart::Param { name } => {
                     let _ = write!(pattern, "{{{name}}}");
                 }
@@ -480,7 +480,7 @@ mod tests {
         assert_eq!(path_parser.to_string(), "/users/{{{{{{escaped}}}}}}");
         assert_eq!(
             path_parser.reverse(&ReverseParamMap::new()).unwrap(),
-            "/users/{{{escaped}}}"
+            "/users/%7B%7B%7Bescaped%7D%7D%7D"
         );
     }
 
@@ -653,14 +653,14 @@ mod tests {
         let path_parser = PathMatcher::new("/café/{id}");
         let mut params = ReverseParamMap::new();
         params.insert("id", "123");
-        assert_eq!(path_parser.reverse(&params).unwrap(), "/café/123");
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/caf%C3%A9/123");
     }
 
     #[test]
     fn non_ascii_path_literal() {
         let path_parser = PathMatcher::new("/café/test");
         let params = ReverseParamMap::new();
-        assert_eq!(path_parser.reverse(&params).unwrap(), "/café/test");
+        assert_eq!(path_parser.reverse(&params).unwrap(), "/caf%C3%A9/test");
     }
 
     #[test]

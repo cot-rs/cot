@@ -9,7 +9,6 @@
 //! the Cot framework and for building custom extensions.
 
 mod body;
-pub mod remote_addr;
 
 pub mod error;
 #[macro_use]

@@ -1525,6 +1525,16 @@ mod tests {
     }
 
     #[cot::test]
+    async fn router_matches_non_ascii_literals() {
+        let sub_router = Router::with_urls([Route::with_handler("/zażółć/", MockHandler)]);
+        let router = Router::with_urls([Route::with_router("/café/", sub_router)]);
+
+        let request = TestRequestBuilder::get("/caf%C3%A9/za%C5%BC%C3%B3%C5%82%C4%87/").build();
+        let response = router.handle(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[cot::test]
     async fn router_handle() {
         let route = Route::with_handler("/test", MockHandler);
         let router = Router::with_urls(vec![route.clone()]);

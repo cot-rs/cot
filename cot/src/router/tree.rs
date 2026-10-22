@@ -108,6 +108,7 @@ impl RouteTrie {
             // route so that routers(sub-routers) that were
             // mounted/declared with trailing slashes still match.
             let insertion_pattern = MatchitPattern::try_from(routes[route_idx].url.clone())?;
+            let prefix = AbsolutePath::new(insertion_pattern.as_str());
             Self::insert_or_diagnose(
                 &mut inner,
                 insertion_pattern,
@@ -121,7 +122,6 @@ impl RouteTrie {
             // use that to find what sub router to search at lookup
             // time.
             if let Some(r) = router_idx {
-                let prefix = AbsolutePath::new(routes[route_idx].url());
                 let wildcard_suffix = AbsolutePath::new(format!("{{*{NESTED_ROUTER_PARAM}}}"));
                 let wildcard = prefix.join(&wildcard_suffix);
 

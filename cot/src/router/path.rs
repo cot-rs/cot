@@ -4,6 +4,7 @@
 //! a given pattern. It also provides a way to reverse paths to their original
 //! form given a set of parameters.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{Display, Write};
 use std::sync::Arc;
@@ -128,6 +129,38 @@ const PATH_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b'{')
     .add(b'}');
 const SEGMENT_ENCODE_SET: &AsciiSet = &PATH_ENCODE_SET.add(b'/');
+
+/// Uppercases percent-encoded bytes and decodes unreserved characters, as per
+/// RFC 3986, section 6.2.2.
+pub(super) fn normalize_percent_encoding(path: &str) -> Cow<'_, str> {
+    if !path.contains('%') {
+        return Cow::Borrowed(path);
+    }
+
+    let mut result = String::with_capacity(path.len());
+    let mut rest = path;
+    while let Some(index) = rest.find('%') {
+        result.push_str(&rest[..index]);
+        rest = &rest[index + 1..];
+        let byte = rest
+            .get(..2)
+            .filter(|hex| hex.bytes().all(|b| b.is_ascii_hexdigit()))
+            .and_then(|hex| u8::from_str_radix(hex, 16).ok());
+        match byte {
+            Some(byte) if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) => {
+                result.push(char::from(byte));
+            }
+            Some(byte) => write!(result, "%{byte:02X}").expect("writing to a String"),
+            None => {
+                result.push('%');
+                continue;
+            }
+        }
+        rest = &rest[2..];
+    }
+    result.push_str(rest);
+    Cow::Owned(result)
+}
 
 impl PathMatcher {
     #[must_use]
@@ -646,6 +679,16 @@ mod tests {
             path_parser.reverse(&params).unwrap(),
             "/static/my%20dir/%C5%BC.css"
         );
+    }
+
+    #[test]
+    fn normalizes_percent_encoding() {
+        assert_eq!(
+            normalize_percent_encoding("/caf%c3%a9/%2f"),
+            "/caf%C3%A9/%2F"
+        );
+        assert_eq!(normalize_percent_encoding("/%63af%7E"), "/caf~");
+        assert_eq!(normalize_percent_encoding("/100%/%zz/%+1"), "/100%/%zz/%+1");
     }
 
     #[test]

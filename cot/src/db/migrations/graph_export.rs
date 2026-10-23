@@ -139,7 +139,7 @@ fn group_by_app<'a>(nodes: &[Node<'a>]) -> Vec<(&'a str, Vec<usize>)> {
 
 #[cfg(test)]
 mod tests {
-    use cot::auth::db::DatabaseUserApp;
+    use cot::auth::user_pass::DatabaseUserApp;
     use cot::db::migrations::{
         Field, Migration, MigrationDependency, MigrationEngine, Operation, SyncDynMigration,
         wrap_migrations,

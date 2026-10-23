@@ -10,7 +10,7 @@ First, add the admin app and the dependencies required to your project in `src/m
 
 ```rust
 use cot::admin::AdminApp;
-use cot::auth::db::{DatabaseUser, DatabaseUserApp};
+use cot::auth::user_pass::{DatabaseUser, DatabaseUserApp};
 use cot::middleware::SessionMiddleware;
 use cot::project::{MiddlewareContext, RegisterAppsContext, RootHandler, RootHandlerBuilder};
 use cot::static_files::StaticFilesMiddleware;
@@ -48,7 +48,7 @@ By default, the admin interface uses Cot's authentication system. Therefore, you
 ```rust
 use async_trait::async_trait; // cargo add async-trait
 use cot::ProjectContext;
-use cot::auth::db::DatabaseUser;
+use cot::auth::user_pass::DatabaseUser;
 use cot::common_types::Password;
 use std::env;
 # struct MyApp;

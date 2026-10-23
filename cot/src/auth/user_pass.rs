@@ -73,7 +73,7 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUser;
+    /// use cot::auth::user_pass::DatabaseUser;
     /// use cot::common_types::Password;
     /// use cot::db::Database;
     /// use cot::html::Html;
@@ -134,7 +134,7 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
+    /// use cot::auth::user_pass::{DatabaseUser, DatabaseUserCredentials};
     /// use cot::common_types::Password;
     /// use cot::db::{Database, LimitedString, Model};
     /// use cot::html::Html;
@@ -176,7 +176,7 @@ impl DatabaseUser {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::{DatabaseUser, DatabaseUserCredentials};
+    /// use cot::auth::user_pass::{DatabaseUser, DatabaseUserCredentials};
     /// use cot::common_types::Password;
     /// use cot::db::{Database, Model};
     /// use cot::html::Html;
@@ -225,7 +225,7 @@ impl DatabaseUser {
     ///
     /// ```
     /// use cot::auth::UserId;
-    /// use cot::auth::db::DatabaseUser;
+    /// use cot::auth::user_pass::DatabaseUser;
     /// use cot::common_types::Password;
     /// use cot::db::Database;
     /// use cot::html::Html;
@@ -270,7 +270,7 @@ impl DatabaseUser {
     ///
     /// ```
     /// use cot::auth::UserId;
-    /// use cot::auth::db::DatabaseUser;
+    /// use cot::auth::user_pass::DatabaseUser;
     /// use cot::common_types::Password;
     /// use cot::db::Database;
     /// use cot::html::Html;
@@ -363,7 +363,7 @@ impl DatabaseUser {
     ///
     /// ```
     /// use cot::auth::UserId;
-    /// use cot::auth::db::DatabaseUser;
+    /// use cot::auth::user_pass::DatabaseUser;
     /// use cot::common_types::Password;
     /// use cot::db::Database;
     /// use cot::html::Html;
@@ -406,7 +406,7 @@ impl DatabaseUser {
     ///
     /// ```
     /// use cot::auth::UserId;
-    /// use cot::auth::db::DatabaseUser;
+    /// use cot::auth::user_pass::DatabaseUser;
     /// use cot::common_types::Password;
     /// use cot::db::Database;
     /// use cot::html::Html;
@@ -493,7 +493,7 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
+    /// use cot::auth::user_pass::DatabaseUserCredentials;
     /// use cot::common_types::Password;
     ///
     /// let credentials =
@@ -509,7 +509,7 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
+    /// use cot::auth::user_pass::DatabaseUserCredentials;
     /// use cot::common_types::Password;
     ///
     /// let credentials =
@@ -526,7 +526,7 @@ impl DatabaseUserCredentials {
     /// # Example
     ///
     /// ```
-    /// use cot::auth::db::DatabaseUserCredentials;
+    /// use cot::auth::user_pass::DatabaseUserCredentials;
     /// use cot::common_types::Password;
     ///
     /// let credentials =
@@ -560,7 +560,7 @@ impl DatabaseUserBackend {
     /// use std::sync::Arc;
     ///
     /// use cot::auth::AuthBackend;
-    /// use cot::auth::db::DatabaseUserBackend;
+    /// use cot::auth::user_pass::DatabaseUserBackend;
     /// use cot::config::ProjectConfig;
     /// use cot::project::{AuthBackendContext, WithApps};
     /// use cot::{Project, ProjectContext};
@@ -623,7 +623,7 @@ impl DatabaseUserApp {
     /// # Example
     ///
     /// ```no_run
-    /// use cot::auth::db::DatabaseUserApp;
+    /// use cot::auth::user_pass::DatabaseUserApp;
     /// use cot::config::{DatabaseConfig, ProjectConfig};
     /// use cot::project::RegisterAppsContext;
     /// use cot::{App, AppBuilder, Project};

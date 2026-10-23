@@ -23,12 +23,12 @@ impl ::cot::db::migrations::Migration for Migration {
                     ::cot::db::migrations::Field::new(
                             ::cot::db::Identifier::new("username"),
                             <crate::db::LimitedString<
-                                { crate::auth::db::MAX_USERNAME_LENGTH },
+                                { crate::auth::user_pass::MAX_USERNAME_LENGTH },
                             > as ::cot::db::DatabaseField>::TYPE,
                         )
                         .set_null(
                             <crate::db::LimitedString<
-                                { crate::auth::db::MAX_USERNAME_LENGTH },
+                                { crate::auth::user_pass::MAX_USERNAME_LENGTH },
                             > as ::cot::db::DatabaseField>::NULLABLE,
                         )
                         .unique(),
@@ -51,6 +51,6 @@ struct _DatabaseUser {
     #[model(primary_key)]
     id: cot::db::Auto<i64>,
     #[model(unique)]
-    username: crate::db::LimitedString<{ crate::auth::db::MAX_USERNAME_LENGTH }>,
+    username: crate::db::LimitedString<{ crate::auth::user_pass::MAX_USERNAME_LENGTH }>,
     password: crate::auth::PasswordHash,
 }

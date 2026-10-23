@@ -2,7 +2,7 @@ use std::error::Error;
 
 use async_trait::async_trait;
 use cot::admin::AdminApp;
-use cot::auth::db::{DatabaseUser, DatabaseUserApp};
+use cot::auth::user_pass::{DatabaseUser, DatabaseUserApp};
 use cot::cli::CliMetadata;
 use cot::config::{
     AuthBackendConfig, DatabaseConfig, MiddlewareConfig, ProjectConfig, SessionMiddlewareConfig,

@@ -16,7 +16,7 @@ help: the following other types implement trait `cot::db::Model`
   | #[model]
   | ^^^^^^^^ `cot::session::db::Session`
   |
- ::: src/auth/db.rs
+ ::: src/auth/user_pass.rs
   |
   | #[model]
   | ^^^^^^^^ `DatabaseUser`

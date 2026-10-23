@@ -40,7 +40,7 @@ No authentication backend. This enables [`NoAuthBackend`](struct@cot::auth::NoAu
 
 ### `type = "database"`
 
-Database authentication backend. This enables [`DatabaseUserBackend`](struct@cot::auth::db::DatabaseUserBackend) to be used as the authentication backend.
+Database authentication backend. This enables [`DatabaseUserBackend`](struct@cot::auth::user_pass::DatabaseUserBackend) to be used as the authentication backend.
 
 ## `[database]`
 

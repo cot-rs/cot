@@ -85,19 +85,12 @@ tempfile.workspace = true
 tracing-test.workspace = true
 trybuild.workspace = true
 
-[build-dependencies]
-ahash.workspace = true
-grass_compiler.workspace = true
-
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo-machete]
 ignored = [
-    # Used indirectly by `grass_compiler`, but it doesn't work with the latest versions of Rust if minimal dependency
-    # versions are used
-    "ahash",
     # Used by `lettre`, but it causes dependency issues if minimal dependency versions are used
     "idna",
     # time requires version 0.3.35 to work with the latest versions of Rust, but we don't use it directly

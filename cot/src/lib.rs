@@ -2,7 +2,8 @@
 //! been designed to be familiar if you've ever used
 //! [Django](https://www.djangoproject.com/), and easy to learn if you haven't.
 //! It's a batteries-included framework built on top of
-//! [axum](https://github.com/tokio-rs/axum).
+//! [hyper](https://hyper.rs/) and the [Tower](https://github.com/tower-rs/tower)
+//! ecosystem.
 //!
 //! ## Features
 //!

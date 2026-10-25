@@ -7,9 +7,10 @@ use tracing::{Level, error, warn};
 
 use crate::config::ProjectConfig;
 use crate::error::NotFound;
+use crate::response::Response;
 use crate::router::Router;
 use crate::router::path::AbsolutePath;
-use crate::{Error, Result, StatusCode, Template};
+use crate::{Body, Error, Result, StatusCode, Template};
 
 #[derive(Debug)]
 pub(super) struct Diagnostics {
@@ -263,10 +264,7 @@ struct RequestData {
 }
 
 #[must_use]
-pub(super) fn handle_not_found(
-    error: &Error,
-    diagnostics: &Diagnostics,
-) -> axum::response::Response {
+pub(super) fn handle_not_found(error: &Error, diagnostics: &Diagnostics) -> Response {
     log_not_found(
         error,
         diagnostics
@@ -285,7 +283,7 @@ pub(super) fn handle_not_found(
 pub(super) fn handle_response_panic(
     panic_payload: &Box<dyn Any + Send>,
     diagnostics: &Diagnostics,
-) -> axum::response::Response {
+) -> Response {
     let request_data = diagnostics
         .request_head
         .as_ref()
@@ -305,10 +303,7 @@ pub(super) fn handle_response_panic(
 }
 
 #[must_use]
-pub(super) fn handle_response_error(
-    error: &Error,
-    diagnostics: &Diagnostics,
-) -> axum::response::Response {
+pub(super) fn handle_response_error(error: &Error, diagnostics: &Diagnostics) -> Response {
     if error.status_code() == StatusCode::NOT_FOUND {
         return handle_not_found(error, diagnostics);
     }
@@ -328,18 +323,15 @@ pub(super) fn handle_response_error(
 }
 
 #[must_use]
-fn build_response(
-    response_string: Result<String>,
-    status_code: StatusCode,
-) -> axum::response::Response {
+fn build_response(response_string: Result<String>, status_code: StatusCode) -> Response {
     match response_string {
-        Ok(error_str) => axum::response::Response::builder()
+        Ok(error_str) => http::Response::builder()
             .status(status_code)
             .header(
                 http::header::CONTENT_TYPE,
                 cot_core::headers::HTML_CONTENT_TYPE,
             )
-            .body(axum::body::Body::new(error_str))
+            .body(Body::fixed(error_str))
             .unwrap_or_else(|_| build_cot_failure_page()),
         Err(error) => {
             error!("Failed to render error page: {}", error);
@@ -377,10 +369,10 @@ const FAILURE_PAGE: &[u8] = include_bytes!("../templates/fail.html");
 /// A last-resort Internal Server Error page.
 ///
 /// Returned when a custom error page fails to render.
-pub(super) fn build_cot_server_error_page() -> axum::response::Response {
-    axum::response::Response::builder()
+pub(super) fn build_cot_server_error_page() -> Response {
+    http::Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .body(axum::body::Body::from(DEFAULT_SERVER_ERROR_PAGE))
+        .body(Body::from(DEFAULT_SERVER_ERROR_PAGE))
         .expect("Building the Cot server error page should never fail")
 }
 
@@ -391,10 +383,10 @@ pub(super) fn build_cot_server_error_page() -> axum::response::Response {
 /// in the event of a catastrophic failure, likely caused by a bug in Cot
 /// itself.
 #[must_use]
-fn build_cot_failure_page() -> axum::response::Response {
-    axum::response::Response::builder()
+fn build_cot_failure_page() -> Response {
+    http::Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .body(axum::body::Body::from(FAILURE_PAGE))
+        .body(Body::from(FAILURE_PAGE))
         .expect("Building the Cot failure page should never fail")
 }
 

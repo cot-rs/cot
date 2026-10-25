@@ -20,7 +20,6 @@ aide = { workspace = true, optional = true }
 anstyle.workspace = true
 askama = { workspace = true, features = ["std"] }
 async-trait.workspace = true
-axum = { workspace = true, features = ["http1", "tokio"] }
 blake3.workspace = true
 bytes.workspace = true
 chrono = { workspace = true, features = ["alloc", "serde", "clock"] }
@@ -40,6 +39,8 @@ hex.workspace = true
 http-body-util.workspace = true
 http.workspace = true
 humantime.workspace = true
+hyper = { workspace = true, features = ["http1", "server"] }
+hyper-util = { workspace = true, features = ["http1", "server-graceful", "tokio"] }
 idna = { workspace = true, optional = true }
 indexmap.workspace = true
 is_terminal_polyfill.workspace = true
@@ -62,7 +63,7 @@ subtle = { workspace = true, features = ["std"] }
 swagger-ui-redist = { workspace = true, optional = true }
 thiserror.workspace = true
 time.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs", "io-util"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "fs", "io-util", "net", "time"] }
 toml = { workspace = true, features = ["parse", "serde"] }
 tower = { workspace = true, features = ["util"] }
 tower-livereload = { workspace = true, optional = true }
@@ -74,6 +75,7 @@ url = { workspace = true, features = ["serde"] }
 criterion = { workspace = true, features = ["async_tokio"] }
 fake.workspace = true
 fantoccini.workspace = true
+hyper = { workspace = true, features = ["client"] }
 insta.workspace = true
 mockall.workspace = true
 reqwest = { workspace = true, features = ["json"] }

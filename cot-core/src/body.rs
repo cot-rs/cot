@@ -11,7 +11,8 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use futures_core::Stream;
 use http_body::{Frame, SizeHint};
-use http_body_util::combinators::BoxBody;
+use http_body_util::BodyExt;
+use http_body_util::combinators::{BoxBody, UnsyncBoxBody};
 use sync_wrapper::SyncWrapper;
 
 use crate::error::impl_into_cot_error;
@@ -39,7 +40,7 @@ pub struct Body {
 pub(crate) enum BodyInner {
     Fixed(Bytes),
     Streaming(SyncWrapper<Pin<Box<dyn Stream<Item = Result<Bytes>> + Send>>>),
-    Axum(SyncWrapper<axum::body::Body>),
+    Incoming(SyncWrapper<UnsyncBoxBody<Bytes, Box<dyn StdError + Send + Sync>>>),
     Wrapper(BoxBody<Bytes, Error>),
 }
 
@@ -48,7 +49,7 @@ impl Debug for BodyInner {
         match self {
             Self::Fixed(data) => f.debug_tuple("Fixed").field(data).finish(),
             Self::Streaming(_) => f.debug_tuple("Streaming").field(&"...").finish(),
-            Self::Axum(axum_body) => f.debug_tuple("Axum").field(axum_body).finish(),
+            Self::Incoming(_) => f.debug_tuple("Incoming").field(&"...").finish(),
             Self::Wrapper(_) => f.debug_tuple("Wrapper").field(&"...").finish(),
         }
     }
@@ -160,8 +161,6 @@ impl Body {
     /// # }
     /// ```
     pub async fn into_bytes_limited(self, limit: usize) -> Result<Bytes> {
-        use http_body_util::BodyExt;
-
         Ok(http_body_util::Limited::new(self, limit)
             .collect()
             .await
@@ -169,10 +168,17 @@ impl Body {
             .map_err(ReadRequestBody)?)
     }
 
+    /// Create a body instance from a body of an incoming HTTP request.
     #[must_use]
     #[doc(hidden)]
-    pub fn axum(inner: axum::body::Body) -> Self {
-        Self::new(BodyInner::Axum(SyncWrapper::new(inner)))
+    pub fn incoming<B>(inner: B) -> Self
+    where
+        B: http_body::Body<Data = Bytes> + Send + 'static,
+        B::Error: Into<Box<dyn StdError + Send + Sync>>,
+    {
+        Self::new(BodyInner::Incoming(SyncWrapper::new(
+            inner.map_err(Into::into).boxed_unsync(),
+        )))
     }
 
     #[must_use]
@@ -212,11 +218,11 @@ impl http_body::Body for Body {
                     Poll::Pending => Poll::Pending,
                 }
             }
-            BodyInner::Axum(ref mut axum_body) => {
-                let axum_body = axum_body.get_mut();
-                Pin::new(axum_body)
+            BodyInner::Incoming(ref mut incoming_body) => {
+                let incoming_body = incoming_body.get_mut();
+                Pin::new(incoming_body)
                     .poll_frame(cx)
-                    .map_err(|error| ReadRequestBody(Box::new(error)).into())
+                    .map_err(|error| ReadRequestBody(error).into())
             }
             BodyInner::Wrapper(ref mut http_body) => Pin::new(http_body)
                 .poll_frame(cx)
@@ -227,7 +233,7 @@ impl http_body::Body for Body {
     fn is_end_stream(&self) -> bool {
         match &self.inner {
             BodyInner::Fixed(data) => data.is_empty(),
-            BodyInner::Streaming(_) | BodyInner::Axum(_) => false,
+            BodyInner::Streaming(_) | BodyInner::Incoming(_) => false,
             BodyInner::Wrapper(http_body) => http_body.is_end_stream(),
         }
     }
@@ -235,7 +241,7 @@ impl http_body::Body for Body {
     fn size_hint(&self) -> SizeHint {
         match &self.inner {
             BodyInner::Fixed(data) => SizeHint::with_exact(data.len() as u64),
-            BodyInner::Streaming(_) | BodyInner::Axum(_) => SizeHint::new(),
+            BodyInner::Streaming(_) | BodyInner::Incoming(_) => SizeHint::new(),
             BodyInner::Wrapper(http_body) => http_body.size_hint(),
         }
     }
@@ -339,6 +345,64 @@ mod tests {
             Poll::Ready(None) => {} // End of stream
             _ => panic!("Body::fixed should return None after the content is consumed"),
         }
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("source body error")]
+    struct SourceBodyError;
+
+    #[test]
+    fn body_incoming() {
+        let body = Body::incoming(http_body_util::Empty::<Bytes>::new());
+        if let BodyInner::Incoming(_) = body.inner {
+            // Incoming body created successfully
+        } else {
+            panic!("Body::incoming should create an incoming body");
+        }
+    }
+
+    #[cot::test]
+    async fn http_body_poll_frame_incoming() {
+        let mut trailers = http::HeaderMap::new();
+        trailers.insert("x-trailer", http::HeaderValue::from_static("value"));
+        let source = http_body_util::StreamBody::new(stream::iter(vec![
+            Ok::<_, SourceBodyError>(Frame::data(Bytes::from("Hello, "))),
+            Ok(Frame::data(Bytes::from("world!"))),
+            Ok(Frame::trailers(trailers.clone())),
+        ]));
+        let mut body = Body::incoming(source);
+
+        let frame = body.frame().await.unwrap().unwrap();
+        assert_eq!(frame.into_data().unwrap(), Bytes::from("Hello, "));
+        let frame = body.frame().await.unwrap().unwrap();
+        assert_eq!(frame.into_data().unwrap(), Bytes::from("world!"));
+        let frame = body.frame().await.unwrap().unwrap();
+        assert_eq!(frame.into_trailers().unwrap(), trailers);
+        assert!(body.frame().await.is_none());
+    }
+
+    #[cot::test]
+    async fn http_body_poll_frame_incoming_error() {
+        let source = http_body_util::StreamBody::new(stream::iter(vec![
+            Ok(Frame::data(Bytes::from("Hello, "))),
+            Err(SourceBodyError),
+        ]));
+        let mut body = Body::incoming(source);
+
+        let frame = body.frame().await.unwrap().unwrap();
+        assert_eq!(frame.into_data().unwrap(), Bytes::from("Hello, "));
+
+        let error = body.frame().await.unwrap().unwrap_err();
+        assert_eq!(error.status_code(), http::StatusCode::BAD_REQUEST);
+        let inner = error.inner();
+        assert!(inner.is::<ReadRequestBody>());
+        assert!(
+            inner
+                .source()
+                .unwrap()
+                .downcast_ref::<SourceBodyError>()
+                .is_some()
+        );
     }
 
     #[test]

@@ -22,7 +22,7 @@ use tower::Service;
 use tower_sessions::MemoryStore;
 
 #[cfg(feature = "db")]
-use crate::auth::db::DatabaseUserBackend;
+use crate::auth::user_pass::DatabaseUserBackend;
 use crate::auth::{Auth, AuthBackend, NoAuthBackend, User, UserId};
 #[cfg(feature = "cache")]
 use crate::cache::Cache;
@@ -1110,7 +1110,7 @@ impl TestDatabase {
     /// ```
     #[cfg(feature = "db")]
     pub fn with_auth(&mut self) -> &mut Self {
-        self.add_migrations(cot::auth::db::migrations::MIGRATIONS.to_vec());
+        self.add_migrations(cot::auth::user_pass::migrations::MIGRATIONS.to_vec());
         self
     }
 

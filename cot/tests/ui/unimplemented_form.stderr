@@ -11,7 +11,7 @@ help: the trait `cot::form::Form` is not implemented for `MyForm`
   | ^^^^^^^^^^^^^
   = note: add #[derive(cot::form::Form)] to the struct to automatically derive the trait
 help: the trait `cot::form::Form` is implemented for `DatabaseUser`
- --> src/auth/db.rs
+ --> src/auth/user_pass.rs
   |
   | #[derive(Debug, Clone, Form, AdminModel)]
   |                        ^^^^
@@ -30,7 +30,7 @@ help: the trait `cot::form::Form` is not implemented for `MyForm`
   | ^^^^^^^^^^^^^
   = note: add #[derive(cot::form::Form)] to the struct to automatically derive the trait
 help: the trait `cot::form::Form` is implemented for `DatabaseUser`
- --> src/auth/db.rs
+ --> src/auth/user_pass.rs
   |
   | #[derive(Debug, Clone, Form, AdminModel)]
   |                        ^^^^

@@ -450,7 +450,7 @@ pub enum AuthBackendConfig {
     /// Database authentication backend.
     ///
     /// This enables
-    /// [`DatabaseUserBackend`](struct@cot::auth::db::DatabaseUserBackend)
+    /// [`DatabaseUserBackend`](struct@cot::auth::user_pass::DatabaseUserBackend)
     /// to be used as the authentication backend.
     #[cfg(feature = "db")]
     Database,

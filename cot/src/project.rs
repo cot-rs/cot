@@ -45,7 +45,7 @@ use tracing::{error, info, trace};
 
 use crate::admin::AdminModelManager;
 #[cfg(feature = "db")]
-use crate::auth::db::DatabaseUserBackend;
+use crate::auth::user_pass::DatabaseUserBackend;
 use crate::auth::{AuthBackend, NoAuthBackend};
 #[cfg(feature = "cache")]
 use crate::cache::Cache;

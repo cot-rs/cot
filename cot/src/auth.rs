@@ -6,9 +6,9 @@
 //!
 //! For the default way to store users in the database, see the [`db`] module.
 
+mod state;
 #[cfg(feature = "db")]
 pub mod user_pass;
-mod state;
 
 use std::any::Any;
 use std::borrow::Cow;

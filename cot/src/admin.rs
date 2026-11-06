@@ -707,10 +707,7 @@ impl App for AdminApp {
     fn static_files(&self) -> Vec<StaticFile> {
         vec![StaticFile::new(
             "admin/admin.css",
-            Bytes::from_static(include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/static/admin/admin.css"
-            ))),
+            Bytes::from_static(include_bytes!("../static/admin/admin.css")),
         )]
     }
 }

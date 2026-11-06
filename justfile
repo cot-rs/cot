@@ -82,3 +82,7 @@ test-docs:
 generate-config-docs:
     # regenerates docs/configuration.md from `cot::config::ProjectConfig`
     cargo run -p cot-test --features config-docs --bin generate_config_docs
+
+generate-css:
+    # regenerates the CSS files in the `cot` crate from their SCSS sources
+    cargo run -p cot-test --bin generate_css

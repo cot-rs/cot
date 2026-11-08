@@ -60,6 +60,74 @@ fn create_model_state_test() {
     assert!(field.foreign_key.clone().is_some());
 }
 
+/// Test that the migration generator will generate the correct create model
+/// migration if the model has a custom table name, and will also correctly
+/// generate the add field migration
+#[test]
+fn custom_table_name_test() {
+    let generator = test_generator();
+    let src = include_str!("migration_generator/custom_table_name/step_1.rs");
+    let source_files = vec![SourceFile::parse(PathBuf::from("main.rs"), src).unwrap()];
+
+    let migration = generator
+        .generate_migrations_as_generated_from_files(source_files.clone())
+        .unwrap()
+        .unwrap();
+
+    let migration_file = generator
+        .generate_migrations_as_source_from_files(source_files)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(migration.migration_name, "m_0001_initial");
+    assert_eq!(migration.dependencies, []);
+
+    let (table_name, fields) = unwrap_create_model(&migration.operations[0]);
+    assert_eq!(table_name, "cot__myamazing_table_name");
+    assert_eq!(fields.len(), 2);
+
+    let field = &fields[0];
+    assert_eq!(field.column_name, "id");
+    assert!(field.primary_key);
+    assert!(field.auto_value);
+    assert!(field.foreign_key.clone().is_none());
+
+    let field = &fields[1];
+    assert_eq!(field.column_name, "field_1");
+    assert!(!field.primary_key);
+    assert!(!field.auto_value);
+    assert!(field.foreign_key.clone().is_none());
+
+    let src = include_str!("migration_generator/custom_table_name/step_2.rs");
+    let source_files = vec![
+        SourceFile::parse(PathBuf::from("main.rs"), src).unwrap(),
+        SourceFile::parse(PathBuf::from(&migration_file.name), &migration_file.content).unwrap(),
+    ];
+
+    let migration = generator
+        .generate_migrations_as_generated_from_files(source_files)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(migration.dependencies.len(), 2);
+    assert!(migration.dependencies.contains(&DynDependency::Migration {
+        app: "cot".to_string(),
+        migration: "m_0001_initial".to_string()
+    }));
+    assert!(migration.dependencies.contains(&DynDependency::Model {
+        model_type: parse_quote!(crate::CustomModel),
+    }));
+
+    assert_eq!(migration.operations.len(), 1);
+
+    let (table_name, field) = unwrap_add_field(&migration.operations[0]);
+    assert_eq!(table_name, "cot__myamazing_table_name");
+    assert_eq!(field.column_name, "field_2");
+    assert!(!field.primary_key);
+    assert!(!field.auto_value);
+    assert!(field.foreign_key.clone().is_none());
+}
+
 #[test]
 fn create_models_foreign_key() {
     let generator = test_generator();

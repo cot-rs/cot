@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-## [0.8.0](https://github.com/cot-rs/cot/compare/cot-v0.7.0...cot-v0.8.0) - 2026-11-08
+## [0.8.0](https://github.com/cot-rs/cot/compare/cot-v0.7.0...cot-v0.8.0) - 2026-11-09
 
 [View diff on diff.rs](https://diff.rs/cot/0.7.0/cot/0.8.0/Cargo.toml)
 

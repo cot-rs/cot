@@ -273,6 +273,7 @@ pub enum TestLanguage {
     AskamaTemplate,
     Bash,
     Html,
+    Text,
 }
 
 impl TryFrom<&str> for TestLanguage {
@@ -285,6 +286,7 @@ impl TryFrom<&str> for TestLanguage {
             "html.j2" => Ok(Self::AskamaTemplate),
             "bash" => Ok(Self::Bash),
             "html" => Ok(Self::Html),
+            "text" => Ok(Self::Text),
             _ => Err(TestLanguageFromStringError(value.to_string())),
         }
     }

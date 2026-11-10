@@ -1,6 +1,6 @@
 [package]
 name = "cot"
-version = "0.7.0"
+version = "0.8.0"
 description = "The Rust web framework for lazy developers."
 categories = ["web-programming", "web-programming::http-server", "network-programming"]
 edition.workspace = true
@@ -43,6 +43,7 @@ hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server-graceful", "tokio"] }
 idna = { workspace = true, optional = true }
 indexmap.workspace = true
+ipnet.workspace = true
 is_terminal_polyfill.workspace = true
 lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"], optional = true }
 matchit.workspace = true

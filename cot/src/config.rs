@@ -257,6 +257,27 @@ pub struct ProjectConfig {
     /// # Ok::<(), cot::Error>(())
     /// ```
     pub middlewares: MiddlewareConfig,
+    /// Client IP address detection configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ProjectConfig;
+    ///
+    /// let config = ProjectConfig::from_toml(
+    ///     r#"
+    /// [client_ip]
+    /// proxies = ["127.0.0.1/32"]
+    /// "#,
+    /// )?;
+    ///
+    /// assert_eq!(
+    ///     config.client_ip.proxies,
+    ///     vec!["127.0.0.1/32".parse().unwrap()]
+    /// );
+    /// # Ok::<(), cot::Error>(())
+    /// ```
+    pub client_ip: ClientIpConfig,
     /// Email backend configuration.
     ///
     /// # Examples
@@ -418,6 +439,7 @@ impl ProjectConfigBuilder {
             #[cfg(feature = "cache")]
             cache: self.cache.clone().unwrap_or_default(),
             static_files: self.static_files.clone().unwrap_or_default(),
+            client_ip: self.client_ip.clone().unwrap_or_default(),
             middlewares: self.middlewares.clone().unwrap_or_default(),
             #[cfg(feature = "email")]
             email: self.email.clone().unwrap_or_default(),
@@ -1206,6 +1228,140 @@ impl StaticFilesConfig {
     #[must_use]
     pub fn builder() -> StaticFilesConfigBuilder {
         StaticFilesConfigBuilder::default()
+    }
+}
+
+/// The configuration for detecting the client IP address.
+///
+/// This is used by the
+/// [`ClientIpAddr`](crate::request::extractors::ClientIpAddr) extractor. By
+/// default, no proxies are trusted, so the client IP is always the address of
+/// the peer that connected to the server.
+///
+/// # Examples
+///
+/// ```
+/// use cot::config::ProjectConfig;
+///
+/// let config = ProjectConfig::from_toml(
+///     r#"
+/// [client_ip]
+/// proxies = ["10.0.0.0/8"]
+/// headers = ["X-Forwarded-For"]
+/// "#,
+/// )?;
+/// # Ok::<(), cot::Error>(())
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Builder, Serialize, Deserialize)]
+#[cfg_attr(feature = "_internal_config-docs", derive(schemars::JsonSchema))]
+#[builder(build_fn(skip, error = std::convert::Infallible))]
+#[serde(default)]
+#[non_exhaustive]
+pub struct ClientIpConfig {
+    /// The networks of the proxies, in CIDR notation, whose headers are
+    /// trusted.
+    ///
+    /// IPv4-mapped IPv6 addresses, such as `::ffff:10.0.0.1`, are matched as
+    /// IPv4 addresses, so IPv4 networks should be used for IPv4 proxies.
+    ///
+    /// Trusting `0.0.0.0/0` or `::/0` allows any client to spoof its IP
+    /// address.
+    #[cfg_attr(feature = "_internal_config-docs", schemars(with = "Vec<String>"))]
+    pub proxies: Vec<ipnet::IpNet>,
+    /// The headers to read the client IP from when the request comes from a
+    /// trusted proxy. The first header present in the request is used.
+    ///
+    /// Besides `Forwarded` and `X-Forwarded-For`, any header containing a
+    /// single IP address can be used, such as `X-Real-IP` or
+    /// `CF-Connecting-IP`. Only list headers that your proxies set or
+    /// overwrite; otherwise, clients can set them.
+    #[cfg_attr(feature = "_internal_config-docs", schemars(with = "Vec<String>"))]
+    pub headers: Vec<ClientIpHeader>,
+}
+
+impl ClientIpConfigBuilder {
+    /// Builds the client IP configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::{ClientIpConfig, ClientIpHeader};
+    ///
+    /// let config = ClientIpConfig::builder()
+    ///     .proxies(vec!["10.0.0.0/8".parse().unwrap()])
+    ///     .headers(vec![ClientIpHeader::XForwardedFor])
+    ///     .build();
+    /// ```
+    #[must_use]
+    pub fn build(&self) -> ClientIpConfig {
+        ClientIpConfig {
+            proxies: self.proxies.clone().unwrap_or_default(),
+            headers: self
+                .headers
+                .clone()
+                .unwrap_or_else(|| vec![ClientIpHeader::XForwardedFor]),
+        }
+    }
+}
+
+impl ClientIpConfig {
+    /// Create a new [`ClientIpConfigBuilder`] to build a [`ClientIpConfig`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::config::ClientIpConfig;
+    ///
+    /// let config = ClientIpConfig::builder().build();
+    /// ```
+    #[must_use]
+    pub fn builder() -> ClientIpConfigBuilder {
+        ClientIpConfigBuilder::default()
+    }
+}
+
+impl Default for ClientIpConfig {
+    fn default() -> Self {
+        ClientIpConfig::builder().build()
+    }
+}
+
+/// A header containing the client IP address, set by a proxy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClientIpHeader {
+    /// The standard `Forwarded` header.
+    Forwarded,
+    /// The `X-Forwarded-For` header.
+    XForwardedFor,
+    /// A header containing a single IP address, such as `X-Real-IP`.
+    Custom(http::HeaderName),
+}
+
+impl ClientIpHeader {
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            Self::Forwarded => "forwarded",
+            Self::XForwardedFor => "x-forwarded-for",
+            Self::Custom(name) => name.as_str(),
+        }
+    }
+}
+
+impl Serialize for ClientIpHeader {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ClientIpHeader {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let name = http::HeaderName::try_from(String::deserialize(deserializer)?)
+            .map_err(serde::de::Error::custom)?;
+        Ok(match name.as_str() {
+            "forwarded" => Self::Forwarded,
+            "x-forwarded-for" => Self::XForwardedFor,
+            _ => Self::Custom(name),
+        })
     }
 }
 
@@ -3239,5 +3395,30 @@ mod tests {
             .try_into()
             .unwrap();
         assert_eq!(my_config.foo, "bar");
+    }
+
+    #[test]
+    fn client_ip_config_from_toml() {
+        let config = ProjectConfig::from_toml(
+            r#"
+            [client_ip]
+            proxies = ["10.0.0.0/8", "::1/128"]
+            headers = ["Forwarded", "X-Forwarded-For", "X-Real-IP"]
+            "#,
+        )
+        .unwrap();
+
+        let expected = ClientIpConfig::builder()
+            .proxies(vec![
+                "10.0.0.0/8".parse().unwrap(),
+                "::1/128".parse().unwrap(),
+            ])
+            .headers(vec![
+                ClientIpHeader::Forwarded,
+                ClientIpHeader::XForwardedFor,
+                ClientIpHeader::Custom(http::HeaderName::from_static("x-real-ip")),
+            ])
+            .build();
+        assert_eq!(config.client_ip, expected);
     }
 }

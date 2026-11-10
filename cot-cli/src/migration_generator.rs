@@ -601,6 +601,16 @@ impl MigrationGenerator {
 
     #[must_use]
     fn model_to_migration_model(model: &ModelInSource) -> TokenStream {
+        // keep the table name if it has been set explicitly, as it would
+        // otherwise be derived from the (prefixed) name of the migration model
+        let table_name = model
+            .model_item
+            .attrs
+            .iter()
+            .find(|attr| is_model_attr(attr))
+            .and_then(|attr| ModelArgs::from_meta(&attr.meta).ok())
+            .and_then(|args| args.table_name);
+
         let mut model_source = model.model_item.clone();
         model_source.vis = syn::Visibility::Inherited;
         model_source.ident = format_ident!("_{}", model_source.ident);
@@ -608,9 +618,12 @@ impl MigrationGenerator {
         model_source
             .attrs
             .push(syn::parse_quote! {#[derive(::core::fmt::Debug)]});
-        model_source
-            .attrs
-            .push(syn::parse_quote! {#[::cot::db::model(model_type = "migration")]});
+        model_source.attrs.push(match table_name {
+            Some(table_name) => syn::parse_quote! {
+                #[::cot::db::model(model_type = "migration", table_name = #table_name)]
+            },
+            None => syn::parse_quote! {#[::cot::db::model(model_type = "migration")]},
+        });
         quote! {
             #model_source
         }

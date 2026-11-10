@@ -28,6 +28,7 @@ Any top-level table not listed below is preserved as-is and made available to yo
 | `cache` | table | [*(see below)*](#cache) | Cache subsystem configuration. |
 | `static_files` | table | [*(see below)*](#static_files) | Static files configuration. |
 | `middlewares` | table | [*(see below)*](#middlewares) | Middleware configuration. |
+| `client_ip` | table | [*(see below)*](#client_ip) | Client IP address detection configuration. |
 | `email` | table | [*(see below)*](#email) | Email backend configuration. |
 
 ## `[auth_backend]`
@@ -145,6 +146,13 @@ Cache-based session storage. This stores session data in a cache service like Re
 |---|---|---|---|
 | `uri` | string | — | The URI to the cache service. |
 
+## `[client_ip]`
+
+| Key | TOML Type | Default | Description |
+|---|---|---|---|
+| `proxies` | array of strings | `[]` | The networks of the proxies, in CIDR notation, whose headers are trusted. IPv4-mapped IPv6 addresses, such as `::ffff:10.0.0.1`, are matched as IPv4 addresses, so IPv4 networks should be used for IPv4 proxies. |
+| `headers` | array of strings | `["x-forwarded-for"]` | The headers to read the client IP from when the request comes from a trusted proxy. The first header present in the request is used. Besides `Forwarded` and `X-Forwarded-For`, any header containing a single IP address can be used, such as `X-Real-IP` or `CF-Connecting-IP`. Only list headers that your proxies set or overwrite; otherwise, clients can set them. |
+
 ## `[email]`
 
 | Key | TOML Type | Default | Description |
@@ -212,6 +220,10 @@ always_save = false
 
 [middlewares.session.store]
 type = "memory"
+
+[client_ip]
+proxies = []
+headers = ["x-forwarded-for"]
 
 [email.transport]
 type = "console"

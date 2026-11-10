@@ -8,6 +8,74 @@ As a general rule, try to upgrade one minor version at a time. Many breaking cha
 
 Sometimes, though, the changes need to be made in a backwards-incompatible manner. This page will help you understand those changes and how to adapt your code.
 
+## From 0.7 to 0.8
+
+### Routing
+
+* **Route Conflicts**: Route registration now rejects ambiguous routes when the router is built. Routes that capture a parameter at the same position must use the same parameter name. Duplicate handler routes also fail during router construction.
+    ```rust,ignore
+    // Before: these conflicting routes could be registered
+    Route::with_handler("/foo/{bar}", handler),
+    Route::with_handler("/foo/{baz}", other_handler),
+
+    // After: keep one route for this path pattern
+    Route::with_handler("/foo/{bar}", handler),
+    ```
+* **Handler Takes Precedence Over an Overlapping Router**: If a handler route overlaps with a nested router at the same path, the handler takes precedence for requests matching that path.
+    ```rust,ignore
+    let nested = Router::with_urls([
+        Route::with_handler("/", nested_index),
+        Route::with_handler("/details", details),
+    ]);
+
+    let router = Router::with_urls([
+        Route::with_handler("/foo", foo),
+        Route::with_router("/foo", nested),
+    ]);
+
+    // GET /foo calls `foo`; the nested router's `/` handler is not reached.
+    // GET /foo/details is still served by the nested router.
+    ```
+* **Trailing Slashes**: Handler routes with and without a trailing slash are distinct routes. Register a handler for each path if both should be available:
+    ```rust,ignore
+    Route::with_handler("/foo", foo),
+    Route::with_handler("/foo/", foo_slash),
+    ```
+    Nested routers mounted at the same path are merged, including mounts that differ only by a trailing slash. Conflicting routes inside merged routers still fail during router construction.
+    ```rust,ignore
+    let first = Router::with_urls([Route::with_handler("/a", a)]);
+    let second = Router::with_urls([Route::with_handler("/b", b)]);
+
+    let router = Router::with_urls([
+        Route::with_router("/users", first),
+        Route::with_router("/users/", second),
+    ]);
+
+    // Both GET /users/a and GET /users/b are routed successfully.
+    ```
+
+### Database
+
+* **Transaction Support**: [`DatabaseBackend`](trait@cot::db::DatabaseBackend) is now implemented for `&Database` and [`Transaction`](struct@cot::db::Transaction) (instead of `Database`), and [`Model`](trait@cot::db::Model)/[`Query`](struct@cot::db::query::Query) methods take the backend by value instead of `&DB`. Calls like `model.save(&db)` or `query.all(db)` with `db: &Database` keep working, but generic helpers need updating:
+    ```rust,ignore
+    // Before
+    async fn create_user<DB: DatabaseBackend>(db: &DB) -> cot::Result<()> {
+        User::new().save(db).await?;
+        Ok(())
+    }
+
+    // After: take the backend by value and reborrow it with `&mut` for each call
+    async fn create_user<DB: DatabaseBackend>(mut db: DB) -> cot::Result<()> {
+        User::new().save(&mut db).await?;
+        Ok(())
+    }
+    ```
+    See the new [`Database::begin`](struct@cot::db::Database#method.begin) API for transactions. Custom [`DatabaseBackend`](trait@cot::db::DatabaseBackend) implementations need to switch to `&mut self` receivers.
+
+### Migrations
+
+* **Models in Custom Operations**: Application models can no longer be used inside migrations (e.g. in [`Operation::custom`](struct@cot::db::migrations::Operation#method.custom)), and migration models can no longer be used outside of them. Use the models defined in the migration file instead; using the wrong kind now returns an error at runtime.
+
 ## From 0.4 to 0.5
 
 ### General
@@ -51,48 +119,3 @@ Sometimes, though, the changes need to be made in a backwards-incompatible manne
 ### Dependencies
 
 * `schemars` dependency has been updated to `0.9`. If you have any custom code to generate OpenAPI specs, (usually by implementing `AsApiOperation`, `ApiOperationPart`, or `AsApiOperation` traits inside `cot::openapi`) you may need to update it accordingly. If you're only using Cot's built-in OpenAPI support, you don't need to do anything except updating your `Cargo.toml` file.
-
-## From 0.7 to 0.8
-
-### Routing
-* **Route Conflicts**: Route registration now rejects ambiguous routes when the router is built. Routes that capture a parameter at the same position must use the same parameter name. Duplicate handler routes also fail during router construction.
-    ```rust,ignore
-    // Before: these conflicting routes could be registered
-    Route::with_handler("/foo/{bar}", handler),
-    Route::with_handler("/foo/{baz}", other_handler),
-
-    // After: keep one route for this path pattern
-    Route::with_handler("/foo/{bar}", handler),
-    ```
-* **Handler Takes Precedence Over an Overlapping Router**: If a handler route overlaps with a nested router at the same path, the handler takes precedence for requests matching that path.
-    ```rust,ignore
-    let nested = Router::with_urls([
-        Route::with_handler("/", nested_index),
-        Route::with_handler("/details", details),
-    ]);
-
-    let router = Router::with_urls([
-        Route::with_handler("/foo", foo),
-        Route::with_router("/foo", nested),
-    ]);
-
-    // GET /foo calls `foo`; the nested router's `/` handler is not reached.
-    // GET /foo/details is still served by the nested router.
-    ```
-* **Trailing Slashes**: Handler routes with and without a trailing slash are distinct routes. Register a handler for each path if both should be available:
-    ```rust,ignore
-    Route::with_handler("/foo", foo),
-    Route::with_handler("/foo/", foo_slash),
-    ```
-    Nested routers mounted at the same path are merged, including mounts that differ only by a trailing slash. Conflicting routes inside merged routers still fail during router construction.
-    ```rust,ignore
-    let first = Router::with_urls([Route::with_handler("/a", a)]);
-    let second = Router::with_urls([Route::with_handler("/b", b)]);
-
-    let router = Router::with_urls([
-        Route::with_router("/users", first),
-        Route::with_router("/users/", second),
-    ]);
-
-    // Both GET /users/a and GET /users/b are routed successfully.
-    ```

@@ -202,7 +202,7 @@ cargo run migration rollback <MIGRATION_NAME> --dry-run
 
 This prints the exact rollback plan without touching your database at all, something like:
 
-```bash
+```text
 Rollback dry run
 
 Target:

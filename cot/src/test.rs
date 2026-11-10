@@ -44,7 +44,7 @@ use crate::email::Email;
 #[cfg(feature = "email")]
 use crate::email::transport::console::Console;
 use crate::project::{prepare_request, prepare_request_for_error_handler, run_at_with_shutdown};
-use crate::request::Request;
+use crate::request::{RemoteAddr, Request};
 use crate::response::Response;
 use crate::router::Router;
 use crate::session::Session;
@@ -241,6 +241,7 @@ pub struct TestRequestBuilder {
     cache: Option<Cache>,
     #[cfg(feature = "email")]
     email: Option<Email>,
+    remote_addr: Option<SocketAddr>,
 }
 
 /// A wrapper over an auth backend that is cloneable.
@@ -298,6 +299,7 @@ impl Default for TestRequestBuilder {
             cache: None,
             #[cfg(feature = "email")]
             email: None,
+            remote_addr: None,
         }
     }
 }
@@ -424,6 +426,22 @@ impl TestRequestBuilder {
     /// ```
     pub fn config(&mut self, config: ProjectConfig) -> &mut Self {
         self.config = Some(Arc::new(config));
+        self
+    }
+
+    /// Set the address of the peer that sent the request.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cot::test::TestRequestBuilder;
+    ///
+    /// let request = TestRequestBuilder::get("/")
+    ///     .remote_addr("203.0.113.1:4711".parse().unwrap())
+    ///     .build();
+    /// ```
+    pub fn remote_addr(&mut self, remote_addr: SocketAddr) -> &mut Self {
+        self.remote_addr = Some(remote_addr);
         self
     }
 
@@ -835,6 +853,10 @@ impl TestRequestBuilder {
 
         if let Some(auth) = &self.auth {
             request.extensions_mut().insert(auth.clone());
+        }
+
+        if let Some(remote_addr) = self.remote_addr {
+            request.extensions_mut().insert(RemoteAddr(remote_addr));
         }
 
         if let Some(form_data) = &self.form_data {

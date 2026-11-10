@@ -71,12 +71,15 @@ pub use cot_core::request::extractors::FromRequestHead;
 #[doc(inline)]
 pub use cot_core::request::extractors::{Path, UrlQuery};
 
+pub use self::client_ip::ClientIpAddr;
 use crate::Body;
 use crate::auth::Auth;
 use crate::form::{Form, FormResult};
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::router::Urls;
 use crate::session::Session;
+
+mod client_ip;
 
 impl FromRequestHead for Urls {
     #[expect(clippy::unused_async_trait_impl)]

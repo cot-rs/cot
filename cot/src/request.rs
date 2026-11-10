@@ -13,6 +13,7 @@
 //! ```
 
 use std::future::Future;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use cot_core::request::{AppName, InvalidContentType, RouteName};
@@ -25,6 +26,13 @@ use crate::request::extractors::FromRequestHead;
 use crate::router::Router;
 
 pub mod extractors;
+
+/// The address of the peer that sent the request, as seen by the server.
+///
+/// Inserted into the request extensions for every accepted connection.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) struct RemoteAddr(pub(crate) SocketAddr);
+
 mod private {
     pub trait Sealed {}
 }

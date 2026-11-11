@@ -2,23 +2,35 @@ name: Release binaries
 
 on:
   release:
-    types: [created]
+    types: [published]
+  # Dry run (build and package, no upload) to validate changes to this workflow.
+  pull_request:
+    paths:
+      - .github/workflows/release-binaries.yml
+  # TODO: temporary, remove before merging.
+  push:
+    branches:
+      - cot-releases
 
 permissions:
   contents: read
 
 jobs:
   upload-cot-cli:
-    if: startsWith(github.event.release.tag_name, 'cot-cli-v')
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'cot-cli-v')
     name: Upload cot-cli (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-22.04
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-22.04
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-22.04
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: aarch64-apple-darwin
@@ -30,6 +42,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -38,18 +52,49 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cross
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        if: matrix.target == 'aarch64-unknown-linux-gnu' || contains(matrix.target, 'musl')
         uses: taiki-e/install-action@v2.85.4
         with:
           tool: cross
 
+      # Completions and manpages are platform-independent, so generate them with a host build.
+      - name: Generate completions and manpages
+        shell: bash
+        run: |
+          mkdir completions
+          cot() { cargo run --locked --quiet --package cot-cli -- "$@"; }
+          cot cli completions bash > completions/cot.bash
+          cot cli completions elvish > completions/cot.elv
+          cot cli completions fish > completions/cot.fish
+          cot cli completions powershell > completions/_cot.ps1
+          cot cli completions zsh > completions/_cot
+          cot cli manpages --create --output-dir man
+
       - name: Build and upload cot-cli
+        id: upload
         uses: taiki-e/upload-rust-binary-action@v1.30.2
         with:
           bin: cot
           package: cot-cli
           target: ${{ matrix.target }}
           archive: cot-cli-$target
-          include: LICENSE-APACHE,LICENSE-MIT
+          include: LICENSE-APACHE,LICENSE-MIT,README.md,cot-cli/CHANGELOG.md,completions,man
           checksum: sha256
           locked: true
+          dry-run: ${{ github.event_name != 'release' }}
+
+      - name: Upload archive as workflow artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v7
+        with:
+          name: cot-cli-${{ matrix.target }}
+          path: |
+            ${{ steps.upload.outputs.tar || steps.upload.outputs.zip }}
+            ${{ steps.upload.outputs.sha256 }}
+          if-no-files-found: error
+
+      - name: Attest build provenance
+        if: github.event_name == 'release'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.upload.outputs.tar || steps.upload.outputs.zip }}

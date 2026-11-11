@@ -43,6 +43,7 @@ hyper = { workspace = true, features = ["http1", "server"] }
 hyper-util = { workspace = true, features = ["http1", "server-graceful", "tokio"] }
 idna = { workspace = true, optional = true }
 indexmap.workspace = true
+linkme = { workspace = true, optional = true }
 ipnet.workspace = true
 is_terminal_polyfill.workspace = true
 lettre = { workspace = true, features = ["builder", "sendmail-transport", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"], optional = true }
@@ -111,7 +112,7 @@ ignored = [
 default = ["sqlite", "postgres", "mysql", "json"]
 full = ["default", "fake", "live-reload", "test", "cache", "redis", "email"]
 fake = ["dep:fake"]
-db = ["dep:sea-query", "dep:sea-query-sqlx", "dep:sqlx"]
+db = ["dep:linkme", "dep:sea-query", "dep:sea-query-sqlx", "dep:sqlx"]
 email = ["dep:lettre", "dep:idna"]
 sqlite = ["db", "sea-query/backend-sqlite", "sea-query-sqlx/sqlx-sqlite", "sqlx/sqlite"]
 postgres = ["db", "sea-query/backend-postgres", "sea-query-sqlx/sqlx-postgres", "sqlx/postgres"]

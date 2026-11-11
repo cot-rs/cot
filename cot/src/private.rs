@@ -11,6 +11,8 @@ pub use aide::openapi::{Operation, RequestBody, Response as OpenApiResponse, Sta
 pub use async_trait::async_trait;
 pub use bytes::Bytes;
 pub use cot_macros::ModelHelper;
+#[cfg(feature = "db")]
+pub use linkme;
 pub use tokio;
 
 pub mod askama {

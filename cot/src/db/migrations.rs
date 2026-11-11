@@ -1,6 +1,9 @@
 //! Database migrations.
 
 mod graph_export;
+// not part of the public API; used in cot-cli
+#[doc(hidden)]
+pub mod schema;
 mod sorter;
 
 use std::collections::{HashSet, VecDeque};

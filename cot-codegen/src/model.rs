@@ -13,6 +13,9 @@ pub struct ModelArgs {
     #[darling(default)]
     pub model_type: ModelType,
     pub table_name: Option<String>,
+    /// Overrides the app the model belongs to (defaults to the current crate's
+    /// name). Used by migration models that mirror other apps' tables.
+    pub app_name: Option<String>,
 }
 
 #[expect(clippy::module_name_repetitions)]

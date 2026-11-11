@@ -140,7 +140,9 @@ impl<T: Model> From<&T> for ForeignKey<T> {
 /// # See also
 ///
 /// - [`ForeignKeyOnUpdatePolicy`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum ForeignKeyOnDeletePolicy {
     /// Don't do any additional actions on delete.
     NoAction,
@@ -172,7 +174,9 @@ impl From<ForeignKeyOnDeletePolicy> for sea_query::ForeignKeyAction {
 /// # See also
 ///
 /// - [`ForeignKeyOnDeletePolicy`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum ForeignKeyOnUpdatePolicy {
     /// Don't do any additional actions on update.
     NoAction,

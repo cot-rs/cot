@@ -10,6 +10,8 @@ use async_trait::async_trait;
 pub use clap;
 use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
 #[cfg(feature = "db")]
+use cot::db::migrations::schema::{MODELS, ProjectSchema, SCHEMA_SUBCOMMAND};
+#[cfg(feature = "db")]
 use cot::db::migrations::{
     DynMigration, GraphExporter, GraphFormat, MigrationEngine, SyncDynMigration,
 };
@@ -113,6 +115,7 @@ impl Cli {
             migration_group.add_task(MigrationGraph);
 
             cli.add_task(migration_group);
+            cli.add_task(DumpSchema);
         }
         cli
     }
@@ -782,6 +785,38 @@ impl CliTask for MigrationGraph {
             None => println!("{rendered}"),
         }
 
+        Ok(())
+    }
+}
+
+/// Prints the project's [`ProjectSchema`] as JSON; used internally by the Cot
+/// CLI to generate migrations.
+#[cfg(feature = "db")]
+struct DumpSchema;
+
+#[cfg(feature = "db")]
+#[async_trait(?Send)]
+impl CliTask for DumpSchema {
+    fn subcommand(&self) -> Command {
+        Command::new(SCHEMA_SUBCOMMAND).hide(true)
+    }
+
+    async fn execute(
+        &mut self,
+        _matches: &ArgMatches,
+        bootstrapper: Bootstrapper<WithConfig>,
+    ) -> Result<()> {
+        let bootstrapper = bootstrapper.with_apps();
+        let apps = bootstrapper.context().apps();
+
+        let migrations: Vec<Box<SyncDynMigration>> =
+            apps.iter().flat_map(|app| app.migrations()).collect();
+        let schema = ProjectSchema::new(&MODELS, migrations)?;
+
+        println!(
+            "{}",
+            serde_json::to_string(&schema).expect("serializing schema should not fail")
+        );
         Ok(())
     }
 }

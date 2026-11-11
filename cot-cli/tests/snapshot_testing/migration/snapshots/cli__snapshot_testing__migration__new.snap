@@ -1,0 +1,18 @@
+---
+source: cot-cli/tests/snapshot_testing/migration/mod.rs
+info:
+  program: cot
+  args:
+    - migration
+    - new
+    - custom
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+[1m[92m    Creating[0m Migration 'm_0002_custom'
+[1m[92m    Creating[0m Migration file '/tmp/TEMP_PATH/[PROJECT_NAME]/src/migrations/m_0002_custom.rs'
+[1m[32m     Created[0m Migration file '/tmp/TEMP_PATH/[PROJECT_NAME]/src/migrations/m_0002_custom.rs'
+[1m[32m     Created[0m Migration 'm_0002_custom'

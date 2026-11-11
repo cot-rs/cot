@@ -66,8 +66,6 @@ pub struct ProjectNewArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum MigrationCommands {
-    /// List all migrations for a Cot project
-    List(MigrationListArgs),
     /// Generate migrations for a Cot project
     Make(MigrationMakeArgs),
     /// Create a new empty migration
@@ -87,13 +85,6 @@ pub struct MigrationNewArgs {
     /// Name of the app to use in the migration (default: crate name)
     #[arg(long)]
     pub app_name: Option<String>,
-}
-
-#[derive(Debug, Args)]
-pub struct MigrationListArgs {
-    /// Path to the crate directory to list migrations for [default: current
-    /// directory]
-    pub path: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

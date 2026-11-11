@@ -95,7 +95,6 @@ fn main() -> anyhow::Result<()> {
             CliCommands::Completions(args) => handlers::handle_cli_completions(args),
         },
         Commands::Migration(cmd) => match cmd {
-            MigrationCommands::List(args) => handlers::handle_migration_list(args),
             MigrationCommands::Make(args) => handlers::handle_migration_make(args),
             MigrationCommands::New(args) => handlers::handle_migration_new(args),
             MigrationCommands::External(args) => {

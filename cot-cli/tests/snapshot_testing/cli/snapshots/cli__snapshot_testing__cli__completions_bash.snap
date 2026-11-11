@@ -76,9 +76,6 @@ _cot() {
             cot__subcmd__help__subcmd__cli,manpages)
                 cmd="cot__subcmd__help__subcmd__cli__subcmd__manpages"
                 ;;
-            cot__subcmd__help__subcmd__migration,list)
-                cmd="cot__subcmd__help__subcmd__migration__subcmd__list"
-                ;;
             cot__subcmd__help__subcmd__migration,make)
                 cmd="cot__subcmd__help__subcmd__migration__subcmd__make"
                 ;;
@@ -88,9 +85,6 @@ _cot() {
             cot__subcmd__migration,help)
                 cmd="cot__subcmd__migration__subcmd__help"
                 ;;
-            cot__subcmd__migration,list)
-                cmd="cot__subcmd__migration__subcmd__list"
-                ;;
             cot__subcmd__migration,make)
                 cmd="cot__subcmd__migration__subcmd__make"
                 ;;
@@ -99,9 +93,6 @@ _cot() {
                 ;;
             cot__subcmd__migration__subcmd__help,help)
                 cmd="cot__subcmd__migration__subcmd__help__subcmd__help"
-                ;;
-            cot__subcmd__migration__subcmd__help,list)
-                cmd="cot__subcmd__migration__subcmd__help__subcmd__list"
                 ;;
             cot__subcmd__migration__subcmd__help,make)
                 cmd="cot__subcmd__migration__subcmd__help__subcmd__make"
@@ -338,22 +329,8 @@ _cot() {
             return 0
             ;;
         cot__subcmd__help__subcmd__migration)
-            opts="list make new"
+            opts="make new"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
-                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-                return 0
-            fi
-            case "${prev}" in
-                *)
-                    COMPREPLY=()
-                    ;;
-            esac
-            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-            return 0
-            ;;
-        cot__subcmd__help__subcmd__migration__subcmd__list)
-            opts=""
-            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -408,7 +385,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration)
-            opts="-p -v -q -h --release --build --package --verbose --quiet --help list make new help"
+            opts="-p -v -q -h --release --build --package --verbose --quiet --help make new help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -430,7 +407,7 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration__subcmd__help)
-            opts="list make new help"
+            opts="make new help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -444,20 +421,6 @@ _cot() {
             return 0
             ;;
         cot__subcmd__migration__subcmd__help__subcmd__help)
-            opts=""
-            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
-                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-                return 0
-            fi
-            case "${prev}" in
-                *)
-                    COMPREPLY=()
-                    ;;
-            esac
-            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-            return 0
-            ;;
-        cot__subcmd__migration__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -492,28 +455,6 @@ _cot() {
                 return 0
             fi
             case "${prev}" in
-                *)
-                    COMPREPLY=()
-                    ;;
-            esac
-            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-            return 0
-            ;;
-        cot__subcmd__migration__subcmd__list)
-            opts="-p -v -q -h --release --build --package --verbose --quiet --help"
-            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
-                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
-                return 0
-            fi
-            case "${prev}" in
-                --package)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
-                -p)
-                    COMPREPLY=($(compgen -f "${cur}"))
-                    return 0
-                    ;;
                 *)
                     COMPREPLY=()
                     ;;

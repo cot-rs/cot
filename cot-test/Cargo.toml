@@ -16,6 +16,7 @@ authors.workspace = true
 cot-cli = { workspace = true, features = ["test_utils"] }
 cot.workspace = true
 glob.workspace = true
+grass_compiler.workspace = true
 libtest-mimic.workspace = true
 schemars = { workspace = true, features = ["std"], optional = true }
 serde_json = { workspace = true, optional = true }
@@ -41,7 +42,15 @@ name = "config_reference"
 path = "tests/config_reference.rs"
 required-features = ["config-docs"]
 
+[[test]]
+name = "css"
+path = "tests/css.rs"
+
 [[bin]]
 name = "generate_config_docs"
 path = "src/bin/generate_config_docs.rs"
 required-features = ["config-docs"]
+
+[[bin]]
+name = "generate_css"
+path = "src/bin/generate_css.rs"

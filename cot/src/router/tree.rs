@@ -94,8 +94,8 @@ impl RouteTrie {
             let value = match (handler_idx, router_idx) {
                 (Some(h), None) => Entry::Handler(h),
                 (None, Some(r)) => Entry::Router(r),
-                // for cases where a handler overlaps a router for the same route/path, the handler
-                // takes precedence.
+                // for cases where a handler overlaps a router for the same
+                // route/path, the handler takes precedence.
                 (Some(h), Some(_r)) => Entry::Handler(h),
                 (None, None) => unreachable!("there should always be a route or handler or both"),
             };

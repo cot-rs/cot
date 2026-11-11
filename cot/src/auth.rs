@@ -842,10 +842,11 @@ struct AuthInner {
     #[debug("..")]
     backend: Arc<dyn AuthBackend>,
     secret_key: SecretKey,
-    // Using a standard Mutex object instead of an async version - it's unlikely this will ever be
-    // accessed from multiple threads, since it's tied to a single request. The mutex is used
-    // mostly to allow the `Auth` object to be cloned and passed around while maintaining the
-    // reference to the same `AuthInner` object with a mutable `user`.
+    // Using a standard Mutex object instead of an async version - it's unlikely
+    // this will ever be accessed from multiple threads, since it's tied to a
+    // single request. The mutex is used mostly to allow the `Auth` object to be
+    // cloned and passed around while maintaining the reference to the same
+    // `AuthInner` object with a mutable `user`.
     #[debug("..")]
     user: Mutex<UserWrapper>,
 }

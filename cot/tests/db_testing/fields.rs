@@ -77,8 +77,8 @@ struct AllFieldsModel {
     field_u8: u8,
     field_u16: u16,
     field_u32: u32,
-    // SQLite only allows us to store signed integers, so we're generating numbers that do not
-    // exceed i64::MAX
+    // SQLite only allows us to store signed integers, so we're generating
+    // numbers that do not exceed i64::MAX
     #[dummy(faker = "0..i64::MAX as u64")]
     field_u64: u64,
     field_f32: f32,

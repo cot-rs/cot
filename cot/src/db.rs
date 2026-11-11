@@ -1924,7 +1924,8 @@ impl RawExecutor for &Database {
             #[cfg(feature = "postgres")]
             DatabaseImpl::Postgres(_) => 65535,
             // https://dev.mysql.com/doc/dev/mysql-server/9.5.0/page_protocol_com_stmt_prepare.html#sect_protocol_com_stmt_prepare_response
-            // The number of parameter returned in the COM_STMT_PREPARE_OK packet is int<2>
+            // The number of parameter returned in the COM_STMT_PREPARE_OK
+            // packet is int<2>
             #[cfg(feature = "mysql")]
             DatabaseImpl::MySql(_) => 65535,
         }
@@ -1988,7 +1989,8 @@ impl RawExecutor for Transaction<'_> {
             #[cfg(feature = "postgres")]
             TransactionImpl::Postgres(_) => 65535,
             // https://dev.mysql.com/doc/dev/mysql-server/9.5.0/page_protocol_com_stmt_prepare.html#sect_protocol_com_stmt_prepare_response
-            // The number of parameter returned in the COM_STMT_PREPARE_OK packet is int<2>
+            // The number of parameter returned in the COM_STMT_PREPARE_OK
+            // packet is int<2>
             #[cfg(feature = "mysql")]
             TransactionImpl::MySql(_) => 65535,
         }

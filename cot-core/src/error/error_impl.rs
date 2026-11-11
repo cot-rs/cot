@@ -6,8 +6,8 @@ use std::ops::Deref;
 use derive_more::with_trait::Debug;
 
 use crate::StatusCode;
-// Need to rename Backtrace to CotBacktrace, because otherwise it triggers special behavior
-// in the thiserror library
+// Need to rename Backtrace to CotBacktrace, because otherwise it triggers
+// special behavior in the thiserror library
 use crate::error::backtrace::{__cot_create_backtrace, Backtrace as CotBacktrace};
 
 /// An error that can occur while using Cot.

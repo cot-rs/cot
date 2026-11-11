@@ -73,7 +73,6 @@ pub use cot_core::request::extractors::{Path, UrlQuery};
 
 pub use self::client_ip::ClientIpAddr;
 use crate::Body;
-use crate::auth::Auth;
 use crate::form::{Form, FormResult};
 use crate::request::{Request, RequestExt, RequestHead};
 use crate::router::Urls;
@@ -282,19 +281,6 @@ impl FromRequestHead for Session {
     #[expect(clippy::unused_async_trait_impl)]
     async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
         Ok(Session::from_extensions(&head.extensions).clone())
-    }
-}
-
-impl FromRequestHead for Auth {
-    #[expect(clippy::unused_async_trait_impl)]
-    async fn from_request_head(head: &RequestHead) -> cot::Result<Self> {
-        let auth = head
-            .extensions
-            .get::<Auth>()
-            .expect("AuthMiddleware not enabled for the route/project")
-            .clone();
-
-        Ok(auth)
     }
 }
 

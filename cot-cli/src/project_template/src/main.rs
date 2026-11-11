@@ -1,6 +1,6 @@
 mod migrations;
 
-use cot::auth::db::DatabaseUserApp;
+use cot::auth::user_pass::DatabaseUserApp;
 use cot::cli::CliMetadata;
 use cot::db::migrations::SyncDynMigration;
 use cot::html::Html;

@@ -201,8 +201,9 @@ async-trait = "0.1"
 fn unique_project_name() -> String {
     static COUNTER: AtomicU32 = AtomicU32::new(0);
     let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-    // Use process ID + counter so parallel test processes don't collide.
-    format!("cot-cli-test-{}-{count}", std::process::id())
+    // Use process ID + counter so parallel test processes don't collide,
+    // zero-padded so that the length of the generated code doesn't vary.
+    format!("cot-cli-test-{:010}-{count:04}", std::process::id())
 }
 
 /// Builder for a generated Cot application.
@@ -381,18 +382,13 @@ impl cot::App for {struct_name} {{
         match &self.migrations {
             Some(code_block) => {
                 format!(
-                    r#"    #[cfg(feature = "db")]
-    fn migrations(&self) -> Vec<Box<cot::db::migrations::SyncDynMigration>> {{
+                    r"    fn migrations(&self) -> Vec<Box<cot::db::migrations::SyncDynMigration>> {{
         {code_block}
-    }}"#
+    }}"
                 )
             }
 
-            None => r#"    #[cfg(feature = "db")]
-    fn migrations(&self) -> Vec<Box<cot::db::migrations::SyncDynMigration>> {
-        vec![]
-    }"#
-            .to_owned(),
+            None => String::new(),
         }
     }
 
@@ -636,6 +632,19 @@ impl CotProject {
         let mut cmd = Command::new(&self.cot_binary);
         cmd.current_dir(&self.project_dir);
         cmd.args(args);
+        cmd
+    }
+
+    /// Like [`Self::cot_cmd`], but with `CARGO_TARGET_DIR` pinned to the
+    /// shared workspace target directory.
+    ///
+    /// Use this for commands that build the project themselves (such as
+    /// `cot migration make`), so that the dependencies aren't rebuilt for
+    /// every test project.
+    #[must_use]
+    pub fn cot_cmd_shared_target(&self, args: &[&str]) -> Command {
+        let mut cmd = self.cot_cmd(args);
+        cmd.env("CARGO_TARGET_DIR", workspace_target_dir());
         cmd
     }
 

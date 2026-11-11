@@ -6,7 +6,8 @@ mod discovery;
 
 use std::path::{Path, PathBuf};
 
-use anyhow::bail;
+use anyhow::{Context, bail};
+use cot::db::migrations::schema::{ProjectSchema, SCHEMA_SUBCOMMAND, SCHEMA_VERSION};
 use cot::metadata::ProjectMetadata;
 use cot::utils::cli::{StatusType, print_status_msg};
 
@@ -49,6 +50,10 @@ pub fn load(
             return Ok(None);
         }
 
+        print_status_msg(
+            StatusType::Notice,
+            &format!("no existing binary found for `{binary_name}`, building it now"),
+        );
         build::build_binary(&package_name, &binary_name, release)?;
         if !binary_path.exists() {
             bail!(
@@ -89,6 +94,48 @@ pub fn load(
         path: binary_path,
         metadata,
     }))
+}
+
+/// Builds the project binary of `package` (always, so that the result reflects
+/// the current source code) and asks it for its database schema.
+pub fn load_schema(path: &Path, package: &str) -> anyhow::Result<ProjectSchema> {
+    let Some(ResolvedBinary {
+        binary_path,
+        project_dir,
+        package_name,
+        binary_name,
+    }) = discovery::resolve(path, false, Some(package))?
+    else {
+        bail!("no Cargo.toml found in the specified directory or any parent directory");
+    };
+
+    build::build_binary(&package_name, &binary_name, false)?;
+
+    // run from the project directory, so that the binary can find its config
+    let output = std::process::Command::new(&binary_path)
+        .arg(SCHEMA_SUBCOMMAND)
+        .current_dir(&project_dir)
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .with_context(|| format!("failed to spawn {}", binary_path.display()))?;
+    if !output.status.success() {
+        bail!(
+            "`{} {SCHEMA_SUBCOMMAND}` failed with {}",
+            binary_path.display(),
+            output.status
+        );
+    }
+
+    let schema: ProjectSchema = serde_json::from_slice(&output.stdout)
+        .context("failed to parse the database schema returned by the project binary")?;
+    if schema.version != SCHEMA_VERSION {
+        bail!(
+            "unsupported schema version {} returned by the project binary (expected {SCHEMA_VERSION}); \
+             make sure the versions of `cot` and `cot-cli` match",
+            schema.version
+        );
+    }
+    Ok(schema)
 }
 
 #[cfg(test)]

@@ -222,6 +222,7 @@ impl PackageManager {
         self.package_root.as_path()
     }
 
+    #[cfg(test)]
     pub(crate) fn get_manifest_path(&self) -> PathBuf {
         let path = &self.get_package_path().join("Cargo.toml");
         path.to_owned()

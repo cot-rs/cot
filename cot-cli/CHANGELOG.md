@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.8.0...cot-cli-v0.9.0) - 2026-11-11
+
+[View diff on diff.rs](https://diff.rs/cot-cli/0.8.0/cot-cli/0.9.0/Cargo.toml)
+
+### New features
+
+- *(cli)* List migrations from registered apps ([#649](https://github.com/cot-rs/cot/pull/649)) (by [@oxura](https://github.com/oxura))
+
+### Other
+
+- *(cli)* Forward `migration list` to project binary ([#649](https://github.com/cot-rs/cot/pull/649)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.8.0](https://github.com/cot-rs/cot/compare/cot-cli-v0.7.0...cot-cli-v0.8.0) - 2026-11-08
 
 [View diff on diff.rs](https://diff.rs/cot-cli/0.7.0/cot-cli/0.8.0/Cargo.toml)

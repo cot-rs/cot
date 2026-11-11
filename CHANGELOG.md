@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.8.1](https://github.com/cot-rs/cot/compare/cot-v0.8.0...cot-v0.8.1) - 2026-11-11
+
+[View diff on diff.rs](https://diff.rs/cot/0.8.0/cot/0.8.1/Cargo.toml)
+
+### New features
+
+- *(cli)* List migrations from registered apps ([#649](https://github.com/cot-rs/cot/pull/649)) (by [@oxura](https://github.com/oxura))
+
+### Other
+
+- Bump nightly version in CI ([#734](https://github.com/cot-rs/cot/pull/734)) (by [@m4tx](https://github.com/m4tx))
+- *(cli)* Forward `migration list` to project binary ([#649](https://github.com/cot-rs/cot/pull/649)) (by [@m4tx](https://github.com/m4tx))
+
 ## [0.8.0](https://github.com/cot-rs/cot/compare/cot-v0.7.0...cot-v0.8.0) - 2026-11-09
 
 [View diff on diff.rs](https://diff.rs/cot/0.7.0/cot/0.8.0/Cargo.toml)

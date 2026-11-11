@@ -10,12 +10,10 @@ use cot::metadata::{ArgMeta, CommandMeta};
 use cot::utils::cli::{StatusType, print_status_msg};
 
 use crate::args::{
-    Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, MigrationNewArgs,
-    ProjectNewArgs,
+    Cli, CompletionsArgs, ManpagesArgs, MigrationMakeArgs, MigrationNewArgs, ProjectNewArgs,
 };
 use crate::migration_generator::{
-    MigrationGeneratorOptions, create_new_migration, list_migrations, make_migrations,
-    try_list_project_migrations,
+    MigrationGeneratorOptions, create_new_migration, make_migrations,
 };
 use crate::new_project::{CotSource, new_project};
 use crate::project::ProjectBinary;
@@ -41,21 +39,6 @@ pub fn handle_new_project(
         CotSource::PublishedCrate
     };
     new_project(&path, &project_name, &cot_source).with_context(|| "unable to create project")
-}
-
-pub fn handle_migration_list(MigrationListArgs { path }: MigrationListArgs) -> anyhow::Result<()> {
-    let path = path.unwrap_or(PathBuf::from("."));
-    if try_list_project_migrations(&path).with_context(|| "unable to list project migrations")? {
-        return Ok(());
-    }
-    let migrations = list_migrations(&path).with_context(|| "unable to list migrations")?;
-    for (app_name, migs) in migrations {
-        for mig in migs {
-            println!("{app_name}\t{mig}");
-        }
-    }
-
-    Ok(())
 }
 
 pub fn handle_migration_make(
@@ -317,17 +300,6 @@ mod tests {
         };
 
         let result = handle_new_project(args);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn migration_list_wrong_directory() {
-        let args = MigrationListArgs {
-            path: Some(PathBuf::from("nonexistent")),
-        };
-
-        let result = handle_migration_list(args);
 
         assert!(result.is_err());
     }
@@ -736,7 +708,7 @@ mod tests {
         assert!(
             migration
                 .get_subcommands()
-                .any(|sc| sc.get_name() == "list")
+                .any(|sc| sc.get_name() == "make")
         );
     }
 

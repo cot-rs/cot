@@ -1,15 +1,11 @@
 use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 
 use cot_cli::migration_generator::{
-    self, DynDependency, DynOperation, MigrationAsSource, MigrationGenerator,
-    MigrationGeneratorOptions, SourceFile,
+    DynDependency, DynOperation, MigrationAsSource, MigrationGenerator, MigrationGeneratorOptions,
+    SourceFile,
 };
-use cot_cli::test_utils;
 use syn::parse_quote;
-
-pub const EXAMPLE_DATABASE_MODEL: &str = include_str!("resources/example_database_model.rs");
 
 /// Test that the migration generator can generate a "create model" migration
 /// for a given model that has an expected state.
@@ -411,59 +407,6 @@ fn find_source_files() {
             .iter()
             .any(|f| f.file_name().unwrap() == nested_file_name)
     );
-}
-
-#[test]
-#[cfg_attr(
-    miri,
-    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
-)]
-fn list_migrations() {
-    let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-    let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
-    test_utils::make_package(temp_dir.path()).unwrap();
-    let mut main = std::fs::OpenOptions::new()
-        .append(true)
-        .open(temp_dir.path().join("src").join("main.rs"))
-        .unwrap();
-    write!(main, "{EXAMPLE_DATABASE_MODEL}").unwrap();
-    migration_generator::make_migrations(
-        temp_dir.path(),
-        MigrationGeneratorOptions {
-            app_name: None,
-            output_dir: None,
-        },
-    )
-    .unwrap();
-
-    let migrations = migration_generator::list_migrations(temp_dir.path()).unwrap();
-
-    assert_eq!(migrations.len(), 1);
-    assert!(migrations.contains_key(package_name));
-    assert_eq!(migrations.get(package_name).unwrap()[0], "m_0001_initial");
-}
-
-#[test]
-fn list_migrations_missing_cargo_toml() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-
-    let migrations = migration_generator::list_migrations(tmp_dir.path());
-
-    assert!(migrations.is_err());
-}
-
-#[test]
-#[cfg_attr(
-    miri,
-    ignore = "unsupported operation: extern static `pidfd_spawnp` is not supported by Miri"
-)]
-fn list_migrations_missing_migrations_dir() {
-    let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-    test_utils::make_package(temp_dir.path()).unwrap();
-
-    let migrations = migration_generator::list_migrations(temp_dir.path()).unwrap();
-
-    assert!(migrations.is_empty());
 }
 
 fn test_generator() -> MigrationGenerator {

@@ -78,23 +78,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
-            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
             [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
             [CompletionResult]::new('new', 'new', [CompletionResultType]::ParameterValue, 'Create a new empty migration')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
-            break
-        }
-        'cot;migration;list' {
-            [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
-            [CompletionResult]::new('--package', '--package', [CompletionResultType]::ParameterName, 'Package to use, in case you''re running this in a workspace')
-            [CompletionResult]::new('--release', '--release', [CompletionResultType]::ParameterName, 'Use target/release instead of target/debug when looking for the project binary')
-            [CompletionResult]::new('--build', '--build', [CompletionResultType]::ParameterName, 'Build the binary if it does not exist')
-            [CompletionResult]::new('-v', '-v', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
-            [CompletionResult]::new('--verbose', '--verbose', [CompletionResultType]::ParameterName, 'Increase logging verbosity')
-            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
-            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Decrease logging verbosity')
-            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
-            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
         'cot;migration;make' {
@@ -127,13 +113,9 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;migration;help' {
-            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
             [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
             [CompletionResult]::new('new', 'new', [CompletionResultType]::ParameterValue, 'Create a new empty migration')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
-            break
-        }
-        'cot;migration;help;list' {
             break
         }
         'cot;migration;help;make' {
@@ -217,12 +199,8 @@ Register-ArgumentCompleter -Native -CommandName 'cot' -ScriptBlock {
             break
         }
         'cot;help;migration' {
-            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all migrations for a Cot project')
             [CompletionResult]::new('make', 'make', [CompletionResultType]::ParameterValue, 'Generate migrations for a Cot project')
             [CompletionResult]::new('new', 'new', [CompletionResultType]::ParameterValue, 'Create a new empty migration')
-            break
-        }
-        'cot;help;migration;list' {
             break
         }
         'cot;help;migration;make' {

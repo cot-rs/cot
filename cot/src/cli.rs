@@ -10,7 +10,9 @@ use async_trait::async_trait;
 pub use clap;
 use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
 #[cfg(feature = "db")]
-use cot::db::migrations::{GraphExporter, GraphFormat, MigrationEngine, SyncDynMigration};
+use cot::db::migrations::{
+    DynMigration, GraphExporter, GraphFormat, MigrationEngine, SyncDynMigration,
+};
 use cot::project::BootstrappedProject;
 use derive_more::Debug;
 
@@ -595,14 +597,16 @@ struct MigrationList;
 
 #[cfg(feature = "db")]
 impl MigrationList {
-    fn write_migrations(
-        apps: &[Box<dyn crate::App>],
-        mut writer: impl Write,
-    ) -> std::io::Result<()> {
+    fn write_migrations(apps: &[Box<dyn crate::App>], mut writer: impl Write) -> Result<()> {
+        let mut migrations: Vec<Box<SyncDynMigration>> = Vec::new();
         for app in apps {
-            for migration in app.migrations() {
-                writeln!(writer, "{}\t{}", migration.app_name(), migration.name())?;
-            }
+            migrations.extend(app.migrations());
+        }
+
+        let engine = MigrationEngine::new(migrations)?;
+        for migration in engine.migrations() {
+            writeln!(writer, "{}\t{}", migration.app_name(), migration.name())
+                .map_err(Error::internal)?;
         }
         Ok(())
     }
@@ -613,7 +617,7 @@ impl MigrationList {
 impl CliTask for MigrationList {
     fn subcommand(&self) -> Command {
         Command::new(MIGRATION_LIST_SUBCOMMAND)
-            .about("List all migrations registered by the project")
+            .about("List all migrations of the project, in the order they are applied")
     }
 
     async fn execute(
@@ -623,8 +627,6 @@ impl CliTask for MigrationList {
     ) -> Result<()> {
         let bootstrapper = bootstrapper.with_apps();
         Self::write_migrations(bootstrapper.context().apps(), std::io::stdout().lock())
-            .map_err(Error::internal)?;
-        Ok(())
     }
 }
 
@@ -900,7 +902,10 @@ mod tests {
         impl Migration for ProjectMigration {
             const APP_NAME: &'static str = "project";
             const MIGRATION_NAME: &'static str = "m_0001_initial";
-            const DEPENDENCIES: &'static [MigrationDependency] = &[];
+            const DEPENDENCIES: &'static [MigrationDependency] = &[MigrationDependency::migration(
+                "dependency",
+                "m_0002_dependency",
+            )];
             const OPERATIONS: &'static [Operation] = &[];
         }
 
@@ -934,13 +939,15 @@ mod tests {
             }
         }
 
+        // registered in reverse order to check that the dependency is listed
+        // first
         let apps: Vec<Box<dyn App>> = vec![Box::new(ProjectApp), Box::new(DependencyApp)];
         let mut output = Vec::new();
         MigrationList::write_migrations(&apps, &mut output).unwrap();
 
         assert_eq!(
             String::from_utf8(output).unwrap(),
-            "project\tm_0001_initial\ndependency\tm_0002_dependency\n"
+            "dependency\tm_0002_dependency\nproject\tm_0001_initial\n"
         );
     }
 

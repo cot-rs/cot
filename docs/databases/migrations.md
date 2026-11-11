@@ -42,7 +42,7 @@ To see what migrations exist across your project, run:
 cot migration list
 ```
 
-This prints every migration Cot can find, one per line, alongside the app (crate) it belongs to. In a workspace, this walks all member crates.
+This runs your project's binary (add `--build` to build it first) and prints every migration registered by the apps of your project, one per line, alongside the app it belongs to. Migrations are listed in the order they are applied, and include the migrations of the apps you didn't write yourself, such as the ones shipped with Cot. In a workspace, select the project with `--package`.
 
 ## Anatomy of a migration file
 

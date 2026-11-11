@@ -176,6 +176,7 @@ impl CargoTomlManager {
 }
 
 impl WorkspaceManager {
+    #[cfg(test)]
     pub(crate) fn get_packages(&self) -> Vec<&PackageManager> {
         self.package_manifests.values().collect()
     }
@@ -219,18 +220,6 @@ impl PackageManager {
 
     pub(crate) fn get_package_path(&self) -> &Path {
         self.package_root.as_path()
-    }
-
-    pub(crate) fn is_runnable_cot_project(&self) -> bool {
-        let depends_on_cot = self.manifest.dependencies.iter().any(|(name, dependency)| {
-            name == "cot"
-                || dependency
-                    .detail()
-                    .and_then(|detail| detail.package.as_deref())
-                    == Some("cot")
-        });
-
-        depends_on_cot && self.package_root.join("src").join("main.rs").is_file()
     }
 
     pub(crate) fn get_manifest_path(&self) -> PathBuf {
@@ -553,39 +542,6 @@ mod tests {
             let package_name = temp_dir.path().file_name().unwrap().to_str().unwrap();
 
             assert_eq!(manager.get_package_name(), package_name);
-        }
-
-        #[test]
-        #[cfg_attr(
-            miri,
-            ignore = "unsupported operation: can't call foreign function `OPENSSL_init_ssl` on OS `linux`"
-        )]
-        fn runnable_cot_project_with_renamed_dependency() {
-            let (temp_dir, _) = get_package();
-            std::fs::write(
-                temp_dir.path().join("Cargo.toml"),
-                r#"
-                    [package]
-                    name = "renamed-cot-dependency"
-                    version = "0.1.0"
-                    edition = "2024"
-
-                    [dependencies]
-                    web-framework = { package = "cot", version = "0.7" }
-                "#,
-            )
-            .unwrap();
-
-            let CargoTomlManager::Package(manager) = CargoTomlManager::from_path(temp_dir.path())
-                .unwrap()
-                .unwrap()
-            else {
-                panic!("expected a package");
-            };
-            assert!(manager.is_runnable_cot_project());
-
-            std::fs::remove_file(temp_dir.path().join("src").join("main.rs")).unwrap();
-            assert!(!manager.is_runnable_cot_project());
         }
 
         #[test]

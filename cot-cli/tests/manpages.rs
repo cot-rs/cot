@@ -18,7 +18,6 @@ fn generate_manpages() {
         "cot-cli-completions.1",
         "cot-cli-manpages.1",
         "cot-migration.1",
-        "cot-migration-list.1",
         "cot-migration-make.1",
         "cot-new.1",
     ];

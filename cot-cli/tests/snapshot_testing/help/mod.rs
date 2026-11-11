@@ -50,14 +50,6 @@ fn help_migration() {
 }
 
 #[test]
-fn help_migration_list() {
-    insta::with_settings!(
-        { filters => GENERIC_FILTERS.to_owned() },
-        { assert_cmd_snapshot!(cot_cli!("help", "migration", "list")) }
-    );
-}
-
-#[test]
 fn help_migration_make() {
     insta::with_settings!(
         { filters => GENERIC_FILTERS.to_owned() },

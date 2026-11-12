@@ -30,6 +30,7 @@ use crate::session::store::memory::MemoryStore;
 #[cfg(feature = "redis")]
 use crate::session::store::redis::RedisStore;
 
+mod from_fn;
 #[cfg(feature = "live-reload")]
 mod live_reload;
 mod trailing_slash;
@@ -97,6 +98,7 @@ pub use cot_core::middleware::IntoCotErrorLayer;
 pub use cot_core::middleware::IntoCotResponseLayer;
 #[doc(inline)]
 pub use cot_core::middleware::{IntoCotError, IntoCotResponse};
+pub use from_fn::{FromFn, FromFnLayer, Next, from_fn};
 #[cfg(feature = "live-reload")]
 pub use live_reload::LiveReloadMiddleware;
 pub use trailing_slash::{TrailingSlashMiddleware, TrailingSlashService};

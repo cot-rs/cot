@@ -70,6 +70,7 @@ pub mod config;
 #[cfg(feature = "email")]
 pub mod email;
 mod error_page;
+mod hot_patching;
 // not part of the public API; used in cot-cli
 #[doc(hidden)]
 pub mod metadata;

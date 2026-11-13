@@ -1,15 +1,7 @@
 use std::collections::HashMap;
-#[cfg(feature = "symbol-resolver")]
-use std::fmt::Display;
 use std::iter::FromIterator;
-#[cfg(feature = "symbol-resolver")]
-use std::path::Path;
 
 use quote::format_ident;
-#[cfg(feature = "symbol-resolver")]
-use syn::UseTree;
-#[cfg(feature = "symbol-resolver")]
-use tracing::warn;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolResolver {
@@ -28,43 +20,6 @@ impl SymbolResolver {
         Self {
             symbols: symbol_map,
         }
-    }
-
-    #[cfg(feature = "symbol-resolver")]
-    #[must_use]
-    pub fn from_file(file: &syn::File, module_path: &Path) -> Self {
-        let imports = Self::get_imports(file, &ModulePath::from_fs_path(module_path));
-        Self::new(imports)
-    }
-
-    /// Return the list of top-level `use` statements, structs, enums, type
-    /// aliases, and constants as a list of [`VisibleSymbol`]s from the file.
-    #[cfg(feature = "symbol-resolver")]
-    fn get_imports(file: &syn::File, module_path: &ModulePath) -> Vec<VisibleSymbol> {
-        let mut imports = Vec::new();
-
-        for item in &file.items {
-            match item {
-                syn::Item::Use(item) => {
-                    imports.append(&mut VisibleSymbol::from_item_use(item, module_path));
-                }
-                syn::Item::Struct(item_struct) => {
-                    imports.push(VisibleSymbol::from_item_struct(item_struct, module_path));
-                }
-                syn::Item::Enum(item_enum) => {
-                    imports.push(VisibleSymbol::from_item_enum(item_enum, module_path));
-                }
-                syn::Item::Type(item_type) => {
-                    imports.push(VisibleSymbol::from_item_type(item_type, module_path));
-                }
-                syn::Item::Const(item_const) => {
-                    imports.push(VisibleSymbol::from_item_const(item_const, module_path));
-                }
-                _ => {}
-            }
-        }
-
-        imports
     }
 
     pub fn resolve_struct(&self, item: &mut syn::ItemStruct) {
@@ -212,179 +167,6 @@ impl VisibleSymbol {
     fn full_path_parts(&self) -> impl Iterator<Item = &str> {
         self.full_path.split("::")
     }
-
-    #[cfg(feature = "symbol-resolver")]
-    fn new_use(alias: &str, full_path: &str) -> Self {
-        Self::new(alias, full_path, VisibleSymbolKind::Use)
-    }
-
-    #[cfg(feature = "symbol-resolver")]
-    fn from_item_use(item: &syn::ItemUse, module_path: &ModulePath) -> Vec<Self> {
-        Self::from_tree(&item.tree, module_path)
-    }
-
-    #[cfg(feature = "symbol-resolver")]
-    fn from_item_struct(item: &syn::ItemStruct, module_path: &ModulePath) -> Self {
-        let ident = item.ident.to_string();
-        let full_path = Self::module_path(module_path, &ident);
-
-        Self {
-            alias: ident,
-            full_path,
-            kind: VisibleSymbolKind::Struct,
-        }
-    }
-
-    #[cfg(feature = "symbol-resolver")]
-    fn from_item_enum(item: &syn::ItemEnum, module_path: &ModulePath) -> Self {
-        let ident = item.ident.to_string();
-        let full_path = Self::module_path(module_path, &ident);
-
-        Self {
-            alias: ident,
-            full_path,
-            kind: VisibleSymbolKind::Enum,
-        }
-    }
-
-    #[cfg(feature = "symbol-resolver")]
-    fn from_item_type(item: &syn::ItemType, module_path: &ModulePath) -> Self {
-        let ident = item.ident.to_string();
-        let full_path = Self::module_path(module_path, &ident);
-
-        Self {
-            alias: ident,
-            full_path,
-            kind: VisibleSymbolKind::TypeAlias,
-        }
-    }
-
-    #[cfg(feature = "symbol-resolver")]
-    fn from_item_const(item: &syn::ItemConst, module_path: &ModulePath) -> Self {
-        let ident = item.ident.to_string();
-        let full_path = Self::module_path(module_path, &ident);
-
-        Self {
-            alias: ident,
-            full_path,
-            kind: VisibleSymbolKind::Const,
-        }
-    }
-
-    #[cfg(feature = "symbol-resolver")]
-    fn module_path(module_path: &ModulePath, ident: &str) -> String {
-        format!("{module_path}::{ident}")
-    }
-
-    #[cfg(feature = "symbol-resolver")]
-    fn from_tree(tree: &UseTree, current_module: &ModulePath) -> Vec<Self> {
-        match tree {
-            UseTree::Path(path) => {
-                let ident = path.ident.to_string();
-                let resolved_path = if ident == "crate" {
-                    current_module.crate_name().to_string()
-                } else if ident == "self" {
-                    current_module.to_string()
-                } else if ident == "super" {
-                    current_module.parent().to_string()
-                } else {
-                    ident
-                };
-
-                return Self::from_tree(&path.tree, current_module)
-                    .into_iter()
-                    .map(|import| {
-                        Self::new_use(
-                            &import.alias,
-                            &format!("{}::{}", resolved_path, import.full_path),
-                        )
-                    })
-                    .collect();
-            }
-            UseTree::Name(name) => {
-                let ident = name.ident.to_string();
-                return vec![Self::new_use(&ident, &ident)];
-            }
-            UseTree::Rename(rename) => {
-                return vec![Self::new_use(
-                    &rename.rename.to_string(),
-                    &rename.ident.to_string(),
-                )];
-            }
-            UseTree::Glob(_) => {
-                warn!("Glob imports are not supported");
-            }
-            UseTree::Group(group) => {
-                return group
-                    .items
-                    .iter()
-                    .flat_map(|tree| Self::from_tree(tree, current_module))
-                    .collect();
-            }
-        }
-
-        vec![]
-    }
-}
-
-#[cfg(feature = "symbol-resolver")]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ModulePath {
-    parts: Vec<String>,
-}
-
-#[cfg(feature = "symbol-resolver")]
-impl ModulePath {
-    #[must_use]
-    pub fn from_fs_path(path: &Path) -> Self {
-        let mut parts = vec![String::from("crate")];
-
-        if path == Path::new("lib.rs") || path == Path::new("main.rs") {
-            return Self { parts };
-        }
-
-        parts.append(
-            &mut path
-                .components()
-                .map(|c| {
-                    let component_str = c.as_os_str().to_string_lossy();
-                    component_str
-                        .strip_suffix(".rs")
-                        .unwrap_or(&component_str)
-                        .to_string()
-                })
-                .collect::<Vec<_>>(),
-        );
-
-        if parts
-            .last()
-            .expect("parts must have at least one component")
-            == "mod"
-        {
-            parts.pop();
-        }
-
-        Self { parts }
-    }
-
-    #[must_use]
-    fn parent(&self) -> Self {
-        let mut parts = self.parts.clone();
-        parts.pop();
-        Self { parts }
-    }
-
-    #[must_use]
-    fn crate_name(&self) -> &str {
-        &self.parts[0]
-    }
-}
-
-#[cfg(feature = "symbol-resolver")]
-impl Display for ModulePath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.parts.join("::"))
-    }
 }
 
 #[cfg(test)]
@@ -396,105 +178,14 @@ mod tests {
     use crate::symbol_resolver::VisibleSymbolKind;
 
     #[test]
-    fn imports() {
-        let source = r"
-use std::collections::HashMap;
-use std::error::Error as StdError;
-use std::fmt::{Debug, Display, Formatter};
-use std::fs::*;
-use rand as r;
-use super::MyModel;
-use crate::MyOtherModel;
-use self::MyThirdModel;
-
-struct MyFourthModel {}
-
-enum MyEnum {}
-
-type MyAlias = u8;
-
-const MY_CONSTANT: u8 = 42;
-        ";
-
-        let file = syn::parse_file(source).unwrap();
-        let imports =
-            SymbolResolver::get_imports(&file, &ModulePath::from_fs_path(Path::new("foo/bar.rs")));
-
-        let expected = vec![
-            VisibleSymbol {
-                alias: "HashMap".to_string(),
-                full_path: "std::collections::HashMap".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "StdError".to_string(),
-                full_path: "std::error::Error".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "Debug".to_string(),
-                full_path: "std::fmt::Debug".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "Display".to_string(),
-                full_path: "std::fmt::Display".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "Formatter".to_string(),
-                full_path: "std::fmt::Formatter".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "r".to_string(),
-                full_path: "rand".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "MyModel".to_string(),
-                full_path: "crate::foo::MyModel".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "MyOtherModel".to_string(),
-                full_path: "crate::MyOtherModel".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "MyThirdModel".to_string(),
-                full_path: "crate::foo::bar::MyThirdModel".to_string(),
-                kind: VisibleSymbolKind::Use,
-            },
-            VisibleSymbol {
-                alias: "MyFourthModel".to_string(),
-                full_path: "crate::foo::bar::MyFourthModel".to_string(),
-                kind: VisibleSymbolKind::Struct,
-            },
-            VisibleSymbol {
-                alias: "MyEnum".to_string(),
-                full_path: "crate::foo::bar::MyEnum".to_string(),
-                kind: VisibleSymbolKind::Enum,
-            },
-            VisibleSymbol {
-                alias: "MyAlias".to_string(),
-                full_path: "crate::foo::bar::MyAlias".to_string(),
-                kind: VisibleSymbolKind::TypeAlias,
-            },
-            VisibleSymbol {
-                alias: "MY_CONSTANT".to_string(),
-                full_path: "crate::foo::bar::MY_CONSTANT".to_string(),
-                kind: VisibleSymbolKind::Const,
-            },
-        ];
-        assert_eq!(imports, expected);
-    }
-
-    #[test]
     fn import_resolver() {
         let resolver = SymbolResolver::new(vec![
-            VisibleSymbol::new_use("MyType", "crate::models::MyType"),
-            VisibleSymbol::new_use("HashMap", "std::collections::HashMap"),
+            VisibleSymbol::new("MyType", "crate::models::MyType", VisibleSymbolKind::Use),
+            VisibleSymbol::new(
+                "HashMap",
+                "std::collections::HashMap",
+                VisibleSymbolKind::Use,
+            ),
         ]);
 
         let path = &mut parse_quote!(MyType);
@@ -522,9 +213,17 @@ const MY_CONSTANT: u8 = 42;
     #[test]
     fn import_resolver_resolve_struct() {
         let resolver = SymbolResolver::new(vec![
-            VisibleSymbol::new_use("MyType", "crate::models::MyType"),
-            VisibleSymbol::new_use("HashMap", "std::collections::HashMap"),
-            VisibleSymbol::new_use("LimitedString", "cot::db::LimitedString"),
+            VisibleSymbol::new("MyType", "crate::models::MyType", VisibleSymbolKind::Use),
+            VisibleSymbol::new(
+                "HashMap",
+                "std::collections::HashMap",
+                VisibleSymbolKind::Use,
+            ),
+            VisibleSymbol::new(
+                "LimitedString",
+                "cot::db::LimitedString",
+                VisibleSymbolKind::Use,
+            ),
             VisibleSymbol::new(
                 "MY_CONSTANT",
                 "crate::constants::MY_CONSTANT",
@@ -555,7 +254,7 @@ const MY_CONSTANT: u8 = 42;
     #[test]
     fn import_resolver_resolve_struct_with_self() {
         let resolver = SymbolResolver::new(vec![
-            VisibleSymbol::new_use("ForeignKey", "cot::db::ForeignKey"),
+            VisibleSymbol::new("ForeignKey", "cot::db::ForeignKey", VisibleSymbolKind::Use),
             VisibleSymbol::new("MyModel", "crate::MyModel", VisibleSymbolKind::Struct),
         ]);
 

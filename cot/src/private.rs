@@ -20,10 +20,6 @@ pub mod askama {
     pub use cot_macros::{Template, filter_fn};
 }
 
-// used in the CLI
-#[cfg(feature = "db")]
-pub use crate::utils::graph::apply_permutation;
-
 /// The version of the crate.
 ///
 /// This is used in the CLI to specify the version of the crate to use in the

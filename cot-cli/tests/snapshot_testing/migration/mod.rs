@@ -1,75 +1,86 @@
-use std::io::Write;
-
-use clap_verbosity_flag::{OffLevel, Verbosity};
-use cot_cli::test_utils;
+use cot_cli::test_harness::{CotAppBuilder, CotProject, CotProjectBuilder};
 
 use super::*;
 
-const EXAMPLE_DATABASE_MODEL: &str = include_str!("../../resources/example_database_model.rs");
+const MIGRATION_FILTERS: &[(&str, &str)] = &[
+    // cargo output of building the project binary
+    (
+        r"(?m)^ *(Adding|Blocking|Compiling|Finished|Locking|Updating)\b.*\n",
+        "",
+    ),
+    (r"\bcot_cli_test_\d+_\d+__", "[PROJECT_NAME]__"),
+    (r"(?ms)^warning: .*?generated \d+ warnings?[^\n]*\n", ""),
+    (r"cot-test-harness-[^/]+", "TEMP_PATH"),
+    (r"on \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\+00:00", "on DATE"),
+    (r"auto_\d{8}_\d{6}", "auto_DATE"),
+];
 
-#[test]
-#[expect(clippy::cast_possible_truncation)]
-fn migration_make_no_models() {
-    let cmd = cot_cli!("migration", "make");
-    for (idx, mut cli) in cot_clis_with_verbosity(&cmd).into_iter().enumerate() {
-        let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
+fn filters() -> Vec<(&'static str, &'static str)> {
+    [GENERIC_FILTERS, TEMP_PATH_FILTERS, MIGRATION_FILTERS].concat()
+}
 
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        test_utils::make_package(temp_dir.path()).unwrap();
+/// A project with an app that registers its migrations, and the default
+/// `DefaultTestModel` model.
+fn migration_project() -> CotProject {
+    let app = CotAppBuilder::new("cot_test_migrations")
+        .migrations("cot::db::migrations::wrap_migrations(migrations::MIGRATIONS)")
+        .build();
+    CotProjectBuilder::new(cot_cli_path())
+        .app(app)
+        .build()
+        .unwrap()
+}
 
-        insta::with_settings!(
-            {
-                description => format!("Verbosity level: {filter}"),
-                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
-            },
-            { assert_cmd_snapshot!(cli.current_dir(temp_dir.path())) }
-        );
-    }
+fn read_migration(project: &CotProject, name: &str) -> String {
+    std::fs::read_to_string(project.path().join("src").join(name)).unwrap()
 }
 
 #[test]
-#[expect(clippy::cast_possible_truncation)]
-fn migration_make_existing_model() {
-    let cmd = cot_cli!("migration", "make");
-    for (idx, mut cli) in cot_clis_with_verbosity(&cmd).into_iter().enumerate() {
-        let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
+fn migration_make() {
+    let project = migration_project();
 
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        let proj_path = temp_dir.path().join("cot-test");
-
-        test_utils::make_package(&proj_path).unwrap();
-        let mut main = std::fs::OpenOptions::new()
-            .append(true)
-            .open(proj_path.join("src").join("main.rs"))
-            .unwrap();
-        write!(main, "{EXAMPLE_DATABASE_MODEL}").unwrap();
-
-        insta::with_settings!(
-            {
-                description => format!("Verbosity level: {filter}"),
-                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
-            },
-            { assert_cmd_snapshot!(cli.current_dir(&proj_path)) }
+    insta::with_settings!({ filters => filters() }, {
+        assert_cmd_snapshot!(
+            "make_initial",
+            project.cot_cmd_shared_target(&["migration", "make"])
         );
-    }
+        insta::assert_snapshot!(
+            "make_initial_migration",
+            read_migration(&project, "migrations/m_0001_initial.rs")
+        );
+        insta::assert_snapshot!(
+            "make_initial_migrations_module",
+            read_migration(&project, "migrations.rs")
+        );
+
+        assert_cmd_snapshot!(
+            "make_no_changes",
+            project.cot_cmd_shared_target(&["migration", "make"])
+        );
+        assert_cmd_snapshot!(
+            "list",
+            project.cot_cmd_shared_target(&["migration", "list"])
+        );
+    });
 }
 
 #[test]
-#[expect(clippy::cast_possible_truncation)]
 fn migration_new() {
-    let cmd = cot_cli!("migration", "new", "custom");
-    for (idx, mut cli) in cot_clis_with_verbosity(&cmd).into_iter().enumerate() {
-        let filter = Verbosity::<OffLevel>::new(idx as u8, 0).filter();
+    let project = migration_project();
+    let make = project
+        .cot_cmd_shared_target(&["migration", "make"])
+        .output()
+        .unwrap();
+    assert!(make.status.success(), "{make:?}");
 
-        let temp_dir = tempfile::TempDir::with_prefix("cot-test-").unwrap();
-        test_utils::make_package(temp_dir.path()).unwrap();
-
-        insta::with_settings!(
-            {
-                description => format!("Verbosity level: {filter}"),
-                filters => [GENERIC_FILTERS, TEMP_PATH_FILTERS, TEMP_PROJECT_FILTERS].concat()
-            },
-            { assert_cmd_snapshot!(cli.current_dir(temp_dir.path())) }
+    insta::with_settings!({ filters => filters() }, {
+        assert_cmd_snapshot!(
+            "new",
+            project.cot_cmd_shared_target(&["migration", "new", "custom"])
         );
-    }
+        insta::assert_snapshot!(
+            "new_migration",
+            read_migration(&project, "migrations/m_0002_custom.rs")
+        );
+    });
 }

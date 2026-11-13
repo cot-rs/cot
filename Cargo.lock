@@ -1003,9 +1003,6 @@ dependencies = [
  "clap_mangen",
  "cot",
  "cot-cli",
- "cot_codegen",
- "darling 0.24.1",
- "glob",
  "heck",
  "hex",
  "insta",
@@ -1048,7 +1045,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
- "tracing",
 ]
 
 [[package]]

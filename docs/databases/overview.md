@@ -80,7 +80,7 @@ pub struct Post {
 ```
 
 ## Field Types
-To use a type in a model, it **must** implement the [`ToDbValue`](trait@cot::db::ToDbValue) and [`FromDbValue`](trait@cot::db::FromDbValue) traits. The [`ToDbValue`](trait@cot::db::ToDbValue) trait tells Cot how to serialize the field value into a format that can be stored in the database (e.g. a string, a number, a boolean, etc.) while the [`FromDbValue`](trait@cot::db::FromDbValue) trait tells Cot how to deserialize the field value from the database format back into the Rust type.
+To use a type in a model, it **must** implement the [`ToDbValue`](trait@cot::db::ToDbValue), [`FromDbValue`](trait@cot::db::FromDbValue), and [`DatabaseField`](trait@cot::db::DatabaseField) traits. The [`ToDbValue`](trait@cot::db::ToDbValue) trait tells Cot how to serialize the field value into a format that can be stored in the database (e.g. a string, a number, a boolean, etc.) while the [`FromDbValue`](trait@cot::db::FromDbValue) trait tells Cot how to deserialize the field value from the database format back into the Rust type. The [`DatabaseField`](trait@cot::db::DatabaseField) trait describes the column used to store the value (its type, nullability, etc.), which is what migrations are generated from.
 Cot provides implementations of these traits for many common types on a best-effort basis. Refer to the [implementations](trait@cot::db::FromDbValue#foreign-impls) and [implementors](trait@cot::db::FromDbValue#implementors) section of the docs for a complete list of the supported types.
 
 In the example below, we show how to use a custom type as a field in a model:
@@ -121,6 +121,10 @@ impl ToDbFieldValue for NewType {
     fn to_db_field_value(&self) -> DbFieldValue {
         self.0.clone().into()
     }
+}
+
+impl DatabaseField for NewType {
+    const TYPE: ColumnType = ColumnType::Integer;
 }
 
 #[model]

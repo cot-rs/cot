@@ -10,7 +10,8 @@ use crate::db::impl_postgres::PostgresValueRef;
 use crate::db::impl_sqlite::SqliteValueRef;
 use crate::db::{
     Auto, ColumnType, DatabaseError, DatabaseField, DbFieldValue, DbValue, ForeignKey, FromDbValue,
-    LimitedString, Model, PrimaryKey, Result, SqlxValueRef, TextField, ToDbFieldValue, ToDbValue,
+    Identifier, LimitedString, Model, PrimaryKey, Result, SqlxValueRef, TextField, ToDbFieldValue,
+    ToDbValue,
 };
 
 mod chrono_fields;
@@ -269,6 +270,8 @@ where
 {
     const NULLABLE: bool = true;
     const TYPE: ColumnType = T::TYPE;
+    const AUTO: bool = T::AUTO;
+    const FOREIGN_KEY: Option<(Identifier, Identifier)> = T::FOREIGN_KEY;
 }
 
 impl<const LIMIT: u32> DatabaseField for LimitedString<LIMIT> {
@@ -341,6 +344,8 @@ impl<const LIMIT: u32> TextField for LimitedString<LIMIT> {}
 impl<T: Model + Send + Sync> DatabaseField for ForeignKey<T> {
     const NULLABLE: bool = T::PrimaryKey::NULLABLE;
     const TYPE: ColumnType = T::PrimaryKey::TYPE;
+    const FOREIGN_KEY: Option<(Identifier, Identifier)> =
+        Some((T::TABLE_NAME, T::PRIMARY_KEY_NAME));
 }
 
 impl<T: Model + Send + Sync> FromDbValue for ForeignKey<T> {
@@ -401,6 +406,7 @@ where
 impl<T: DatabaseField> DatabaseField for Auto<T> {
     const NULLABLE: bool = T::NULLABLE;
     const TYPE: ColumnType = T::TYPE;
+    const AUTO: bool = true;
 }
 
 impl<T: DatabaseField> FromDbValue for Auto<T> {

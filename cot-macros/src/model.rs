@@ -83,12 +83,14 @@ struct ModelBuilder {
     fields_as_update_from_db: Vec<TokenStream>,
     fields_as_get_values: Vec<TokenStream>,
     fields_as_field_refs: Vec<TokenStream>,
+    fields_as_migration_fields: Vec<TokenStream>,
 }
 
 impl ToTokens for ModelBuilder {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.append_all(self.build_model_impl());
         tokens.append_all(self.build_fields_struct());
+        tokens.append_all(self.build_model_registration());
     }
 }
 
@@ -118,6 +120,7 @@ impl ModelBuilder {
             fields_as_update_from_db: Vec::with_capacity(field_count),
             fields_as_get_values: Vec::with_capacity(field_count),
             fields_as_field_refs: Vec::with_capacity(field_count),
+            fields_as_migration_fields: Vec::with_capacity(field_count),
         };
         for field in &model.fields {
             model_builder.push_field(field);
@@ -153,11 +156,48 @@ impl ModelBuilder {
             #index => &self.#name as &dyn #orm_ident::ToDbFieldValue
         ));
 
+        self.fields_as_migration_fields
+            .push(Self::migration_field(field));
+
         self.fields_as_field_refs.push(quote!(
             #[doc = concat!("Field reference to [`", stringify!(#name), "::", stringify!(#column_name), "`].")]
             pub const #name: #orm_ident::query::expr::FieldRef<#ty> =
                 #orm_ident::query::expr::FieldRef::<#ty>::new(#orm_ident::Identifier::new(#column_name));
         ));
+    }
+
+    /// Builds the `cot::db::migrations::Field` for given field.
+    #[must_use]
+    fn migration_field(field: &Field) -> TokenStream {
+        let orm_ident = orm_ident();
+        let column_name = &field.column_name;
+        let ty = &field.ty;
+        let as_db_field = quote!(<#ty as #orm_ident::DatabaseField>);
+        let fk_spec = field.foreign_key.as_ref();
+        let on_delete = fk_spec.and_then(|fk| fk.on_delete).unwrap_or_default();
+        let on_update = fk_spec.and_then(|fk| fk.on_update).unwrap_or_default();
+
+        let mut tokens = quote! {
+            let field = #orm_ident::migrations::Field::new(
+                #orm_ident::Identifier::new(#column_name),
+                #as_db_field::TYPE,
+            )
+            .set_null(#as_db_field::NULLABLE);
+            let field = if #as_db_field::AUTO { field.auto() } else { field };
+            let field = match #as_db_field::FOREIGN_KEY {
+                Some((table_name, column_name)) => {
+                    field.foreign_key(table_name, column_name, #on_delete, #on_update)
+                }
+                None => field,
+            };
+        };
+        if field.primary_key {
+            tokens.extend(quote!(let field = field.primary_key();));
+        }
+        if field.unique {
+            tokens.extend(quote!(let field = field.unique();));
+        }
+        quote!({ #tokens field })
     }
 
     #[must_use]
@@ -181,6 +221,7 @@ impl ModelBuilder {
         let fields_as_from_db = &self.fields_as_from_db;
         let fields_as_update_from_db = &self.fields_as_update_from_db;
         let fields_as_get_values = &self.fields_as_get_values;
+        let fields_as_migration_fields = &self.fields_as_migration_fields;
 
         quote! {
             #[#crate_ident::__private::async_trait]
@@ -191,6 +232,9 @@ impl ModelBuilder {
 
                 const COLUMNS: &'static [#orm_ident::Column] = &[
                     #(#fields_as_columns,)*
+                ];
+                const MIGRATION_FIELDS: &'static [#orm_ident::migrations::Field] = &[
+                    #(#fields_as_migration_fields,)*
                 ];
                 const MODEL_TYPE: #orm_ident::ModelType = #model_type;
                 const APP_NAME: &'static str = #app_name;
@@ -241,6 +285,31 @@ impl ModelBuilder {
                         .await
                 }
             }
+        }
+    }
+
+    /// Registers application models globally, so that the CLI can generate
+    /// migrations for them.
+    #[must_use]
+    fn build_model_registration(&self) -> TokenStream {
+        if self.model_type != ModelType::Application {
+            return TokenStream::new();
+        }
+
+        let crate_ident = cot_ident();
+        let orm_ident = orm_ident();
+        let name = &self.name;
+        let linkme = quote!(#crate_ident::__private::linkme);
+        let schema = quote!(#orm_ident::migrations::schema);
+
+        quote! {
+            // `distributed_slice` uses `#[link_section]`, which counts as unsafe code
+            #[allow(unsafe_code)]
+            const _: () = {
+                #[#linkme::distributed_slice(#schema::MODELS)]
+                #[linkme(crate = #linkme)]
+                static MODEL: #schema::ModelSchema = #schema::ModelSchema::of::<#name>();
+            };
         }
     }
 

@@ -671,6 +671,11 @@ pub trait Model: Sized + Send + 'static {
     /// The columns of the model.
     const COLUMNS: &'static [Column];
 
+    /// The schema of the model's columns, as used in migrations.
+    ///
+    /// This is used by the Cot CLI to generate migrations.
+    const MIGRATION_FIELDS: &'static [migrations::Field];
+
     #[expect(missing_docs)]
     const MODEL_TYPE: ModelType = ModelType::Application;
 
@@ -3836,7 +3841,9 @@ impl<const LIMIT: u32> fake::Dummy<fake::Faker> for LimitedString<LIMIT> {
 ///     const TYPE: ColumnType = ColumnType::Text;
 /// }
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[non_exhaustive]
 pub enum ColumnType {
     /// A boolean column type.

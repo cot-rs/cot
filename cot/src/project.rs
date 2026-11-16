@@ -58,6 +58,8 @@ use crate::config::{AuthBackendConfig, ProjectConfig};
 #[cfg(feature = "db")]
 use crate::db::Database;
 #[cfg(feature = "db")]
+use crate::db::migrations::schema::{MODELS, ProjectSchema, SCHEMA_FLAG};
+#[cfg(feature = "db")]
 use crate::db::migrations::{MigrationEngine, SyncDynMigration};
 #[cfg(feature = "email")]
 use crate::email::Email;
@@ -969,10 +971,37 @@ impl Bootstrapper<Uninitialized> {
             std::process::exit(0);
         }
 
+        #[cfg(feature = "db")]
+        if cot_args.iter().any(|arg| arg == SCHEMA_FLAG) {
+            return self.print_schema();
+        }
+
         let common_options = cli.common_options();
         let self_with_context = self.with_config_name(common_options.config())?;
 
         cli.execute(self_with_context).await
+    }
+
+    /// Prints the project's [`ProjectSchema`] as JSON, for the Cot CLI to
+    /// generate migrations from.
+    ///
+    /// Uses the default config, so that the config files are not needed.
+    #[cfg(feature = "db")]
+    fn print_schema(self) -> cot::Result<()> {
+        let bootstrapper = self.with_config(ProjectConfig::default()).with_apps();
+        let migrations: Vec<Box<SyncDynMigration>> = bootstrapper
+            .context()
+            .apps()
+            .iter()
+            .flat_map(|app| app.migrations())
+            .collect();
+        let schema = ProjectSchema::new(&MODELS, migrations)?;
+
+        println!(
+            "{}",
+            serde_json::to_string(&schema).expect("serializing schema should not fail")
+        );
+        Ok(())
     }
 
     /// Reads the configuration of the project and moves to the next

@@ -28,10 +28,7 @@ clap = { workspace = true, features = ["derive", "env", "wrap_help", "string"] }
 clap_complete.workspace = true
 clap_mangen.workspace = true
 clap-verbosity-flag = { workspace = true, features = ["tracing"] }
-darling.workspace = true
 cot.workspace = true
-cot_codegen = { workspace = true, features = ["symbol-resolver"] }
-glob.workspace = true
 heck.workspace = true
 hex.workspace = true
 petgraph.workspace = true
@@ -39,7 +36,7 @@ prettyplease.workspace = true
 proc-macro2 = { workspace = true, features = ["span-locations"] }
 rand = { workspace = true, features = ["std", "std_rng", "sys_rng"] }
 quote.workspace = true
-syn.workspace = true
+syn = { workspace = true, features = ["full", "parsing", "printing"] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 serde = { workspace = true, features = ["derive"] }

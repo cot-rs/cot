@@ -147,9 +147,47 @@ impl Parse for PathAccessParser {
     }
 }
 
+/// An argument passed to a function or method in a query expression.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ExprArgument {
+    /// A reference to a model field.
+    FieldRef {
+        field_name: syn::Ident,
+        field_token: Token![$],
+    },
+    /// A regular Rust expression.
+    Value(syn::Expr),
+}
+
+impl Parse for ExprArgument {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        if input.peek(Token![$]) {
+            let field = input.parse::<FieldParser>()?;
+            Ok(Self::FieldRef {
+                field_name: field.name,
+                field_token: field.field_token,
+            })
+        } else {
+            input.parse().map(Self::Value)
+        }
+    }
+}
+
+impl quote::ToTokens for ExprArgument {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Self::FieldRef {
+                field_name,
+                field_token,
+            } => tokens.extend(quote! { #field_token #field_name }),
+            Self::Value(value) => value.to_tokens(tokens),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct FunctionCallParser {
-    args: syn::punctuated::Punctuated<syn::Expr, Token![,]>,
+    args: syn::punctuated::Punctuated<ExprArgument, Token![,]>,
 }
 
 impl FunctionCallParser {
@@ -164,7 +202,7 @@ impl Parse for FunctionCallParser {
         let args_content;
         syn::parenthesized!(args_content in input);
         Ok(Self {
-            args: args_content.parse_terminated(syn::Expr::parse, Token![,])?,
+            args: args_content.parse_terminated(ExprArgument::parse, Token![,])?,
         })
     }
 }
@@ -323,7 +361,7 @@ pub enum Expr {
     },
     FunctionCall {
         function: Box<Expr>,
-        args: Vec<syn::Expr>,
+        args: Vec<ExprArgument>,
     },
     And(Box<Expr>, Box<Expr>),
     Or(Box<Expr>, Box<Expr>),
@@ -689,11 +727,22 @@ mod tests {
             Box::new(field("a")),
             Box::new(Expr::FunctionCall {
                 function: Box::new(value("bar")),
-                args: vec![parse_quote!(42), parse_quote!("baz")],
+                args: vec![
+                    ExprArgument::Value(parse_quote!(42)),
+                    ExprArgument::Value(parse_quote!("baz")),
+                ],
             }),
         );
 
         assert_eq!(expected, unwrap_syn(Expr::parse(input)));
+    }
+    #[test]
+    fn function_argument_field_ref_roundtrips() {
+        let input = quote! { $other };
+        let argument: ExprArgument = syn::parse2(input.clone()).unwrap();
+
+        assert!(matches!(argument, ExprArgument::FieldRef { .. }));
+        assert_eq!(quote!(#argument).to_string(), input.to_string());
     }
 
     #[test]

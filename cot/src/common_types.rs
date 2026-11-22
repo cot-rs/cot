@@ -596,7 +596,7 @@ impl Email {
     /// ```
     #[must_use]
     pub fn email(&self) -> String {
-        self.0.email()
+        self.0.email().to_owned()
     }
 
     /// Returns the local part of the email address (the part before the '@'
@@ -713,7 +713,7 @@ impl From<EmailParseError> for FormFieldValidationError {
 #[cfg(feature = "db")]
 impl ToDbValue for Email {
     fn to_db_value(&self) -> DbValue {
-        self.0.clone().email().into()
+        self.email().into()
     }
 }
 

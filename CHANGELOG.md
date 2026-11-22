@@ -6,10 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-### Fixes
-
-- Upgrade `lettre` from 0.11.23 to 0.11.24 (RUSTSEC-2026-0561 SMTP command injection) ([#747](https://github.com/cot-rs/cot/issues/747))
-
 ## [0.8.0](https://github.com/cot-rs/cot/compare/cot-v0.7.0...cot-v0.8.0) - 2026-11-09
 
 [View diff on diff.rs](https://diff.rs/cot/0.7.0/cot/0.8.0/Cargo.toml)

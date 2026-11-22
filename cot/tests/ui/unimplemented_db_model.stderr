@@ -16,8 +16,23 @@ help: the following other types implement trait `cot::db::Model`
   | #[model]
   | ^^^^^^^^ `cot::session::db::Session`
   |
+ ::: src/auth/canonical.rs
+  |
+  | #[model(table_name = "cot__no_user", model_type = "internal")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `NoUser`
+  |
  ::: src/auth/db.rs
   |
   | #[model]
   | ^^^^^^^^ `DatabaseUser`
+  |
+ ::: src/auth/user_pass.rs
+  |
+  | #[model]
+  | ^^^^^^^^ `PasswordUser`
+  |
+ ::: src/test.rs
+  |
+  |     #[model]
+  |     ^^^^^^^^ `TestUser`
   = note: this error originates in the attribute macro `model` (in Nightly builds, run with -Z macro-backtrace for more info)

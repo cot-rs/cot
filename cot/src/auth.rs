@@ -7,8 +7,13 @@
 //! For the default way to store users in the database, see the [`db`] module.
 
 #[cfg(feature = "db")]
+pub mod backend;
+pub mod canonical;
+#[cfg(feature = "db")]
 pub mod db;
 mod state;
+#[cfg(feature = "db")]
+pub mod user_pass;
 
 use std::any::Any;
 use std::borrow::Cow;
@@ -16,6 +21,7 @@ use std::sync::Arc;
 
 /// backwards compatible shim for form Password type.
 use async_trait::async_trait;
+pub use canonical::NoUser;
 use chrono::{DateTime, FixedOffset};
 use cot_core::error::impl_into_cot_error;
 use derive_more::with_trait::Debug;
@@ -56,6 +62,9 @@ pub enum AuthError {
     /// supported.
     #[error("{ERROR_PREFIX} tried to get a user by an unsupported user ID type")]
     UserIdTypeNotSupported,
+    /// The user doesn't exist in the database.
+    #[error("{ERROR_PREFIX} the user does not exist")]
+    UserNotFound,
 }
 impl_into_cot_error!(AuthError, UNAUTHORIZED);
 

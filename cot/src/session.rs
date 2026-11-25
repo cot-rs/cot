@@ -160,3 +160,82 @@ impl DerefMut for Session {
         &mut self.inner
     }
 }
+
+/// A view of a [`Session`] that only has access to its own, private part of
+/// the session data.
+///
+/// All keys are transparently prefixed with the scope and a `.` (with scope
+/// `hi`, the key `key1` is stored as `hi.key1`), so that the data stored by
+/// different scopes can't collide, even if they use the same keys. This is
+/// used to give each [authentication
+/// backend](crate::auth::backend::AuthenticationBackendCommon) a private space
+/// in the session.
+///
+/// Note that the data is still stored in the same session, so it is removed
+/// when the session is flushed (for instance, when the user logs out).
+#[derive(Debug, Clone)]
+pub struct ScopedSession {
+    session: Session,
+    scope: String,
+}
+
+impl ScopedSession {
+    /// Creates a new scoped session. `scope` must be unique among all the
+    /// scopes stored in the session.
+    #[expect(
+        dead_code,
+        reason = "only used by the authentication system, which doesn't use it yet"
+    )]
+    pub(crate) fn new(session: Session, scope: &str) -> Self {
+        Self {
+            session,
+            scope: scope.to_owned(),
+        }
+    }
+
+    fn key(&self, key: &str) -> String {
+        format!("{}.{key}", self.scope)
+    }
+
+    /// Gets a value from the scoped session.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session could not be loaded or the value could
+    /// not be deserialized.
+    pub async fn get<T: serde::de::DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Result<Option<T>, tower_sessions::session::Error> {
+        self.session.get(&self.key(key)).await
+    }
+
+    /// Inserts a value into the scoped session, replacing the previous value
+    /// for the key, if any.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session could not be loaded or the value could
+    /// not be serialized.
+    pub async fn insert<T: serde::Serialize>(
+        &self,
+        key: &str,
+        value: T,
+    ) -> Result<(), tower_sessions::session::Error> {
+        self.session.insert(&self.key(key), value).await
+    }
+
+    /// Removes a value from the scoped session and returns it, if it was
+    /// present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session could not be loaded or the value could
+    /// not be deserialized.
+    pub async fn remove<T: serde::de::DeserializeOwned>(
+        &self,
+        key: &str,
+    ) -> Result<Option<T>, tower_sessions::session::Error> {
+        self.session.remove(&self.key(key)).await
+    }
+}
